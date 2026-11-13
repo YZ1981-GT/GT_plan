@@ -669,6 +669,16 @@
         "executionId": "2f76204f-e760-4efb-996c-89f74055546a",
         "chatSessionId": "sess_af9db3aa-9c29-4d5d-a566-836b8f01e945",
         "timestamp": 1794490344153
+      },
+      {
+        "executionId": "43de051e-ffc1-422b-86c6-f92fefb4a777",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794492235866
+      },
+      {
+        "executionId": "43de051e-ffc1-422b-86c6-f92fefb4a777",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794492239904
       }
     ],
     "9.2 【测试】经理账号改企业代码：无授权看到授权提示；对有下级的【测试】企业改代码看到影响清单弹窗；无引用的新【测试】项目改代码成功后复原": [
@@ -676,6 +686,16 @@
         "executionId": "1f55e0ae-da7c-4a2c-9dad-79647d16eb45",
         "chatSessionId": "sess_af9db3aa-9c29-4d5d-a566-836b8f01e945",
         "timestamp": 1794462454596
+      },
+      {
+        "executionId": "43de051e-ffc1-422b-86c6-f92fefb4a777",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794492235942
+      },
+      {
+        "executionId": "43de051e-ffc1-422b-86c6-f92fefb4a777",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794493040993
       }
     ],
     "9.3 下载模板，用 openpyxl 写入数字类型代码与无缓存公式后导入，预校验列出针对性提示（无 Excel 环境时以此代替手工输入，并在记录里写明）": [
@@ -683,6 +703,16 @@
         "executionId": "1f55e0ae-da7c-4a2c-9dad-79647d16eb45",
         "chatSessionId": "sess_af9db3aa-9c29-4d5d-a566-836b8f01e945",
         "timestamp": 1794462454625
+      },
+      {
+        "executionId": "43de051e-ffc1-422b-86c6-f92fefb4a777",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794492236008
+      },
+      {
+        "executionId": "43de051e-ffc1-422b-86c6-f92fefb4a777",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794494116030
       }
     ],
     "9.4 两个标签页打开合并总览，先后拖拽同一节点：后者提示「已被他人调整」并刷新；实测后把上级恢复原值并对账两口径项目": [
@@ -690,6 +720,21 @@
         "executionId": "1f55e0ae-da7c-4a2c-9dad-79647d16eb45",
         "chatSessionId": "sess_af9db3aa-9c29-4d5d-a566-836b8f01e945",
         "timestamp": 1794462454654
+      },
+      {
+        "executionId": "43de051e-ffc1-422b-86c6-f92fefb4a777",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794492236098
+      },
+      {
+        "executionId": "43de051e-ffc1-422b-86c6-f92fefb4a777",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794495023917
+      },
+      {
+        "executionId": "906ae4d7-edc3-4046-bcf4-2aa32a34f7eb",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794495384079
       }
     ],
     "9.5 `initScript` 拦截企业树接口注入两类诊断：进入合并工作台弹窗、「我知道了」后刷新不再弹、三个推送入口出现确认框": [
@@ -697,6 +742,21 @@
         "executionId": "1f55e0ae-da7c-4a2c-9dad-79647d16eb45",
         "chatSessionId": "sess_af9db3aa-9c29-4d5d-a566-836b8f01e945",
         "timestamp": 1794462454688
+      },
+      {
+        "executionId": "43de051e-ffc1-422b-86c6-f92fefb4a777",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794492236138
+      },
+      {
+        "executionId": "906ae4d7-edc3-4046-bcf4-2aa32a34f7eb",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794496297811
+      },
+      {
+        "executionId": "7ca750ff-b853-4a0f-bd81-ddea116c21fa",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794534150787
       }
     ],
     "9.6 在 `http://192.168.20.60:3030` 复测 9.1、9.4、9.5": [
@@ -704,6 +764,21 @@
         "executionId": "1f55e0ae-da7c-4a2c-9dad-79647d16eb45",
         "chatSessionId": "sess_af9db3aa-9c29-4d5d-a566-836b8f01e945",
         "timestamp": 1794462454739
+      },
+      {
+        "executionId": "43de051e-ffc1-422b-86c6-f92fefb4a777",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794492236204
+      },
+      {
+        "executionId": "cbd506c8-cc5f-49e7-bea9-ba257bb3e0df",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794498334841
+      },
+      {
+        "executionId": "7ca750ff-b853-4a0f-bd81-ddea116c21fa",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794535592188
       }
     ],
     "10.1 review 文档 §0.5 / §10 / §10.1 标注 P1-1 / P1-2 / P1-5 的落地方式、拍板结果与 P2-1 / P2-2 不做理由": [
@@ -711,6 +786,16 @@
         "executionId": "1f55e0ae-da7c-4a2c-9dad-79647d16eb45",
         "chatSessionId": "sess_af9db3aa-9c29-4d5d-a566-836b8f01e945",
         "timestamp": 1794462454771
+      },
+      {
+        "executionId": "43de051e-ffc1-422b-86c6-f92fefb4a777",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794492236250
+      },
+      {
+        "executionId": "ef9005e4-de57-4259-b2b5-f266c3f0cbf8",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794532846823
       }
     ],
     "10.2 在 `.kiro/specs/INDEX.md` 登记本 spec（基于最新 HEAD 副本只加本行，CRLF 与表格列数校验）": [
@@ -718,6 +803,16 @@
         "executionId": "1f55e0ae-da7c-4a2c-9dad-79647d16eb45",
         "chatSessionId": "sess_af9db3aa-9c29-4d5d-a566-836b8f01e945",
         "timestamp": 1794462454803
+      },
+      {
+        "executionId": "43de051e-ffc1-422b-86c6-f92fefb4a777",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794492236291
+      },
+      {
+        "executionId": "3e669982-45c9-499d-8983-9208644b4971",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794533693758
       }
     ],
     "1. 规范化单一来源（R1；design §2.1、§4）": [
@@ -774,6 +869,20 @@
         "executionId": "2f76204f-e760-4efb-996c-89f74055546a",
         "chatSessionId": "sess_af9db3aa-9c29-4d5d-a566-836b8f01e945",
         "timestamp": 1794490296378
+      }
+    ],
+    "9. 浏览器实测": [
+      {
+        "executionId": "3e669982-45c9-499d-8983-9208644b4971",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794534049017
+      }
+    ],
+    "10. 收尾": [
+      {
+        "executionId": "3e669982-45c9-499d-8983-9208644b4971",
+        "chatSessionId": "sess_7d7771b6-9e61-4b46-bfed-84a240290307",
+        "timestamp": 1794534054061
       }
     ]
   }

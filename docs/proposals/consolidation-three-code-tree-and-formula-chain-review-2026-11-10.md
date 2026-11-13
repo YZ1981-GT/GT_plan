@@ -102,17 +102,34 @@
 
 本轮将 v3 的“未实现”结论收窄为：R1 保存失败可见性、R2 内容摘要 CAS、R3 保护解析/回写标手工格、R4 写入方登记守卫已在当前工作区实现并有后端/前端定向测试；树版本 fail-open、stale 状态语义、后台 headless、树身份和 Excel 代码列仍由原 review 或后续 spec 管理，不能因本轮完成而前移为已实现。
 
-### 0.5.3 consol-status-semantics-closure 实施复核（2026-11-13）
+---
 
-本节是对 `consol-status-semantics-closure` 的追加复核，只更新原 review 的 P0-5、P1-6 与就绪门裁决；§0.5~§0.5.2 的立项前判断和前置 spec 收尾记录保持不变。依据本 spec `tasks.md` 的实现记录、定向回归记录和状态更新，未把尚未完成的 clean-HEAD 对拍、R270 回滚或浏览器证据写成独立验收通过。
+### 0.5.3 consol-group-code-entry-consistency 实施复核（2026-11-12）
+
+本节是立 spec 后的收尾复核，依据当前已入库实现、定向测试以及本 spec `tasks.md` 的 9.1~9.5 运行记录；它只更新 §10 三项 P1 与两项 P2 的状态，不把 9.3 的 openpyxl 替代验证写成真实 Excel 客户端验收。
+
+| 条目 | 实际落地方式与拍板结果 | 代码、测试与运行证据 | 边界与影响 |
+| --- | --- | --- | --- |
+| **P1-1 拖拽改上级 CAS** | **已落地。** 路由请求增加必填的 `expected_parent_company_code`；缺字段返回 428，显式 `null` 表示调用方看到的是无上级。服务层先取得年度拓扑锁并 `refresh` 项目，再对当前值与期望值统一规范化后比较；不一致返回 `PARENT_CODE_CONFLICT` 409 且不写任何口径。最终拍板采用“改前上级代码”这一最小 CAS，不复用 `entity_group_fields_hash`：森林接口没有计算该 hash 所需的完整口径/关系字段，而拖拽本次只修改上级。前端带期望值，409 只提示并刷新树，不自动重试。 | `routers/project_wizard.py` 的 `UpdateParentCodeRequest` / `update_parent_code`；`services/group_links.py` 的 `reparent_project`。`test_parent_code_update.py` 覆盖缺字段、过期值、`null`、规范化比较和锁后交错；`test_group_code_entry_cas_mutations.py` 的四个磁盘变异覆盖删比较、移到锁前、缺字段放行和前端漏传；`ConsolidationHub.reparent.spec.ts` 覆盖请求体、409 提示和不重试。tasks 9.4 记录双标签页真实 200 → 409、只刷新不二次 PATCH，并完成两口径恢复对账。 | CAS 只保护本次拖拽看到的上级字段；批量更新继续使用自身的 `entity_group_fields_hash`。9.4 是真实浏览器/PG 证据，9.6 的内网复测仍按任务记录保留。 |
+| **P1-2 三码规范化单一来源** | **已落地。** 后端 `normalize_uscc_input` 按 NFKC → 去首尾空白 → 大写，空值为 `None`；单建、向导、集团关系、批量、授权比较均调用它，按规范值校验和入库。前端 `normalizeUsccInput` 同规则，向导三个代码输入框失焦写回，校验对规范值执行。非法字符和中间空格仍拒绝；错误保持字符串 detail，统一为 `字段：原因`，不改授权类 dict 回执。最终采用“友好规范化后校验”，没有改成一律拒绝小写/全角/首尾空格。 | `services/uscc_validator.py` 的 `normalize_uscc_input` / `format_code_error` 及各写入口调用；前端 `utils/uscc_validator.ts`、`BasicInfoStep.vue`。共享 `backend/tests/fixtures/uscc_test_vectors.json` 由 `test_uscc_validator.py` 和 `uscc_validator.spec.ts` 逐条读取；`test_group_code_entry_consistency.py` 覆盖单建、向导、批量、拖拽四入口同输入矩阵；`BasicInfoStep.normalize.spec.ts` 覆盖三输入框失焦和中间空格拒绝。tasks 9.1 记录真实向导失焦、保存后库值和复原对账。 | 规范化只处理 NFKC、首尾空白和大小写，不猜测修复中间空格、数字化或非法字符。读取侧既有 `strip()` 不因本 spec 扩大改动面。 |
+| **P1-5 Excel 代码列与导出基线** | **已落地。** 模板数据区和错误明细的三码列设为文本格式并写字符串；导入先识别数字单元格并报原值，二次只读扫描三列识别无缓存公式；无缓存公式拒绝，有缓存公式使用缓存值；错误明细保留平台读到的原值。更新集团关系导出不再回退旧 `group_fields_hash`，缺少 `entity_group_fields_hash` 直接报错。拍板不猜测 Excel 丢精度后的原码，要求用户改为文本后重试。 | `services/batch_project_workbook.py` 的 `_style_code_columns`、`load_data_sheet`、`_CodeCell` / `_code_cell` / `parse_row`；`services/batch_project_export.py` 的 `_project_export_row`。`test_batch_project_code_cells.py` 和 `test_batch_project_import_code_types.py` 覆盖模板、int/float、无缓存/有缓存公式、文本、错误原值回写和导出基线；tasks 9.3 记录真实模板下载、HTTP 预校验、错误明细下载和 30 passed 回归，数字/公式/文本五类结果逐条对账。 | 本环境没有真实 Excel 客户端，9.3 按任务允许用 openpyxl + OOXML 缓存构造覆盖；因此证明的是平台读取链和真实 HTTP/UI 预校验，不宣称完成 Excel 客户端往返或 xlsm/CSV 兼容。 |
+
+两项不做的 P2 也在本轮明确收口：
+
+| 条目 | 不做理由 | 影响与后续边界 |
+| --- | --- | --- |
+| **P2-1 回执补 `tree_kind`** | **不做。** 集团架构森林与合并范围树不是同一接口状态：前者使用 `code@year`，后者使用 `code:role`，合并类接口在服务端自建合并树；现有调用链没有把森林回执当合并计算输入的误用证据。增加字段只会扩大所有回执/类型的改动面。 | 当前回执不显式携带树类型，调用方仍须依赖端点契约；若以后出现同时接受两种树的通用端点、跨树缓存或误用证据，应另立契约 spec 再增加 `tree_kind`，并同步前后端。 |
+| **P2-2 fingerprint 显式纳入规则版本号** | **不做。** 当前 fingerprint 由规范化后的树输出计算，规则变化只要改变输出就会改变 fingerprint，已有确认比较可识别；没有证据表明同一输出在不同规则版本间需要靠额外版本号区分。 | 历史确认记录没有独立的算法版本字段，若未来需要审计“同输出但算法不同”、跨版本回放或规则回滚，应先定义版本迁移与兼容策略，再另立 spec；本 spec 不增加迁移和回执字段。 |
+
+### 0.5.4 consol-status-semantics-closure 实施复核（2026-11-13）
+
+本节是对 `consol-status-semantics-closure` 的追加复核，只更新原 review 的 P0-5、P1-6 与就绪门裁决；§0.5~§0.5.3 的立项前判断和前置 spec 收尾记录保持不变。依据本 spec `tasks.md` 的实现记录、定向回归记录和状态更新，未把尚未完成的 clean-HEAD 对拍、R270 回滚或浏览器证据写成独立验收通过。
 
 | 条目 | 实际落地方式 | 证据与边界 |
 | --- | --- | --- |
 | **P0-5 审批成功 / 事件入队 / 任务完成 / 页面可见四态** | 抵销审批响应改为 `EliminationReviewResponse`，按发布结果返回 `recalc_trigger`：`event_published`、`event_failed` 或 `not_applicable`；发布失败附 `recalc_notice`。重算处理器入队失败经 `consol_push_failure_record` 写入失败的推送运行记录，并广播 `consol.push_failed`。调整分录批量审批回执保留逐笔 `tb_update_status`，增加 `downstream` 的发布数/失败数；前端按这些字段分别提示已审批、事件投递失败和下游刷新失败，不再把审批成功说成报表/附注已经完成。 | 后端落点为 `models/consolidation_schemas.py`、`routers/consolidation.py`、`services/consol_elimination_recalc_handler.py`、`services/consol_push_failure_record.py`、`routers/adjustment_review.py` 与 `services/adjustment_review_service.py`；前端落点为 `ConsolElimNodePanel.vue`、`worksheets/EliminationSheet.vue`、`useAdjustmentHallActions.ts`。`test_consol_elimination_review_response.py`、`test_consol_status_mutations.py`、`test_consol_status_r5_mutations.py` 及相关 Vitest 已覆盖三态回执、失败记录、`tb_update_status` 汇总和 `downstream.failed` 提示。代码与定向回归已有证据；浏览器拦截响应的独立最终证据仍按 tasks 状态保留为未闭合。 |
 | **P1-6 stale、重新汇总与推送附注步骤如实报状态** | V270/R270 与 ORM 增加 `stale_reason` / `stale_at`；`consol_note_stale_state.py` 统一置位、清除和复制继承，章节 GET 与 `consol.note_stale` 载荷补齐原因，前端 `ConsolNoteStaleTag.vue` 显示待更新原因和时间。重新汇总以 `kept_manual` 区分“全部为手工格”，按 `computed_value` 统计差异，只有 `persisted` 计入更新章节，全部失败时执行器抛出业务错误。推送和级联刷新统一使用 `note_step_verdict`：`no_template_type`、`no_sections`、`no_tree` 记 skipped，`context_failed` 记 failed，不再把这些结果记为 succeeded。 | 后端/前端落点包括 `services/consol_note_stale_state.py`、`services/consol_push_notes.py`、`services/consol_note_subtree_reaggregate.py`、`services/consol_note_reaggregate_executor.py`、`ConsolNoteTab.vue` 与 `ConsolidationIndex.vue`；守卫和变异覆盖见 `test_consol_note_stale_writers_guard.py`、`test_consol_note_stale_state.py`、`test_consol_status_r1_mutations.py`、`test_consol_status_mutations.py`、`test_consol_phase2_cascade_pbt.py`。任务记录的本 spec 定向后端回归为 110 passed，5 个相关前端 Vitest 共 161 passed；共享 PG 已只读核对 V270 已应用且 checksum 一致。R270 回滚、完整 clean-HEAD 对拍及最终浏览器复测仍未闭合。 |
 | **就绪门服务端强制的裁决** | **不在服务端强制可执行动作。** 保留既有七域五态就绪状态和前端按钮禁用；推送、重新汇总、operations 在未就绪时仍可由服务端受理，由页面按就绪条提示并禁用入口。 | 该裁决承接 2026-11-11 用户确认和 design §8：重复项目、关系冲突继续提示而不阻断，`require_calc_year` 仍只校年度；把就绪门变成服务端拒绝会把诊断提示升级成阻断，违反既有裁决。该决定不放宽登录/项目权限、CAS、锁、请求校验、事务原子性或失败留痕。 |
-
----
 
 ## 1. 范围、结论与证据边界
 
@@ -652,15 +669,15 @@ Node headless 执行器必须有独立构建检查：源文件摘要、别名解
 | P0-3 | 合并附注保存补 CAS（按内容摘要比较，不加迁移） | **未实现**（无任何 revision 参数） | 并发下后写覆盖前写且不报冲突 | 两客户端并发保存，后者收 409，本地编辑不丢 |
 | P0-4 | ~~树版本记录改为可观测~~ → 降为 P2（见 §0.5 第 3 条） | **已可查**（warnings 落推送运行记录） | — | — |
 | P0-5 | 明确审批成功 / 事件入队 / 任务完成 / 页面可见四态 | 部分实现（`adjustment_review.py:163-192` 已分离）；**已立 spec `consol-status-semantics-closure`**（抵销回执 `recalc_trigger`、入队失败写失败运行记录；调整回执按 `tb_update_status` 汇总） | 避免前端与审计误判链路已完成 | API 回执与页面能区分四种阶段 |
-| P1-1 | 拖拽改上级补 CAS：请求带「改前上级」，锁内比较（**不复用** `entity_group_fields_hash`：森林接口不给算它所需的口径与关系字段） | **已立 spec `consol-group-code-entry-consistency`** | 后提交者覆盖先提交者的结构修复 | 两客户端并发拖拽，后者 409 |
-| P1-2 | 三码规范化单一来源（NFKC + 去空白 + 大写）、按规范值入库、报错统一「{字段}：{原因}」（保留字符串 detail，不改结构化回执） | **已立 spec `consol-group-code-entry-consistency`** | 各入口诊断口径不一致 | 四入口同一输入同结论、同入库值、同文案 |
+| P1-1 | 拖拽改上级补 CAS：请求带「改前上级」，锁内比较（**不复用** `entity_group_fields_hash`：森林接口不给算它所需的口径与关系字段） | **已落地（`consol-group-code-entry-consistency` 任务 5、9.4）**：`expected_parent_company_code` 经锁后 refresh 比较，冲突 409 | 后提交者覆盖先提交者的结构修复 | 两客户端并发拖拽，后者 409；真实双标签页已复核 |
+| P1-2 | 三码规范化单一来源（NFKC + 去空白 + 大写）、按规范值入库、报错统一「{字段}：{原因}」（保留字符串 detail，不改结构化回执） | **已落地（`consol-group-code-entry-consistency` 任务 1~3、9.1）**：后端/前端函数与共享向量已接入 | 各入口诊断口径不一致 | 四入口同一输入同结论、同入库值、同文案；真实向导失焦/保存已复核 |
 | P1-3 | 就绪门在七域五态上补「可执行动作白名单」 | **已实现基础**（`consol_readiness_service.py:28,148-156`）；**已定（按建议）**：服务端不强制，前端按钮禁用保持（见 `consol-status-semantics-closure` design §8） | 避免各页自行判断能否推送 | `tree=not_ready` 时推送按钮禁用 |
 | P1-4 | ~~附注映射确认改为服务端现算 hash~~ | **已实现**（`routers/consol_note_detail_templates.py:478-509` 现读重建，见 §0.5 第 4 条） | — | — |
-| P1-5 | Excel 代码列文本格式、数字单元格与无缓存公式针对性提示、导出不再回退旧 hash（前导零经核对不现实：真实代码首位非 0） | **已立 spec `consol-group-code-entry-consistency`** | Excel 数值化不可逆 | 数字 / 公式 / 文本单元格各有确定结论 |
+| P1-5 | Excel 代码列文本格式、数字单元格与无缓存公式针对性提示、导出不再回退旧 hash（前导零经核对不现实：真实代码首位非 0） | **已落地（`consol-group-code-entry-consistency` 任务 4、9.3）**：文本列、类型诊断、缓存判定、错误原值回写和基线硬门已接入 | Excel 数值化不可逆 | 数字 / 公式 / 文本单元格各有确定结论；真实 HTTP/UI 预校验已复核，真实 Excel 客户端仍未宣称 |
 | P1-6 | stale 原因与时间、重新汇总与推送附注步骤如实报状态 | **已立 spec `consol-status-semantics-closure`** | 把技术状态变成可操作状态 | 页面显示原因与时间；部分失败、跳过不显示为成功 |
 | P1-7 | headless 前台/后台共享任务键 + 后台化（期 3） | 前台已有（同步），后台未做 | 防止双写与「API 存在即已接线」 | 显式、事件、构建、运行时四组证据闭合 |
-| P2-1 | ~~回执补 `tree_kind` 标识~~ → 不做 | 经核对无误用路径（森林键 `code@year`、合并树键 `code:role`，合并类接口服务端自建树） | — | — |
-| P2-2 | ~~树版本 fingerprint 显式纳入规则版本号~~ → 不做 | 指纹由树的输出算出（`consol_scope_confirmation_service.py:45-120`），规则变化导致输出变化即被识别 | — | — |
+| P2-1 | ~~回执补 `tree_kind` 标识~~ → **不做** | **拍板保留不做**：森林键 `code@year` 与合并树键 `code:role` 已由端点语义区分，未发现误用路径 | 当前回执无显式树类型；若未来出现跨树通用端点、缓存或误用证据，另立 spec | 不纳入本 spec，见 §0.5.3 / §10.1.1 |
+| P2-2 | ~~树版本 fingerprint 显式纳入规则版本号~~ → **不做** | **拍板保留不做**：fingerprint 由规范化后的树输出计算，规则变化改变输出即可被识别 | 当前历史记录无独立算法版本字段；若未来要识别“同输出不同算法”、跨版本回放或规则回滚，另立版本迁移 spec | 不纳入本 spec，见 §0.5.3 / §10.1.1 |
 | P2-3 | 任务观测面板、输入/输出 digest、历史诊断导出 | 未实现 | 降低长期运维成本 | 可按 operation/event/job 反查完整链路 |
 | P2-4 | 端到端回放样本与故障注入工具 | 部分已有（`backend/tests/consol_operation/` 22 个文件） | 提高回归效率 | 可重放正常、冲突、重试、取消、恢复 |
 
@@ -674,6 +691,18 @@ Node headless 执行器必须有独立构建检查：源文件摘要、别名解
 | `AMBIGUOUS_SELF_REFERENCE` 新增 | 现网三码相同一律判 `SELF_ULTIMATE` | **已定（按建议）**：不加，没有「无法判断」的业务场景 |
 | 向导修改企业代码是否受建项授权限制 | 建项授权只接在单建、批量、连续审计三处，向导保存可把项目改到任意合法代码 | **已定（用户 2026-11-11）**：要求对新代码有建项授权，由 `consol-group-code-entry-consistency` R2.5 承接；同时修复向导保存 / 确认只校登录的越权 |
 | 企业代码更正 / 主体变更的 `node_key` | §3.5 | **已定（按建议）**：本轮只做「同年度有引用即拒绝并弹窗列出影响」（`consol-group-code-entry-consistency` R6）；`old → new` 迁移另立 spec |
+
+#### 10.1.1 本 spec 收尾决策与落地记录（2026-11-12）
+
+本小节中的 **P1-1 / P1-2 / P1-5** 指 §10 优先级表的拖拽 CAS、三码规范化和 Excel 代码列条目；§10.1 上方的“初稿 P1-1 / P1-2”仍指 §3.2 中“重复项目/关系冲突是否阻断”的另一组历史编号，二者不混用。
+
+| 条目 | 拍板结果 | 本 spec 落地/不做结论 |
+| --- | --- | --- |
+| §10 P1-1 拖拽改上级 CAS | 采用“改前上级代码”作为请求级基线；不复用 `entity_group_fields_hash`；比较必须位于年度拓扑锁和 `refresh` 之后。 | 已落地：缺字段 428、过期值 409、显式 `null` 可用，前端 409 刷新且不重试；实现与测试证据见 §0.5.3。 |
+| §10 P1-2 三码规范化 | 采用 NFKC → 去首尾空白 → 大写后校验和入库；共享前后端测试向量；保留字符串错误 detail，不改授权类 dict 回执。 | 已落地：四写入口、向导失焦、共享向量和统一 `字段：原因` 文案均有代码与定向测试；实现与边界见 §0.5.3。 |
+| §10 P1-5 Excel 代码列 | 数字单元格不可逆时拒绝猜测；无缓存公式拒绝，有缓存公式读取缓存；更新关系必须带 `entity_group_fields_hash`。 | 已落地：模板/错误明细文本格式、数字和公式诊断、原值回写、旧 hash 回退删除均完成；本环境无真实 Excel 客户端，边界见 §0.5.3。 |
+| §10 P2-1 `tree_kind` | **不做。** 两种树由端点和键格式区分，当前无误用证据。 | 不改回执字段；若未来出现跨树通用端点、缓存或误用路径，另立契约 spec。影响和边界见 §0.5.3。 |
+| §10 P2-2 规则版本号 | **不做。** fingerprint 来自规范化树输出，规则变化改变输出即可识别。 | 不增加迁移/回执字段；若未来需要区分同输出不同算法、跨版本回放或规则回滚，另立版本治理 spec。影响和边界见 §0.5.3。 |
 
 ### 10.2 本 spec 实施后状态（2026-11-12）
 
@@ -698,8 +727,8 @@ Node headless 执行器必须有独立构建检查：源文件摘要、别名解
 
 | 条目 | 当前状态 | 落地方式与证据 | 边界 |
 | --- | --- | --- | --- |
-| **P0-5 审批成功 / 事件入队 / 任务完成 / 页面可见四态** | **代码已落地，定向回归有证据；运行时独立验收未闭合** | 抵销审批以 `recalc_trigger` / `recalc_notice` 区分事件已发布、事件失败和不适用；处理器入队失败写失败推送运行记录并广播 `consol.push_failed`。调整审批以 `tb_update_status` 汇总落账事实，回执增加 `downstream`，前端提示发布失败而不暗示下游已完成。相关后端/前端实现与变异用例见 §0.5.3。 | 任务记录的后端 110 passed、前端 161 passed 是定向回归，不替代 clean-HEAD 逐节点对拍；浏览器 `initScript` 拦截回执的最终独立证据仍待补。 |
-| **P1-6 stale、重新汇总与推送附注步骤如实报状态** | **代码已落地，定向回归有证据；迁移/浏览器收尾未闭合** | V270/R270、stale 原因模块与写入方守卫形成统一原因链；章节标签显示原因和时间；`kept_manual`、`computed_value`、`manual_differs_count` 和全部失败异常使重新汇总摘要如实；`skip_reason`（`no_template_type`、`no_sections`、`no_tree`、`context_failed`）与共享 `note_step_verdict` 使推送/级联刷新区分失败和跳过。相关文件、守卫和变异证据见 §0.5.3。 | 共享 PG 只读确认 V270 已应用且 checksum 一致，尚未执行 R270 回滚；完整 clean-HEAD 对拍、全量类型对拍和最终浏览器复测继续按 tasks 状态保留。 |
+| **P0-5 审批成功 / 事件入队 / 任务完成 / 页面可见四态** | **代码已落地，定向回归有证据；运行时独立验收未闭合** | 抵销审批以 `recalc_trigger` / `recalc_notice` 区分事件已发布、事件失败和不适用；处理器入队失败写失败推送运行记录并广播 `consol.push_failed`。调整审批以 `tb_update_status` 汇总落账事实，回执增加 `downstream`，前端提示发布失败而不暗示下游已完成。相关后端/前端实现与变异用例见 §0.5.4。 | 任务记录的后端 110 passed、前端 161 passed 是定向回归，不替代 clean-HEAD 逐节点对拍；浏览器 `initScript` 拦截回执的最终独立证据仍待补。 |
+| **P1-6 stale、重新汇总与推送附注步骤如实报状态** | **代码已落地，定向回归有证据；迁移/浏览器收尾未闭合** | V270/R270、stale 原因模块与写入方守卫形成统一原因链；章节标签显示原因和时间；`kept_manual`、`computed_value`、`manual_differs_count` 和全部失败异常使重新汇总摘要如实；`skip_reason`（`no_template_type`、`no_sections`、`no_tree`、`context_failed`）与共享 `note_step_verdict` 使推送/级联刷新区分失败和跳过。相关文件、守卫和变异证据见 §0.5.4。 | 共享 PG 只读确认 V270 已应用且 checksum 一致，尚未执行 R270 回滚；完整 clean-HEAD 对拍、全量类型对拍和最终浏览器复测继续按 tasks 状态保留。 |
 | **就绪门是否在服务端强制可执行动作** | **已裁决：不强制** | 服务端保留七域五态状态计算；前端按就绪条禁用按钮并展示原因。未就绪时推送、重新汇总和 operations 不因就绪门被服务端拒绝，仍按各自权限、CAS、锁和业务错误处理。 | 这是 2026-11-11 用户确认的范围裁决，不是遗漏的服务端门禁任务；重复项目和关系冲突继续提示、不阻断，若未来要改为服务端阻断须另行拍板并另立范围。 |
 
 ## 11. 端到端验收矩阵
