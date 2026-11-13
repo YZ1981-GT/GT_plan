@@ -23,6 +23,7 @@ from app.models.audit_platform_schemas import (
 )
 from app.services.materiality_service import MaterialityService
 from app.services.trial_balance_service import TrialBalanceService
+from app.models.core import User
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/materiality",

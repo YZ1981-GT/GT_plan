@@ -446,7 +446,7 @@ class SignReadinessService:
 
         # 3. 说明非空
         no_expl_q = select(func.count()).select_from(WorkingPaper).where(
-            *base, sa.or_(
+            *base, or_(
                 WorkingPaper.explanation_status == "not_started",
                 WorkingPaper.explanation_status.is_(None),
             ))

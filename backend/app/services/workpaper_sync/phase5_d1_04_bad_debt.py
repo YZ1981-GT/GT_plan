@@ -43,7 +43,7 @@ footer R22 `合计  ` = B12+B17。
 """
 from __future__ import annotations
 
-from typing import Final, Mapping
+from typing import Any, Final, Mapping
 
 from app.services.workpaper_sync.excel_extract import BindingKind
 from app.services.workpaper_sync.phase5_row_table_sheet import (

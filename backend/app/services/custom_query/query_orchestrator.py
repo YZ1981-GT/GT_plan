@@ -32,6 +32,8 @@ _Requirements: 1.6, 9.5, 11.1, 11.2_
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import logging
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import asdict, dataclass, field, replace
@@ -59,6 +61,9 @@ from app.services.custom_query.pagination import (
     validate_pagination,
 )
 from app.services.custom_query.query_cache import QueryCache, query_cache
+
+if TYPE_CHECKING:
+    from app.services.custom_query.version_capture import VersionVector
 
 logger = logging.getLogger(__name__)
 

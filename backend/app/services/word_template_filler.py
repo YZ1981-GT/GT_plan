@@ -13,6 +13,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import logging
 import os
 import zipfile
@@ -28,6 +30,9 @@ from app.services.export_task_service import ExportTaskService
 from app.services.note_text_word_render import append_note_text
 from app.services.report_placeholder_service import ReportPlaceholderService
 from app.services.report_snapshot_service import ReportSnapshotService
+
+if TYPE_CHECKING:
+    from docx import Document
 
 logger = logging.getLogger(__name__)
 

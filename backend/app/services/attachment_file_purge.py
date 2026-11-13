@@ -12,10 +12,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import logging
 from collections.abc import Iterable
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
+if TYPE_CHECKING:
+    from app.services.attachment_storage_resolver import StoredAttachmentRef
 
 logger = logging.getLogger(__name__)
 

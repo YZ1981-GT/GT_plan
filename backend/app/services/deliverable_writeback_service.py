@@ -19,7 +19,7 @@ import logging
 import re
 from enum import Enum
 from io import BytesIO
-from typing import TypedDict
+from typing import Any, TypedDict
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession

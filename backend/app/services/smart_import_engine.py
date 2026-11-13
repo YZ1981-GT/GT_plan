@@ -1729,17 +1729,13 @@ def smart_parse_files(
                 diag["balance_count"] = len(bal)
                 diag["aux_balance_count"] = len(aux_bal)
             elif dt == "account_chart":
-                added_before = len(acct_records)
-                for row in csv_parsed["rows"]:
-                    _append_account_record(
-                        row=row,
-                        project_id=project_id,
-                        seen_codes=seen_codes,
-                        acct_records=acct_records,
-                        by_category=by_category,
-                        staged=True,
-                    )
-                diag["account_count"] = len(acct_records) - added_before
+                # 🔴 preview 模式下只统计「预计科目数」，不建真实 AccountChart 行。
+                # 原写法直接引用 `acct_records` / `project_id` / `seen_codes` /
+                # `by_category`，而这四个名字在 `smart_parse_files()` 作用域内
+                # 根本不存在（它们是 `write_four_tables()` 的局部变量），
+                # 且本模块无 `from __future__ import annotations` 兜底 ⇒ CSV 预览碰到
+                # 科目表必抛 NameError。预览不写库，只需给出行数估算。
+                diag["account_count_est"] = csv_parsed["row_count"]
             else:
                 diag["status"] = "skipped"
                 diag["message"] = f"CSV 未识别的数据类型: {dt}"
@@ -2080,7 +2076,7 @@ async def write_four_tables(
                 # 只保留表中存在的列，过滤掉 direction 等不属于该表的字段
                 filtered = {k: v for k, v in row.items() if k in valid_cols}
                 filtered.update({"id": _uuid.uuid4(), "project_id": project_id, "year": year,
-                                 "import_batch_id": batch.id, "dataset_id": _dataset_id, "is_deleted": False})
+                                 "import_batch_id": batch.id, "dataset_id": _dataset_id, "is_deleted": False})  # noqa: F821 — write_four_tables 已废弃（首行 raise），不可达
                 recs.append(filtered)
             if recs:
                 await db.execute(tbl.insert(), recs)
@@ -2139,7 +2135,7 @@ async def write_four_tables(
 
             led_buf.append({
                 "id": _uuid.uuid4(), "project_id": project_id, "year": year,
-                "import_batch_id": led_batch.id, "dataset_id": _dataset_id, "is_deleted": False, **row,
+                "import_batch_id": led_batch.id, "dataset_id": _dataset_id, "is_deleted": False, **row,  # noqa: F821 — write_four_tables 已废弃（首行 raise），不可达
             })
 
             # 流式拆分辅助明细账
@@ -2148,7 +2144,7 @@ async def write_four_tables(
                 for dim in dims:
                     aux_buf.append({
                         "id": _uuid.uuid4(), "project_id": project_id, "year": year,
-                        "import_batch_id": aux_batch.id, "dataset_id": _dataset_id, "is_deleted": False,
+                        "import_batch_id": aux_batch.id, "dataset_id": _dataset_id, "is_deleted": False,  # noqa: F821 — write_four_tables 已废弃（首行 raise），不可达
                         "aux_type": dim["aux_type"], "aux_code": dim["aux_code"], "aux_name": dim["aux_name"],
                         "aux_dimensions_raw": aux_dim_str,
                     })

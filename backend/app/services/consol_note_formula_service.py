@@ -29,6 +29,7 @@ from uuid import UUID
 if TYPE_CHECKING:
     from app.schemas.consol_context import ConsolContext
     from app.services.consol_tree_service import TreeNode
+    from app.services.consol_report_view_service import ViewContext
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError

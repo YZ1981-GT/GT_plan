@@ -11,6 +11,8 @@ spec: d1-sync-row-table-engine-and-d1-coverage · Task 30 · Requirement 5.6
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import io
 import os
 import sys
@@ -28,6 +30,9 @@ warnings.filterwarnings("ignore")
 
 from app.services.workpaper_sync import phase5_d1_06_business_mode as D106  # noqa: E402
 from app.services.workpaper_sync import phase5_d1_notes_receivable as D1  # noqa: E402
+
+if TYPE_CHECKING:
+    import openpyxl
 
 
 @pytest.fixture(scope="module")

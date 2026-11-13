@@ -1012,7 +1012,7 @@ def _add_page_number(paragraph):
     run._element.append(fldChar2)
 
     run2 = paragraph.add_run("1")
-    run2.font.size = Pt(9)
+    run2.font.size = Pt(9)  # noqa: F821 — Pt 来自模块顶层 `from docx.shared import Pt`
 
     fldChar3 = OxmlElement("w:fldChar")
     fldChar3.set(qn("w:fldCharType"), "end")

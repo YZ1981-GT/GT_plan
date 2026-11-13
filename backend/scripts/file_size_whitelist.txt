@@ -1962,3 +1962,21 @@ backend/app/services/consol_snapshot_service.py 1276
 #   本 spec 把 9 个规则的异常分支改为「检查异常，未执行」后 1176 行。
 #   拆分方向：IndependenceDeclarationCompleteRule（约 270 行）与 EventCascadeHealthRule（约 125 行）各抽独立模块，本文件保留注册与再导出。
 backend/app/services/gate_rules_phase14.py 1176
+# backend/tests/procedure_trim/test_trim_report_line_amounts.py — 全仓 CI 红修复时补 `from typing import Any`（F821）。HEAD 已 1255 行（超 800 未登记的历史大测试）。
+#   拆分方向：按被测断言族拆成 amount_math / report_line_mapping 两个模块，本文件保留 fixture 与聚合。
+backend/tests/procedure_trim/test_trim_report_line_amounts.py 1256
+# backend/tests/workpaper_sync/test_combined_workbook_wp_code_resolution.py — 全仓 CI 红修复时补 `from typing import Any`（F821）。HEAD 已 842 行（超 800 未登记的历史大测试）。
+#   拆分方向：按合册解析 / wp_code 裁决 / 冲突消解三段拆模块。
+backend/tests/workpaper_sync/test_combined_workbook_wp_code_resolution.py 843
+# backend/app/services/ledger_import/converter.py — 全仓 CI 红修复时补 TYPE_CHECKING 块（BalanceConversionResult / LedgerConversionResult 的 F821）。HEAD 已 801 行。
+#   拆分方向：currency 归一 / 余额行 / 序时账行三个函数组各抽伴生模块，本文件保留编排入口。
+backend/app/services/ledger_import/converter.py 806
+# backend/app/services/excel_html_converter.py — 全仓 CI 红修复时给 Pt 使用行加 noqa（F821，净增 0 行）。HEAD 已 1261 行，超 800 未登记。
+#   拆分方向：xlsx->html 渲染 / docx 生成 / 样式映射三段抽伴生模块。
+backend/app/services/excel_html_converter.py 1261
+# backend/scripts/check/check_projection_lane_adjudication.py — 全仓 CI 红修复时补 Mapping 到既有 typing import（F821，净增 0 行）。HEAD 已 815 行。
+#   拆分方向：判据表 / 报告渲染 / CLI 三段拆模块。
+backend/scripts/check/check_projection_lane_adjudication.py 815
+# backend/app/routers/recycle_bin.py — 全仓 CI 红修复时补保存点与真实删除入口（修 2 处运行时 NameError）。HEAD 已 831 行。
+#   拆分方向：列表与恢复 / 永久删除（含级联与保存点）/ 附件清理三段拆 service。
+backend/app/routers/recycle_bin.py 837

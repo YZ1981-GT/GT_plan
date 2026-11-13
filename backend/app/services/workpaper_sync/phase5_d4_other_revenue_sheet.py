@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any, Final, Mapping
+from typing import Any, Final, Iterator, Mapping
 
 #: 与 phase5_d4_revenue_detail 共享的模板身份（同 workbook）。
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4 收入底稿.xlsx"

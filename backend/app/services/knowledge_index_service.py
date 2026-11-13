@@ -51,6 +51,7 @@ from app.services.knowledge_vector_support import (
     score_text_vector_chunks,
 )
 from app.services.vector_store import get_vector_store, PgTextStore
+from datetime import timezone
 
 logger = logging.getLogger(__name__)
 

@@ -544,7 +544,10 @@ async def permanently_delete(
         await assert_destructible(db, user, row, operation="purge")
 
     if item_type == "project":
-        await _cascade_delete_project(db, item_id)
+        # 🔴 原写 `_cascade_delete_project(db, item_id)` 在全仓根本不存在
+        #    （只有这一处引用）⇒ 这个分支一调就 NameError。正确入口是
+        #    同文件 `_purge_project_in_current_transaction`（已在批量删除路径上使用）。
+        await _purge_project_in_current_transaction(db, user, item_id)
     elif item_type == "adjustment":
         group_id, deleted_rows = await _purge_adjustment_group(db, row)
         await db.commit()
@@ -761,6 +764,9 @@ async def empty_recycle_bin(
                 await _purge_adjustment_group(db, anchor)
                 deleted_count += 1
             continue
+        # 🔴 原写直接用 `savepoint` 却从未 `begin_nested()` ⇒ NameError。
+        #    按同文件 `_batch_purge_projects` 的形式补上保存点。
+        savepoint = await db.begin_nested()
         try:
             result = await db.execute(delete(model).where(model.is_deleted == True))  # noqa: E712
             count = int(result.rowcount or 0)

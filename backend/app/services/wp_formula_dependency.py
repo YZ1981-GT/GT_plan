@@ -13,12 +13,17 @@ D4 架构决策：公式解析器 → 构建依赖图 → 拓扑排序 → 逐�
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import logging
 import re
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 _logger = logging.getLogger(__name__)
 

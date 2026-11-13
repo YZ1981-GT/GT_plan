@@ -25,6 +25,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 if TYPE_CHECKING:
+    import openpyxl
     from app.services.consol_calc_basis import CalcBasis
 
 from app.models.consolidation_models import (

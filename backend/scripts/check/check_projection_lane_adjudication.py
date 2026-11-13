@@ -47,7 +47,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, Mapping
 
 _REPO: Final[Path] = Path(__file__).resolve().parents[3]
 _BACKEND: Final[Path] = _REPO / "backend"

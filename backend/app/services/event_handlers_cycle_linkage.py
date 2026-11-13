@@ -81,6 +81,7 @@ flowchart TD
 注意：前 4 个 handler 无下游事件发布，仅写 field_overrides + 失效缓存；
       第 5 个 handler 是唯一会发布新事件（TRIAL_BALANCE_UPDATED）产生级联的。
 """
+from typing import Any
 from __future__ import annotations
 
 import logging

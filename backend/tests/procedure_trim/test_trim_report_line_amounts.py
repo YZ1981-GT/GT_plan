@@ -53,6 +53,7 @@ from types import SimpleNamespace
 
 import pytest
 import sqlalchemy as sa
+from typing import Any
 
 _HERE = Path(__file__).resolve()
 _BACKEND = _HERE.parents[2]  # backend/

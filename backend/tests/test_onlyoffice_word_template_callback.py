@@ -350,7 +350,7 @@ word_template_wp_codes = st.sampled_from([
 @pytest.mark.asyncio
 @hyp_settings(max_examples=5, deadline=None)
 @given(status=valid_callback_status, wp_code=word_template_wp_codes)
-async def test_property_13_callback_persistence(status, wp_code):
+async def test_property_13_callback_persistence(status, wp_code, tmp_path):
     """**Validates: Requirements 6.2**
 
     Property 13: OnlyOffice 回调持久化

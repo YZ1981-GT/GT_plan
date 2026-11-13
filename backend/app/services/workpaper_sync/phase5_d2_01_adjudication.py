@@ -46,9 +46,14 @@ shared/dynamicAdjudicationRows.resolveCellState / displayValueForCellState 四�
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import hashlib
 import json
 from typing import Any, Final, Mapping
+
+if TYPE_CHECKING:
+    from app.services.workpaper_sync.contracts import SyncContract
 
 
 # ═══════════════════════════════════════════════════════════════════════════

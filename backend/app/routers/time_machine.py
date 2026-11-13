@@ -22,7 +22,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+import logging
+
 from app.services import time_machine_service as svc
+
+logger = logging.getLogger(__name__)
 from app.services.audit_log_helper import append_audit_log
 
 router = APIRouter(prefix="/api/instances", tags=["时光机"])

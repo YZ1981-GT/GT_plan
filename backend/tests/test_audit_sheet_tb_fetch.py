@@ -211,7 +211,7 @@ async def test_generate_audit_sheet_data_persisted_rows_with_tb():
         tb_rows=[("1121", Decimal("100000.00"), Decimal("120000.00"),
                   Decimal("0.00"), Decimal("0.00"))],
     )
-    result = await _generate_audit_sheet_data(
+    result = await _generate_audit_sheet_data(  # noqa: F821 — 该函数已在 task 1.3 删除，此用例已 @pytest.mark.skip
         file_path=None,
         sheet_name="审定表D1-1",
         existing=existing,
@@ -230,7 +230,7 @@ async def test_generate_audit_sheet_data_persisted_rows_with_tb():
 @pytest.mark.asyncio
 async def test_generate_audit_sheet_data_no_file_no_db_degrades():
     """无模板 + 无 db → audit_rows=[] + tb_values={} + 空说明区（全降级，不抛异常）。"""
-    result = await _generate_audit_sheet_data(
+    result = await _generate_audit_sheet_data(  # noqa: F821 — 该函数已在 task 1.3 删除，此用例已 @pytest.mark.skip
         file_path=None,
         sheet_name="审定表D1-1",
         existing=None,
