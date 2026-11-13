@@ -1,13 +1,27 @@
-"""完成阶段公共 API — A16 推荐 / 摘要 / issue hints / export-word."""
+"""完成阶段公共 API — 核对表模板包 / A16 推荐 / 摘要 / issue hints / 完成标记 / A30 归档检查建议。
+
+2026-11-12 删除本文件里 ``GET …/working-papers/{wp_id}/export-word`` 与
+``…/export-word/check-incomplete`` 两个端点（spec ``api-prefix-fix-recovery`` R3 / 任务 4）：
+它们与 ``wp_export_word`` 同路径、比后者先注册（FastAPI 取首条命中）⇒ 后者永远不可达；
+且生效实现本身是坏的 —— ``WorkingPaper`` 模型没有 ``wp_code`` 列（只有 ``wp_index_id``），
+``find_template_file_any(wp.wp_code)`` 恒 ``AttributeError`` ⇒ 导出 Word 恒 500；
+check 返回 ``{incomplete, count}`` 而 ``wp_export_word.CheckIncompleteResponse`` 与前端读
+``{complete, missing_fields, wp_code, reason}`` ⇒ 确认框永不弹。两个端点现由 ``wp_export_word``
+提供（按编码分发到 A17-1 / A17-2-1 / A18-2 的专用导出服务）。
+
+同文件另有 3 个与专用路由同路径的端点（``a16/recommended-version``、``issue-hints``、
+``workpaper-summaries/{key}``），仍为「先注册者遮蔽后注册者」，已冻结在
+``tests/test_duplicate_route_registration_baseline.py::_KNOWN_DUPLICATES`` 里，不在本 spec 范围。
+
+守卫 ``tests/test_duplicate_route_registration_baseline.py``。
+"""
 
 from __future__ import annotations
 
-import logging
 from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,10 +30,6 @@ from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.models.workpaper_models import WorkingPaper
 from app.services.a16_version_service import recommend_main_version, recommend_supplement
-from app.services.docx_template_filler import check_incomplete_text, fill_docx_template
-from app.services.wp_template_init_service import find_template_file_any
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/projects", tags=["completion-phase"])
 
@@ -203,66 +213,6 @@ async def get_issue_hints(
         "fraud": {"count": len(fraud_rows), "titles": [r.title for r in fraud_rows]},
         "legal": {"count": len(legal_rows), "titles": [r.title for r in legal_rows]},
     }
-
-
-@router.get("/{project_id}/working-papers/{wp_id}/export-word")
-async def export_workpaper_word(
-    project_id: UUID,
-    wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
-):
-    wp = await db.get(WorkingPaper, wp_id)
-    if not wp or wp.project_id != project_id:
-        raise HTTPException(404, "底稿不存在")
-    path = find_template_file_any(wp.wp_code)
-    if not path:
-        raise HTTPException(404, f"模板未找到: {wp.wp_code}")
-    r = await db.execute(
-        sa.text("SELECT client_name, audit_period_end FROM projects WHERE id = :pid"),
-        {"pid": str(project_id)},
-    )
-    row = r.one_or_none()
-    replacements = {}
-    if row:
-        if row.client_name:
-            replacements["××公司"] = row.client_name
-            replacements["XX公司"] = row.client_name
-        if row.audit_period_end:
-            year = str(row.audit_period_end.year)
-            replacements["202X"] = year
-            replacements["201X"] = year
-    data, incomplete = fill_docx_template(path, replacements=replacements)
-    if incomplete:
-        logger.info("export-word incomplete placeholders wp=%s: %s", wp.wp_code, incomplete[:5])
-    return Response(
-        content=data,
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": f'attachment; filename="{wp.wp_code}_export.docx"'},
-    )
-
-
-@router.get("/{project_id}/working-papers/{wp_id}/export-word/check-incomplete")
-async def check_export_incomplete(
-    project_id: UUID,
-    wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
-):
-    wp = await db.get(WorkingPaper, wp_id)
-    if not wp or wp.project_id != project_id:
-        raise HTTPException(404, "底稿不存在")
-    r = await db.execute(
-        sa.text(
-            "SELECT remark FROM checklist_responses WHERE wp_id = :wid AND remark IS NOT NULL"
-        ),
-        {"wid": str(wp_id)},
-    )
-    issues: list[str] = []
-    for (remark,) in r.fetchall():
-        if remark:
-            issues.extend(check_incomplete_text(str(remark)))
-    return {"incomplete": issues, "count": len(issues)}
 
 
 @router.get("/{project_id}/workpapers/{wp_id}/archive-checklist/suggestions")

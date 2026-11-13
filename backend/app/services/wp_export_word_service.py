@@ -1,11 +1,11 @@
 """export-word 统一分发服务（PRE-2 端点骨架）.
 
 按 wp_code 前缀分发到各 spec 编排服务（a17_word_exporter、
-regulatory_letter_service 等）。当前无编排服务就绪，全部返回 501。
+regulatory_letter_service 等）。未注册编码返回 501。
 
 设计要点（见 .kiro/specs/completion-phase-infra/requirements.md PRE-2）：
 - 本层是纯分发/编排，**禁止**在此重新实现颜色语义（那在 docx_template_filler.py）
-- wp_code 查 wp_index 表（WorkingPaper.wp_index_id → WpIndex.wp_code）
+- wp_code 查 wp_index 表（WorkingPaper.wp_index_id → WpIndex.wp_code），并校验 wp 属于请求的项目
 """
 
 from __future__ import annotations
@@ -68,8 +68,15 @@ _register_a18_handlers()
 # ─── 辅助：查 wp_code ────────────────────────────────────────────────────────
 
 
-async def _resolve_wp_code(db: AsyncSession, wp_id: UUID) -> str | None:
-    """通过 wp_id 查 wp_index.wp_code。返回 None 表示 wp 不存在或无索引。"""
+async def _resolve_wp_code(
+    db: AsyncSession, wp_id: UUID, project_id: UUID | None = None
+) -> str | None:
+    """通过 wp_id 查 wp_index.wp_code。返回 None 表示 wp 不存在或无索引。
+
+    ``project_id`` 给出时**同时**校验该底稿属于这个项目（返回 None 即视为「底稿不存在」）。
+    🔴 端点挂了项目级只读门（``require_project_access``）只证明调用者能读 ``project_id``，
+    不证明 ``wp_id`` 属于它 —— 不校验就能拿 A 项目权限导出 B 项目底稿（跨项目越权）。
+    """
     stmt = (
         select(WpIndex.wp_code)
         .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
@@ -78,6 +85,8 @@ async def _resolve_wp_code(db: AsyncSession, wp_id: UUID) -> str | None:
             WorkingPaper.is_deleted == False,  # noqa: E712
         )
     )
+    if project_id is not None:
+        stmt = stmt.where(WorkingPaper.project_id == project_id)
     result = await db.execute(stmt)
     row = result.scalar_one_or_none()
     return row
@@ -109,7 +118,7 @@ async def export_word(
         - 未实现: (None, wp_code, 501)
         - 底稿不存在: (None, None, 404)
     """
-    wp_code = await _resolve_wp_code(db, wp_id)
+    wp_code = await _resolve_wp_code(db, wp_id, project_id)
     if wp_code is None:
         return None, None, 404
 
@@ -133,7 +142,7 @@ async def check_incomplete(
         - 未实现时返回 complete=False + reason
         - 底稿不存在返回 404
     """
-    wp_code = await _resolve_wp_code(db, wp_id)
+    wp_code = await _resolve_wp_code(db, wp_id, project_id)
     if wp_code is None:
         return {"error": "底稿不存在"}, 404
 
