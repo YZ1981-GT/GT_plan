@@ -308,6 +308,8 @@ class MappingResponse(BaseModel):
     original_account_code: str
     original_account_name: str | None = None
     standard_account_code: str
+    #: 标准科目名称（取本项目标准科目表；列表接口填写，其余接口可为空）
+    standard_account_name: str | None = None
     mapping_type: MappingType
     created_at: datetime
 

@@ -196,6 +196,7 @@ export const accountMapping = {
   detail: (pid: string, mappingId: string) => `/api/projects/${pid}/mapping/${mappingId}`,
   autoMatch: (pid: string) => `/api/projects/${pid}/mapping/auto-match`,
   completionRate: (pid: string) => `/api/projects/${pid}/mapping/completion-rate`,
+  batchConfirm: (pid: string) => `/api/projects/${pid}/mapping/batch-confirm`,
 } as const
 
 // ─── 报表行次映射 ───────────────────────────────────────────────────────────

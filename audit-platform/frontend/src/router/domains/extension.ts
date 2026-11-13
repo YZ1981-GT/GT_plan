@@ -6,6 +6,11 @@ import type { RouteRecordRaw } from 'vue-router'
  */
 export const extensionRoutes: RouteRecordRaw[] = [
 {
+          path: 'extension/agent-store',
+          name: 'AgentStore',
+          component: () => import('@/views/AgentStore.vue'),
+        },
+{
           path: 'extension/custom-templates',
           name: 'CustomTemplateList',
           component: () => import('@/views/extension/CustomTemplateList.vue'),

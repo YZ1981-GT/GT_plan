@@ -223,7 +223,6 @@
                 {{ item.label }}
                 <span v-if="item.maturity === 'pilot'" class="gt-maturity-badge gt-maturity-pilot">试点</span>
                 <span v-else-if="item.maturity === 'experimental'" class="gt-maturity-badge gt-maturity-exp">实验</span>
-                <span v-else-if="item.maturity === 'developing'" class="gt-maturity-badge gt-maturity-dev">📌 即将上线</span>
               </span>
             </transition>
           </div>
@@ -501,6 +500,7 @@ const FALLBACK_NAV = [
   { key: 'permissions', label: '权限管理', icon: UserFilled, path: '/settings/permissions', maturity: 'production', roles: ['admin'] },
   { key: 'departments', label: '部门管理', icon: OfficeBuilding, path: '/settings/departments', maturity: 'production', roles: ['admin'] },
   { key: 'knowledge', label: '知识库', icon: Reading, path: '/knowledge', maturity: 'production', roles: null },
+  { key: 'agent-store', label: '智能体商店', icon: Box, path: '/extension/agent-store', maturity: 'developing', roles: null },
   { key: 'private-storage', label: '私人库', icon: Suitcase, path: '/private-storage', maturity: 'production', roles: null },
   { key: 'ai-models', label: 'AI 模型', icon: Cpu, path: '/settings/ai-models', maturity: 'production', roles: ['admin'] },
 ]
