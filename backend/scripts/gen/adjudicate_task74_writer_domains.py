@@ -409,9 +409,14 @@ _RULES: tuple[Rule, ...] = (
         # 2026-11-03：attachments 的 download / preview 已退役（a6c1fa93a 改走 C3 存储计划），
         # office_preview::_resolve_local_path 已删除 —— 从这张表里拿掉，它们若被重新发现
         # 必须重新裁决，而不是被这条旧规则静默接住。
+        # 2026-11-12：completion_phase 的 export-word / check-export-incomplete 两个端点已删除
+        # （spec ``api-prefix-fix-recovery`` 任务 4：它们与 ``wp_export_word`` 同路径且先注册，
+        # 遮蔽后者的唯一实现，且自身因 ``WorkingPaper`` 无 ``wp_code`` 列恒 500）——
+        # 同理从这张表里拿掉。锚点仍在的对象是 wp_download / wp_template_download 的四个
+        # 下载预览行与 export_job_service 的进度行；被重新发现的 export-word 入口属
+        # ``wp_export_word`` 路由，不再进 writer 清册。
         match=lambda e: e["writer_id"]
         in {
-            "app.routers.completion_phase::export_workpaper_word",
             "app.routers.wp_download::get_cloud_url",
             "app.routers.wp_template_download::download_template_by_code",
             "app.routers.wp_template_download::download_template_prefilled",
@@ -562,6 +567,7 @@ _RULES: tuple[Rule, ...] = (
         match=lambda e: _mod(e)
         in {
             "app.routers.wp_template",
+            "app.routers.consol_workpaper",
             "app.services.b60_plan_service",
             "app.services.chain_orchestrator",
             "app.services.workpaper_generation_service",

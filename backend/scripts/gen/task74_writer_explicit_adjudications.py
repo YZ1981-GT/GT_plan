@@ -387,4 +387,13 @@ EXPLICIT: dict[str, tuple[str, str, str]] = {
         "The spool holds an upload, not workpaper content, so no revision may move here; the "
         "content write happens later in `durable_job_executor.execute_bulk_import`",
     ),
+    "app.services.custom_query.query_artifacts::SealResult.__init__": (
+        "read_only_evaluation",
+        "A result DTO constructor for custom-query artifact sealing: its `file_path` attribute "
+        "describes the staged artifact returned to the caller, not a `WorkingPaper` model or a "
+        "database content store, and the constructor performs no session, SQL, or artifact I/O",
+        "Nothing to migrate. The discovery predicate matches the generic `file_path` attribute "
+        "name on an in-memory result object; keep this row in the read-only evaluation lane so "
+        "the false-positive is explicit rather than silently treated as a persisted workpaper write",
+    ),
 }
