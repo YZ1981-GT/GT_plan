@@ -74,3 +74,9 @@ pgvector==0.4.2  # KnowledgeIndex.embedding_vec = mapped_column(Vector(1024)) �
 #    完全看不出是缺包）。CI 上 `python scripts/seed/init_tables.py` 因此整步失败，
 #    连带 dsh-agent-panel-backend / -mcp-data 两个 job 挂在 Bootstrap schema。
 #    本地环境早已装了它，所以这个缺失只在 clean checkout 暴露。
+python-calamine==0.6.2  # 账套导入流式解析（app/services/ledger_import/parsers/excel_parser_calamine.py）
+# 🔴 曾遗漏在此文件外：该 parser 在函数体内 `from python_calamine import CalamineWorkbook`，
+#    缺包时被自身 except 包成 RuntimeError("calamine parsing failed ...")，于是
+#    backend/tests/ledger_import/test_excel_parser_calamine.py 7 例在 CI 上恒红
+#    （本地环境早已装了它，所以这个缺失只在 clean checkout 暴露）。
+#    CI 的 ledger-import-smoke job 直接跑这个文件，缺包即整 job 失败。
