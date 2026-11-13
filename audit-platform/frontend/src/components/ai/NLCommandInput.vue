@@ -34,12 +34,25 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
+
+interface NLAction {
+  label: string
+  description?: string
+  type?: string
+  payload?: Record<string, unknown>
+}
+
+interface NLCommandResult {
+  status: string
+  message?: string
+  action?: NLAction
+}
 
 // 桩实现 — 自然语言指令后端端点尚未就绪
 const nlCommandApi = {
-  execute: (_projectId: string, _query: string) =>
+  execute: (_projectId: string, _query: string): Promise<{ data: NLCommandResult }> =>
     Promise.resolve({ data: { status: 'error', message: '自然语言指令功能开发中' } }),
 }
 
@@ -49,7 +62,7 @@ const emit = defineEmits(['action-confirmed', 'action-cancelled'])
 const query = ref('')
 const executing = ref(false)
 const showHelp = ref(false)
-const lastResult = ref(null)
+const lastResult = ref<NLCommandResult | null>(null)
 
 const examples = [
   '生成本月销售收入的截止测试底稿',
@@ -76,7 +89,7 @@ async function execute() {
   }
 }
 
-function fillExample(text) {
+function fillExample(text: string) {
   query.value = text
   showHelp.value = false
 }
