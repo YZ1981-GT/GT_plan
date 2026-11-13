@@ -174,7 +174,7 @@ async def _advisory_lock(db: AsyncSession, project_id: UUID, year: int) -> None:
 # 附注步骤（_mark_notes_stale / _refresh_notes）已迁出到 consol_push_notes（spec
 # consol-status-semantics-closure 任务 1）；保留同名导入：既有测试按
 # ``consol_push_service._refresh_notes`` 打补丁的写法照常生效（_push_one 经本模块全局名调用）。
-from app.services.consol_push_notes import _mark_notes_stale, _refresh_notes  # noqa: F401
+from app.services.consol_push_notes import _mark_notes_stale, _refresh_notes, note_step_verdict  # noqa: F401
 
 
 @dataclass
@@ -340,31 +340,15 @@ async def _push_one(
             warnings.append(f"「{name}」合并报表有 {blank} 行取不到数，已留空并写明原因")
         return f"报表 {len(results)} 张 {total} 行" + (f"，留空 {blank} 行" if blank else "")
 
-    async def notes() -> str:
+    async def notes() -> tuple[str, str]:
         stats = await _refresh_notes(
             db, project_id, year, context=context, tree=tree, basis=basis,
         )
-        parts = []
-        stale = stats.get("stale_marked", 0)
-        sections = stats.get("distinct_section_count", 0)
-        nodes = stats.get("node_count", 0)
-        refreshed = stats.get("refreshed_count", 0)
-        kept = stats.get("kept_pulled_count", 0)
-        failed = stats.get("failed_count", 0)
-        note_status = stats.get("note_status", "skipped")
-
-        if stale:
-            parts.append(f"标记 {stale} 行待更新")
-        parts.append(f"{sections} 个章节 × {nodes} 个节点")
-        parts.append(f"刷新 {refreshed}")
-        if kept:
-            parts.append(f"保留单体附注拉数 {kept}（待重新汇总）")
-        if failed:
-            parts.append(f"失败 {failed}")
-            warnings.append(f"「{name}」附注刷新有 {failed} 个章节×节点失败")
-        parts.append(f"附注状态={note_status}")
-        # CP-03：返回 (detail, note_status) 元组，让 for 循环消费结构化状态
-        return ("，".join(parts), note_status)
+        step_status, detail = note_step_verdict(stats)
+        if int(stats.get("failed_count") or 0) or step_status == "failed":
+            warnings.append(f"「{name}」附注刷新未完成：{detail}")
+        # CP-03/R3：返回 (detail, step_status)，由共享 verdict 决定 skipped / failed。
+        return detail, step_status
 
     bodies = {STEP_WORKSHEET: worksheet, STEP_TRIAL: trial, STEP_REPORT: report, STEP_NOTES: notes}
     all_ok = True
@@ -386,15 +370,15 @@ async def _push_one(
                     break
                 continue
 
-            # CP-03：notes 步骤返回 (detail, note_status) 元组；
-            # partial/failed 降级步骤状态，skipped 当没有可刷新目标也不算成功
+            # R3：附注步骤状态由 note_step_verdict 统一决定；合法跳过保留 skipped，
+            # context_failed 已被 verdict 映射为 failed，不再伪装成成功。
             if isinstance(result, tuple):
                 detail, note_status = result
                 if note_status in ("partial", "failed"):
                     record(step, note_status, detail)
                     all_ok = False
                 elif note_status == "skipped":
-                    record(step, "succeeded", detail)  # skipped = 合法无可刷新目标，不降级
+                    record(step, "skipped", detail)
                 else:
                     record(step, "succeeded", detail)
             else:

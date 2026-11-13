@@ -273,6 +273,7 @@ async def test_batch_approve_reports_per_item_and_notifies_preparer_and_owner_on
     assert resp.status_code == 200, resp.text
     assert sorted(it["entry_group_id"] for it in body["succeeded"]) == sorted([g1, g2])
     assert [f["entry_group_id"] for f in body["failed"]] == [g3] and "先提交复核" in body["failed"][0]["reason"]
+    assert body["downstream"] == {"published": 4, "failed": 0}
 
     # 批准状态与 TB 调整列在路由 commit 前同一事务成立；下游事件已进入耐久 outbox。
     tb_values = {code: (aje, audited) for code, aje, audited in (await db.execute(

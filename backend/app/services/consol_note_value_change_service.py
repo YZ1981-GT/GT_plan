@@ -36,6 +36,7 @@ async def on_note_section_saved(
     """
     from app.models.consol_note_data_models import ConsolNoteData
     from app.models.consol_note_mapping_models import ConsolNoteMappingBinding
+    from app.services.consol_note_stale_state import ConsolNoteStaleSource, mark_stale
 
     query = sa.select(ConsolNoteMappingBinding).where(
         ConsolNoteMappingBinding.entity_project_id == entity_project_id,
@@ -55,7 +56,7 @@ async def on_note_section_saved(
             ConsolNoteData.year == year,
             ConsolNoteData.section_id == section_id,
         ))).scalars().all():
-            record.is_stale = True
+            mark_stale(record, ConsolNoteStaleSource.STANDALONE_NOTE_SAVED)
         results.append({
             "consol_project_id": str(binding.project_id),
             "section_id": section_id,

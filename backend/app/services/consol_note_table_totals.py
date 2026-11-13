@@ -141,6 +141,8 @@ class BuiltRows:
     kept_index: dict[int, int] = field(default_factory=dict)
     #: 不写的「……」占位行行名（spec note-pull-followup-closure R15）
     dropped_placeholders: list[str] = field(default_factory=list)
+    #: 所有本次真正写入的自动单元格（含合计 / 比例），用于 kept_manual 判定。
+    automatic_written: list[dict[str, Any]] = field(default_factory=list)
 
 
 def remap_cells(cells: Iterable[tuple[int, int]], old_to_new: dict[int, int]) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
@@ -205,6 +207,7 @@ def build_note_rows(
     new_rows: list[list[str]] = []
     filled: list[dict[str, Any]] = []
     kept: list[dict[str, Any]] = []
+    automatic_written: list[dict[str, Any]] = []
     for i, (name, _row_type) in enumerate(kept_skeleton):
         row = [""] * width
         if width:
@@ -217,28 +220,45 @@ def build_note_rows(
                     old = saved(i, col)
                     row[col] = old
                     if col in row_amounts:
-                        kept.append({"row": i, "col": col, "kept_value": old})
+                        kept.append({
+                            "row": i,
+                            "col": col,
+                            "kept_value": old,
+                            "computed_value": fmt_amount(row_amounts[col]),
+                        })
                 elif col in row_amounts:
                     formatted = fmt_amount(row_amounts[col])
                     row[col] = formatted
-                    filled.append({"row": i, "col": col, "value": formatted, "target_name": name})
+                    written = {"row": i, "col": col, "value": formatted, "target_name": name}
+                    filled.append(written)
+                    automatic_written.append(written)
         new_rows.append(row)
     total_cols = _amount_cols(table, width)
     for i in total_order(shaped, plans):
         row = new_rows[i]
         for col in total_cols:
-            if (i, col) in guard:
-                row[col] = saved(i, col)
-                continue
             total = sum_terms(plans[i], lambda r, col=col: to_decimal(new_rows[r][col]))
             if total is None and col in (new_amounts.get(i) or {}):
                 total = new_amounts[i][col]  # 构成这一列全空：用来源同一行之和（R6.5）
+            if (i, col) in guard:
+                old = saved(i, col)
+                row[col] = old
+                if total is not None:
+                    kept.append({
+                        "row": i,
+                        "col": col,
+                        "kept_value": old,
+                        "computed_value": fmt_amount(total),
+                    })
+                continue
             if total is not None:
-                row[col] = fmt_amount(total)
+                formatted = fmt_amount(total)
+                row[col] = formatted
+                automatic_written.append({"row": i, "col": col, "value": formatted})
     if table is not None:
-        _derive_ratios(table, shaped, new_rows, guard)
+        _derive_ratios(table, shaped, new_rows, guard, automatic_written)
     return BuiltRows(new_rows, filled, kept, old_to_new, {i: n for n, i in enumerate(keep)},
-                     [skeleton[i][0] for i in sorted(drop)])
+                     [skeleton[i][0] for i in sorted(drop)], automatic_written)
 
 
 def _amount_cols(table: dict | None, width: int) -> list[int]:
@@ -250,7 +270,13 @@ def _amount_cols(table: dict | None, width: int) -> list[int]:
     return [c + 1 for c in amount_columns(table) if 0 < c + 1 < width]
 
 
-def _derive_ratios(table: dict, shaped: list[dict], rows: list[list[str]], guard: set[tuple[int, int]]) -> None:
+def _derive_ratios(
+    table: dict,
+    shaped: list[dict],
+    rows: list[list[str]],
+    guard: set[tuple[int, int]],
+    automatic_written: list[dict[str, Any]],
+) -> None:
     """汇总后的比例 / 损失率（与单体预设同一判定）；手工 / 锁定格不动，分子为空、分母为 0 不写。"""
     from app.services.note_formula_ratios import derive_ratio, ratio_plans, ratio_rows
 
@@ -265,7 +291,12 @@ def _derive_ratios(table: dict, shaped: list[dict], rows: list[list[str]], guard
             if (r, col) in guard or col >= len(rows[r]):
                 continue
             value = derive_ratio(plan, r, read)
-            rows[r][col] = fmt_amount(value) if value is not None else ""
+            if value is not None:
+                formatted = fmt_amount(value)
+                rows[r][col] = formatted
+                automatic_written.append({"row": r, "col": col, "value": formatted})
+            else:
+                rows[r][col] = ""
 
 
 def build_table_rows(
@@ -279,3 +310,18 @@ def build_table_rows(
     """返回 (新行, 写入的单元格, 保留的手工 / 锁定单元格)；不去占位行的 ``build_note_rows``。"""
     built = build_note_rows(skeleton, amounts, width=width, protected=protected, existing_rows=existing_rows)
     return built.rows, built.filled, built.kept
+
+
+def amount_equal(left: Any, right: Any) -> bool:
+    """按分比较两个单元格，非金额值退回去空白字符串比较。"""
+    left_amount = to_decimal(left)
+    right_amount = to_decimal(right)
+    if left_amount is not None or right_amount is not None:
+        if left_amount is None or right_amount is None:
+            return False
+        return left_amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) == right_amount.quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+    left_text = "" if left is None else str(left).strip()
+    right_text = "" if right is None else str(right).strip()
+    return left_text == right_text

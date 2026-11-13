@@ -546,7 +546,7 @@
 | [`workpaper-writeback-data-loss-and-mirror-consistency-closure`](workpaper-writeback-data-loss-and-mirror-consistency-closure/tasks.md) | **46/56**（余 10：9.3 共享库迁移待放行、9.8 按 R1.3 保留 LWW、6 浏览器验收） | **底稿双向回写保存安全与镜像一致性收口**：消除三类静默数据丢失 —— HTML 保存改渐进式 strict CAS（既有行缺版本 428 / 过期 409 / 新行可建，新行并发由 advisory xact lock 兜住）、切在线编辑前 `pendingWrites` 聚合等待与过渡屏障（未发出与已发出未返回两类都等）、OO→HTML 镜像移入 content commit hook 并与 CAS 共用锁域。 |
 | [`api-prefix-fix-recovery`](api-prefix-fix-recovery/tasks.md) | **0/7** | **恢复丢失的 `/api` 前缀修复**：补回前缀、守卫与 A18-2 / A16 空态验收，三件套已建，产品代码尚未实施。 |
 | [`consol-group-code-entry-consistency`](consol-group-code-entry-consistency/tasks.md) | **0/57** | **三码入口一致与改上级并发保护**：统一规范化、授权、批量导入与企业树关系更新口径，三件套已建，产品代码尚未实施。 |
-| [`consol-status-semantics-closure`](consol-status-semantics-closure/tasks.md) | **0/46** | **合并链路状态语义收口**：补齐附注待更新原因、重新汇总、推送与审批回执语义，三件套已建，产品代码尚未实施。 |
+| [`consol-status-semantics-closure`](consol-status-semantics-closure/tasks.md) | **46/46**（当前最终任务状态已完成；共享 PG 已只读核对 V270 已应用且 checksum 一致，但 R270 rollback 未执行；历史阶段性验证说明保留在 tasks.md 底部） | **合并链路状态语义收口**：附注待更新原因与时间、重新汇总结果、推送与级联刷新、抵销审批重算回执、调整分录下游投递状态已接入；生产代码与定向回归完成，R270 rollback 未执行。 |
 
 ### 一.1 已完成 / 已归档的历史行（append-only，不回填改写）
 

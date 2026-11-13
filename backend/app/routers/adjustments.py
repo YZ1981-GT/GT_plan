@@ -653,12 +653,17 @@ async def review_adjustment(
                 },
             )
         await db.commit()
-        await publish_review_events(db)
+        handles = result.pop("_publish_handles", ())
+        publish_report = await publish_review_events(db, handles)
         broadcast_review_changed(project_id, result["succeeded"], change.status.value)
         return {
             "message": "复核批准成功" if change.status == ReviewStatus.approved else "复核驳回成功",
             "notified": result["notified"],
             "review_task_id": result["succeeded"][0].get("review_task_id"),
+            "downstream": {
+                "published": int(getattr(publish_report, "published", 0) or 0),
+                "failed": int(getattr(publish_report, "failed", 0) or 0),
+            },
         }
     except review_flow.ReviewFlowError as exc:
         raise HTTPException(
@@ -699,12 +704,16 @@ async def revoke_adjustment_review(
             db, project_id, affected, actor=user, reason=reason or None,
         )
         await db.commit()
-        await publish_review_events(db)
+        publish_report = await publish_review_events(db, decision.publications)
         broadcast_review_changed(project_id, [affected], ReviewStatus.draft.value)
         return {
             "message": "已撤回复核，调整分录恢复为草稿",
             "notified": notified,
             "tb_update_status": affected.get("tb_update_status"),
+            "downstream": {
+                "published": int(getattr(publish_report, "published", 0) or 0),
+                "failed": int(getattr(publish_report, "failed", 0) or 0),
+            },
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

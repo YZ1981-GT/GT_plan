@@ -277,3 +277,14 @@ describe('刷新追踪已抽成 composable', () => {
     expect(index).not.toContain('function _stopRefreshTracking(')
   })
 })
+
+
+describe('重新汇总完成摘要接线', () => {
+  it('合并总览只消费 reaggregateSummary，不读取旧 result.errors', () => {
+    const start = index.indexOf('async function onReaggregateCompleted')
+    const end = index.indexOf('\n}', start)
+    const fn = index.slice(start, end > start ? end : start + 1800)
+    expect(fn).toContain('reaggregateSummary(result)')
+    expect(fn).not.toContain('result.errors')
+  })
+})

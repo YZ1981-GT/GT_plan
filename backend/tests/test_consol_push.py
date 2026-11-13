@@ -498,10 +498,16 @@ class TestEndpoints:
                 assert before_env["published"] is False and before_env["download_allowed"] is False
                 before = before_env["rows"]
                 before_ar = next(r for r in before if r["row_code"] == "BS-006")["current_period_amount"]
+                # 报表生成是显式排队的后台 operation；SQLite 测试引擎是单连接，
+                # 后续抵销写入必须等该 operation 释放结果集和事务，否则会与 refresh/commit 交叉。
+                from app.workers.consol_operation_worker import wait_for_operations
+
+                await wait_for_operations()
                 eid = (await c.post(f"/api/consolidation/eliminations?project_id={gid}", json=_payload(group["G"]))).json()["id"]
                 resp = await c.post(f"/api/consolidation/eliminations/{eid}/review?project_id={gid}", json={"action": "approve"})
                 assert resp.status_code == 200 and resp.json()["review_status"] == "approved"
                 await handle_elimination_approved(published[-1])
+                await wait_for_operations()
                 after = (await c.get(f"/api/consolidation/reports/{gid}/{Y}",
                                      params={"report_type": "balance_sheet", "mode": "preview"})).json()["rows"]
                 assert D(next(r for r in after if r["row_code"] == "BS-006")["current_period_amount"]) == D(before_ar) - 50
@@ -518,6 +524,7 @@ class TestEndpoints:
                 assert revoked.status_code == 200 and revoked.json()["review_status"] == "draft"
                 assert published[-1].event_type.value == "elimination.revoked"
                 await handle_elimination_revoked(published[-1])
+                await wait_for_operations()
                 back = (await c.get(f"/api/consolidation/reports/{gid}/{Y}",
                                     params={"report_type": "balance_sheet", "mode": "preview"})).json()["rows"]
                 assert next(r for r in back if r["row_code"] == "BS-006")["current_period_amount"] == before_ar

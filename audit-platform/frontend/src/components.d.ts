@@ -205,6 +205,7 @@ declare module 'vue' {
     ConsolNoteDetailTemplateEditor: typeof import('./components/consolidation/ConsolNoteDetailTemplateEditor.vue')['default']
     ConsolNoteGridCell: typeof import('./components/consolidation/ConsolNoteGridCell.vue')['default']
     ConsolNoteMappingDialog: typeof import('./components/consolidation/ConsolNoteMappingDialog.vue')['default']
+    ConsolNoteStaleTag: typeof import('./components/consolidation/ConsolNoteStaleTag.vue')['default']
     ConsolNoteTab: typeof import('./components/consolidation/ConsolNoteTab.vue')['default']
     ConsolNoteTemplateManagerDialog: typeof import('./components/consolidation/ConsolNoteTemplateManagerDialog.vue')['default']
     ConsolNoteTopnNotice: typeof import('./components/consolidation/ConsolNoteTopnNotice.vue')['default']

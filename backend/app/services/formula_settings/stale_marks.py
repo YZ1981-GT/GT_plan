@@ -78,35 +78,6 @@ async def mark_note_stale(
     )
 
 
-# ── 合并附注域 ──────────────────────────────────────────────────────────────
-
-async def mark_consol_note_stale(
-    db: AsyncSession,
-    project_id: uuid.UUID,
-    slot_keys: Iterable[str],
-) -> int:
-    """合并附注：受影响章节的 ``consol_note_data.is_stale = true``。只 flush 不 commit。"""
-    try:
-        from app.models.consol_note_data_models import ConsolNoteData
-    except ImportError:
-        logger.debug("consol_note_models 不可用，跳过合并附注标过期")
-        return 0
-
-    sections = _sections_from_slots(slot_keys)
-    if not sections:
-        return 0
-    result = await db.execute(
-        sa.update(ConsolNoteData)
-        .where(
-            ConsolNoteData.project_id == project_id,
-            ConsolNoteData.section_code.in_(sections),
-        )
-        .values(is_stale=True)
-        .execution_options(synchronize_session=False)
-    )
-    return result.rowcount or 0
-
-
 # ── 统一入口 ────────────────────────────────────────────────────────────────
 
 async def mark_in_txn(
@@ -141,9 +112,6 @@ async def mark_in_txn(
         n = await mark_note_stale(db, project_id, slots)
         return {"domain": domain, "marked": n}
 
-    if domain == "consol_note":
-        n = await mark_consol_note_stale(db, project_id, slots)
-        return {"domain": domain, "marked": n}
-
-    # cross_check / push / tb_detail：不标过期
+    # cross_check / push / tb_detail / consol_note：不在此处标过期；
+    # 合并附注公式传播统一走 propagate_consol_note 的 operation。
     return {"domain": domain, "marked": 0, "reason": "no_stale_mark_for_domain"}

@@ -42,7 +42,10 @@ def test_manual_cells_kept_even_when_source_has_no_amount_and_feed_totals():
         width=3, protected={(0, 1), (0, 2), (4, 1)}, existing_rows=existing,
     )
     assert rows[0] == ["甲", "999.00", "5.00"]
-    assert kept == [{"row": 0, "col": 1, "kept_value": "999.00"}]
+    assert kept == [
+        {"row": 0, "col": 1, "kept_value": "999.00", "computed_value": "1.00"},
+        {"row": 4, "col": 1, "kept_value": "1.00", "computed_value": "1009.00"},
+    ]
     assert rows[2] == ["小计", "999.00", "5.00"]   # 保留的手工数参与小计
     assert rows[4] == ["合计", "1.00", "5.00"]     # 合计格本身被保护 ⇒ 不重算
 
@@ -141,7 +144,9 @@ def test_placeholder_row_dropped_and_manual_cell_follows_its_row():
                             existing_rows=existing, placeholders=[1])
     assert [r[0] for r in built.rows] == ["工资", "办公费", "合计"]
     assert built.rows[1] == ["办公费", "999.00", ""] and built.rows[2][1] == "1009.00"
-    assert built.kept == [{"row": 1, "col": 1, "kept_value": "999.00"}]
+    assert built.kept == [{
+        "row": 1, "col": 1, "kept_value": "999.00", "computed_value": "20.00",
+    }]
     assert built.dropped_placeholders == ["……"] and built.kept_index == {0: 0, 2: 1, 3: 2}
     assert remap_cells({(2, 1), (1, 2)}, built.old_to_new) == ([(1, 1)], [(1, 2)])
 

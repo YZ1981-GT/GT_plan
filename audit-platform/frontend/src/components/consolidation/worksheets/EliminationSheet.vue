@@ -394,10 +394,24 @@ async function onSaved() {
 }
 
 // ─── 状态操作（规则与差额节点面板一致）──────────────────────────────────────
+function reviewResultMessage(action: 'submit' | 'approve' | 'revoke', result: { recalc_trigger?: string; recalc_notice?: string | null }) {
+  if (result.recalc_trigger === 'event_failed') {
+    ElMessage.warning(result.recalc_notice || '审批已生效，但重算事件投递失败，请在合并推送页手动重试')
+    return
+  }
+  if (action === 'submit') {
+    ElMessage.success('已提交审批')
+  } else if (action === 'approve') {
+    ElMessage.success('已审批，合并数将在后台重算，完成或失败会在合并页提示')
+  } else {
+    ElMessage.success('已撤销审批，合并数将在后台重算，完成或失败会在合并页提示')
+  }
+}
+
 async function act(row: ElimTreeLine, action: 'submit' | 'approve') {
   try {
-    await reviewElimination(row.entry_id, props.projectId, { action })
-    ElMessage.success(action === 'submit' ? '已提交审批' : '已审批，合并试算、报表与附注将自动推送')
+    const result = await reviewElimination(row.entry_id, props.projectId, { action })
+    reviewResultMessage(action, result)
     await afterChange()
   } catch {
     /* 由 http 拦截器提示（如归属节点已不在企业树中） */
@@ -431,8 +445,8 @@ async function revokeEntry(row: ElimTreeLine) {
     return
   }
   try {
-    await reviewElimination(row.entry_id, props.projectId, { action: 'revoke' })
-    ElMessage.success('已撤销审批，合并数将自动重算')
+    const result = await reviewElimination(row.entry_id, props.projectId, { action: 'revoke' })
+    reviewResultMessage('revoke', result)
     await afterChange()
   } catch {
     /* 由 http 拦截器提示（如合并已锁定） */

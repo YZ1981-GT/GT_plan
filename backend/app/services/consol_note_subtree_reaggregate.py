@@ -21,7 +21,6 @@ from __future__ import annotations
 import copy
 import logging
 from collections import Counter
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Awaitable, Callable, Sequence
@@ -37,7 +36,7 @@ from app.models.consol_note_mapping_models import (
     ConsolNoteTemplateBinding,
 )
 from app.services.consol_calc_basis import node_measures
-from app.services.consol_group_tree import KIND_AGGREGATE, KIND_ELIM, ROLE_CONSOL
+from app.services.consol_group_tree import KIND_ELIM, ROLE_CONSOL
 from app.services.consol_note_detail_apply_service import (
     ApplyError,
     apply_detail_refresh,
@@ -91,12 +90,25 @@ class ReaggregateCancelled(RuntimeError):
 
 #: 汇总节点写入来源标记（ConsolNoteTab 据此显示「🔄 子树汇总」）
 WRITE_SOURCE = "subtree_aggregate"
-ACTION_PULL, ACTION_ELIM, ACTION_AGGREGATE = "pull", "elim", "aggregate"
-_PERSISTED, _SKIPPED, _FAILED = "persisted", "skipped", "failed"
 #: 这些拉数失败要用户去「📋 明细映射」处理（列入待确认映射企业）
 _PENDING_APPLY_CODES = frozenset({
     "NO_BINDINGS", "UNMAPPED_ROWS", "SOURCE_CHANGED", "VERSION_MISSING", "TEMPLATE_BINDING_MISMATCH",
 })
+
+from app.services.consol_note_reaggregate_result import (
+    ACTION_AGGREGATE,
+    ACTION_ELIM,
+    ACTION_PULL,
+    _FAILED,
+    _KEPT_MANUAL,
+    _PERSISTED,
+    _SKIPPED,
+    _NodeTally,
+    _Outcome,
+    _action,
+    _amount_key,
+    _label,
+)
 
 
 async def reaggregate_subtree(
@@ -133,75 +145,7 @@ async def reaggregate_subtree(
         return run.result()
 
 
-# ─────────────────────────────── 结果 ───────────────────────────────
-
-
-@dataclass
-class _Outcome:
-    section_id: str
-    node: TreeNode
-    action: str
-    status: str
-    reason: str | None = None
-    pending: bool = False
-    detail: dict[str, Any] = field(default_factory=dict)
-    #: 本节点这一章没算完整（自身失败，或因下级失败而没汇总）⇒ 上级也不汇总
-    incomplete: bool = False
-
-    def to_dict(self) -> dict[str, Any]:
-        out = {
-            "section_id": self.section_id,
-            "node_key": self.node.node_key,
-            "action": self.action,
-            "status": self.status,
-            "reason": self.reason,
-        }
-        out.update(self.detail)
-        return out
-
-
-@dataclass
-class _NodeTally:
-    node: TreeNode
-    action: str
-    written: int = 0
-    skipped: int = 0
-    failed: int = 0
-    reasons: Counter = field(default_factory=Counter)
-
-    def add(self, outcome: _Outcome) -> None:
-        if outcome.status == _PERSISTED:
-            self.written += 1
-        elif outcome.status == _FAILED:
-            self.failed += 1
-        else:
-            self.skipped += 1
-        if outcome.reason and outcome.status != _PERSISTED:
-            self.reasons[outcome.reason] += 1
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "node_key": self.node.node_key,
-            "kind": self.node.kind,
-            "action": self.action,
-            "label": _label(self.node),
-            "written": self.written,
-            "skipped": self.skipped,
-            "failed": self.failed,
-            "reasons": [{"reason": r, "count": n} for r, n in self.reasons.most_common()],
-        }
-
-
-def _label(node: TreeNode) -> str:
-    return node.display_name or node.company_name or node.node_key
-
-
-def _action(node: TreeNode) -> str:
-    if node.kind == KIND_ELIM:
-        return ACTION_ELIM
-    if node.kind == KIND_AGGREGATE or node.children:
-        return ACTION_AGGREGATE
-    return ACTION_PULL
+# ─────────────────────────────── 编排 ───────────────────────────────
 
 
 def _row_cells(row: Any) -> list[str]:
@@ -398,10 +342,39 @@ class _Run:
     async def _process_node(self, section_id: str, node: TreeNode) -> _Outcome:
         action = _action(node)
         if action == ACTION_ELIM:
-            return await self._elim(section_id, node)
-        if action == ACTION_AGGREGATE:
-            return await self._aggregate(section_id, node)
-        return await self._pull(section_id, node)
+            outcome = await self._elim(section_id, node)
+        elif action == ACTION_AGGREGATE:
+            outcome = await self._aggregate(section_id, node)
+        else:
+            outcome = await self._pull(section_id, node)
+        return self._classify_protected_outcome(outcome)
+
+    @staticmethod
+    def _classify_protected_outcome(outcome: _Outcome) -> _Outcome:
+        """区分真正写入与全手工/锁定格保留，避免把 kept_manual 说成 persisted。"""
+        kept = outcome.detail.get("kept_manual") or []
+        kept_count = int(outcome.detail.get("kept_manual_count") or len(kept))
+        if outcome.status != _PERSISTED or kept_count <= 0:
+            return outcome
+
+        def differs(item: dict[str, Any]) -> bool:
+            current = item.get("kept_value", item.get("current"))
+            computed = item.get("computed_value", item.get("formula_value"))
+            return _amount_key(current) != _amount_key(computed)
+
+        differs_count = (
+            int(outcome.detail["manual_differs_count"])
+            if "manual_differs_count" in outcome.detail
+            else sum(1 for item in kept if isinstance(item, dict) and differs(item))
+        )
+        outcome.detail["kept_manual_count"] = kept_count
+        outcome.detail["manual_differs_count"] = differs_count
+        if int(outcome.detail.get("filled_count") or 0) == 0:
+            outcome.status = _KEPT_MANUAL
+            outcome.reason = (
+                f"全部为手工格，汇总值未写入（其中 {differs_count} 格与汇总值不同）"
+            )
+        return outcome
 
     # ── 数据叶子：按已确认映射从单体附注拉数 ──
 
@@ -444,6 +417,8 @@ class _Run:
                         f"单体附注没有读到该表：{missing[0]}" if missing else None, detail={
                             "filled_count": res.get("filled_count", 0),
                             "kept_manual_count": res.get("kept_manual_count", 0),
+                            "manual_differs_count": res.get("manual_differs_count", 0),
+                            "kept_manual": res.get("kept_manual") or [],
                         })
 
     # ── 差额节点：按抵销 / 调整分录（公式内核） ──
@@ -467,6 +442,7 @@ class _Run:
         return _Outcome(sid, node, ACTION_ELIM, _PERSISTED, detail={
             "filled_count": len(res.get("filled") or []),
             "kept_manual_count": res.get("kept_manual_count", 0),
+            "kept_manual": res.get("kept_manual") or [],
         })
 
     # ── 汇总节点：Σ 直接下级已保存数 + 差额 ──
@@ -561,7 +537,7 @@ class _Run:
         built = build_note_rows(skeleton, amounts, width=width, protected=protected,
                                 existing_rows=existing_rows, placeholders=placeholders,
                                 table=consol_table if headers else None)
-        new_rows, filled, kept = built.rows, built.filled, built.kept
+        new_rows, kept = built.rows, built.kept
         lost_protected = remap_protected(data, record, manual, locked, built.old_to_new)
         for i, cells in verbatim.items():
             new_rows[built.kept_index[i]] = (cells + [""] * width)[:width]
@@ -578,7 +554,9 @@ class _Run:
             "_subtree_provenance": {"children": provenance, "unplaced": unplaced[:50], "aggregated_at": now.isoformat()},
         })
         record.data = data
-        record.is_stale = False
+        from app.services.consol_note_stale_state import clear_stale
+
+        clear_stale(record)
         record.updated_at = now
         # V243：来源投影
         from app.services.consol_note_source_projection import compute_source_mode, source_digest as _sd, update_source_projection
@@ -592,8 +570,9 @@ class _Run:
         update_source_projection(record, _mode, digest=_sd(data))
         await self._snapshot(sid, node, record)
         return _Outcome(sid, node, ACTION_AGGREGATE, _PERSISTED, detail={
-            "filled_count": len(filled),
+            "filled_count": len(built.automatic_written),
             "kept_manual_count": len(kept),
+            "kept_manual": kept,
             "dropped_placeholders": built.dropped_placeholders,
             "lost_protected": lost_protected[:50],
             "unplaced_count": len(unplaced),
@@ -644,8 +623,10 @@ class _Run:
             record.data.pop(stale_key, None)
         await self._snapshot(sid, node, record)
         return _Outcome(sid, node, ACTION_AGGREGATE, _PERSISTED, detail={
-            "filled_count": sum(1 for row in result.rows for cell in row[1:] if str(cell).strip()),
-            "kept_manual_count": len(summary["kept"]), "lost_protected": summary["lost_protected"][:50],
+            "filled_count": len(summary["filled"]),
+            "kept_manual_count": len(summary["kept"]), "manual_differs_count": summary["manual_differs_count"],
+            "kept_manual": summary["kept"],
+            "lost_protected": summary["lost_protected"][:50],
             "topn": summary, "children": [{k: e.get(k) for k in ("node_key", "included", "reason")} for e in provenance],
         })
 
@@ -723,6 +704,8 @@ class _Run:
 
     async def _writable_record(self, sid: str, node: TreeNode, source: ConsolNoteData | None) -> ConsolNoteData:
         """写入目标永远是节点专属行；根节点只有项目级兼容行时先复制（保住其中的手工格）。"""
+        from app.services.consol_note_stale_state import clear_values, inherit_values
+
         if source is not None and source.node_key == node.node_key:
             return source
         if source is not None:
@@ -736,14 +719,14 @@ class _Run:
                     if isinstance(source.data, dict)
                     else {}
                 ),
-                is_stale=bool(source.is_stale),
+                **inherit_values(source),
                 updated_at=datetime.now(timezone.utc),
             )
             self.db.add(record)
             self.records[(sid, node.node_key)] = record
             return record
         record = ConsolNoteData(project_id=self.project_id, year=self.year, section_id=sid,
-                                node_key=node.node_key, data={}, is_stale=False)
+                                node_key=node.node_key, data={}, **clear_values())
         self.db.add(record)
         self.records[(sid, node.node_key)] = record
         return record
@@ -761,10 +744,15 @@ class _Run:
 
     def result(self) -> dict[str, Any]:
         written_any = any(t.written for t in self.tallies.values())
+        kept_manual_any = any(o.status == _KEPT_MANUAL for o in self.selected)
         if self.failures:
             status = "partial" if written_any else _FAILED
         else:
             status = _PERSISTED if written_any else _SKIPPED
+        # 全手工/锁定格只表示本次已处理但没有自动写入，run 级保持 skipped，
+        # 具体章节通过 kept_manual 结果和 manual_differs_count 说明原因。
+        if not written_any and kept_manual_any and not self.failures:
+            status = _SKIPPED
         nodes = [self.tallies[n.node_key].to_dict() for n in iter_nodes(self.node) if n.node_key in self.tallies]
         return {
             "mode": "subtree",

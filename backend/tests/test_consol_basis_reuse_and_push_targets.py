@@ -97,7 +97,7 @@ def test_injected_basis_rejects_year_project_and_tree_mismatch() -> None:
 @pytest.mark.asyncio
 async def test_push_loads_one_distinct_basis_per_target_and_reuses_it_in_all_steps(monkeypatch) -> None:
     from app.services import consol_calc_basis, consol_context_service, consol_push_service, consol_tree_service
-    from app.services import consol_report_service, consol_trial_service, consol_worksheet_engine
+    from app.services import consol_report_service, consol_trial_service, consol_version_vector, consol_worksheet_engine
 
     source_id, parent_id = uuid.uuid4(), uuid.uuid4()
     targets = (source_id, parent_id)
@@ -124,6 +124,11 @@ async def test_push_loads_one_distinct_basis_per_target_and_reuses_it_in_all_ste
         "note_status": "persisted",
     })
     record_tree = AsyncMock(return_value="")
+    # push 在每个 target 校验 basis 后还会构建版本向量；本测试只验证 basis
+    # 的按目标装载与四步复用，因此用异步返回的最小向量替代其数据库读取。
+    version_vector = AsyncMock(
+        return_value=SimpleNamespace(model_dump=lambda **_kwargs: {})
+    )
 
     monkeypatch.setattr(consol_push_service, "push_targets", AsyncMock(return_value=list(targets)))
     monkeypatch.setattr(consol_push_service, "_project_name", AsyncMock(side_effect=lambda _db, pid: str(pid)))
@@ -136,6 +141,7 @@ async def test_push_loads_one_distinct_basis_per_target_and_reuses_it_in_all_ste
     monkeypatch.setattr(consol_context_service, "build_consol_context", build_source_context)
     monkeypatch.setattr(consol_context_service, "build_target_consol_context", build_target_context)
     monkeypatch.setattr(consol_calc_basis, "load_calc_basis", load_basis)
+    monkeypatch.setattr(consol_version_vector, "build_version_vector", version_vector)
     monkeypatch.setattr(consol_worksheet_engine, "recalc_full", worksheet)
     monkeypatch.setattr(consol_trial_service, "recalculate_trial", trial)
     monkeypatch.setattr(consol_report_service.ConsolReportService, "generate_consol_reports", report)

@@ -58,8 +58,18 @@ async def _push(event: Any, trigger: str) -> None:
             trigger, requested.operation.id, project_id, year,
         )
     except Exception as err:
-        # 顶层兜底：入队故障绝不回滚已提交的审批；持久 operation 自己记录运行失败。
+        # 顶层兜底：入队故障绝不回滚已提交的审批；独立记录失败运行并广播，
+        # 让合并页和推送历史都能看到，而不是只留日志。
         logger.error("合并推送事件入队失败（项目 %s 年度 %s）：%s", project_id, year, err)
+        from app.services.consol_push_failure_record import record_consol_push_failure
+
+        await record_consol_push_failure(
+            project_id,
+            int(year),
+            trigger=trigger,
+            reason=f"合并重算事件投递失败：{err}",
+            source_id=str(source_id) if "source_id" in locals() else None,
+        )
 
 
 async def handle_elimination_approved(event: Any) -> None:

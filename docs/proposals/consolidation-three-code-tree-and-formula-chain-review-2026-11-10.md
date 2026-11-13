@@ -102,6 +102,16 @@
 
 本轮将 v3 的“未实现”结论收窄为：R1 保存失败可见性、R2 内容摘要 CAS、R3 保护解析/回写标手工格、R4 写入方登记守卫已在当前工作区实现并有后端/前端定向测试；树版本 fail-open、stale 状态语义、后台 headless、树身份和 Excel 代码列仍由原 review 或后续 spec 管理，不能因本轮完成而前移为已实现。
 
+### 0.5.3 consol-status-semantics-closure 实施复核（2026-11-13）
+
+本节是对 `consol-status-semantics-closure` 的追加复核，只更新原 review 的 P0-5、P1-6 与就绪门裁决；§0.5~§0.5.2 的立项前判断和前置 spec 收尾记录保持不变。依据本 spec `tasks.md` 的实现记录、定向回归记录和状态更新，未把尚未完成的 clean-HEAD 对拍、R270 回滚或浏览器证据写成独立验收通过。
+
+| 条目 | 实际落地方式 | 证据与边界 |
+| --- | --- | --- |
+| **P0-5 审批成功 / 事件入队 / 任务完成 / 页面可见四态** | 抵销审批响应改为 `EliminationReviewResponse`，按发布结果返回 `recalc_trigger`：`event_published`、`event_failed` 或 `not_applicable`；发布失败附 `recalc_notice`。重算处理器入队失败经 `consol_push_failure_record` 写入失败的推送运行记录，并广播 `consol.push_failed`。调整分录批量审批回执保留逐笔 `tb_update_status`，增加 `downstream` 的发布数/失败数；前端按这些字段分别提示已审批、事件投递失败和下游刷新失败，不再把审批成功说成报表/附注已经完成。 | 后端落点为 `models/consolidation_schemas.py`、`routers/consolidation.py`、`services/consol_elimination_recalc_handler.py`、`services/consol_push_failure_record.py`、`routers/adjustment_review.py` 与 `services/adjustment_review_service.py`；前端落点为 `ConsolElimNodePanel.vue`、`worksheets/EliminationSheet.vue`、`useAdjustmentHallActions.ts`。`test_consol_elimination_review_response.py`、`test_consol_status_mutations.py`、`test_consol_status_r5_mutations.py` 及相关 Vitest 已覆盖三态回执、失败记录、`tb_update_status` 汇总和 `downstream.failed` 提示。代码与定向回归已有证据；浏览器拦截响应的独立最终证据仍按 tasks 状态保留为未闭合。 |
+| **P1-6 stale、重新汇总与推送附注步骤如实报状态** | V270/R270 与 ORM 增加 `stale_reason` / `stale_at`；`consol_note_stale_state.py` 统一置位、清除和复制继承，章节 GET 与 `consol.note_stale` 载荷补齐原因，前端 `ConsolNoteStaleTag.vue` 显示待更新原因和时间。重新汇总以 `kept_manual` 区分“全部为手工格”，按 `computed_value` 统计差异，只有 `persisted` 计入更新章节，全部失败时执行器抛出业务错误。推送和级联刷新统一使用 `note_step_verdict`：`no_template_type`、`no_sections`、`no_tree` 记 skipped，`context_failed` 记 failed，不再把这些结果记为 succeeded。 | 后端/前端落点包括 `services/consol_note_stale_state.py`、`services/consol_push_notes.py`、`services/consol_note_subtree_reaggregate.py`、`services/consol_note_reaggregate_executor.py`、`ConsolNoteTab.vue` 与 `ConsolidationIndex.vue`；守卫和变异覆盖见 `test_consol_note_stale_writers_guard.py`、`test_consol_note_stale_state.py`、`test_consol_status_r1_mutations.py`、`test_consol_status_mutations.py`、`test_consol_phase2_cascade_pbt.py`。任务记录的本 spec 定向后端回归为 110 passed，5 个相关前端 Vitest 共 161 passed；共享 PG 已只读核对 V270 已应用且 checksum 一致。R270 回滚、完整 clean-HEAD 对拍及最终浏览器复测仍未闭合。 |
+| **就绪门服务端强制的裁决** | **不在服务端强制可执行动作。** 保留既有七域五态就绪状态和前端按钮禁用；推送、重新汇总、operations 在未就绪时仍可由服务端受理，由页面按就绪条提示并禁用入口。 | 该裁决承接 2026-11-11 用户确认和 design §8：重复项目、关系冲突继续提示而不阻断，`require_calc_year` 仍只校年度；把就绪门变成服务端拒绝会把诊断提示升级成阻断，违反既有裁决。该决定不放宽登录/项目权限、CAS、锁、请求校验、事务原子性或失败留痕。 |
+
 ---
 
 ## 1. 范围、结论与证据边界
@@ -681,6 +691,16 @@ Node headless 执行器必须有独立构建检查：源文件摘要、别名解
 | 原 review 其他 P1/P2 | **未因本 spec 改变** | 树版本结构化、stale 状态语义、拖拽 CAS、三码/Excel 代码列、headless 后台化、全链路 worker 观测仍按 §10.1 和后续 spec 处理。 |
 
 因此当前建议顺序应改读为：本 spec 的 P0-1 → P0-3 → P0-2 已完成；后续重点是补齐可复核的 R5.1 7.1/7.2 运行证据，以及按 `consol-status-semantics-closure`、`consol-group-code-entry-consistency` 各自边界继续推进。完成本 spec 不代表整个 §10 验收矩阵已通过。
+
+### 10.3 consol-status-semantics-closure 实施后状态（2026-11-13）
+
+§10.1 的优先级表和 §10.2 的前置 spec 状态均保留为历史记录；本小节追加记录 `consol-status-semantics-closure` 对 P0-5、P1-6 的当前落地方式，并单独记录就绪门不在服务端强制的裁决。完成本 spec 的代码与定向回归不等于整个 §10 验收矩阵全部通过。
+
+| 条目 | 当前状态 | 落地方式与证据 | 边界 |
+| --- | --- | --- | --- |
+| **P0-5 审批成功 / 事件入队 / 任务完成 / 页面可见四态** | **代码已落地，定向回归有证据；运行时独立验收未闭合** | 抵销审批以 `recalc_trigger` / `recalc_notice` 区分事件已发布、事件失败和不适用；处理器入队失败写失败推送运行记录并广播 `consol.push_failed`。调整审批以 `tb_update_status` 汇总落账事实，回执增加 `downstream`，前端提示发布失败而不暗示下游已完成。相关后端/前端实现与变异用例见 §0.5.3。 | 任务记录的后端 110 passed、前端 161 passed 是定向回归，不替代 clean-HEAD 逐节点对拍；浏览器 `initScript` 拦截回执的最终独立证据仍待补。 |
+| **P1-6 stale、重新汇总与推送附注步骤如实报状态** | **代码已落地，定向回归有证据；迁移/浏览器收尾未闭合** | V270/R270、stale 原因模块与写入方守卫形成统一原因链；章节标签显示原因和时间；`kept_manual`、`computed_value`、`manual_differs_count` 和全部失败异常使重新汇总摘要如实；`skip_reason`（`no_template_type`、`no_sections`、`no_tree`、`context_failed`）与共享 `note_step_verdict` 使推送/级联刷新区分失败和跳过。相关文件、守卫和变异证据见 §0.5.3。 | 共享 PG 只读确认 V270 已应用且 checksum 一致，尚未执行 R270 回滚；完整 clean-HEAD 对拍、全量类型对拍和最终浏览器复测继续按 tasks 状态保留。 |
+| **就绪门是否在服务端强制可执行动作** | **已裁决：不强制** | 服务端保留七域五态状态计算；前端按就绪条禁用按钮并展示原因。未就绪时推送、重新汇总和 operations 不因就绪门被服务端拒绝，仍按各自权限、CAS、锁和业务错误处理。 | 这是 2026-11-11 用户确认的范围裁决，不是遗漏的服务端门禁任务；重复项目和关系冲突继续提示、不阻断，若未来要改为服务端阻断须另行拍板并另立范围。 |
 
 ## 11. 端到端验收矩阵
 

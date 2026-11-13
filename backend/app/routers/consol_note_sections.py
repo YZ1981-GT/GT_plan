@@ -9,12 +9,10 @@ GET /api/consol-note-sections/{project_id}/{year}/{section_id}/data — 加载�
 import json
 import logging
 import re
-from dataclasses import replace as _replace
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
-import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -404,12 +402,14 @@ async def get_note_data(
     except HTTPException:
         raise
     if record is None:
-        return {"content": {}, "updated_at": None, "node_key": node_key, "data_digest": None}
+        return {"content": {}, "updated_at": None, "node_key": node_key, "data_digest": None, "is_stale": False, "stale_reason": None, "stale_reason_label": None, "stale_at": None}
+    from app.services.consol_note_stale_state import label_of
+    is_stale = bool(record.is_stale); stale_reason = str(record.stale_reason) if is_stale and record.stale_reason else None
     return {
-        "content": record.data if isinstance(record.data, dict) else {},
-        "updated_at": str(record.updated_at) if record.updated_at else None,
-        "node_key": record.node_key if record.node_key is not None else node_key,
-        "data_digest": digest_of(record),
+        "content": record.data if isinstance(record.data, dict) else {}, "updated_at": str(record.updated_at) if record.updated_at else None,
+        "node_key": record.node_key if record.node_key is not None else node_key, "data_digest": digest_of(record),
+        "is_stale": is_stale, "stale_reason": stale_reason, "stale_reason_label": label_of(stale_reason) if is_stale else None,
+        "stale_at": str(record.stale_at) if is_stale and record.stale_at else None,
     }
 
 
@@ -519,7 +519,7 @@ async def refresh_note_by_formula(
 
     resolved_node_key = _requested_node_key(node_key, body)
     # 节点作用域完整校验（项目/年度/企业树/节点定位）
-    scope = await _resolve_note_scope(db, project_id, year, resolved_node_key, section_id)
+    await _resolve_note_scope(db, project_id, year, resolved_node_key, section_id)
     template_type = await _resolve_requested_template(db, project_id, body)
 
     try:

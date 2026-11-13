@@ -373,10 +373,20 @@ async def save_scoped_note_record(
         update_source_projection(record, "manual", digest=digest_of(record))
         return record
 
-    inherited_stale = bool(scope.node_key)
-    if scope.node_key is not None and base is not None:
-        # 只有根节点允许得到 legacy 基准；节点首次复制时沿用其 stale 状态。
-        inherited_stale = bool(base.is_stale)
+    from app.services.consol_note_stale_state import (
+        ConsolNoteStaleSource,
+        clear_values,
+        inherit_values,
+        stale_values,
+    )
+
+    if scope.node_key is not None:
+        # 节点首次复制有 legacy 基线时继承完整 stale 元数据；没有基线则明确记录 node_created。
+        stale_metadata = inherit_values(base) if base is not None else stale_values(
+            ConsolNoteStaleSource.NODE_CREATED, now=now,
+        )
+    else:
+        stale_metadata = clear_values()
 
     candidate = ConsolNoteData(
         project_id=scope.project_id,
@@ -384,10 +394,7 @@ async def save_scoped_note_record(
         section_id=scope.section_id,
         node_key=scope.node_key,
         data=copy.deepcopy(data),
-        # stale 表示数据是否等待上游刷新，不是“是否已经完成节点复制”。
-        # 新显式节点没有 legacy 基线时沿用历史约定标 stale；从 legacy 复制时
-        # 保留源状态；旧 NULL 行保持 fresh。
-        is_stale=inherited_stale if scope.node_key is not None else False,
+        **stale_metadata,
         updated_at=now,
     )
     update_source_projection(candidate, "manual", digest=digest_of(candidate))

@@ -24,7 +24,7 @@ from app.models.audit_platform_schemas import EventPayload, EventType, ReviewSta
 from app.services import adjustment_review_task_service as review_tasks
 from app.services.adjustment_service import AdjustmentService
 from app.services.trial_balance_service import TrialBalanceService
-from app.services.workpaper_sync.outbox import DurableEventOutboxService
+from app.services.workpaper_sync.outbox import DurableEventOutboxService, PendingPublication
 
 
 @dataclass(frozen=True)
@@ -32,6 +32,7 @@ class AdjustmentDecisionResult:
     info: dict[str, Any]
     tb_updated: bool
     account_codes: tuple[str, ...]
+    publications: tuple[PendingPublication, ...] = ()
 
 
 class AdjustmentReviewCoordinator:
@@ -195,24 +196,25 @@ class AdjustmentReviewCoordinator:
             "review_task_id": str(task.id),
             "review_task_revision": task.revision,
         }
-        await DurableEventOutboxService.enqueue_event(self.db, EventPayload(
+        publications: list[PendingPublication] = []
+        publications.append(await DurableEventOutboxService.enqueue_event(self.db, EventPayload(
             event_type=EventType.ADJUSTMENT_APPROVED,
             project_id=project_id,
             year=year,
             account_codes=account_codes,
             entry_group_id=entry_group_id,
             extra=common_extra,
-        ))
-        await DurableEventOutboxService.enqueue_event(self.db, EventPayload(
+        )))
+        publications.append(await DurableEventOutboxService.enqueue_event(self.db, EventPayload(
             event_type=EventType.TRIAL_BALANCE_UPDATED,
             project_id=project_id,
             year=year,
             account_codes=account_codes,
             entry_group_id=entry_group_id,
             extra={**common_extra, "trigger": "adjustment_approved"},
-        ))
+        )))
         info["tb_update_status"] = "committed"
-        return AdjustmentDecisionResult(info, True, tuple(account_codes))
+        return AdjustmentDecisionResult(info, True, tuple(account_codes), tuple(publications))
 
     async def revoke(
         self,
@@ -258,21 +260,22 @@ class AdjustmentReviewCoordinator:
             "trigger": "adjustment_review_revoked",
             "reason": (reason or "").strip() or None,
         }
-        await DurableEventOutboxService.enqueue_event(self.db, EventPayload(
+        publications: list[PendingPublication] = []
+        publications.append(await DurableEventOutboxService.enqueue_event(self.db, EventPayload(
             event_type=EventType.ADJUSTMENT_REVIEW_REVOKED,
             project_id=project_id,
             year=year,
             account_codes=account_codes,
             entry_group_id=entry_group_id,
             extra=extra,
-        ))
-        await DurableEventOutboxService.enqueue_event(self.db, EventPayload(
+        )))
+        publications.append(await DurableEventOutboxService.enqueue_event(self.db, EventPayload(
             event_type=EventType.TRIAL_BALANCE_UPDATED,
             project_id=project_id,
             year=year,
             account_codes=account_codes,
             entry_group_id=entry_group_id,
             extra=extra,
-        ))
+        )))
         info["tb_update_status"] = "committed"
-        return AdjustmentDecisionResult(info, True, tuple(account_codes))
+        return AdjustmentDecisionResult(info, True, tuple(account_codes), tuple(publications))

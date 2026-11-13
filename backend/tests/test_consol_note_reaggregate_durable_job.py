@@ -139,3 +139,28 @@ async def test_async_route_creates_idempotent_job(factory, monkeypatch):
         with pytest.raises(HTTPException) as conflict:
             await route.reaggregate_consol_notes_async(project, 2025, changed, None, db, user, None)
     assert conflict.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_executor_all_failed_business_result_marks_job_failed(monkeypatch):
+    claim = _claim()
+    session = _Session()
+    monkeypatch.setattr(executor, 'async_session', lambda: session)
+    monkeypatch.setattr(executor, 'assert_project_permission', AsyncMock())
+    monkeypatch.setattr(executor, 'check_consol_lock', AsyncMock())
+    from app.services import consol_node_scope, consol_note_aggregation_service, consol_note_formula_service
+    monkeypatch.setattr(consol_node_scope, 'resolve_requested_node_key', lambda *_a: 'root')
+    monkeypatch.setattr(consol_node_scope, 'resolve_node_scope', AsyncMock(return_value=SimpleNamespace(year=2025, node_key='root', tree=object())))
+    monkeypatch.setattr(consol_note_aggregation_service, 'validate_lineage_dag', AsyncMock(return_value=True))
+    monkeypatch.setattr(consol_note_formula_service, 'note_template_type', lambda value: value)
+    monkeypatch.setattr(executor, 'reaggregate_subtree', AsyncMock(return_value={
+        'status': 'failed', 'sections_processed': 1, 'sections_updated': 0,
+        'failures': [{'section_id': '五、1', 'node_key': 'root', 'status': 'failed', 'error': '章节失败'}],
+    }))
+
+    async def report(*_args):
+        return True
+
+    with pytest.raises(executor.ConsolReaggregateJobError, match='章节失败'):
+        await executor.execute_consol_note_reaggregate(claim, report)
+    assert session.committed == 1

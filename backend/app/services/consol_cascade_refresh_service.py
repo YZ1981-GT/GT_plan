@@ -44,6 +44,7 @@ from app.services.consol_reconciliation_service import (
     ReconciliationResult,
     reconcile_worksheet_vs_trial,
 )
+from app.services.consol_push_notes import note_step_verdict
 from app.services.consol_push_service import refresh_notes_exclusive
 from app.services.consol_report_service import generate_consol_reports_sync
 from app.services.consol_trial_service import recalculate_trial
@@ -308,27 +309,20 @@ async def refresh_all(
         logger.exception("级联刷新合并附注失败（下游步，继续）：项目=%s 年度=%s", parent_project_id, year)
         _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "error")
     else:
-        note_status = stats.get("note_status")
-        if note_status == "persisted":
+        step_status, detail = note_step_verdict(stats)
+        if step_status == "succeeded":
             result.steps_completed.append(STEP_NOTES)
             _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "completed")
-        elif note_status in ("partial", "failed"):
-            # 部分 / 全部章节×节点失败：如实记错误，不算完成（与推送 CP-03 同口径）
+        elif step_status in ("partial", "failed"):
             result.errors.append({
                 "step": STEP_NOTES,
                 "node": root_node_label,
-                "error": (
-                    f"合并附注刷新{'部分失败' if note_status == 'partial' else '失败'}："
-                    f"失败 {stats.get('failed_count', 0)} 个章节×节点，"
-                    f"按公式刷新 {stats.get('refreshed_count', 0)}，"
-                    f"保留单体附注拉数 {stats.get('kept_pulled_count', 0)}"
-                ),
+                "error": detail,
             })
             _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "error")
         else:
-            # 没有可刷新的章节 / 节点（无模板类型、无企业树、上下文不可用等）：跳过，不伪装成完成
             result.steps_skipped.append(STEP_NOTES)
-            logger.info("级联刷新：没有可刷新的合并附注，跳过（项目=%s 统计=%s）", parent_project_id, stats)
+            logger.info("级联刷新：合并附注步骤已跳过（项目=%s 统计=%s）", parent_project_id, detail)
             _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "skipped")
 
     result.duration_ms = int((time.monotonic() - t0) * 1000)

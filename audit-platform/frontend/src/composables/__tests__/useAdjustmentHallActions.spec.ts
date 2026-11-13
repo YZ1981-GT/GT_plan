@@ -117,6 +117,7 @@ describe('useAdjustmentHallActions', () => {
       confirmText: '确认通过',
       message: expect.stringContaining('1 笔手工分录将在批准事务中计入试算表审定数'),
     }))
+    expect(ui.confirmDangerous.mock.calls[0][0].message).toContain('报表与附注由后台刷新，完成后各页面显示最新数')
     expect(api.reviewAdjustmentsBatch).toHaveBeenCalledWith('p1', { entry_group_ids: ['g-draft'], status: 'approved' })
     expect(onChanged).toHaveBeenCalledTimes(1)
   })
@@ -199,4 +200,22 @@ describe('withDescriptions（导入 / 保存回执只有编号，摘要从列表
     expect(rows[0]).toEqual({ entry_group_id: 'g1', adjustment_no: 'AJE-003' })
     expect(out[0]).not.toBe(rows[0])
   })
+})
+
+
+it('审批回执按 TB 状态汇总，并提示下游投递失败会自动重试', () => {
+  const result = flowResultMessage({
+    succeeded: [
+      { entry_group_id: 'g1', tb_update_status: 'committed' },
+      { entry_group_id: 'g2', tb_update_status: 'awaiting_workpaper_publish' },
+      { entry_group_id: 'g3', tb_update_status: 'workpaper_publish_unchanged' },
+    ],
+    failed: [],
+    notified: [],
+    downstream: { published: 2, failed: 1 },
+  }, '通过')
+  expect(result.type).toBe('warning')
+  expect(result.message).toContain('已计入试算表 1 笔、待来源底稿发布 1 笔、底稿发布无变化 1 笔')
+  expect(result.message).toContain('已投递后台刷新事件 2 条')
+  expect(result.message).toContain('部分刷新事件投递失败，系统会自动重试')
 })

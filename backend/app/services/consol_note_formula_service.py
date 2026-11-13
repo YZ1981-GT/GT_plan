@@ -1024,13 +1024,15 @@ async def _copy_note_data_record(
     node_key: str,
 ) -> ConsolNoteData:
     """把根节点 legacy 数据复制为节点专属行，避免填入覆盖项目级兼容行。"""
+    from app.services.consol_note_stale_state import inherit_values
+
     record = ConsolNoteData(
         project_id=project_id,
         year=year,
         section_id=section_id,
         node_key=node_key,
         data=copy.deepcopy(source.data) if isinstance(source.data, dict) else {},
-        is_stale=bool(source.is_stale),
+        **inherit_values(source),
         updated_at=datetime.now(timezone.utc),
     )
     db.add(record)
@@ -1270,7 +1272,9 @@ async def fill_by_formula(
     if preserve_pulled and record is not None and record_write_source(record) in PULLED_SOURCES:
         stale_marked = snapshot_changed(record.last_formula_value, formula_values)
         if stale_marked:
-            record.is_stale = True
+            from app.services.consol_note_stale_state import ConsolNoteStaleSource, mark_stale
+
+            mark_stale(record, ConsolNoteStaleSource.FORMULA_VALUE_CHANGED, now=now)
             record.last_formula_value = formula_values
             await db.flush()
         return {
@@ -1309,7 +1313,9 @@ async def fill_by_formula(
         db.add(record)
     else:
         record.data = data
-        record.is_stale = False
+        from app.services.consol_note_stale_state import clear_stale
+
+        clear_stale(record)
         record.updated_at = now
         record.last_formula_value = formula_values
     # V243：来源投影
@@ -1409,17 +1415,19 @@ async def fill_note_sections(
             })
 
     kept_pulled = sum(1 for r in results if r.get("status") == "kept_pulled")
-    updated = len(results) - kept_pulled
+    persisted_results = sum(1 for r in results if r.get("status") == "persisted")
+    skipped_results = len(results) - kept_pulled - persisted_results
     return {
         "project_id": str(project_id),
         "year": year,
         "node_key": node_key,
         "legacy_null": node_key is None,
         "template_type": resolved_template,
-        "status": "persisted" if results and not failures else "failed" if failures else "skipped",
+        "status": "failed" if failures else "persisted" if persisted_results else "skipped",
         "results": results,
         "failures": failures,
         "sections_processed": len(results) + len(failures),
-        "sections_updated": updated,
+        "sections_updated": persisted_results,
         "sections_kept_pulled": kept_pulled,
+        "sections_skipped": skipped_results,
     }

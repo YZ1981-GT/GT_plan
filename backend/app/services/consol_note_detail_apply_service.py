@@ -18,7 +18,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.consol_note_data_models import ConsolNoteData
-from app.services.consol_note_table_totals import to_decimal as _to_decimal
+from app.services.consol_note_table_totals import amount_equal, to_decimal as _to_decimal
 from app.models.consol_note_mapping_models import (
     ConsolNoteDetailTemplate,
     ConsolNoteDetailTemplateVersion,
@@ -376,7 +376,9 @@ async def apply_detail_refresh(
     data["_detail_applied_at"] = datetime.now(timezone.utc).isoformat()
 
     note_record.data = data
-    note_record.is_stale = False
+    from app.services.consol_note_stale_state import clear_stale
+
+    clear_stale(note_record)
     note_record.updated_at = datetime.now(timezone.utc)
     # V243：来源投影
     from app.services.consol_note_source_projection import compute_source_mode, source_digest as _sd, update_source_projection
@@ -390,6 +392,10 @@ async def apply_detail_refresh(
     update_source_projection(note_record, _mode, digest=_sd(data))
     await db.flush()
 
+    manual_differs_count = sum(
+        1 for item in kept_manual
+        if not amount_equal(item.get("kept_value"), item.get("computed_value"))
+    )
     return {
         "status": "applied",
         "section_id": section_id,
@@ -399,8 +405,9 @@ async def apply_detail_refresh(
         "skipped_entities": skipped_entities,
         "unbound_entities": unbound_entities,
         "out_of_scope_count": len(out_of_scope),
-        "filled_count": len(filled),
+        "filled_count": len(built.automatic_written),
         "kept_manual_count": len(kept_manual),
+        "manual_differs_count": manual_differs_count,
         "filled": filled[:50],
         "kept_manual": kept_manual[:50],
         "template_row_count": len(template_rows),

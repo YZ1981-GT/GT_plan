@@ -174,7 +174,7 @@ describe('重新汇总完成提示（节点子树）', () => {
       failures: [{ section_id: '五-1-1', node_key: 'G:consol_elim', status: 'failed', error: '无法计算差额：当前合并范围尚未由用户确认' }],
     })
     expect(summary.ok).toBe(false)
-    expect(summary.text).toBe('重新汇总完成：写入 1 个节点（拉数 1 / 差额 0 / 汇总 0）；本节点未更新：下级企业都没有可汇总的单体附注数据；'
+    expect(summary.text).toBe('重新汇总未完全完成：写入 1 个节点（拉数 1 / 差额 0 / 汇总 0）；本节点未更新：下级企业都没有可汇总的单体附注数据；'
       + '4 家企业待在「📋 明细映射」确认映射（乙、丙、丁 等）；1 处出错：无法计算差额：当前合并范围尚未由用户确认')
   })
 

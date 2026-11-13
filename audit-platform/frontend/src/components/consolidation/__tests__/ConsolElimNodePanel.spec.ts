@@ -10,6 +10,7 @@ import { defineComponent, h } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import type { ConsolTreeNode } from '@/services/consolidationApi'
 
+const message = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), info: vi.fn() }))
 const api = {
   getEliminations: vi.fn(),
   getNodeAmounts: vi.fn(),
@@ -32,7 +33,7 @@ vi.mock('@/services/consolidationApi', () => ({
 }))
 const mockPush = vi.fn()
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: mockPush }) }))
-vi.mock('element-plus', () => ({ ElMessage: { success: vi.fn(), warning: vi.fn(), info: vi.fn() } }))
+vi.mock('element-plus', () => ({ ElMessage: message }))
 vi.mock('@/utils/confirm', () => ({
   confirmDelete: vi.fn().mockResolvedValue(undefined),
   confirmDangerous: vi.fn().mockResolvedValue(undefined),
@@ -145,6 +146,7 @@ const ENTRY = {
 describe('ConsolElimNodePanel', () => {
   beforeEach(() => {
     Object.values(api).forEach((f) => f.mockReset())
+    Object.values(message).forEach((f) => f.mockReset())
     api.getEliminations.mockResolvedValue([ENTRY])
     api.getNodeAmounts.mockResolvedValue({ year: 2025, node_key: 'G:branch_elim', display_name: '', kind: 'elim', rows: [] })
     api.getWorksheetAccounts.mockResolvedValue({ year: 2025, accounts: [] })
@@ -281,4 +283,24 @@ describe('ConsolElimNodePanel', () => {
     expect(api.getEliminations).toHaveBeenLastCalledWith('p-g', 2025, { nodeKey: 'G:consol_elim' })
     expect(api.getWorksheetAccounts).toHaveBeenCalledTimes(1)
   })
+})
+
+
+it('审批成功但重算事件投递失败时显示警告与手动重试说明', async () => {
+  Object.values(api).forEach((f) => f.mockReset())
+  Object.values(message).forEach((f) => f.mockReset())
+  api.getNodeAmounts.mockResolvedValue({ year: 2025, node_key: 'G:branch_elim', display_name: '', kind: 'elim', rows: [] })
+  api.getWorksheetAccounts.mockResolvedValue({ year: 2025, accounts: [] })
+  api.getEliminations.mockResolvedValue([{ ...ENTRY, review_status: 'pending_review' }])
+  api.reviewElimination.mockResolvedValue({
+    ...ENTRY,
+    review_status: 'approved',
+    recalc_trigger: 'event_failed',
+    recalc_notice: '审批已生效，但后台重算事件投递失败，请在合并推送页手动重试',
+  })
+  const wrapper = mountPanel(node('G:branch_elim', '某集团'))
+  await flushPromises()
+  await wrapper.find('[data-testid="elim-approve-IA-001"]').trigger('click')
+  await flushPromises()
+  expect(message.warning).toHaveBeenCalledWith('审批已生效，但后台重算事件投递失败，请在合并推送页手动重试')
 })

@@ -176,12 +176,13 @@ async def mark_in_year(db, domain: str, project_id: uuid.UUID, year: int | None,
                                  sections=sections, year=year)
         return {"domain": domain, "marked": n}
     if domain == "consol_note":
+        from app.services.consol_note_stale_state import ConsolNoteStaleSource, stale_values
         from app.models.consol_note_data_models import ConsolNoteData
 
         result = await db.execute(sa.update(ConsolNoteData).where(
             ConsolNoteData.project_id == project_id, ConsolNoteData.year == year,
             ConsolNoteData.section_id.in_(sections),
-        ).values(is_stale=True).execution_options(synchronize_session=False))
+        ).values(**stale_values(ConsolNoteStaleSource.FORMULA_SETTINGS)).execution_options(synchronize_session=False))
         return {"domain": domain, "marked": int(result.rowcount or 0)}
     return {"domain": domain, "marked": 0, "reason": "no_stale_mark_for_domain"}
 

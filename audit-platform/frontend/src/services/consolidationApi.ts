@@ -93,6 +93,11 @@ export interface EliminationEntry {
   updated_at?: string
 }
 
+export interface EliminationReviewResponse extends EliminationEntry {
+  recalc_trigger: 'event_published' | 'event_failed' | 'not_applicable'
+  recalc_notice?: string | null
+}
+
 /** 新增 / 修改分录请求体（修改时字段可选；branch_entity_code 显式 null = 改回合并差额） */
 export interface EliminationEntryPayload {
   project_id?: string
@@ -663,7 +668,7 @@ export interface ConsolNoteReaggregateResult {
     section_id: string
     node_key: string
     action: ConsolNoteReaggregateAction
-    status: 'persisted' | 'skipped' | 'failed'
+    status: 'persisted' | 'kept_manual' | 'skipped' | 'failed'
     reason: string | null
     [k: string]: unknown
   }>
@@ -1104,7 +1109,7 @@ export async function deleteElimination(entryId: string, projectId: string): Pro
  */
 export async function reviewElimination(
   entryId: string, projectId: string, action: EliminationReviewAction,
-): Promise<EliminationEntry> {
+): Promise<EliminationReviewResponse> {
   return api.post(`${P.eliminations.review(entryId)}?project_id=${projectId}`, action)
 }
 

@@ -319,6 +319,7 @@ export interface AdjustmentFlowResult {
   failed: Array<{ entry_group_id: string; adjustment_no: string | null; reason: string }>
   notified: Array<{ user_id: string; name: string; kind: string }>
   warning?: string | null
+  downstream?: { published: number; failed: number }
 }
 
 export interface AdjustmentReviewTask {

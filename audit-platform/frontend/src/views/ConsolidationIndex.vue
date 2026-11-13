@@ -676,6 +676,7 @@ import { projects as P_proj, reportConfig as P_rc, consolNoteSections as P_cn, c
 import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWorksheetTabs.vue'
 import ConsolNoteTab from '@/components/consolidation/ConsolNoteTab.vue'
+import { reaggregateSummary } from '@/components/consolidation/composables/consolNoteView'
 import ConsolScopeConfigDialog from '@/components/wizard/ConsolScopeConfigDialog.vue'
 import ConsolTrialBalanceTab from '@/components/consolidation/ConsolTrialBalanceTab.vue'
 import ConsolReportBreakdownView from '@/components/consolidation/ConsolReportBreakdownView.vue'
@@ -1057,21 +1058,20 @@ async function onReaggregateCompleted(job: PlatformJobSnapshot): Promise<void> {
   reaggregateJobId.value = ''
   reaggregateContext.value = null
   if (!context) return
-  const updated = result.sections_updated ?? result.sections_processed ?? 0
-  const errCount = Array.isArray(result.errors) ? result.errors.length : 0
-  if (errCount > 0) {
-    ElMessage.warning(`附注重新汇总完成（更新 ${updated} 个章节，${errCount} 个章节有告警）`)
-  } else {
-    ElMessage.success(`附注重新汇总完成（更新 ${updated} 个章节）`)
-  }
+  const summary = reaggregateSummary(result)
+  ElMessage[summary.ok ? 'success' : 'warning'](summary.text)
   activeTab.value = 'consol_note'
   await loadConsolNoteTree(true)
   const noteResult = await reloadNoteForRefresh(context)
-  if (noteResult?.status === 'done') {
-    consolStale.value = false
-  } else {
-    const reason = noteResult?.reason || '附注章节重读未完成'
-    ElMessage.warning(`重新汇总完成，但章节重读${noteResult?.status === 'failed' ? '失败' : '跳过'}：${reason}`)
+  if (summary.ok) {
+    if (noteResult?.status === 'done') {
+      consolStale.value = false
+    } else {
+      const reason = noteResult?.reason || '附注章节重读未完成'
+      ElMessage.warning(`重新汇总完成，但章节重读${noteResult?.status === 'failed' ? '失败' : '跳过'}：${reason}`)
+    }
+  } else if (noteResult?.status === 'failed') {
+    ElMessage.warning(`重新汇总未完全完成，章节重读失败：${noteResult.reason || '未知原因'}`)
   }
 }
 

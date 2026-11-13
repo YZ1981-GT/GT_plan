@@ -723,4 +723,6 @@ class TestApplyOptionalAndPlaceholder:
             ["工资", "100.00", "80.00"], ["办公费", "999", "40.00"], ["合计", "1099.00", "120.00"]]
         assert record.data["manual_cells"] == [{"row": 1, "col": 1}], "手工标记跟着「办公费」移到新行号"
         assert result["dropped_placeholders"] == ["……"] and result["lost_protected"] == []
-        assert result["kept_manual"] == [{"row": 1, "col": 1, "kept_value": "999"}]
+        assert result["kept_manual"] == [{
+            "row": 1, "col": 1, "kept_value": "999", "computed_value": "50.00",
+        }]
