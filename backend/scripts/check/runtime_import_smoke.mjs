@@ -23,8 +23,8 @@
  *   1 — 有加载失败
  */
 
-import { resolve, relative } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { resolve, relative, dirname } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
@@ -67,45 +67,55 @@ const DEDICATED_COMPONENT_TYPES = new Set([
 // ─── Parse registry to extract import paths ─────────────────────────────────
 
 /**
- * 从 htmlRendererRegistry.ts 解析每个专属 componentType 的 import 路径。
- * 匹配模式: componentType: 'xxx' 之后紧跟的 import('...') 路径。
+ * 从 registry（barrel ``htmlRendererRegistry.ts`` + ``registry/entries/*.ts``）
+ * 解析每个专属 componentType 的 import 路径。
+ *
+ * 结构演变（spec workpaper-maintainability-convergence §8.2）：
+ * 条目本体已从单体 ``htmlRendererRegistry.ts`` 迁到 ``registry/entries/*.ts``，
+ * barrel 只做装配（``[...coreEntries, ...formsEntries, ...]``）。
+ * 只读 barrel 会解析出 **0 条** —— 所有 componentType 都被判成「未注册」，
+ * 于是守卫整片变红而不是真发现问题（2026-11-14 CI 的 runtime-import-smoke 即此）。
+ * 因此必须扫 entries 目录 + barrel 本身。
  */
+function registrySourceFiles() {
+  const dir = resolve(FRONTEND_ROOT, 'src/components/workpaper');
+  const files = [REGISTRY_PATH];
+  const entriesDir = resolve(dir, 'registry/entries');
+  for (const name of readdirSync(entriesDir)) {
+    if (name.endsWith('.ts')) files.push(resolve(entriesDir, name));
+  }
+  return files;
+}
+
 function parseRegistryImports() {
-  const content = readFileSync(REGISTRY_PATH, 'utf-8');
-
-  // 定位 REGISTRY_LIST 段
-  const startIdx = content.indexOf('const REGISTRY_LIST');
-  const endIdx = content.indexOf('export const HTML_RENDERER_REGISTRY');
-  if (startIdx < 0 || endIdx < 0) {
-    console.error('[ERROR] Cannot locate REGISTRY_LIST in htmlRendererRegistry.ts');
-    process.exit(1);
-  }
-  const registryText = content.slice(startIdx, endIdx);
-
-  // 提取 componentType → import path 映射
-  // Pattern: componentType: 'xxx' ... import('path')
   const entries = new Map();
-  const entryRe = /componentType:\s*'([^']+)'/g;
-  const importRe = /import\(\s*'([^']+)'\s*\)/g;
 
-  let match;
-  const componentTypes = [];
-  while ((match = entryRe.exec(registryText)) !== null) {
-    componentTypes.push({ type: match[1], index: match.index });
-  }
+  for (const file of registrySourceFiles()) {
+    const content = readFileSync(file, 'utf-8');
 
-  // For each componentType, find the nearest import() after it
-  for (let i = 0; i < componentTypes.length; i++) {
-    const ct = componentTypes[i];
-    const nextStart = ct.index;
-    const nextEnd = i < componentTypes.length - 1
-      ? componentTypes[i + 1].index
-      : registryText.length;
-
-    const segment = registryText.slice(nextStart, nextEnd);
-    const importMatch = /import\(\s*'([^']+)'\s*\)/.exec(segment);
-    if (importMatch) {
-      entries.set(ct.type, importMatch[1]);
+    // 每个条目形如：
+    //   {
+    //     componentType: 'k1-other-receivables',
+    //     component: defineAsyncComponent(() => import('../../K1OtherReceivables.vue')),
+    //     ...
+    //   }
+    // 按 componentType 位置切段，再在该段内找最近的 import()。
+    const entryRe = /componentType:\s*'([^']+)'/g;
+    const starts = [];
+    let m;
+    while ((m = entryRe.exec(content)) !== null) {
+      starts.push({ type: m[1], index: m.index });
+    }
+    for (let i = 0; i < starts.length; i++) {
+      const seg = content.slice(
+        starts[i].index,
+        i < starts.length - 1 ? starts[i + 1].index : content.length,
+      );
+      // 相对路径相对**当前文件**解析，改为绝对文件路径（ssrLoadModule 可直接吃）
+      const importMatch = /import\(\s*'([^']+)'\s*\)/.exec(seg);
+      if (importMatch) {
+        entries.set(starts[i].type, resolve(dirname(file), importMatch[1]));
+      }
     }
   }
 
@@ -172,13 +182,9 @@ async function main() {
       continue;
     }
 
-    // Resolve the import path relative to the registry file location
-    const registryDir = 'src/components/workpaper';
-    const resolvedPath = importPath.startsWith('./')
-      ? `/${registryDir}/${importPath.slice(2)}`
-      : importPath.startsWith('../')
-        ? `/${registryDir}/${importPath}`
-        : `/${importPath}`;
+    // importPath 已在 parseRegistryImports 里解析成**绝对文件路径**
+    // （相对 entries 文件所在目录展开）——Vite 的 ssrLoadModule 直接吃绝对路径。
+    const resolvedPath = importPath;
 
     try {
       // ssrLoadModule 执行完整 ESM 加载（含所有 import 链解析）

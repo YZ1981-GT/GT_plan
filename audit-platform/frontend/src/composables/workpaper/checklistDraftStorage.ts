@@ -37,7 +37,9 @@ export function userScopedWorkpaperDraftPrefix(namespace: string, scope: readonl
 
 export function userScopedWorkpaperDraftKey(namespace: string, scope: readonly string[]): string | null {
   const prefix = userScopedWorkpaperDraftPrefix(namespace, scope.slice(0, -1))
-  const item = scope.at(-1)
+  // 不用 `scope.at(-1)`：本仓部分 tsconfig（`tsconfig.pac-t21.json` 等）lib 低于
+  // ES2022，`Array.prototype.at` 不在类型里 ⇒ TS2339 打红。索引取值等价且各处都能编。
+  const item = scope.length > 0 ? scope[scope.length - 1] : undefined
   return prefix && item ? `${prefix}${encodeURIComponent(item)}` : null
 }
 

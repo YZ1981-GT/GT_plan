@@ -66,13 +66,25 @@ class TestMetaOverrideAlignment:
         assert set(all_meta.keys()) >= EXPECTED_CYCLES
 
     def test_non_null_codes_have_override(self, all_meta, overrides):
-        """meta 的非 null code 必须在 override 有映射。"""
+        """meta 的非 null code 必须在 override 有映射。
+
+        🔴 例外：G0 的 ``diffCode`` 是**底稿目录索引号**（展示值），不是 tab 名索引号。
+        `cycleConfirmationMeta.ts` 里 G0 段有明确注释：目录 F4:F12 是索引号唯一裁决者，
+        「非证券差异表 tab 写 G0-4 而目录为 G0-5」；定位一律走 `sheets.diff.sheetName`
+        的真实 tab 名。而 `wp_code_overrides.json` 是按 **tab 名**登记的
+        （`G0-4 -> confirmation-diff-nonsecurities`）。
+        两套编号本就不同，要求 `目录索引号 ∈ override` 是把两种口径混为一谈 ——
+        这条豁免按 `(循环, 字段)` 精确点名，不做「前缀白名单」以免掩盖真缺口。
+        """
+        CATALOG_INDEX_FIELDS = {("G0", "diffCode")}  # 展示值=目录索引号，非 tab 名
         missing = []
         for cycle, fields in all_meta.items():
             if cycle not in EXPECTED_CYCLES:
                 continue
             for field, code in fields.items():
                 if code is None:
+                    continue
+                if (cycle, field) in CATALOG_INDEX_FIELDS:
                     continue
                 # code 可能是 'E0-7' 形式，查 override 时先试完整名再试编码
                 if code not in overrides:
@@ -81,6 +93,19 @@ class TestMetaOverrideAlignment:
                     if not found:
                         missing.append(f"{cycle}.{field}={code}")
         assert not missing, f"Meta 非 null code 在 override 无映射: {missing}"
+
+    def test_g0_diff_code_is_catalog_index_not_tab_name(self, all_meta, overrides, meta_source):
+        """反向自证：G0.diffCode 确实是目录索引号（故不受上一条约束）。
+
+        防止将来有人把 G0.diffCode 改成 tab 名后，上一行的豁免悄悄变成漏检。
+        """
+        assert all_meta["G0"]["diffCode"] == "G0-5"
+        # 目录索引号 G0-5 不在 override（它按 tab 名登记）
+        assert "G0-5" not in overrides
+        # 真实 tab 名 G0-4 在 override —— 这才是 sheet 定位用的键
+        assert overrides.get("G0-4") == "confirmation-diff-nonsecurities"
+        # 且 meta 源码里确实声明了「索引号唯一裁决者」的口径
+        assert "索引号唯一裁决者" in meta_source
 
     def test_null_codes_not_required(self, all_meta, overrides):
         """meta 为 null 的字段不要求 override 映射（本测试确认无误报）。"""

@@ -34,7 +34,13 @@ from uuid import uuid4
 
 from app.core.config import Settings, settings
 from app.routers import wp_formula as router_mod
-from tests.d_cycle_extraction._endpoint_doubles import AuthGateSessionMixin, admin_user, formula_row
+from tests.d_cycle_extraction._endpoint_doubles import (
+    AuthGateSessionMixin,
+    FakeExecuteResult as _FakeResult,
+    FakeSessionWriteMixin,
+    admin_user,
+    formula_row,
+)
 from app.routers.wp_render_strategies import _d6_contract_assets as d6
 from app.services.d_cycle_extraction import presets as presets_mod
 from app.services.d_cycle_extraction.presets import SOURCE_PRESET
@@ -49,19 +55,7 @@ def _run(coro):
 # ---------------------------------------------------------------------------
 
 
-class _FakeResult:
-    def __init__(self, *, scalar=None, rows=None):
-        self._scalar = scalar
-        self._rows = rows or []
-
-    def scalar_one_or_none(self):
-        return self._scalar
-
-    def scalars(self):
-        return SimpleNamespace(all=lambda: list(self._rows))
-
-
-class _FakeSession(AuthGateSessionMixin):
+class _FakeSession(FakeSessionWriteMixin, AuthGateSessionMixin):
     def __init__(self, *, wp, wp_code, user_formulas=None, project_year=None):
         self.wp = wp
         self.wp_code = wp_code
@@ -69,6 +63,7 @@ class _FakeSession(AuthGateSessionMixin):
         # d-cycle-tier-a-writeback-detail-seed Task 3.1：GET Tier A 求值需 projects.audit_year。
         self.project_year = project_year
         self.committed = False
+        self._init_write_side()
 
     async def execute(self, stmt, params=None):
         s = str(stmt).lower()

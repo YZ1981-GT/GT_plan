@@ -123,6 +123,20 @@ async def _seed_attachment(
 
 class TestPreviewWhitelistContract:
     def test_whitelist_frozen_and_includes_svg(self) -> None:
+        """预览白名单契约：SVG 在**契约集合**内，但被活动内容拦截挡在外联预览之外。
+
+        🔴 口径变更（spec `attachment-platform-cross-module-closure` R1.4：
+        「SVG/HTML 等活动内容不得内联执行」）：本 job 的原判据要求
+        `previewable_types` 里**含** `.svg`，那与后来的安全要求冲突 ——
+        SVG 可携带脚本，内联同源返回等于 XSS 入口。
+
+        现行两层设计：
+          ① `previewable_types` = 可预览的普通格式（不含活动内容）；
+          ② `inline_preview_allowed()` = 活动内容兜底（SVG/HTML 一律只下载），
+             由 `attachment_security_baseline` 的守卫单测钉住。
+        因此本判据改为：代码集合 ∪ 活动内容集合 == 契约集合，且 SVG 必须落在
+        活动内容那一侧（不得内联）。
+        """
         contract = _load("backend_preview_api_contract.json")
         src = ATTACHMENTS_ROUTER.read_text(encoding="utf-8")
         m = re.search(r"previewable_types\s*=\s*\{([^}]+)\}", src)
@@ -133,10 +147,31 @@ class TestPreviewWhitelistContract:
             if part.strip().strip("'\"")
         }
         expect = set(contract["preview_whitelist_exts"])
-        assert found == expect
-        assert ".svg" in found
+
+        # 活动内容（只下载、不内联）——与 attachment_storage_resolver 单一来源
+        from app.services.attachment_storage_resolver import (
+            ACTIVE_CONTENT_EXTENSIONS,
+            inline_preview_allowed,
+        )
+
+        active = {e.lower() for e in ACTIVE_CONTENT_EXTENSIONS}
+        # 契约集合里每个扩展名必须恰好归入一侧（内联预览 / 仅下载），不得遗漏。
+        # 活动内容集会包含契约未列出的 `.html/.htm/.xhtml`（它们本来就只能下载，不属预览白名单），
+        # 故只校验契约列出的那些，不要求两侧并集等于契约全集的超集方向。
+        assert expect <= (found | active), (
+            f"预览口径漂移：契约里有但两侧都没有 {sorted(expect - (found | active))}"
+        )
+        assert not (expect & active - {".svg"}), (
+            f"契约声明的可预览格式被误判为活动内容: {sorted(expect & active - {'.svg'})}"
+        )
+        # SVG 必须被活动内容拦截（不得内联预览）
+        assert ".svg" in active, "SVG 必须是活动内容（不得内联预览）"
+        assert inline_preview_allowed("x.svg") is False
+        # 活动内容不得出现在可内联预览集合里
+        assert not (found & active), f"活动内容混入内联预览集合: {sorted(found & active)}"
         for ext in contract["preview_whitelist_excludes"]:
             assert ext not in found
+            assert ext not in active
 
     def test_non_whitelist_json_shape_keys_documented(self) -> None:
         contract = _load("backend_preview_api_contract.json")

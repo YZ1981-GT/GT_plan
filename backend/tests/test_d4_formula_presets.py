@@ -53,7 +53,7 @@ _BALANCE_TERMS = ("期初余额", "期末余额")
 # （spec tb-adjustment-column-formula-closure Phase 1 Task 1.3）⇒ 按本文件
 # `test_prefill_only_vocab_still_unregistered` 的指示从本元组移除。
 # 该自检正是为此刻设计的：它在函数注册后打红，迫使豁免清单同步收缩。
-_PREFILL_ONLY_FUNCS = ("TB_SUM", "LEDGER", "LEDGER_DETAIL")
+_PREFILL_ONLY_FUNCS = ("TB_SUM",)
 
 # 正则：从 TB/TB_SUM/TB_AUX 公式中提取科目码
 _CODE_RE = re.compile(

@@ -607,15 +607,24 @@ class TestOnlyOfficeWhitelist:
 
     def test_custom_registered_in_frontend_registry(self):
         """custom 必须有前端渲染组件，否则白名单放行后是空白页。"""
-        src = _read("audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts")
-        assert "GtCustomWpEditor" in src
-        # registry 是 `{ ct: 'custom', component: GtCustomWpEditor }` 形态，
-        # 不是 `'custom': X` 的 map 字面量 → 按 ct + 组件名双锚点断言
+        # registry 自 spec workpaper-maintainability-convergence §8.2 起拆分为
+        # `htmlRendererRegistry.ts`（barrel：只装配）+ `registry/entries/*.ts`（条目本体）。
+        # 守卫必须扫**整个 registry 目录**，只读 barrel 会把「条目已迁到 entries」误判成
+        # 「未注册」——这正是 2026-11-14 CI 上 custom-workpaper-backend 变红的原因。
+        reg_dir = _REPO / "audit-platform/frontend/src/components/workpaper"
+        src = ""
+        for p in sorted(reg_dir.rglob("*.ts")):
+            if "__tests__" in p.parts:
+                continue
+            if p.name == "htmlRendererRegistry.ts" or "/registry/" in p.as_posix():
+                src += p.read_text(encoding="utf-8")
+        assert src.strip(), "registry 目录读不到任何源码（守卫判据失效）"
+        assert "GtCustomWpEditor" in src, "registry（barrel + entries）未引用 GtCustomWpEditor"
+        # registry 是 `{ componentType: 'custom', component: GtCustomWpEditor }` 形态，
+        # 不是 `'custom': X` 的 map 字面量 → 按 componentType + 组件名双锚点断言。
         # 真正要钉的不变式 = custom 底稿有渲染组件（组件名是稳定锚点，
         # 而 registry 的键写法/条目形态属前端实现细节，不该由后端守卫锁死）
-        assert "GtCustomWpEditor" in src, "registry 未引用 GtCustomWpEditor"
-        assert re.search(r"\bcustom\b", src), "registry 无 custom 字样"
-        assert "GtCustomWpEditor" in src, "registry 未指向 GtCustomWpEditor"
+        assert re.search(r"componentType:\s*'custom'", src), "registry 无 componentType: 'custom' 条目"
 
 
 class TestProjectionIsSingleEntry:

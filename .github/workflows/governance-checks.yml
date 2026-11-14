@@ -865,8 +865,39 @@ jobs:
     # ⑤ 列头字面丢了源 xlsx 空格（`账  龄` / 上市 `金  额` 双空格 / 国企 `金 额` 单空格），
     #    上市两级表头父组名误写「期末余额/上年年末余额」（源为「期末数/上年年末数」）。
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        # 🔴 必须 pgvector 镜像：create_all 含 VECTOR(1024) 列，裸 postgres:16 会报
+        #    type "vector" does not exist 使建表整体失败。
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: audit_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform
+      # 🔴 挡住 init_tables.py 的 seed 端点回调（CI 无后端，显式钉死避免写别人库）
+      API_BASE_URL: http://127.0.0.1:9
     steps:
       - uses: actions/checkout@v4
+      - name: Bootstrap schema (create_all -> migrations)
+        # 🔴 本 job 的守卫会连库（禁 skip：静默 skip 就是假绿）。空库必须先
+        #    create_all 建平台基础 schema —— 迁移绝大多数是 ALTER 增量，空库直接跑
+        #    上百个 `relation does not exist` 且 run_pending() 仍返回成功。
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python backend/scripts/seed/init_tables.py
+          python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -1352,8 +1383,39 @@ jobs:
     # 三阶段变动表行集重建（源模板 12/10 行）+ 附注汇总表推送 + item_id 一致性守卫。
     # spec: .kiro/specs/k1-extraction-chain-and-note-alignment/
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        # 🔴 必须 pgvector 镜像：create_all 含 VECTOR(1024) 列，裸 postgres:16 会报
+        #    type "vector" does not exist 使建表整体失败。
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: audit_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform
+      # 🔴 挡住 init_tables.py 的 seed 端点回调（CI 无后端，显式钉死避免写别人库）
+      API_BASE_URL: http://127.0.0.1:9
     steps:
       - uses: actions/checkout@v4
+      - name: Bootstrap schema (create_all -> migrations)
+        # 🔴 本 job 的守卫会连库（禁 skip：静默 skip 就是假绿）。空库必须先
+        #    create_all 建平台基础 schema —— 迁移绝大多数是 ALTER 增量，空库直接跑
+        #    上百个 `relation does not exist` 且 run_pending() 仍返回成功。
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python backend/scripts/seed/init_tables.py
+          python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -1671,7 +1733,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        # 🔴 必须 pgvector 镜像：create_all 含 VECTOR(1024) 列，裸 postgres:16 会
+        #    报 type "vector" does not exist 使建表整体失败。
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: audit_platform
@@ -1694,8 +1758,22 @@ jobs:
         run: |
           pip install "uv>=0.7"
           uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
-      - name: Run migrations (PG schema for integration tests)
-        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending())"
+      # 🔴 空库引导（顺序不可调换，理由见 dsh-agent-panel-backend 同名步骤的注释）：
+      # ① CREATE EXTENSION vector —— create_all 含 VECTOR(1024) 列；
+      # ② init_tables.py = Base.metadata.create_all —— 平台基础 schema 由 ORM 建，
+      #    `backend/migrations/V*.sql` 绝大多数是 ALTER 增量；空库直接跑迁移会有上百个
+      #    `relation "xxx" does not exist` **而 run_pending() 仍返回成功** ⇒
+      #    后续连库守卫全因缺表而红（本 job 此前恒红就是这个原因）；
+      # ③ 再跑迁移补齐增量。
+      - name: Bootstrap schema (create_all -> migrations)
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{{{ github.workspace }}}}/backend
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python scripts/seed/init_tables.py
+          python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
         working-directory: backend
       - name: Coverage/drift guard (bidirectional HTTP + worker ⇔ ledger, no fake-pass + native_authz audited)
         run: python -m app.security.coverage_guard
@@ -2046,8 +2124,39 @@ jobs:
     #
     # 无 DB 依赖：四个守卫与两个 --check 均实测 rc=0 / 0 skipped（读快照与源 xlsx，不连库）。
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        # 🔴 必须 pgvector 镜像：create_all 含 VECTOR(1024) 列，裸 postgres:16 会报
+        #    type "vector" does not exist 使建表整体失败。
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: audit_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform
+      # 🔴 挡住 init_tables.py 的 seed 端点回调（CI 无后端，显式钉死避免写别人库）
+      API_BASE_URL: http://127.0.0.1:9
     steps:
       - uses: actions/checkout@v4
+      - name: Bootstrap schema (create_all -> migrations)
+        # 🔴 本 job 的守卫会连库（禁 skip：静默 skip 就是假绿）。空库必须先
+        #    create_all 建平台基础 schema —— 迁移绝大多数是 ALTER 增量，空库直接跑
+        #    上百个 `relation does not exist` 且 run_pending() 仍返回成功。
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python backend/scripts/seed/init_tables.py
+          python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -2882,7 +2991,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        # 🔴 必须 pgvector 镜像：create_all 含 VECTOR(1024) 列，裸 postgres:16 会
+        #    报 type "vector" does not exist 使建表整体失败。
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: audit_platform
@@ -2906,8 +3017,23 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt -q
-      - name: Run migrations (four-table schema)
-        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending())"
+      # 🔴 空库引导（顺序不可调换，理由见 dsh-agent-panel-backend 同名步骤的注释）：
+      # ① CREATE EXTENSION vector —— create_all 含 VECTOR(1024) 列；
+      # ② init_tables.py = Base.metadata.create_all —— 平台基础 schema 由 ORM 建，
+      #    `backend/migrations/V*.sql` 绝大多数是 ALTER 增量；空库直接跑迁移会有上百个
+      #    `relation "xxx" does not exist` **而 run_pending() 仍返回成功** ⇒
+      #    后续连库守卫全因缺表而红（本 job 此前恒红就是这个原因）；
+      # ③ 再跑迁移补齐增量。
+      - name: Bootstrap schema (create_all -> migrations)
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{{{ github.workspace }}}}/backend
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python scripts/seed/init_tables.py
+          python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
+        working-directory: backend
       - name: Legacy encoding balances stay zero (live DB, read-only)
         run: >-
           python -m pytest
@@ -2939,7 +3065,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        # 🔴 必须 pgvector 镜像：create_all 含 VECTOR(1024) 列，裸 postgres:16 会
+        #    报 type "vector" does not exist 使建表整体失败。
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: audit_platform
@@ -2963,8 +3091,23 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt -q
-      - name: Run migrations (report_config + four-table schema, applies V138)
-        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending())"
+      # 🔴 空库引导（顺序不可调换，理由见 dsh-agent-panel-backend 同名步骤的注释）：
+      # ① CREATE EXTENSION vector —— create_all 含 VECTOR(1024) 列；
+      # ② init_tables.py = Base.metadata.create_all —— 平台基础 schema 由 ORM 建，
+      #    `backend/migrations/V*.sql` 绝大多数是 ALTER 增量；空库直接跑迁移会有上百个
+      #    `relation "xxx" does not exist` **而 run_pending() 仍返回成功** ⇒
+      #    后续连库守卫全因缺表而红（本 job 此前恒红就是这个原因）；
+      # ③ 再跑迁移补齐增量。
+      - name: Bootstrap schema (create_all -> migrations)
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{{{ github.workspace }}}}/backend
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python scripts/seed/init_tables.py
+          python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
+        working-directory: backend
       - name: report_config account-code integrity (live DB, read-only)
         run: >-
           python -m pytest
@@ -3143,8 +3286,39 @@ jobs:
     # 🔴 连库用例走「单次 asyncio.run 取快照 + 断言同步」范式：连接池绑定首个事件循环，
     # 第二次 run 必炸成 `AttributeError: 'NoneType' object has no attribute 'send'`。
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        # 🔴 必须 pgvector 镜像：create_all 含 VECTOR(1024) 列，裸 postgres:16 会报
+        #    type "vector" does not exist 使建表整体失败。
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: audit_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform
+      # 🔴 挡住 init_tables.py 的 seed 端点回调（CI 无后端，显式钉死避免写别人库）
+      API_BASE_URL: http://127.0.0.1:9
     steps:
       - uses: actions/checkout@v4
+      - name: Bootstrap schema (create_all -> migrations)
+        # 🔴 本 job 的守卫会连库（禁 skip：静默 skip 就是假绿）。空库必须先
+        #    create_all 建平台基础 schema —— 迁移绝大多数是 ALTER 增量，空库直接跑
+        #    上百个 `relation does not exist` 且 run_pending() 仍返回成功。
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python backend/scripts/seed/init_tables.py
+          python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -4178,7 +4352,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        # 🔴 必须 pgvector 镜像：create_all 含 VECTOR(1024) 列，裸 postgres:16 会
+        #    报 type "vector" does not exist 使建表整体失败。
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: audit_platform
@@ -4201,8 +4377,22 @@ jobs:
         run: |
           pip install "uv>=0.7"
           uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
-      - name: Run migrations (PG schema for connected guards)
-        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending())"
+      # 🔴 空库引导（顺序不可调换，理由见 dsh-agent-panel-backend 同名步骤的注释）：
+      # ① CREATE EXTENSION vector —— create_all 含 VECTOR(1024) 列；
+      # ② init_tables.py = Base.metadata.create_all —— 平台基础 schema 由 ORM 建，
+      #    `backend/migrations/V*.sql` 绝大多数是 ALTER 增量；空库直接跑迁移会有上百个
+      #    `relation "xxx" does not exist` **而 run_pending() 仍返回成功** ⇒
+      #    后续连库守卫全因缺表而红（本 job 此前恒红就是这个原因）；
+      # ③ 再跑迁移补齐增量。
+      - name: Bootstrap schema (create_all -> migrations)
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{{{ github.workspace }}}}/backend
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python scripts/seed/init_tables.py
+          python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
         working-directory: backend
       - name: Anchor map guards (Property 3/4/5/6/7/8/13/14/15/16)
         # Property 4 是本 spec 最有价值的一条：读前端 composable 源码抽 serializeRows()
@@ -4305,7 +4495,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        # 🔴 必须 pgvector 镜像：create_all 含 VECTOR(1024) 列，裸 postgres:16 会
+        #    报 type "vector" does not exist 使建表整体失败。
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: audit_platform
@@ -4328,8 +4520,22 @@ jobs:
         run: |
           pip install "uv>=0.7"
           uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
-      - name: Run migrations (PG schema for connected guards)
-        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending())"
+      # 🔴 空库引导（顺序不可调换，理由见 dsh-agent-panel-backend 同名步骤的注释）：
+      # ① CREATE EXTENSION vector —— create_all 含 VECTOR(1024) 列；
+      # ② init_tables.py = Base.metadata.create_all —— 平台基础 schema 由 ORM 建，
+      #    `backend/migrations/V*.sql` 绝大多数是 ALTER 增量；空库直接跑迁移会有上百个
+      #    `relation "xxx" does not exist` **而 run_pending() 仍返回成功** ⇒
+      #    后续连库守卫全因缺表而红（本 job 此前恒红就是这个原因）；
+      # ③ 再跑迁移补齐增量。
+      - name: Bootstrap schema (create_all -> migrations)
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{{{ github.workspace }}}}/backend
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python scripts/seed/init_tables.py
+          python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
         working-directory: backend
       - name: Diff data integrity (Property 1~4；is_mock / 落盘↔实时逐条相等 / format_diff 可定位)
         # 落盘 `note_soe_listed_diff.json` 曾自标 `is_mock=true` 且已 stale
@@ -4865,7 +5071,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        # 🔴 必须 pgvector 镜像：create_all 含 VECTOR(1024) 列，裸 postgres:16 会
+        #    报 type "vector" does not exist 使建表整体失败。
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: audit_platform
@@ -4888,8 +5096,22 @@ jobs:
         run: python -m pip install -r backend/requirements.txt -q
       # 🔴 pytest 一律从**仓库根**跑（从 backend/ 跑会让用相对路径的测试假红）；
       #    只有迁移这一步需要 cwd=backend（`from app.core...` 依赖该 import root）。
-      - name: Run migrations (report_config，供槽级 row_code 连库守卫)
-        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending())"
+      # 🔴 空库引导（顺序不可调换，理由见 dsh-agent-panel-backend 同名步骤的注释）：
+      # ① CREATE EXTENSION vector —— create_all 含 VECTOR(1024) 列；
+      # ② init_tables.py = Base.metadata.create_all —— 平台基础 schema 由 ORM 建，
+      #    `backend/migrations/V*.sql` 绝大多数是 ALTER 增量；空库直接跑迁移会有上百个
+      #    `relation "xxx" does not exist` **而 run_pending() 仍返回成功** ⇒
+      #    后续连库守卫全因缺表而红（本 job 此前恒红就是这个原因）；
+      # ③ 再跑迁移补齐增量。
+      - name: Bootstrap schema (create_all -> migrations)
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{{{ github.workspace }}}}/backend
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python scripts/seed/init_tables.py
+          python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
         working-directory: backend
       - name: 边① 源 xlsx ↔ 附注 seed 列结构对齐（须 0 欠账 + 39 项自检全过）
         run: python backend/scripts/diagnose/diagnose_g7_column_alignment.py --check

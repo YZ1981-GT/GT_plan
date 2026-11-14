@@ -216,7 +216,9 @@ def test_report_formula_parser_exposes_required_methods():
     )
 
     for name, expected_params in (
-        ("execute", ["self", "formula", "row_cache"]),
+        # `strict` 为 keyword-only（`*, strict: bool = False`，spec formula-hub-integrity-closure
+        # 引入的严格取数口径），inspect 会把它列进参数表。
+        ("execute", ["self", "formula", "row_cache", "strict"]),
         ("extract_account_codes", ["self", "formula"]),
         ("extract_row_refs", ["self", "formula"]),
     ):

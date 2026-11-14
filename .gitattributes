@@ -53,3 +53,16 @@ backend/data/acnr/catalog_snapshots/*.json text eol=lf
 # 生成器恒写 LF、`--check` 原来比原始字节 ⇒ 干净检出（autocrlf 转成 CRLF）上检查模式与双生成判据恒红，
 # 「红成常态」后真实漂移也没人看。检查模式已改为按换行归一比较；这里再固定检出为 LF。index 里本就是 LF，不产生行尾 churn。
 backend/data/authz/*.json text eol=lf
+
+# Excel instrumentation 的两份契约/基线强制 LF（2026-11-14）。
+# `excel_instrumentation._assert_tier_a_fresh` 用**磁盘原始字节** sha256 比对上表中的
+# `tier_a_runtime.files[].sha256`。core.autocrlf=true 把 LF blob 检出成 CRLF 后：
+#   * Windows 本机：磁盘 CRLF，基线若也是按 CRLF 生成 ⇒ 绿
+#   * CI（Linux，LF 检出）：磁盘 LF ⇒ 与 CRLF 基线不符 ⇒ 红
+# 结果是「CI 上 3 个 job 恒红（d4-ipo-checklist / materialize-reuse-digest-caliber /
+# e1-sync-coverage-guards），本机却全绿」，而且 digest 基线会随生成它的机器漂移。
+# ⇒ 口径统一到**仓库内容（LF）**：这两份固定 eol=lf，且 digest 一律按 git blob 计算。
+# 本文件与上面几条是同一个坑的第四次复现，故把 eol=lf 显式写死而非依赖 autocrlf。
+backend/data/onlyoffice_excel_identity_carrier_contract.json text eol=lf
+backend/data/onlyoffice_excel_instrumentation_gate.json text eol=lf
+backend/app/services/excel_structure_fingerprint.py text eol=lf

@@ -149,7 +149,7 @@ def override_deps(mock_user, mock_db):
     # 回填走交付中心 _guard_action（admin 跳过成员校验但仍查 EQCR 委派）+ 交付件归属校验：mock_db 答不了这两类查询，
     # 本文件只验路由编排（提交 / 回执 / 能力门控），鉴权与归属见 test_deliverable_generation_membership_auth.py
     with (
-        patch("app.routers.deliverable._is_project_eqcr", new=AsyncMock(return_value=False)),
+        patch("app.routers.deliverable.is_project_eqcr", new=AsyncMock(return_value=False)),
         patch("app.routers.deliverable_lineage._ensure_task_in_project", new=AsyncMock(return_value=None)),
     ):
         yield

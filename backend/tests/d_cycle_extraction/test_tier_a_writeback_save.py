@@ -23,7 +23,13 @@ from uuid import uuid4
 
 from app.core.config import settings
 from app.routers import wp_formula as router_mod
-from tests.d_cycle_extraction._endpoint_doubles import AuthGateSessionMixin, admin_user, formula_row
+from tests.d_cycle_extraction._endpoint_doubles import (
+    AuthGateSessionMixin,
+    FakeExecuteResult as _FakeResult,
+    FakeSessionWriteMixin,
+    admin_user,
+    formula_row,
+)
 
 
 def _run(coro):
@@ -35,19 +41,7 @@ def _run(coro):
 # ---------------------------------------------------------------------------
 
 
-class _FakeResult:
-    def __init__(self, *, scalar=None, rows=None):
-        self._scalar = scalar
-        self._rows = rows or []
-
-    def scalar_one_or_none(self):
-        return self._scalar
-
-    def scalars(self):
-        return SimpleNamespace(all=lambda: list(self._rows))
-
-
-class _FakeSession(AuthGateSessionMixin):
+class _FakeSession(FakeSessionWriteMixin, AuthGateSessionMixin):
     """记录所有 execute 的 SQL，用于断言无 checklist_responses/DB 写回（Property 13）。"""
 
     def __init__(self, *, wp, wp_code, user_formulas=None):
@@ -56,6 +50,7 @@ class _FakeSession(AuthGateSessionMixin):
         self.user_formulas = user_formulas or []
         self.committed = False
         self.executed_sql: list[str] = []
+        self._init_write_side()
 
     async def execute(self, stmt, params=None):
         s = str(stmt)
