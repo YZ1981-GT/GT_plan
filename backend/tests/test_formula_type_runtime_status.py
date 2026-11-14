@@ -396,6 +396,26 @@ class _FakeSession:
     async def flush(self) -> None:  # noqa: D102
         self.flushed += 1
 
+    def begin_nested(self):
+        """SAVEPOINT 替身（async context manager，无操作）。
+
+        `persist_cross_check_results` 把落库包在 ``async with db.begin_nested()``
+        里（SAVEPOINT 隔离：单次落库失败只回滚自己，不毒化调用方事务）。
+        替身缺这个方法时异常会被外层 ``except`` fail-open 吞成 ``return 0``，
+        于是断言变成「写入 0 行」——替身不全伪装成业务缺陷。
+        """
+        return _NullSavepoint()
+
+
+class _NullSavepoint:
+    """``AsyncSession.begin_nested()`` 的替身：enter/exit 均无操作。"""
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
 
 @pytest.mark.asyncio
 async def test_persist_writes_one_row_per_outcome_with_substitute_data() -> None:

@@ -6561,6 +6561,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install python-docx
-        run: pip install python-docx lxml
+        # 🔴 不能只装 python-docx/lxml：脚本链会 import 到
+        # `app.services.note_word_table` → `app.services.consol_note_formula_service`，
+        # 后者 `import sqlalchemy`（本 job 实测 2026-11-14 CI：
+        # ModuleNotFoundError: No module named 'sqlalchemy'）。
+        # 直接装 backend 全量依赖，避免「今天补一个、明天漏一个」的追打。
+        run: python -m pip install -r backend/requirements.txt
       - name: Check note template sync
         run: python backend/scripts/seed/sync_note_templates_from_word.py --check

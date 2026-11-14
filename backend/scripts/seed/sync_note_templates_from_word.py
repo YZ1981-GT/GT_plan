@@ -1143,4 +1143,13 @@ def main():
 
 
 if __name__ == "__main__":
+    # 🔴 输出含中文与 emoji（✅/🔴/✔ 等）。Windows 控制台默认 GBK 编码，
+    #    直接 print 会在**逻辑全部通过之后**抛 UnicodeEncodeError 使脚本 exit 1
+    #    ⇒ CI job（note-template-sync-check）恒红而真正原因是「打不出勾」。
+    #    重配 stdout/stderr 为 UTF-8（errors=replace 兜底，永不因编码失败）。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):  # pragma: no cover - 老解释器/已重定向
+            pass
     main()
