@@ -98,7 +98,13 @@ def main() -> int:
         "cases": results,
         "allRed": all(r.get("verdict") == "RED" for r in results),
     }
-    out = ROOT / ".kiro/specs/workpaper-guidance-content-closure/basis"
+    # 🔴 该 spec 已归档（`_archive/17-2026-10-03-verified-batch/`），报告只写归档区，
+    #    不重建活跃区的同名 basis 目录（否则已归档 spec 会重新出现被跟踪的残留文件）。
+    out = (
+        ROOT
+        / ".kiro/specs/_archive/17-2026-10-03-verified-batch"
+        / "workpaper-guidance-content-closure/basis"
+    )
     out.mkdir(parents=True, exist_ok=True)
     (out / "T05-mutation-report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=True), encoding="utf-8"

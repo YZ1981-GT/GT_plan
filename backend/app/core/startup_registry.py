@@ -25,6 +25,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Literal, Sequence
 
+from app.core import startup_candidate_gate as _candidate_gate
 from app.core import startup_deferred as _deferred
 from app.core import startup_migrations as _migrations
 
@@ -188,6 +189,9 @@ async def run_startup_tasks(
             deferred.append(spec)
             results.append(StartupTaskResult(spec.name, spec.phase, "deferred", 0, reload_handoff.deferred_detail()))
             continue
+
+        if _candidate_gate.apply_policy(spec, results, report, _set_runtime_report, StartupTaskResult, desensitize_detail):
+            continue
         skip_reason: str | None = None
         if spec.skip_condition is not None:
             try:
@@ -295,12 +299,10 @@ async def _task_acnr_redis_inject(_ctx: StartupContext) -> None:
     if acnr_redis is not None:
         set_redis_client(acnr_redis)
 
-
 def _task_register_event_handlers(_ctx: StartupContext) -> None:
     from app.services.event_handlers import register_event_handlers
 
     register_event_handlers()
-
 
 def _task_register_a13_event_handlers(_ctx: StartupContext) -> None:
     from app.services.a13_event_handler import register_a13_event_handlers
@@ -793,6 +795,8 @@ def start_all_workers(stop_event: asyncio.Event) -> list[asyncio.Task]:
     """
     ctx = StartupContext(stop_event=stop_event)
     for spec in _worker_specs():
+        if _candidate_gate.skip_reason(spec.name):
+            continue
         if spec.skip_condition is not None and spec.skip_condition(ctx):
             continue
         spec.run(ctx)
@@ -834,6 +838,9 @@ STARTUP_TASKS: tuple[StartupTaskSpec, ...] = (
         criticality="critical",
         run=_task_setup_logging,
     ),
+    StartupTaskSpec(
+        name="verify_candidate_tree_identity", phase="bootstrap", criticality="critical",
+        run=_candidate_gate.verify_tree_identity),
     StartupTaskSpec(
         name="run_migrations",
         phase="migration",

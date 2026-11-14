@@ -110,7 +110,6 @@ async def preview_file(
 
 @router.post(
     "/{project_id}/account-chart/import",
-    response_model=AccountImportResult,
 )
 async def import_client_chart(
     project_id: UUID,
@@ -121,27 +120,33 @@ async def import_client_chart(
     column_mapping: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
-) -> AccountImportResult:
-    """导入科目表 + 四表数据（支持多文件一次上传）。
+) -> dict:
+    """旧同步科目表导入入口**永久退役**，固定返回 410。
 
-    使用 smart_import_streaming 统一处理：
-    - 多文件安全：只 soft-delete 一次，不会后续文件覆盖前面的
-    - 内存可控：逐 sheet 解析并写入
-    - 自动提取科目表、四表数据、诊断信息
+    spec platform-global-display-settings-closure 任务 8 / 复核记录模式②
+    「声明为 retired 但真的在跑」：本端点原先仍 `POST` 且真的执行
+    `LedgerImportApplicationService.run_account_chart_import`（写入科目表与四表），
+    而 `LEDGER_IMPORT_ENTRYPOINTS` 已把它标成 `kind="retired"`，且
+    `validate_entrypoints` **只校验路径存在、不校验真返回 410** ⇒ 两边自相矛盾。
+
+    现行确认式导入必须走：
+      preview（`/account-chart/preview`）→ 单位确认 → `submit`
+      （`/account-chart/import-async` 或 `/ledger-import/submit`）。
+    旧的「直接传文件就写库」路径没有单位确认，会把万元账套按元写进库，差一万倍。
+
+    保留鉴权依赖 `require_project_access("edit")`：退役端点不该因为 410
+    而变成未登录可达的探针（否则它就不再受项目门禁约束）。
     """
-    from app.services.ledger_import_application_service import LedgerImportApplicationService
-
-    result_payload = await LedgerImportApplicationService.run_account_chart_import(
-        project_id=project_id,
-        user_id=str(current_user.id),
-        db=db,
-        files=files,
-        file=file,
-        upload_token=upload_token,
-        year=year,
-        column_mapping=column_mapping,
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "error_code": "LEDGER_IMPORT_MOVED_TO_CONFIRMED_JOB",
+            "message": (
+                "旧的同步科目表导入入口已退役：请先在「科目表预览」确认金额单位，"
+                "再经确认式导入提交；现行流程不会未经单位确认就写入账套。"
+            ),
+        },
     )
-    return AccountImportResult(**result_payload)
 
 
 @router.post("/{project_id}/account-chart/import-reset")

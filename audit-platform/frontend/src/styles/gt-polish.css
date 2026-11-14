@@ -167,11 +167,11 @@
   display: none !important;
 }
 
-/* 表格内链接按钮 */
+/* 表格内链接按钮（字号跟账号显示偏好；spec platform-global-display-settings-closure R5） */
 .el-table .el-button.is-link,
 .el-table .el-button.is-text {
   padding: 2px 6px !important;
-  font-size: 12px !important;
+  font-size: var(--gt-display-font-size, 12px) !important;
 }
 
 
@@ -384,8 +384,9 @@
   --el-descriptions-item-bordered-label-background: var(--gt-color-primary-bg) !important;
 }
 
+/* 描述列表与表格同属「数据区」，字号跟账号显示偏好（任务 5 R5） */
 .el-descriptions__label {
-  font-size: 12px !important;
+  font-size: var(--gt-display-font-size, 12px) !important;
   color: var(--gt-color-text-secondary) !important;
   font-weight: 600 !important;
   white-space: nowrap !important;

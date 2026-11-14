@@ -27,59 +27,23 @@
         <!-- 通知铃铛 -->
         <slot name="nav-notifications" />
 
-        <!-- 显示设置 Aa -->
+        <!-- 显示设置 Aa（spec platform-global-display-settings-closure 任务 5）：
+             面板复用 `DisplayPreferencesPanel` 的 compact 形态 —— 原来这里手写了 14 处
+             el-radio-group / el-switch 直接读写 displayPrefs，与管理员 Tab 各维护一份，
+             改一处必漏另一处。现在两处入口共用同一个组件。
+             面板底部给「全部显示设置」链接：普通用户走 `/display-settings`（无 admin 门），
+             管理员另有 `/settings` 的系统配置。 -->
         <el-popover placement="bottom" :width="300" trigger="click" :teleported="true">
           <template #reference>
             <div class="gt-topbar-btn" title="显示设置">
               <span class="gt-topbar-text-icon">Aa</span>
             </div>
           </template>
-          <div class="gt-display-prefs-panel">
-            <div class="gt-dp-row">
-              <span class="gt-dp-label">金额单位</span>
-              <el-radio-group v-model="displayPrefs.amountUnit" size="small" @change="(v: any) => displayPrefs.setUnit(v)">
-                <el-radio-button v-for="opt in displayPrefs.unitOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</el-radio-button>
-              </el-radio-group>
-            </div>
-            <div class="gt-dp-row">
-              <span class="gt-dp-label">表格字号</span>
-              <el-radio-group v-model="displayPrefs.fontSize" size="small" @change="(v: any) => displayPrefs.setFontSize(v)">
-                <el-radio-button v-for="opt in displayPrefs.fontOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</el-radio-button>
-              </el-radio-group>
-            </div>
-            <div class="gt-dp-row">
-              <span class="gt-dp-label">小数位数</span>
-              <el-radio-group v-model="displayPrefs.decimals" size="small" @change="(v: any) => displayPrefs.setDecimals(v)">
-                <el-radio-button :value="0">整数</el-radio-button>
-                <el-radio-button :value="2">2位</el-radio-button>
-                <el-radio-button :value="4">4位</el-radio-button>
-              </el-radio-group>
-            </div>
-            <div class="gt-dp-row">
-              <span class="gt-dp-label">零值显示</span>
-              <el-switch v-model="displayPrefs.showZero" size="small" active-text="0.00" inactive-text="—" @change="(v: any) => displayPrefs.setShowZero(v)" />
-            </div>
-            <div class="gt-dp-row">
-              <span class="gt-dp-label">负数红色</span>
-              <el-switch v-model="displayPrefs.negativeRed" size="small" @change="(v: any) => displayPrefs.setNegativeRed(v)" />
-            </div>
-            <div class="gt-dp-row">
-              <span class="gt-dp-label">变动高亮</span>
-              <el-radio-group v-model="displayPrefs.highlightThreshold" size="small" @change="(v: any) => displayPrefs.setHighlightThreshold(v)">
-                <el-radio-button :value="0">关</el-radio-button>
-                <el-radio-button :value="0.1">10%</el-radio-button>
-                <el-radio-button :value="0.2">20%</el-radio-button>
-                <el-radio-button :value="0.5">50%</el-radio-button>
-              </el-radio-group>
-            </div>
-            <!-- 表格编辑方式（spec excel-style-table-editing R1） -->
-            <div class="gt-dp-row">
-              <span class="gt-dp-label">表格编辑</span>
-              <el-radio-group :model-value="displayPrefs.gridEditMode" size="small" data-testid="grid-edit-mode" @change="(v: any) => displayPrefs.setGridEditMode(v)">
-                <el-radio-button v-for="opt in displayPrefs.gridEditModeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</el-radio-button>
-              </el-radio-group>
-            </div>
-            <div class="gt-dp-hint">{{ gridEditModeHint }}</div>
+          <DisplayPreferencesPanel compact />
+          <div class="gt-dp-more">
+            <el-button link type="primary" size="small" @click="openDisplaySettings">
+              全部显示设置
+            </el-button>
           </div>
         </el-popover>
 
@@ -100,8 +64,11 @@
             <el-icon :size="18"><DeleteFilled /></el-icon>
           </div>
         </el-tooltip>
-        <el-tooltip content="系统设置" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/settings')">
+        <!-- 系统配置入口：只有管理员能进 `/settings`（该路由有 permission: admin）。
+             非管理员点「系统设置」会被路由守卫弹「您没有访问该页面的权限」并踢回首页 ——
+             所以按角色分流到各自能进的页面（spec platform-global-display-settings-closure 任务 5）。 -->
+        <el-tooltip :content="isAdmin ? '系统设置' : '显示设置'" placement="bottom">
+          <div class="gt-topbar-btn" data-testid="topbar-settings-entry" @click="openSettingsEntry">
             <el-icon :size="18"><Setting /></el-icon>
           </div>
         </el-tooltip>
@@ -434,6 +401,7 @@ import { eventBus, type SyncEventPayload, type OpenFormulaManagerPayload, type F
 import { operationHistory } from '@/utils/operationHistory'
 import { subscribeProjectEvent, WILDCARD_EVENT, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import DegradedBanner from '@/components/DegradedBanner.vue'
+import DisplayPreferencesPanel from '@/components/settings/DisplayPreferencesPanel.vue'
 
 // 这些组件只在用户首次打开时下载和挂载；挂载后保留实例，避免关闭再开丢局部状态。
 const CustomQueryDialog = defineAsyncComponent(() => import('@/components/query/CustomQueryDialog.vue'))
@@ -442,7 +410,18 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const displayPrefs = useDisplayPrefsStore()
-const gridEditModeHint = computed(() => displayPrefs.gridEditModeOptions.find((o) => o.value === displayPrefs.gridEditMode)?.hint ?? '')
+
+// 系统配置 `/settings` 有 `meta.permission: 'admin'`（router/domains/system.ts）。
+// 非管理员点进去会被守卫提示无权并踢回首页 ⇒ 顶栏按角色分流到各自可达的页面。
+const isAdmin = computed(() => (authStore.user?.role ?? '') === 'admin')
+
+function openSettingsEntry() {
+  router.push(isAdmin.value ? '/settings' : '/display-settings')
+}
+
+function openDisplaySettings() {
+  router.push('/display-settings')
+}
 const { isDark, toggle: toggleTheme } = useTheme()
 
 /** formula-toolbar Task 5 — primary outlet owner epoch (bumped on workpaper route change). */
@@ -1638,32 +1617,15 @@ onUnmounted(() => {
   transform: translateX(-4px);
 }
 
-/* ── 显示设置面板 ── */
-.gt-display-prefs-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.gt-dp-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.gt-dp-hint {
-  margin-top: -6px;
-  font-size: var(--gt-font-size-xs);
-  line-height: 1.5;
-  color: var(--gt-color-text-tertiary);
-}
-.gt-dp-label {
-  font-size: var(--gt-font-size-xs);
-  color: var(--gt-color-text-secondary);
-  min-width: 56px;
-  flex-shrink: 0;
-}
-.gt-dp-row :deep(.el-radio-button__inner) {
-  padding: 4px 10px;
-  font-size: var(--gt-font-size-xs);
+/* ── 显示设置面板 ──
+   🔴 原来这里有一整套手写样式的显示设置面板，已换成语义同一的
+      `DisplayPreferencesPanel`（compact 形态），与管理员页签共用同一组件，
+      对应的旧样式类全部删除（守卫 displaySettingsWiring.spec.ts 反向断言）。 */
+.gt-dp-more {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--gt-color-border-light, #ebeef5);
+  text-align: right;
 }
 
 /* 进度面板高亮闪烁 */

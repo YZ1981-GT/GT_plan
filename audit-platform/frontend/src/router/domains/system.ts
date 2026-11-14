@@ -67,6 +67,15 @@ export const systemRoutes: RouteRecordRaw[] = [
           meta: { permission: 'admin' },
         },
 {
+          // spec platform-global-display-settings-closure 任务 5 / AC-07：
+          // 显示偏好是**每个登录用户**都要能改的（字号 / 密度 / 单位 / 固定列），
+          // 所以不能挂在只有 admin 能进的 `settings` 下。这里不设 permission 门控，
+          // 系统配置仍留在 admin 门内。普通用户的设置入口只指向本页。
+          path: 'display-settings',
+          name: 'DisplaySettings',
+          component: () => import('@/views/DisplaySettingsView.vue'),
+        },
+{
           path: 'consolidation',
           name: 'ConsolidationHub',
           component: () => import('@/views/ConsolidationHub.vue'),

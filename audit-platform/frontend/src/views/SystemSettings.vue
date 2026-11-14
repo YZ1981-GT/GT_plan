@@ -146,12 +146,19 @@
     </div>
       </el-tab-pane>
 
-      <!-- ═══ Tab 2: 枚举管理（仅 admin） ═══ -->
+      <!-- ═══ Tab 2: 显示设置（所有登录用户；spec platform-global-display-settings-closure 任务 5）
+           与顶栏 Aa 紧凑面板、`/display-settings` 独立页共用同一个 DisplayPreferencesPanel，
+           三处只有一个实现。此前该面板只在独立页上有，管理页没有复用入口。 ═══ -->
+      <el-tab-pane label="显示设置" name="display">
+        <DisplayPreferencesPanel v-if="activeTab === 'display'" />
+      </el-tab-pane>
+
+      <!-- ═══ Tab 3: 枚举管理（仅 admin） ═══ -->
       <el-tab-pane v-if="isAdmin" label="枚举管理" name="enum-dict">
         <EnumDictManager v-if="activeTab === 'enum-dict'" />
       </el-tab-pane>
 
-      <!-- ═══ Tab 3: 日志查看（仅 admin，MT-8） ═══ -->
+      <!-- ═══ Tab 4: 日志查看（仅 admin，MT-8） ═══ -->
       <el-tab-pane v-if="isAdmin" label="日志查看" name="logs">
         <LogViewerPanel v-if="activeTab === 'logs'" />
       </el-tab-pane>
@@ -168,11 +175,12 @@ import { handleApiError } from '@/utils/errorHandler'
 import { useAuthStore } from '@/stores/auth'
 import EnumDictManager from '@/components/system/EnumDictManager.vue'
 import LogViewerPanel from '@/components/system/LogViewerPanel.vue'
+import DisplayPreferencesPanel from '@/components/settings/DisplayPreferencesPanel.vue'
 
 const authStore = useAuthStore()
 const isAdmin = computed(() => (authStore.user?.role || '') === 'admin')
 
-const activeTab = ref<'basic' | 'enum-dict' | 'logs'>('basic')
+const activeTab = ref<'basic' | 'display' | 'enum-dict' | 'logs'>('basic')
 
 const loading = ref(false)
 const saving = ref(false)

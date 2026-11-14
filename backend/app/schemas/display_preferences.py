@@ -49,6 +49,15 @@ class DisplayPreferencesResponse(BaseModel):
 # design §16 F6：显式 null 与未提交的区分
 # 用 sentinel 表示"字段未出现在请求中"
 _UNSET = object()
+# 🔴 经 pydantic.Field(default_factory=…) 注入同一哨兵（闭包捕获同一对象）：
+#    直接赋默认值时 pydantic 生成 OpenAPI JSON Schema 会报
+#    PydanticJsonSchemaWarning（object() 不可 JSON 序列化），每次启动打 9 条日志噪音。
+#    default_factory 返回的仍是同一个 _UNSET，`is` 判据与校验行为完全不变
+#    （2026-11-14 探针验证：警告 1→0、哨兵身份一致、传值/默认行为一致）。
+
+
+def _unset() -> Any:
+    return _UNSET
 
 
 class DisplayPreferencesPatch(BaseModel):
@@ -65,15 +74,16 @@ class DisplayPreferencesPatch(BaseModel):
     base_revision: int = Field(..., ge=0, description="乐观锁版本号")
 
     # 所有业务字段可选；显式传 null 表示"跟随项目"（amount_unit_override）
-    amount_unit_override: AmountUnitOverride | None = _UNSET  # type: ignore[assignment]
-    font_size: FontSize | None = _UNSET  # type: ignore[assignment]
-    show_zero: bool | None = _UNSET  # type: ignore[assignment]
-    decimals: int | None = _UNSET  # type: ignore[assignment]
-    negative_red: bool | None = _UNSET  # type: ignore[assignment]
-    highlight_threshold: float | None = _UNSET  # type: ignore[assignment]
-    density: Density | None = _UNSET  # type: ignore[assignment]
-    grid_edit_mode: GridEditMode | None = _UNSET  # type: ignore[assignment]
-    fixed_columns: dict[str, Any] | None = _UNSET  # type: ignore[assignment]
+    # 默认值统一走 _unset()（见上方注释：避开 PydanticJsonSchemaWarning）
+    amount_unit_override: AmountUnitOverride | None = Field(default_factory=_unset)  # type: ignore[assignment]
+    font_size: FontSize | None = Field(default_factory=_unset)  # type: ignore[assignment]
+    show_zero: bool | None = Field(default_factory=_unset)  # type: ignore[assignment]
+    decimals: int | None = Field(default_factory=_unset)  # type: ignore[assignment]
+    negative_red: bool | None = Field(default_factory=_unset)  # type: ignore[assignment]
+    highlight_threshold: float | None = Field(default_factory=_unset)  # type: ignore[assignment]
+    density: Density | None = Field(default_factory=_unset)  # type: ignore[assignment]
+    grid_edit_mode: GridEditMode | None = Field(default_factory=_unset)  # type: ignore[assignment]
+    fixed_columns: dict[str, Any] | None = Field(default_factory=_unset)  # type: ignore[assignment]
 
     @model_validator(mode="after")
     def _at_least_one_business_field(self) -> "DisplayPreferencesPatch":

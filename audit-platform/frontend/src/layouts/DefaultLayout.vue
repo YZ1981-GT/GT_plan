@@ -129,6 +129,8 @@ import GlobalSearchDialog from '@/components/common/GlobalSearchDialog.vue'
 import { Bell, DataAnalysis, DataLine, Lock, CaretBottom } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { initGlobalBackspace } from '@/composables/useNavigationStack'
+import { useGlobalTableLayout } from '@/composables/useGlobalTableLayout'
+import { useDisplayPreferencesRuntime } from '@/composables/useDisplayPreferencesRuntime'
 import { isTextEntryTarget } from '@/utils/shortcuts'
 import { handleApiError } from '@/utils/errorHandler'
 import { useRoleContextStore } from '@/stores/roleContext'
@@ -142,6 +144,17 @@ import { routeViewKey } from '@/utils/routeViewKey'
 const route = useRoute()
 const router = useRouter()
 initGlobalBackspace(router)
+
+// ─── 显示偏好运行时（spec platform-global-display-settings-closure 任务 5）───
+// 🔴 两个 composable 此前在仓库里各有定义但**零生产调用方**（设计 §16 F10 / §16 F4），
+//    导致「改字号 / 密度立刻生效」与「改字号后表格重新 doLayout」都只存在于单测里：
+//    ① useDisplayPreferencesRuntime：按账号加载偏好 + 写根变量（--gt-display-font-size /
+//       --gt-table-row-height 等），换账号时重新加载；
+//    ② useGlobalTableLayout：字号变化后 nextTick 对所有 .el-table 调 doLayout，
+//       避免窄字号下列宽过宽、宽字号下过窄的错位。
+//    两者都要求已激活 Pinia，因此只在 setup 内调用一次（布局层是唯一挂载点）。
+useDisplayPreferencesRuntime()
+useGlobalTableLayout()
 
 // UI-1: 方向性页面过渡动画（前进 slide-left，后退 slide-right）
 const transitionName = ref('slide-left')
@@ -315,7 +328,9 @@ const FULLWIDTH_PATHS = [
   '/my-procedures',
 ]
 // '/workpapers/'：底稿短链（定位后替换到编辑器）不是项目子路径，不加则落进浏览模式、路由内容不渲染（acnr T16）
-const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/', '/eqcr/', '/workpapers/']
+// '/display-settings'：全宽独立设置页（spec platform-global-display-settings-closure 任务 5），
+//   不加这条会落进三栏浏览模式、右侧被项目详情占掉 ⇒ 普通用户看不到自己的显示偏好面板
+const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/display-settings', '/dashboard/', '/eqcr/', '/workpapers/']
 
 function isFullWidthPath(p: string): boolean {
   if (FULLWIDTH_PATHS.includes(p)) return true

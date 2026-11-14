@@ -248,14 +248,27 @@ async def export_data(
     """导出含数据的完整坏账准备表 xlsx（父行汇总 + 子行明细 + 合计行）。
 
     Requirements: 2.1, 2.2, 2.3, 2.4
+
+    🔴 单元策略接线（spec platform-global-display-settings-closure 任务 10）：
+    金额按**项目**的 `amount_unit` 折算（不是个人显示偏好 —— 正式交付件必须与
+    项目口径一致，见 requirements AC-20），R7 同步写明「金额单位：元/千元/万元」。
+    此前 `ExportUnitPolicy` 无任何生产调用方，导出恒为元且不标单位。
     """
     from fastapi.responses import StreamingResponse
 
     from app.services.bad_debt_export_service import BadDebtExportService
+    from app.services.export_unit_policy_resolver import (
+        resolve_export_policy,
+        resolve_project_id_for_wp_index,
+    )
 
     wp_index_id = await resolve_wp_index_id(db, wp_id)
+    # 单位策略：从底稿索引反查项目 → 读 amount_unit → 构造 policy（唯一入口）
+    project_id = await resolve_project_id_for_wp_index(db, wp_index_id)
+    policy = await resolve_export_policy(db, project_id)
+
     svc = BadDebtExportService(db)
-    buf = await svc.export_bytes(wp_index_id, template_only=False)
+    buf = await svc.export_bytes(wp_index_id, template_only=False, export_policy=policy)
     filename = "bad_debt_data.xlsx"
     return StreamingResponse(
         buf,

@@ -56,10 +56,15 @@ CANONICAL_TITLES = {
     "completion": "完成标准",
 }
 
+# 🔴 该 spec 已于 2026-10-03 归档进 `_archive/17-2026-10-03-verified-batch/`，
+#    basis 产物只能写到归档区（活跃区同名路径会让已归档 spec 看起来仍是 active，
+#    并让残留文件被 git 跟踪）。归档目录内已有同系列 T05/T17~T22 产物。
 REPORT = (
     ROOT
     / ".kiro"
     / "specs"
+    / "_archive"
+    / "17-2026-10-03-verified-batch"
     / "workpaper-guidance-content-closure"
     / "basis"
     / "T07-promote-unmapped-report.json"
