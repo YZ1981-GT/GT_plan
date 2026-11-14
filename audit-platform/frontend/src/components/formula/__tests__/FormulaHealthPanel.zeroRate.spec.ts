@@ -16,7 +16,11 @@ function healthy(crossCheck: unknown) {
 async function render(data: unknown) {
   get.mockResolvedValue(data)
   const wrapper = shallowMount(FormulaHealthPanel, {
-    props: { projectId: 'synthetic-project', year: 2025 }, global: { directives: { loading: () => {} } },
+    props: { projectId: 'synthetic-project', year: 2025 },
+    global: {
+      directives: { loading: () => {} },
+      stubs: { 'el-alert': true, 'el-table': true, 'el-table-column': true, 'el-tag': true },
+    },
   })
   wrappers.push(wrapper)
   await flushPromises()
@@ -39,4 +43,18 @@ describe('健康面板真实零通过率', () => {
     expect(get).toHaveBeenCalledTimes(1)
     expect(get).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ _silent: true }))
   })
+})
+
+it('公式配置率查询失败显示不可用而不是 0%', async () => {
+  const wrapper = await render({
+    ...healthy({ has_results: false }),
+    formula_config_rate: {
+      available: false,
+      coverage_rate: null,
+      message: '公式配置率暂时无法读取',
+    },
+  })
+  expect(wrapper.findAll('.gt-fh-card-value')[2].text()).toBe('—')
+  expect(wrapper.findAll('.gt-fh-card-desc')[2].text()).toBe('公式配置率暂时无法读取')
+  expect(wrapper.get('.gt-fh-score-value').text()).toBe('—')
 })

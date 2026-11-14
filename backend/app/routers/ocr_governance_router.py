@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, Query
@@ -177,6 +176,26 @@ def _isoformat(dt: Any) -> str | None:
     if hasattr(dt, "isoformat"):
         return dt.isoformat()
     return str(dt)
+
+
+def _confirmation_to_dict(confirmation: Any) -> dict:
+    """Map canonical OCR confirmation columns to the legacy API response keys.
+
+    ``OcrConfirmation`` is human-only and intentionally has no persisted
+    ``actor_type`` or ``reason`` columns; keep those legacy keys with their
+    contract values without reading non-existent ORM attributes.
+    """
+    return {
+        "id": str(confirmation.id),
+        "result_id": str(confirmation.ocr_result_id),
+        "field_name": confirmation.field_key,
+        "decision": confirmation.decision,
+        "original_value": confirmation.original_value,
+        "confirmed_value": confirmation.confirmed_value,
+        "actor_type": "user",
+        "reason": None,
+        "created_at": _isoformat(confirmation.confirmed_at),
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -492,7 +511,7 @@ async def add_confirmation(
     ocr.confirm 能力 + 仅人工 actor（Service Identity 禁止确认）。
     """
     pid = _parse_uuid(project_id, "project_id")
-    jid = _parse_uuid(job_id, "job_id")
+    _parse_uuid(job_id, "job_id")
     rid = _parse_uuid(result_id, "result_id")
     actor = ActorContext.for_user(current_user.id)
     role = await _get_user_role(db, current_user, pid)
@@ -509,6 +528,14 @@ async def add_confirmation(
             "Service Identity cannot perform human confirmation",
         )
 
+    if body.reason:
+        # OcrConfirmation has no reason column. Do not silently discard a
+        # caller-provided reason until the persistence contract is decided.
+        raise EvidenceGovernanceError(
+            EvidenceErrorCode.METADATA_INCOMPLETE,
+            "当前 OCR 确认模型不持久化 reason，请先完成字段契约设计",
+        )
+
     idem_key = idempotency_key or f"ocr:confirm:{result_id}:{body.field_name}:{body.decision}"
 
     facade = EvidenceGovernanceFacade(db)
@@ -521,7 +548,6 @@ async def add_confirmation(
             decision=body.decision,
             confirmed_value=body.confirmed_value,
             actor=txn.actor,
-            reason=body.reason,
         )
         return confirmation
 
@@ -544,14 +570,9 @@ async def add_confirmation(
         return {"replayed": True, "command_root_id": str(cmd_result.command_root_id)}
 
     confirmation = cmd_result.result
-    return {
-        "id": str(confirmation.id),
-        "result_id": str(confirmation.result_id),
-        "field_name": confirmation.field_name,
-        "decision": confirmation.decision,
-        "confirmed_value": confirmation.confirmed_value,
-        "command_root_id": str(cmd_result.command_root_id),
-    }
+    response = _confirmation_to_dict(confirmation)
+    response["command_root_id"] = str(cmd_result.command_root_id)
+    return response
 
 
 @router.get("/jobs/{job_id}/results/{result_id}/confirmations")
@@ -565,7 +586,7 @@ async def list_confirmations(
 ):
     """列出 OCR 结果的所有确认记录（diff view）。"""
     import sqlalchemy as sa
-    from app.models.evidence_governance_models import OcrConfirmation, OcrJob, OcrResult
+    from app.models.evidence_governance_models import OcrConfirmation, OcrJob
 
     pid = _parse_uuid(project_id, "project_id")
     jid = _parse_uuid(job_id, "job_id")
@@ -589,27 +610,15 @@ async def list_confirmations(
     # Fetch confirmations
     stmt = (
         sa.select(OcrConfirmation)
-        .where(OcrConfirmation.result_id == rid)
-        .order_by(OcrConfirmation.created_at.asc())
+        .where(OcrConfirmation.ocr_result_id == rid)
+        .order_by(OcrConfirmation.confirmed_at.asc())
     )
     result = await db.execute(stmt)
     confirmations = result.scalars().all()
 
     return {
         "result_id": str(rid),
-        "confirmations": [
-            {
-                "id": str(c.id),
-                "field_name": c.field_name,
-                "decision": c.decision,
-                "original_value": c.original_value,
-                "confirmed_value": c.confirmed_value,
-                "actor_type": c.actor_type,
-                "reason": c.reason,
-                "created_at": _isoformat(c.created_at),
-            }
-            for c in confirmations
-        ],
+        "confirmations": [_confirmation_to_dict(c) for c in confirmations],
     }
 
 
@@ -715,7 +724,7 @@ async def preview_mapping(
     所有项目成员可访问。rejected 字段不出现在 mapping 中。
     """
     pid = _parse_uuid(project_id, "project_id")
-    jid = _parse_uuid(job_id, "job_id")
+    _parse_uuid(job_id, "job_id")
     rid = _parse_uuid(result_id, "result_id")
     actor = ActorContext.for_user(current_user.id)
     role = await _get_user_role(db, current_user, pid)

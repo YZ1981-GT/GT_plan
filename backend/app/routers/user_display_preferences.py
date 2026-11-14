@@ -23,6 +23,7 @@ from app.schemas.display_preferences import (
 )
 from app.services.user_display_preferences_service import (
     DisplayPrefsRevisionConflict,
+    DisplayPrefsStorageLimitExceeded,
     get_preferences,
     patch_preferences,
 )
@@ -77,6 +78,17 @@ async def patch_display_preferences(
                 "code": "DISPLAY_PREFS_REVISION_CONFLICT",
                 "message": "偏好版本冲突，请使用最新版本重试",
                 "current": e.current.model_dump(mode="json"),
+            },
+        )
+    except DisplayPrefsStorageLimitExceeded as e:
+        # 422：请求本身合法但规范化后的载荷超过 64KiB 存储合同（design §2）
+        await db.rollback()
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=422,
+            content={
+                "code": "DISPLAY_PREFS_STORAGE_LIMIT_EXCEEDED",
+                "message": str(e),
             },
         )
     except Exception:

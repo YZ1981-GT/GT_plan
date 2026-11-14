@@ -192,9 +192,9 @@ def test_n3_fetch_abs_normalizes_both_sign_conventions():
     assert b["end_balance"] == 200530.32
 
 
-def test_n3_fetch_query_error_fails_open():
-    out = _run(n3._fetch_tb_data(_ctx(raise_on_execute=True)))
-    assert out["end_balance"] == 0
+def test_n3_fetch_query_error_fails_closed():
+    with pytest.raises(RuntimeError, match="N3 试算表取数失败"):
+        _run(n3._fetch_tb_data(_ctx(raise_on_execute=True)))
 
 
 def test_n3_prefill_by_slot_not_all_other():
@@ -216,9 +216,9 @@ def test_n3_prefill_parent_only_returns_empty():
     assert out == {}
 
 
-def test_n3_prefill_query_error_fails_open():
-    out = _run(n3._build_adjudication_prefill(_ctx(raise_on_execute=True)))
-    assert out == {}
+def test_n3_prefill_query_error_fails_closed():
+    with pytest.raises(RuntimeError, match="N3 审定表预填取数失败"):
+        _run(n3._build_adjudication_prefill(_ctx(raise_on_execute=True)))
 
 
 # ─── Property 13: N3 无披露 inert 残留 ──────────────────────────────────────

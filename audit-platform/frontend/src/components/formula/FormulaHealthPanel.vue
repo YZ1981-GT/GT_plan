@@ -8,7 +8,7 @@
 
     <!-- 健康度总分 -->
     <div class="gt-fh-score">
-      <span class="gt-fh-score-value" :style="{ color: scoreColor }">{{ overallScore }}%</span>
+      <span class="gt-fh-score-value" :style="{ color: scoreColor }">{{ overallScore == null ? '—' : `${overallScore}%` }}</span>
       <span class="gt-fh-score-label">公式健康度</span>
     </div>
 
@@ -33,7 +33,9 @@
       <!-- 3. 公式配置率 -->
       <div class="gt-fh-card">
         <div class="gt-fh-card-title">📐 报表公式配置率</div>
-        <div class="gt-fh-card-value" :style="{ color: pctColor(configPct) }">{{ configPct }}%</div>
+        <div class="gt-fh-card-value" :style="{ color: configPct == null ? 'var(--gt-color-text-tertiary)' : pctColor(configPct) }">
+          {{ configPct == null ? '—' : `${configPct}%` }}
+        </div>
         <div class="gt-fh-card-desc">{{ configDesc }}</div>
       </div>
 
@@ -142,10 +144,16 @@ const pushSuccDesc = computed(() => {
   return `写入 ${r.written} / 跳过 ${r.skipped} / 保留 ${r.kept}`
 })
 
-const configPct = computed(() => data.value?.formula_config_rate?.coverage_rate ?? 0)
+const configPct = computed<number | null>(() => {
+  const c = data.value?.formula_config_rate
+  if (c?.available === false) return null
+  return c?.coverage_rate ?? null
+})
 const configDesc = computed(() => {
   const c = data.value?.formula_config_rate
-  return c ? `${c.with_formula}/${c.total_rows} 行已配置公式` : ''
+  if (c?.available === false) return c.message || '公式配置率无法读取'
+  if (!c || c.coverage_rate == null) return '暂无配置数据'
+  return `${c.with_formula}/${c.total_rows} 行已配置公式`
 })
 
 const pendingCount = computed(() => data.value?.pending_conflicts?.pending ?? 0)
@@ -165,7 +173,9 @@ const staleDesc = computed(() => {
 
 const cycles = computed(() => data.value?.push_coverage?.cycles ?? [])
 
-const overallScore = computed(() => {
+const overallScore = computed<number | null>(() => {
+  // 配置率不可用时，综合分也不可用，不能把查询失败当成真实 0 分。
+  if (configPct.value == null) return null
   // 综合评分 = 六维度加权平均
   const w = [
     { v: pushCovPct.value, w: 0.2 },
@@ -180,6 +190,7 @@ const overallScore = computed(() => {
 
 const scoreColor = computed(() => {
   const s = overallScore.value
+  if (s == null) return 'var(--gt-color-text-tertiary)'
   if (s >= 80) return 'var(--gt-color-success)'
   if (s >= 50) return 'var(--gt-color-wheat)'
   return 'var(--gt-color-danger)'

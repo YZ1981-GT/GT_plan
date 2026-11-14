@@ -269,7 +269,7 @@ async def edit_time_suggest(
     result = await db.execute(
         sa.select(Log.new_value, Log.created_at).where(
             Log.user_id == staff_id,
-            Log.action.in_(["workpaper_online_open", "workpaper_online_save"]),
+            Log.action_type.in_(["workpaper_online_open", "workpaper_online_save"]),
             Log.created_at >= day_start,
             Log.created_at < day_end,
         ).order_by(Log.created_at)

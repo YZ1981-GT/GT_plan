@@ -25,5 +25,26 @@ module.exports = {
   rules: { 'no-undef': 'error' },
   overrides: [
     { files: ['**/*.d.ts'], rules: { 'no-undef': 'off' } },
+    {
+      // vitest.config.ts 里 `globals: true`：describe / it / expect / vi /
+      // beforeEach 都是运行时注入的全局，eslint 的 env 不认识它们。
+      // 只在测试文件上声明，生产代码的 no-undef 判据不变。
+      files: ['**/*.spec.ts', '**/*.spec.tsx', '**/*.test.ts', '**/*.test.tsx',
+              '**/__tests__/**/*.ts', '**/__tests__/**/*.tsx'],
+      globals: {
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        vi: 'readonly',
+        vitest: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        suite: 'readonly',
+        bench: 'readonly',
+      },
+    },
   ],
 }

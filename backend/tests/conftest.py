@@ -144,7 +144,6 @@ def pytest_collection_modifyitems(config, items):
     spec procedure-chain-hardening-and-java-contracts R20：PG 判定认 ``postgres://``（原先只认含 ``postgresql`` 的地址）；
     设 ``GT_REQUIRE_PG=1`` 时地址不是 PG 而收集到了 pg_only 用例 ⇒ ``UsageError``，不再静默跳过。
     """
-    from tests._perf_gate import perf_write_gate_error
     from tests._pg_url import is_pg_url, pg_requirement_error
 
     db_url = os.getenv("DATABASE_URL", "sqlite")
@@ -152,15 +151,6 @@ def pytest_collection_modifyitems(config, items):
                                  [item.nodeid for item in items if "pg_only" in item.keywords])
     if error:
         raise pytest.UsageError(error)
-    # 任务 0.3：选中「写真库的性能用例」却未声明可销毁库时整次运行失败，绝不静默写共享 PG。
-    perf_error = perf_write_gate_error(
-        db_url,
-        os.environ,
-        [item.nodeid for item in items
-         if "perf" in item.keywords and "pg_only" in item.keywords],
-    )
-    if perf_error:
-        raise pytest.UsageError(perf_error)
     skip_pg = pytest.mark.skip(reason="requires PostgreSQL")
     tag_pg = not is_pg_url(db_url)
     for item in items:
@@ -183,11 +173,26 @@ def pytest_configure(config):
 
 
 def pytest_collection_finish(session):
-    """收集阶段若有模块（直接或经辅助模块）触发了 gevent 猴子补丁，在跑任何用例之前就报错。
+    """在最终选择集上执行全局收集期安全检查。
 
-    补丁一旦打上，后续 TestClient / asyncio 用例会静默卡死（全量运行曾零输出挂起 30 分钟），
-    报错比挂起好查得多。常见来源是导入 locust（见本文件顶部 collect_ignore）。
+    ``pytest_collection_modifyitems`` 运行时，pytest 的 ``-m`` 过滤尚未必完成。
+    写性能测试闸门必须放在这里，否则 ``-m 'pg_only and not perf'`` 也会先被未选中的
+    ``perf`` 用例触发，导致 CI 的功能 PG job 在收集阶段退出码 4。
     """
+    from tests._perf_gate import perf_write_gate_error
+
+    db_url = os.getenv("DATABASE_URL", "sqlite")
+    perf_error = perf_write_gate_error(
+        db_url,
+        os.environ,
+        [item.nodeid for item in session.items
+         if "perf" in item.keywords and "pg_only" in item.keywords],
+    )
+    if perf_error:
+        raise pytest.UsageError(perf_error)
+
+    # 收集阶段若有模块（直接或经辅助模块）触发了 gevent 猴子补丁，在跑任何用例之前就报错。
+    # 补丁一旦打上，后续 TestClient / asyncio 用例会静默卡死；报错比挂起好查得多。
     import sys as _sys
 
     monkey = _sys.modules.get("gevent.monkey")

@@ -10,7 +10,7 @@ import logging
 from typing import Optional
 
 from fastapi import HTTPException
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,37 @@ class WpPermissionService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    @staticmethod
+    def _assignment_query(*, user_id: uuid.UUID, project_id: uuid.UUID):
+        """查询用户在项目中的有效委派。
+
+        ``ProjectAssignment`` 通过 ``staff_id`` 关联人员档案；用户身份只能从
+        ``StaffMember.user_id`` 解析，不能直接从委派表读取。
+        """
+        from app.models.staff_models import ProjectAssignment, StaffMember
+
+        return (
+            select(ProjectAssignment)
+            .select_from(ProjectAssignment)
+            .join(StaffMember, ProjectAssignment.staff_id == StaffMember.id)
+            .where(
+                ProjectAssignment.project_id == project_id,
+                StaffMember.user_id == user_id,
+                ProjectAssignment.is_deleted.is_(False),
+                StaffMember.is_deleted.is_(False),
+            )
+        )
+
+    async def _single_assignment(
+        self, *, user_id: uuid.UUID, project_id: uuid.UUID
+    ):
+        """返回唯一有效委派；重复人员档案时 fail-closed。"""
+        result = await self.db.execute(
+            self._assignment_query(user_id=user_id, project_id=project_id).limit(2)
+        )
+        rows = result.scalars().all()
+        return rows[0] if len(rows) == 1 else None
+
     async def check_project_access(
         self,
         *,
@@ -29,16 +60,9 @@ class WpPermissionService:
         project_id: uuid.UUID,
     ) -> bool:
         """项目级权限：用户是否为项目组成员"""
-        from app.models.staff_models import ProjectAssignment
-        stmt = select(ProjectAssignment).where(
-            and_(
-                ProjectAssignment.project_id == project_id,
-                ProjectAssignment.user_id == user_id,
-                ProjectAssignment.is_deleted == False,
-            )
-        )
-        result = await self.db.execute(stmt)
-        return result.scalar_one_or_none() is not None
+        return await self._single_assignment(
+            user_id=user_id, project_id=project_id
+        ) is not None
 
     async def check_cycle_access(
         self,
@@ -52,16 +76,9 @@ class WpPermissionService:
         if not await self.check_project_access(user_id=user_id, project_id=project_id):
             return False
         # 循环级：partner/manager/qc 可访问所有循环，auditor 只能访问分配的
-        from app.models.staff_models import ProjectAssignment
-        stmt = select(ProjectAssignment).where(
-            and_(
-                ProjectAssignment.project_id == project_id,
-                ProjectAssignment.user_id == user_id,
-                ProjectAssignment.is_deleted == False,
-            )
+        assignment = await self._single_assignment(
+            user_id=user_id, project_id=project_id
         )
-        result = await self.db.execute(stmt)
-        assignment = result.scalar_one_or_none()
         if not assignment:
             return False
         # 高权限角色可访问所有循环
@@ -82,16 +99,9 @@ class WpPermissionService:
         if not await self.check_project_access(user_id=user_id, project_id=project_id):
             return False
         # partner/manager 可访问所有底稿
-        from app.models.staff_models import ProjectAssignment
-        stmt = select(ProjectAssignment).where(
-            and_(
-                ProjectAssignment.project_id == project_id,
-                ProjectAssignment.user_id == user_id,
-                ProjectAssignment.is_deleted == False,
-            )
+        assignment = await self._single_assignment(
+            user_id=user_id, project_id=project_id
         )
-        result = await self.db.execute(stmt)
-        assignment = result.scalar_one_or_none()
         if not assignment:
             return False
         if assignment.role in ("partner", "manager", "qc", "eqcr", "admin"):

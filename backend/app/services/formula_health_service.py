@@ -127,35 +127,51 @@ async def _last_run_stats(
 async def _config_coverage(
     db: AsyncSession, project_id: uuid.UUID, year: int
 ) -> dict[str, Any]:
-    """统计 report_config 中有公式 vs 无公式的行。"""
+    """统计项目有效报表配置中有公式的行数。
+
+    ``report_config`` 没有 ``project_id`` 或 ``year`` 列。项目层通过
+    ``applicable_standard = 'project:{project_id}'`` 表达，年度不是报表配置
+    的持久化维度；这里必须复用有效配置加载器，和报表生成保持同一口径。
+    """
     try:
-        from app.models.report_models import ReportConfig
-
-        total_q = sa.select(sa.func.count()).select_from(ReportConfig).where(
-            ReportConfig.project_id == project_id,
-            ReportConfig.year == year,
-            ReportConfig.is_deleted == sa.false(),
+        from app.services.formula_settings.effective_report import (
+            load_effective_report_configs,
         )
-        total = (await db.execute(total_q)).scalar() or 0
+        from app.services.report_config_service import ReportConfigService
 
-        with_formula_q = sa.select(sa.func.count()).select_from(ReportConfig).where(
-            ReportConfig.project_id == project_id,
-            ReportConfig.year == year,
-            ReportConfig.is_deleted == sa.false(),
-            ReportConfig.formula.isnot(None),
-            ReportConfig.formula != "",
+        standard = await ReportConfigService.resolve_applicable_standard(db, project_id)
+        rows = await load_effective_report_configs(
+            db,
+            standard=standard,
+            project_id=project_id,
         )
-        with_formula = (await db.execute(with_formula_q)).scalar() or 0
-
+        total = len(rows)
+        with_formula = sum(
+            1 for row in rows if row.formula is not None and str(row.formula).strip()
+        )
         return {
+            "available": True,
             "total_rows": total,
             "with_formula": with_formula,
             "without_formula": total - with_formula,
-            "coverage_rate": round(with_formula / total * 100, 1) if total > 0 else 0,
+            "coverage_rate": round(with_formula / total * 100, 1) if total else 0,
         }
     except Exception:
-        logger.warning("公式配置率查询失败", exc_info=True)
-        return {"total_rows": 0, "with_formula": 0, "coverage_rate": 0}
+        logger.warning(
+            "公式配置率查询失败 [project=%s year=%s]",
+            project_id,
+            year,
+            exc_info=True,
+        )
+        return {
+            "available": False,
+            "error": "FORMULA_CONFIG_COVERAGE_UNAVAILABLE",
+            "message": "公式配置率暂时无法读取",
+            "total_rows": None,
+            "with_formula": None,
+            "without_formula": None,
+            "coverage_rate": None,
+        }
 
 
 # ── 维度 4：冲突待确认数 ───────────────────────────────────────────────────

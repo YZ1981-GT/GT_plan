@@ -6,7 +6,7 @@ PG 特定行为（如 JSONB）不在此测试范围。
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -73,7 +73,10 @@ class TestComputeHealthStructure:
 
         # 各维度应该有默认值，不抛异常
         assert result["push_success_rate"].get("has_run") is False or "error" in result["push_success_rate"]
-        assert result["formula_config_rate"].get("total_rows", 0) == 0
+        # 配置率读取失败必须标记不可用，不能把查询错误伪装成 0% 覆盖率。
+        assert result["formula_config_rate"]["available"] is False
+        assert result["formula_config_rate"]["coverage_rate"] is None
+        assert result["formula_config_rate"]["error"] == "FORMULA_CONFIG_COVERAGE_UNAVAILABLE"
         assert result["pending_conflicts"].get("pending", 0) == 0
 
 
@@ -103,13 +106,27 @@ class TestConfigCoverage:
     """维度 3：公式配置率。"""
 
     @pytest.mark.asyncio
-    async def test_zero_when_no_rows(self, project_id):
+    async def test_zero_when_no_rows(self, project_id, monkeypatch):
+        from app.services import report_config_service
+        from app.services.formula_settings import effective_report
         from app.services.formula_health_service import _config_coverage
-        db = AsyncMock()
-        # 第一次调用返回 total=0，第二次返回 with_formula=0
-        db.execute = AsyncMock(return_value=_MockScalar(0))
 
-        result = await _config_coverage(db, project_id, 2025)
+        async def standard(_db, _project_id):
+            return "enterprise"
+
+        async def no_rows(*args, **kwargs):
+            return []
+
+        monkeypatch.setattr(
+            report_config_service.ReportConfigService,
+            "resolve_applicable_standard",
+            staticmethod(standard),
+        )
+        monkeypatch.setattr(effective_report, "load_effective_report_configs", no_rows)
+
+        result = await _config_coverage(object(), project_id, 2025)
+        assert result["available"] is True
+        assert result["total_rows"] == 0
         assert result["coverage_rate"] == 0
 
 

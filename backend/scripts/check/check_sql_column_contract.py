@@ -319,6 +319,34 @@ def _load_allowlist() -> set[str]:
         return set()
 
 
+def _collect_orm_attributes() -> dict[str, set[str]]:
+    """收集 ORM 映射属性名，而不是数据库物理列名。
+
+    SQLAlchemy 允许 Python 属性名与数据库列名不同，例如
+    ``CfVerificationResult.pass_ = Column("pass", ...)``。裸 SQL 仍须按物理
+    列名检查，但 ``Model.attr`` 形态必须按 mapper 的属性键检查，否则合法的
+    保留字避让会被误报成列契约违规。
+    """
+    backend_dir = str(REPO_ROOT / "backend")
+    if backend_dir not in sys.path:
+        sys.path.insert(0, backend_dir)
+
+    try:
+        from app.models.base import Base
+    except ImportError:
+        return {}
+
+    attributes: dict[str, set[str]] = {}
+    for mapper in Base.registry.mappers:
+        table_name = getattr(mapper.local_table, "name", None)
+        if not table_name:
+            continue
+        attributes[table_name.lower()] = {
+            prop.key for prop in mapper.column_attrs
+        }
+    return attributes
+
+
 # ─── FROM/JOIN 别名映射（简易版）────────────────────────────────────────────
 
 _FROM_JOIN_ALIAS_RE = re.compile(
@@ -360,6 +388,8 @@ def run_check(strict: bool = False) -> int:
 
     # 收集类名→表名映射
     class_to_table = _collect_orm_class_to_table()
+    # ORM 属性名与数据库物理列名可能不同（如 pass_ -> pass），单独收集。
+    orm_attributes = _collect_orm_attributes()
 
     print(f"ORM 模型: {len(orm_columns)} 张表, {len(class_to_table)} 个映射类")
 
@@ -425,9 +455,10 @@ def run_check(strict: bool = False) -> int:
                 allowed_hits.append((rel_path, line_no, table_name, attr_name))
                 continue
 
-            # 检查列是否存在于 ORM 表
-            if table_name in orm_columns:
-                if attr_name not in orm_columns[table_name]:
+            # 检查是否存在对应的 ORM 映射属性。这里不能使用物理列集合，
+            # 否则 pass_ -> pass 这类合法的 SQLAlchemy 属性映射会被误报。
+            if table_name in orm_attributes:
+                if attr_name not in orm_attributes[table_name]:
                     violations.append((rel_path, line_no, table_name, attr_name, "orm_attr"))
 
     # ─── 输出报告 ─────────────────────────────────────────────────────────

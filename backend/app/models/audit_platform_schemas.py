@@ -228,6 +228,8 @@ class ProjectCreateResponse(BaseModel):
     # V212 当前审计阶段与预审截止日（改动走 PUT /api/projects/{id}/audit-phase）
     current_audit_phase: str = "final"
     interim_cutoff_date: date | None = None
+    # platform-global-display-settings-closure R4 / AC-05：项目默认金额单位随详情下发
+    amount_unit: str | None = None
 
 
 # ===================================================================

@@ -428,10 +428,10 @@ async def get_edit_time(
 
     # 查找该底稿的编辑相关日志
     result = await db.execute(
-        sa.select(Log.created_at, Log.action).where(
+        sa.select(Log.created_at, Log.action_type).where(
             sa.or_(
-                sa.and_(Log.action == "workpaper_online_open", Log.new_value.contains(str(wp_id))),
-                sa.and_(Log.action == "workpaper_online_save", Log.new_value.contains(str(wp_id))),
+                sa.and_(Log.action_type == "workpaper_online_open", Log.new_value.contains(str(wp_id))),
+                sa.and_(Log.action_type == "workpaper_online_save", Log.new_value.contains(str(wp_id))),
             )
         ).order_by(Log.created_at)
     )

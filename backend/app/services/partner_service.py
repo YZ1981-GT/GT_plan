@@ -434,10 +434,32 @@ class SignReadinessService:
                         "detail": f"{reviewed}/{total} 已通过二级复核"})
         if not p1: all_pass = False
 
-        # 2. QC通过
-        from app.models.workpaper_models import WpQcResult
-        qc_fail_q = select(func.count()).select_from(WpQcResult).where(
-            WpQcResult.project_id == project_id, WpQcResult.blocking_count > 0)
+        # 2. QC通过：只看每份底稿最新的一次检查，历史失败不能持续阻断签字。
+        latest_qc = (
+            select(
+                WpQcResult.working_paper_id,
+                func.max(WpQcResult.check_timestamp).label("max_check_timestamp"),
+            )
+            .join(WorkingPaper, WpQcResult.working_paper_id == WorkingPaper.id)
+            .where(
+                WorkingPaper.project_id == project_id,
+                WorkingPaper.is_deleted.is_(False),
+            )
+            .group_by(WpQcResult.working_paper_id)
+            .subquery()
+        )
+        qc_fail_q = (
+            select(func.count(func.distinct(WpQcResult.working_paper_id)))
+            .select_from(WpQcResult)
+            .join(
+                latest_qc,
+                and_(
+                    WpQcResult.working_paper_id == latest_qc.c.working_paper_id,
+                    WpQcResult.check_timestamp == latest_qc.c.max_check_timestamp,
+                ),
+            )
+            .where(WpQcResult.blocking_count > 0)
+        )
         qc_fail = (await self.db.execute(qc_fail_q)).scalar() or 0
         p2 = qc_fail == 0
         checks.append({"check_name": "QC通过", "passed": p2,

@@ -15,6 +15,14 @@
  import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
  import type { TrialBalanceRow } from '@/services/trialBalanceRows'
 
+ /**
+  * 项目默认金额单位（platform-global-display-settings-closure R4 / AC-05）。
+  *
+  * 🔴 「跟随项目」屏幕显示与正式导出共用这个服务端权威值，只有三档；
+  * 不用自由字符串兜底（`hundred` / `亿元` 一律非法）。
+  */
+ export type ProjectAmountUnit = 'yuan' | 'qian' | 'wan'
+
  export interface ProjectListItem {
    id: string
    name?: string | null
@@ -22,6 +30,8 @@
    audit_year?: number | string | null
    audit_period_end?: string | null
    audit_period_start?: string | null
+   /** 项目默认金额单位；缺失/非法由 project store 降级，类型上不兜底成 'yuan' */
+   amount_unit?: ProjectAmountUnit | null
  }
 
  export async function listProjects(): Promise<ProjectListItem[]> {

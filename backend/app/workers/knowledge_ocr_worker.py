@@ -79,6 +79,6 @@ async def run(stop_event: asyncio.Event) -> None:
 
 #: 注册到统一唤醒表：业务域只调 `wake_worker("knowledge_ocr_worker")`，不 import 本模块
 #: （🔴 2026-11-14 解 domain-boundary 的 `<domain> -> backend-workers` 反向依赖）。
-from app.core.worker_wakeup import register_waker as _register_waker
+from app.core.worker_wakeup import register_waker as _register_waker  # noqa: E402
 
 _register_waker("knowledge_ocr_worker", wake)

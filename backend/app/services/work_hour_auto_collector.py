@@ -81,15 +81,15 @@ class WorkHourAutoCollector:
                 AuditLogEntry.object_type,
                 AuditLogEntry.object_id,
                 AuditLogEntry.action_type,
-                AuditLogEntry.created_at,
+                AuditLogEntry.ts,
                 AuditLogEntry.payload,
             )
             .where(
                 AuditLogEntry.user_id == user_id,
-                sa.func.date(AuditLogEntry.created_at) >= date_from,
-                sa.func.date(AuditLogEntry.created_at) <= date_to,
+                sa.func.date(AuditLogEntry.ts) >= date_from,
+                sa.func.date(AuditLogEntry.ts) <= date_to,
             )
-            .order_by(AuditLogEntry.created_at)
+            .order_by(AuditLogEntry.ts)
         )
         rows = (await self.db.execute(q)).all()
 
@@ -97,7 +97,7 @@ class WorkHourAutoCollector:
         for row in rows:
             # 从 audit_log 推断项目和活动类型
             activity = {
-                "timestamp": row.created_at,
+                "timestamp": row.ts,
                 "action_type": row.action_type,
                 "object_type": row.object_type,
                 "object_id": str(row.object_id) if row.object_id else None,
@@ -114,14 +114,11 @@ class WorkHourAutoCollector:
         self, user_id: uuid.UUID, date_from: date, date_to: date
     ) -> list[dict]:
         """从 workpaper_extraction_log 采集抽凭/截止测试"""
-        try:
-            from app.models.audit_platform_models import WorkpaperExtractionLog
-        except ImportError:
-            return []
+        from app.models.audit_platform_models import WorkpaperExtractionLog
 
         q = (
             sa.select(
-                WorkpaperExtractionLog.wp_id,
+                WorkpaperExtractionLog.workpaper_id,
                 WorkpaperExtractionLog.created_at,
             )
             .where(
@@ -130,18 +127,15 @@ class WorkHourAutoCollector:
                 sa.func.date(WorkpaperExtractionLog.created_at) <= date_to,
             )
         )
-        try:
-            rows = (await self.db.execute(q)).all()
-        except Exception:
-            return []
+        rows = (await self.db.execute(q)).all()
 
-        # 批量反查 wp_id → project_id
-        wp_ids = list(set(r.wp_id for r in rows if r.wp_id))
-        wp_project_map = await self._resolve_projects_from_wp_ids(wp_ids)
+        # 批量反查 workpaper_id → project_id
+        workpaper_ids = list(set(r.workpaper_id for r in rows if r.workpaper_id))
+        wp_project_map = await self._resolve_projects_from_wp_ids(workpaper_ids)
 
         activities: list[dict] = []
         for row in rows:
-            project_id = wp_project_map.get(str(row.wp_id)) if row.wp_id else None
+            project_id = wp_project_map.get(str(row.workpaper_id)) if row.workpaper_id else None
             if not project_id:
                 continue
             activities.append({
@@ -157,16 +151,13 @@ class WorkHourAutoCollector:
         """批量从 wp_id 反查 project_id（经 working_paper 表）"""
         if not wp_ids:
             return {}
-        try:
-            q = sa.text("""
-                SELECT wp.id AS wp_id, wp.project_id
-                FROM working_paper wp
-                WHERE wp.id = ANY(:ids)
-            """)
-            rows = (await self.db.execute(q, {"ids": wp_ids})).all()
-            return {str(r.wp_id): str(r.project_id) for r in rows}
-        except Exception:
-            return {}
+        q = sa.text("""
+            SELECT wp.id AS wp_id, wp.project_id
+            FROM working_paper wp
+            WHERE wp.id = ANY(:ids)
+        """)
+        rows = (await self.db.execute(q, {"ids": wp_ids})).all()
+        return {str(r.wp_id): str(r.project_id) for r in rows}
 
     async def _collect_sampled_vouchers(
         self, user_id: uuid.UUID, date_from: date, date_to: date

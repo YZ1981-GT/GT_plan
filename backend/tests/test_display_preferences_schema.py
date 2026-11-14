@@ -110,7 +110,6 @@ def test_fixed_columns_enforces_page_count_key_length_and_storage_size() -> None
             "base_revision": 0,
             "fixed_columns": {"": {"columns": []}},
         })
-
     too_many_pages = {f"page-{index}": {"columns": []} for index in range(101)}
     with pytest.raises(ValidationError):
         DisplayPreferencesPatch.model_validate({
@@ -118,7 +117,9 @@ def test_fixed_columns_enforces_page_count_key_length_and_storage_size() -> None
             "fixed_columns": too_many_pages,
         })
 
-    # 每项单独合法，但补齐服务端 saved_at 后的规范 JSON 超过 64KiB。
+    # 每项单独合法，但整体超过 wire 边界的 64KiB 粗筛：
+    # pydantic 层先拒（请求体阶段），服务端保存前还有一道精确的
+    # 规范 JSON 64KiB 校验（含 saved_at 注入后），两层合同互补。
     oversized = {
         f"page-{index:03d}": {"columns": [f"column-{column:03d}-" + "x" * 88 for column in range(20)]}
         for index in range(100)

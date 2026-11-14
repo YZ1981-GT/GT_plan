@@ -63,7 +63,6 @@ def _sync_prefill_to_snapshot(snap: dict, structure_data: dict, worksheets) -> N
 
     structure_data.rows 是跨 sheet 扁平化的，需要按 sheet 拆分后写回 snap.sheets[name].cellData
     """
-    sheets_meta = structure_data.get("sheets", [])
     rows_arr = structure_data.get("rows", [])
     order = snap.get("sheet_order_names") or list(snap.get("sheets", {}).keys())
     sheets_map = snap.get("sheets") or {}
@@ -279,7 +278,6 @@ async def prefill_workpaper_real(
             if structure_data is not None:
                 # structure 的 rows 是跨 sheet 扁平化的，需累加前序 sheet 的行数
                 row_offset = 0
-                sheets_meta = structure_data.get("sheets", [])
                 snapshot_sheets = wb.worksheets
                 for prior_idx in range(f["sheet_idx"]):
                     if prior_idx < len(snapshot_sheets):
@@ -1033,8 +1031,8 @@ async def fill_header_cells(
     """按 wp_template_metadata.header_cells 配置填充底稿 R3/R4 表头
 
     锚定 requirements F4.2:
-    - R3 左:被审计单位名称(Project.company_name)
-    - R3 中:审计期间(Project.year)
+    - R3 左:被审计单位名称(Project.client_name)
+    - R3 中:审计年度(Project.audit_year)
     - R3 右:索引号(wp_code + sheet 后缀)
     - R4 左:编制人/日期(从 WorkingPaper.created_by 取 + first_open_at)
     - R4 中:复核人/日期(L1 复核通过后回填)
@@ -1086,10 +1084,12 @@ async def fill_header_cells(
     company_name = ""
     audit_year = ""
     if project is not None:
-        company_name = getattr(project, "company_name", "") or getattr(project, "name", "") or ""
-        audit_year = str(getattr(project, "year", "") or "")
+        company_name = str(getattr(project, "client_name", "") or "")
+        audit_year = str(getattr(project, "audit_year", "") or "")
     else:
-        proj_q = sa.select(Project.company_name, Project.year).where(Project.id == wp.project_id)
+        proj_q = sa.select(Project.client_name, Project.audit_year).where(
+            Project.id == wp.project_id
+        )
         proj_row = (await db.execute(proj_q)).first()
         if proj_row:
             company_name = proj_row[0] or ""
@@ -1118,10 +1118,10 @@ async def fill_header_cells(
         if wp.created_by:
             from app.models.core import User
             usr = (await db.execute(
-                sa.select(User.full_name, User.username).where(User.id == wp.created_by)
+                sa.select(User.username).where(User.id == wp.created_by)
             )).first()
             if usr:
-                preparer_name = usr[0] or usr[1] or ""
+                preparer_name = usr[0] or ""
                 preparer_date = (wp.created_at or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
                 preparer_str = f"{preparer_name} {preparer_date}"
     except Exception as e:

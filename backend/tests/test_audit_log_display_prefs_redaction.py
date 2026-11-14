@@ -39,13 +39,15 @@ def test_display_preferences_audit_payload_keeps_only_revision_and_field_names()
 
 
 def test_display_preferences_trailing_slash_and_invalid_state_fail_closed():
+    # state 异常时 fail-closed：revision 也不允许保留（revision 配合字段名
+    # 可推断偏好变化轮次），只留下「已脱敏」标记。
     redacted = _redact_if_display_prefs(
         "patch",
         "/api/users/me/display-preferences/",
         {"data": {"revision": 8, "page_key": "trial_balance"}},
         RequestStub("not-a-list"),
     )
-    assert redacted == {"revision": 8, "changed_fields": []}
+    assert redacted == {"redacted": True, "changed_fields": []}
 
 
 def test_other_write_responses_are_unchanged():

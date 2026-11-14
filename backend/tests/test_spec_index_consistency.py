@@ -427,11 +427,20 @@ def test_archive_number_collision_baseline_has_no_stale_entry() -> None:
 
 
 def _unindexed_active_specs(index_lines: list[str], active: set[str]) -> set[str]:
+    """返回已有 ``tasks.md`` 的活跃 spec 中尚未在 INDEX 出现的目录名。
+
+    ``.kiro/specs`` 下允许暂存调查材料目录（例如只有 ``basis/``、尚未形成
+    三件套）。它们不是活跃 spec，不能因为目录存在就要求活跃表登记；活跃表和
+    统计行的正式分母都以 ``tasks.md`` 为准。
+    """
     text = "\n".join(index_lines)
     mentioned = {
         t.split("/")[0] for t in _LOCAL_LINK.findall(text) if t.split("/")[0]
     }
-    return {n for n in active if n not in mentioned}
+    return {
+        n for n in active
+        if (SPECS_DIR / n / "tasks.md").exists() and n not in mentioned
+    }
 
 
 def test_unindexed_active_specs_only_shrink(

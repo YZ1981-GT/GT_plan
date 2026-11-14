@@ -56,8 +56,11 @@ class DisplayPreferencesPatch(BaseModel):
 
     extra='forbid' 拒绝额外字段。
     base_revision 必填（CAS），至少一个业务字段。
+    strict=True：R2 的 wire 合同要求类型、范围、精度在边界拒绝——
+    ``1`` 不是 bool、``"2"`` 不是 int、NaN/超过 4 位小数的阈值不允许
+    经 lax 宽化悄悄通过（spec 阶段 A 合同测试逐条钉住）。
     """
-    model_config = {"extra": "forbid"}
+    model_config = {"extra": "forbid", "strict": True}
 
     base_revision: int = Field(..., ge=0, description="乐观锁版本号")
 
@@ -74,7 +77,14 @@ class DisplayPreferencesPatch(BaseModel):
 
     @model_validator(mode="after")
     def _at_least_one_business_field(self) -> "DisplayPreferencesPatch":
-        """至少一个除 base_revision 外的业务字段。"""
+        """至少一个除 base_revision 外的业务字段。
+
+        strict=True 下 ``None`` 无法通过 ``Literal``/``bool`` 等强类型字段的
+        校验（那正是设计想要的：不允许业务字段传 null，显式 null 只属于
+        ``amount_unit_override`` 的可选语义）。因此「显式 null = 跟随项目」
+        的合法输入在这里只剩 ``amount_unit_override``；其余字段传 null 会被
+        strict 校验直接拒绝，无需在此重复判断。
+        """
         business_fields = [
             "amount_unit_override", "font_size", "show_zero", "decimals",
             "negative_red", "highlight_threshold", "density",
@@ -91,14 +101,47 @@ class DisplayPreferencesPatch(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def _reject_explicit_null_for_non_override_fields(self) -> "DisplayPreferencesPatch":
+        """design §16 F6：仅 amount_unit_override 允许显式 null。
+
+        strict 模式下 ``Literal`` 字段遇到 ``None`` 报的是类型错误；
+        这里把 bool/数值/枚举/字典字段的 null 统一翻译成稳定业务文案，
+        测试按文案断言，不依赖 pydantic 的类型错误措辞。
+        """
+        non_nullable = {
+            "font_size": "font_size 不允许为 null",
+            "show_zero": "show_zero 不允许为 null",
+            "decimals": "decimals 不允许为 null",
+            "negative_red": "negative_red 不允许为 null",
+            "highlight_threshold": "highlight_threshold 不允许为 null",
+            "density": "density 不允许为 null",
+            "grid_edit_mode": "grid_edit_mode 不允许为 null",
+            "fixed_columns": "fixed_columns 不允许为 null",
+        }
+        raw = self.model_dump(exclude_unset=True)
+        for field, message in non_nullable.items():
+            if field in raw and raw[field] is None:
+                raise ValueError(message)
+        return self
+
+    @model_validator(mode="after")
     def _validate_ranges(self) -> "DisplayPreferencesPatch":
         """校验 decimals/threshold/fixed_columns 边界。"""
+        import math
+
         if self.decimals is not _UNSET and self.decimals is not None:
             if not (0 <= self.decimals <= 6):
                 raise ValueError("decimals 必须在 0~6 之间")
 
         if self.highlight_threshold is not _UNSET and self.highlight_threshold is not None:
-            if not (0 <= self.highlight_threshold <= 1):
+            threshold = self.highlight_threshold
+            if isinstance(threshold, float):
+                if math.isnan(threshold) or math.isinf(threshold):
+                    raise ValueError("highlight_threshold 必须是有限数值")
+                # 线协议只承诺 4 位小数精度（前端滑块步长 0.0001）
+                if round(threshold, 4) != threshold:
+                    raise ValueError("highlight_threshold 最多 4 位小数")
+            if not (0 <= threshold <= 1):
                 raise ValueError("highlight_threshold 必须在 0~1 之间")
 
         if self.fixed_columns is not _UNSET and self.fixed_columns is not None:
@@ -123,9 +166,25 @@ class DisplayPreferencesPatch(BaseModel):
                         if col in seen:
                             raise ValueError(f"重复列 key：{col!r}")
                         seen.add(col)
-                # 请求不得带 saved_at
-                if "saved_at" in page_val:
-                    raise ValueError("fixed_columns 请求不得包含 saved_at")
+                # 请求值只认 columns 键；saved_at/其他键一律拒绝
+                allowed_keys = {"columns"}
+                extra_keys = set(page_val.keys()) - allowed_keys
+                if extra_keys:
+                    raise ValueError(
+                        f"fixed_columns 请求只允许 columns 键，"
+                        f"收到未知键：{sorted(extra_keys)!r}"
+                    )
+                if "columns" not in page_val:
+                    raise ValueError(f"pageKey {page_key!r} 缺少 columns")
+
+            # wire 边界粗筛：请求体阶段的 fixed_columns 已超 64KiB 时直接拒绝，
+            # 不等 service 的规范 JSON 精确校验（那层还含 saved_at 注入后的体积）。
+            import json as _json
+            _canonical = _json.dumps(
+                fc, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+            )
+            if len(_canonical.encode("utf-8")) > 64 * 1024:
+                raise ValueError("fixed_columns 规范化后超过 64KiB 存储上限")
 
         return self
 

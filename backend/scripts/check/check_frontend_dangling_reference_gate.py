@@ -146,18 +146,95 @@ def run_vite_optimize(log: Path) -> dict[str, Any]:
         "log": str(log),
     }
 
+#: 浏览器 / TS lib / Node 的全局**类型**（不是运行时值，编译期擦除）。
+#:
+#: 🔴 为什么单独一桶而不是塞进 ``type_only_globals`` 豁免表：那份表有
+#: ``never_called_anywhere`` 反滥用判据，而 Worker / DOM 类型在本仓库里确实
+#: 会被 ``new`` 或类型断言使用，塞进去会误红。本桶只要求「名字不构成运行时值」，
+#: 且由 ``_LIB_TYPE_NAMES`` 显式枚举 —— 新增一个名字必须改代码，不是加一行 JSON。
+_LIB_TYPE_NAMES: frozenset[str] = frozenset({
+    "DedicatedWorkerGlobalScope", "Transferable", "WorkerOptions",
+    "ParentNode", "NodeJS", "MouseEventInit", "KeyboardEventInit",
+    "LockManager", "MessageEvent", "ErrorEvent", "CloseEvent", "IDBFactory",
+})
+
+_USAGE_CACHE: dict[tuple[str, str], tuple[int, int]] = {}
+
+
+def _name_usage(path: Path, name: str) -> tuple[int, int]:
+    """返回 (``typeof X`` 守卫次数, **脱离守卫的**裸调用次数)。
+
+    判定「受守卫支配」的口径：调用点所在的那条语句里出现了
+    ``typeof X`` —— 覆盖两种真实写法::
+
+        if (typeof X === 'function') X(...)
+        typeof X === 'function' ? X(...) : Y(...)
+
+    只在同一语句（同一物理行，或同一 ``if (`` 起始的多行条件体）内算受支配；
+    任何一处 `X(...)` 出现在没有 ``typeof X`` 的语句里，都算裸调用 ⇒ 归 dangling。
+    """
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return 0, 0
+
+    guard_re = re.compile(rf"typeof\s+{re.escape(name)}\b")
+    guards = len(guard_re.findall(text))
+    if guards == 0:
+        return 0, 0
+
+    lines = text.split("\n")
+    # 记录哪些行属于「含 typeof 守卫的语句」：从含 typeof 的行起，向下最多 3 行
+    # （覆盖 `if (typeof X === 'function')\n  X(...)` 这类换行写法）。
+    guarded_lines: set[int] = set()
+    for i, line in enumerate(lines):
+        if guard_re.search(line):
+            for k in range(i, min(i + 4, len(lines))):
+                guarded_lines.add(k)
+
+    unprotected = 0
+    for form in (f"{name}(", f"new {name}("):
+        idx = text.find(form)
+        while idx != -1:
+            before = text[idx - 1] if idx > 0 else " "
+            if not (before.isalnum() or before in "_$."):
+                line_no = text[:idx].count("\n")
+                if line_no not in guarded_lines:
+                    unprotected += 1
+            idx = text.find(form, idx + 1)
+    return guards, unprotected
+
+
 def classify(rows: list[dict[str, Any]], auto: set[str], exempt: set[str]) -> dict[str, Any]:
-    """把 no-undef findings 分三桶。只有 `dangling` 桶算失败。"""
+    """把 no-undef findings 分五桶。只有 `dangling` 桶算失败。
+
+    ``typeof_guarded`` 的判据是**行为型**：该名字在本文件里有 ``typeof X``
+    守卫、且没有任何裸调用。``typeof`` 对未声明标识符不会抛 ReferenceError
+    （返回 'undefined'），所以这类写法是安全的能力探测；一旦有人把它当函数
+    直接调用，``calls > 0`` 会立刻把它打回 ``dangling``。
+    """
     buckets: dict[str, list[dict[str, Any]]] = {
-        "auto_import": [], "type_only_exempt": [], "dangling": []
+        "auto_import": [], "type_only_exempt": [], "lib_type": [],
+        "typeof_guarded": [], "dangling": [],
     }
     for row in rows:
-        if row["name"] in auto:
+        name = row["name"]
+        if name in auto:
             buckets["auto_import"].append(row)
-        elif row["name"] in exempt:
+        elif name in exempt:
             buckets["type_only_exempt"].append(row)
+        elif name in _LIB_TYPE_NAMES:
+            buckets["lib_type"].append(row)
         else:
-            buckets["dangling"].append(row)
+            path = FRONTEND / row["file"]
+            key = (str(path), name)
+            if key not in _USAGE_CACHE:
+                _USAGE_CACHE[key] = _name_usage(path, name)
+            guards, calls = _USAGE_CACHE[key]
+            if guards > 0 and calls == 0:
+                buckets["typeof_guarded"].append(row)
+            else:
+                buckets["dangling"].append(row)
     return buckets
 
 

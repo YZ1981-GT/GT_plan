@@ -280,10 +280,14 @@ class LedgerEvaluation:
         findings: list[CapabilityFinding],
         drifts: list[LedgerDrift],
         schema_version: int,
+        out_of_population: set[str] | None = None,
     ) -> None:
         self.findings = findings
         self.drifts = drifts
         self.schema_version = schema_version
+        # Ledger 中仍保留、但 generator 已不再生成主入口的历史 entry。
+        # 它们不进入当前覆盖率分母，但必须在报告中显式可见，不能伪装成有效覆盖。
+        self.out_of_population = out_of_population or set()
 
     @property
     def missing(self) -> list[CapabilityFinding]:
@@ -508,11 +512,25 @@ def evaluate_ledger(root_codes: set[str], ledger: dict) -> LedgerEvaluation:
         entries = {}
         drifts.append(LedgerDrift('*', '*', 'entries 不是对象'))
 
+    # 与 generate_coverage_ledger.py 使用同一人口：只有存在 Gt<root> 主入口的
+    # override 根编码才进入当前能力覆盖率。历史 ledger 里的 note-only / 通用
+    # audit-sheet entry 保留在文件中供迁移追溯，但不应继续充当有效覆盖证据。
+    active_root_codes = {
+        code for code in root_codes if find_main_entry(code) is not None
+    }
+    out_of_population = set(entries) & (set(root_codes) - active_root_codes)
+
     if schema_version not in (1, 2):
         drifts.append(LedgerDrift('*', '*', f'不支持的 schemaVersion: {raw_version!r}'))
 
-    for wp_code in sorted(root_codes):
+    for wp_code in sorted(active_root_codes):
         entry = entries.get(wp_code)
+        if not isinstance(entry, dict) and find_main_entry(wp_code) is None:
+            # overrides 里还包含 note-only / 通用 audit-sheet 编码，但它们没有
+            # Gt<code> 主入口，不属于 capability ledger 的扫描人口；generator
+            # 也不会为这类编码生成 entry。只有有主入口却未登记时才是漂移。
+            continue
+
         if not isinstance(entry, dict):
             drifts.append(LedgerDrift(wp_code, '*', 'wp_code 未登记或 entry 非对象'))
             findings.extend(
@@ -556,7 +574,7 @@ def evaluate_ledger(root_codes: set[str], ledger: dict) -> LedgerEvaluation:
     for stale_code in sorted(set(entries) - root_codes):
         drifts.append(LedgerDrift(stale_code, '*', 'Ledger 存在已不在注册真源中的 entry'))
 
-    return LedgerEvaluation(findings, drifts, schema_version)
+    return LedgerEvaluation(findings, drifts, schema_version, out_of_population)
 
 
 def print_report(evaluation: LedgerEvaluation, stream: TextIO = sys.stdout) -> None:
@@ -586,6 +604,11 @@ def print_report(evaluation: LedgerEvaluation, stream: TextIO = sys.stdout) -> N
         f'不确定={counts[STATE_UNKNOWN]}, '
         f'豁免={counts[STATE_EXEMPT]}, '
         f'Ledger 漂移={len(evaluation.drifts)}',
+        file=stream,
+    )
+    print(
+        '  不在当前 generator 主入口人口的历史 entry: '
+        f'{len(evaluation.out_of_population)}',
         file=stream,
     )
 

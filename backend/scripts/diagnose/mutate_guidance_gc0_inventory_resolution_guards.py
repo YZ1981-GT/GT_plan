@@ -136,10 +136,23 @@ MUTATIONS: tuple[Mutation, ...] = (
 )
 
 
+def _eol_bytes(payload: bytes, fragment: bytes) -> bytes:
+    """把 LF 书写的 bytes 锚点按目标文件真实行尾编码。
+
+    🔴 ``core.autocrlf=true``：目标 ``.py`` 在 Windows 工作树是 CRLF、在 CI 是 LF。
+    锚点统一按 LF 书写，比较与替换前必须归一，否则只会「本机恒 ANCHOR-MISS、
+    CI 绿」，让这套变异检验在开发机上完全空转。
+    """
+    eol = b"\r\n" if b"\r\n" in payload else b"\n"
+    if eol == b"\n":
+        return fragment
+    return fragment.replace(b"\r\n", b"\n").replace(b"\n", eol)
+
+
 def _assert_anchor(mutation: Mutation) -> None:
     payload = (ROOT / mutation.relative_path).read_bytes()
-    count = payload.count(mutation.original)
-    replacement_count = payload.count(mutation.replacement)
+    count = payload.count(_eol_bytes(payload, mutation.original))
+    replacement_count = payload.count(_eol_bytes(payload, mutation.replacement))
     if count != 1 or replacement_count:
         raise RuntimeError(
             f"{mutation.mutation_id}: anchor={count} replacement={replacement_count}"
@@ -149,9 +162,12 @@ def _assert_anchor(mutation: Mutation) -> None:
 def _apply(mutation: Mutation) -> None:
     path = ROOT / mutation.relative_path
     payload = path.read_bytes()
-    if payload.count(mutation.original) != 1:
+    original = _eol_bytes(payload, mutation.original)
+    if payload.count(original) != 1:
         raise RuntimeError(f"{mutation.mutation_id}: apply anchor 不唯一")
-    path.write_bytes(payload.replace(mutation.original, mutation.replacement, 1))
+    path.write_bytes(
+        payload.replace(original, _eol_bytes(payload, mutation.replacement), 1)
+    )
 
 
 def _restore(mutation: Mutation) -> None:

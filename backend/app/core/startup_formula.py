@@ -7,8 +7,6 @@ startup_registry 只留一行调用。与既有 ``startup_deferred.py`` 同一�
 """
 from __future__ import annotations
 
-import logging
-
 
 def register_formula_settings_startup() -> None:
     """注册公式设置传播 handler，并**断言** outbox 专用派发器已完成注册。
