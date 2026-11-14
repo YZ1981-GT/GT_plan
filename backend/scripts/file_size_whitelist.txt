@@ -1717,6 +1717,10 @@ backend/scripts/diagnose/diagnose_g7_column_alignment.py  1576
 #     按门禁提示拆了伴生模块 `_note_text_sections.py`（text_sections 关注点整段搬出 + 逐名 re-export），
 #     现 737 行，比 HEAD 还小。白名单只给历史大文件，自己推过线的要拆。
 backend/app/routers/wp_render_strategies/_j1_disclosure_import_export.py  831
+#   2026-11-14 _j1_import_export.py：HEAD 上 1546 行已超限（历史大文件，10 个 sheet_type 的
+#     模板构建 + 导出数据分支都在单文件），本会话只加 8 行注释并把 GET+POST 双方法 api_route
+#     拆成两条单方法路由（+19）。同族 _j1_disclosure_import_export.py 已在册，拆分方向同上。
+backend/app/routers/wp_render_strategies/_j1_import_export.py  1565
 backend/scripts/fix/fix_note_i_cycle_structure.py  1259
 backend/tests/test_note_expandable_rows.py  986
 #   GtC24JournalDetail.vue / GtWpRenderer.vue / useH1LeaseCheck.ts / N1TabCalcTable.vue / audit_check.py /

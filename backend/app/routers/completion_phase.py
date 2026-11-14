@@ -9,8 +9,9 @@ check 返回 ``{incomplete, count}`` 而 ``wp_export_word.CheckIncompleteRespons
 ``{complete, missing_fields, wp_code, reason}`` ⇒ 确认框永不弹。两个端点现由 ``wp_export_word``
 提供（按编码分发到 A17-1 / A17-2-1 / A18-2 的专用导出服务）。
 
-同文件另有 3 个与专用路由同路径的端点（``a16/recommended-version``、``issue-hints``、
-``workpaper-summaries/{key}``），仍为「先注册者遮蔽后注册者」，已冻结在
+同文件曾有 4 个与专用路由同路径的端点；``a16/recommended-version`` 已删（2026-11-14，
+死实现：wp_editor_router 同路径先注册 ⇒ 永不可达，且返回旧形状 {main, supplement}）；
+余下 ``issue-hints``、``workpaper-summaries/{key}`` 仍为「先注册者遮蔽后注册者」，已冻结在
 ``tests/test_duplicate_route_registration_baseline.py::_KNOWN_DUPLICATES`` 里，不在本 spec 范围。
 
 守卫 ``tests/test_duplicate_route_registration_baseline.py``。
@@ -29,7 +30,6 @@ from app.core.database import get_db
 from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.models.workpaper_models import WorkingPaper
-from app.services.a16_version_service import recommend_main_version, recommend_supplement
 
 router = APIRouter(prefix="/api/projects", tags=["completion-phase"])
 
@@ -80,17 +80,10 @@ async def get_checklist_template_bundle(
     return {"template": template_data, "responses": responses}
 
 
-@router.get("/{project_id}/a16/recommended-version")
-async def get_a16_recommended_version(
-    project_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
-):
-    main = await recommend_main_version(db, project_id)
-    supplement = await recommend_supplement(db, project_id)
-    return {"main": main, "supplement": supplement}
-
-
+# 🔴 GET /{project_id}/a16/recommended-version 已删（2026-11-14）：它是同路径死实现 ——
+#    wp_editor_router 的同名端点先注册（FastAPI 取首条命中），本端点从未可达；返回形状
+#    {main, supplement} 是旧契约，前端 WorkpaperWordEditor 只认 {recommended_code, …}。
+#    曾冻结在 tests/test_duplicate_route_registration_baseline.py::_KNOWN_DUPLICATES。
 @router.get("/{project_id}/completion-flags")
 async def get_completion_flags(
     project_id: UUID,
