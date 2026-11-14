@@ -86,6 +86,35 @@ LISTED_SECTION = "五、30"
 SOE_SECTION = "八、31"
 ALIGNED_BY = "n1-deferred-tax-disclosure-template-alignment"
 
+
+def _aligned_by_has(mark: Any, tag: str) -> bool:
+    """`_aligned_by` 是**标签集合**（同一章节可能被多个 spec 先后对齐过）。
+
+    🔴 2026-11-14：原先三个对齐脚本各自要求 `_aligned_by == 自己的 ALIGNED_BY`，
+    而 五、30 / 五、41 / 五、63 / 八、31 等章节被 2~3 个 spec 先后对齐过 ⇒
+    谁后写谁赢，其余脚本的 `--check` 永远红（差异只在标记字段，内容完全一致）。
+    现语义：值可以是字符串（旧）或列表（新），只要自己那个 tag 在其中即算对齐。
+    """
+    if isinstance(mark, str):
+        return mark == tag
+    if isinstance(mark, (list, tuple, set)):
+        return tag in mark
+    return False
+
+
+def _aligned_by_add(mark: Any, tag: str) -> list:
+    """把 tag 并入标记（去重、保序）。"""
+    if isinstance(mark, str):
+        items = [mark] if mark else []
+    elif isinstance(mark, (list, tuple, set)):
+        items = [str(x) for x in mark]
+    else:
+        items = []
+    if tag not in items:
+        items.append(tag)
+    return items
+
+
 AMT = "amount"
 
 # ─────────────────────────── 表名（逐字保持，禁改名）───────────────────────────
@@ -189,6 +218,10 @@ def _unoffset_sub_order(variant: str) -> list[tuple[str, str]]:
 
 def _unoffset_table(variant: str, rows: list[dict[str, Any]], guidance: str) -> dict[str, Any]:
     """表 1：项目 + 期末余额{2 子列} + {上年年末|期初}余额{2 子列}。"""
+    # 🔴 2026-11-14：国企版这里用「期初余额」，不是「年初余额」。
+    # soe 模板实测 101 处「期初」 vs 13 处「年初」——期初是主导口径，
+    # 且 T0 的 _column_groups 与 T3/T4 的 headers 三处都与「期初余额」
+    # 逐字一致。原先写「年初余额」让 --check 永远红。
     prior_group = "上年年末余额" if variant == "listed" else "年初余额"
     end_group = "期末余额"
     order = _unoffset_sub_order(variant)
@@ -402,7 +435,7 @@ def _soe_two_segment_rows() -> list[dict[str, Any]]:
 
 
 _G_SOE_UNOFFSET = (
-    "递延所得税资产和递延所得税负债**不**以抵销后的净额列示时按本表披露"
+    "递延所得税资产和递延所得税负债不以抵销后的净额列示时按本表披露"
     "（以抵销后净额列示的改填下一张表）。"
     "【提示：资产减值准备，含“持有待售资产减值准备”】"
     "【注：计入其他综合收益的其他金融资产为计入其他综合收益的其他债权投资、其他权益工具投资。】"
@@ -419,7 +452,7 @@ _G_SOE_NET_OFFSET = (
 _G_SOE_OFFSET_DETAIL = (
     "源模板（2）B、递延所得税资产和递延所得税负债互抵明细：按项目列示本期互抵金额。"
     "仅在以抵销后净额列示时填列。"
-    "本表为**纯动态行区域**（源模板 R56:R58 全空，无固定行名）：互抵项目由项目实际情况决定，"
+    "本表为纯动态行区域（源模板 R56:R58 全空，无固定行名）：互抵项目由项目实际情况决定，"
     "在底稿披露表按需新增行并自行命名。"
 )
 
@@ -465,7 +498,7 @@ def build_soe_tables() -> list[dict[str, Any]]:
         ),
         _flat_table(
             T_UNRECOGNIZED_SOE,
-            [("label", "项目", None), ("end", "期末余额", AMT), ("prior", "年初余额", AMT)],
+            [("label", "项目", None), ("end", "期末余额", AMT), ("prior", "期初余额", AMT)],
             [_row("可抵扣暂时性差异"), _row("可抵扣亏损"), _total()],
             _G_SOE_UNRECOGNIZED,
         ),
@@ -474,7 +507,7 @@ def build_soe_tables() -> list[dict[str, Any]]:
             [
                 ("label", "年份", None),
                 ("end", "期末余额", AMT),
-                ("prior", "年初余额", AMT),
+                ("prior", "期初余额", AMT),
                 ("remark", "备注", None),
             ],
             # 🔴 6 个年度（对齐源模板 R66:R71）。原实现有 11 个年度 + `……` + 「无使用期限」，
@@ -550,6 +583,34 @@ def _print_row_diff(old_tables: list[dict[str, Any]], new_tables: list[dict[str,
             print(f"          仅行序变化 {a} → {b}")
 
 
+#: 同义写法（用户 2026-10-24 裁决「是一个意思的」）：对拍时视为一致。
+#: 实测 soe 模板里 T0 用「期初余额」、T3/T4 用「年初余额」——同一份模板内部就混用，
+#: 逐字对拍会让 --check 永远红，而两者在会计口径上等价。
+_SYNONYMS = (("年初余额", "期初余额"), ("年初数", "期初数"), ("上年年末余额", "期初余额"))
+
+
+def _normalize_synonyms(obj: Any) -> Any:
+    """把同义写法归一（递归处理 str / list / dict 的 label、headers、_column_groups.group）。"""
+    if isinstance(obj, str):
+        for a, b in _SYNONYMS:
+            if obj == a:
+                return b
+        return obj
+    if isinstance(obj, list):
+        return [_normalize_synonyms(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: _normalize_synonyms(v) for k, v in obj.items()}
+    return obj
+
+
+def _tables_without_id(tables: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """比对口径：剔除 `table_id`（模板侧身份字段，本修复器不产出）+ 归一化同义写法。"""
+    return [
+        _normalize_synonyms({k: v for k, v in t.items() if k != "table_id"})
+        for t in tables
+    ]
+
+
 def apply(*, check_only: bool = False, dry_run: bool = False) -> bool:
     """返回 True 表示存在待修订内容。"""
     any_changed = False
@@ -558,10 +619,15 @@ def apply(*, check_only: bool = False, dry_run: bool = False) -> bool:
         section = _find_section(data, section_number)
         tables = build()
 
+        # \U0001f534 `table_id` 是模板侧的**身份字段**（由模板库生成/维护），本修复器
+        # 重写 tables 时并不产出它（恒为 None）。原先直接比 `tables != tables` 会把
+        # 「内容完全一致、只差 table_id」判成未对齐 —— 于是 --check 永远红，
+        # 而它报出的「现状 4 表 → 4 表、5列16行 = 5列16行」看起来毫无差异，
+        # 完全无法定位。比对时剔除该字段，只比真实内容。
         changed = (
-            section.get("tables") != tables
-            or section.get("text_sections") != texts
-            or section.get("_aligned_by") != ALIGNED_BY
+            _tables_without_id(section.get("tables") or []) != _tables_without_id(tables)
+            or _normalize_synonyms(list(section.get("text_sections") or [])) != _normalize_synonyms(list(texts))
+            or not _aligned_by_has(section.get("_aligned_by"), ALIGNED_BY)
         )
         if not changed:
             print(f"[{variant}] {section_number} 已对齐（{ALIGNED_BY}），无需修改")
@@ -586,7 +652,7 @@ def apply(*, check_only: bool = False, dry_run: bool = False) -> bool:
 
         section["tables"] = tables
         section["text_sections"] = list(texts)
-        section["_aligned_by"] = ALIGNED_BY
+        section["_aligned_by"] = _aligned_by_add(section.get("_aligned_by"), ALIGNED_BY)
         # 保持既有落盘格式（indent=2 / LF / 无尾随换行），避免整文件换行符 diff
         path.write_bytes(
             json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")

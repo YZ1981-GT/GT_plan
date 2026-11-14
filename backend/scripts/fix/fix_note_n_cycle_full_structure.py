@@ -30,6 +30,35 @@ SOE_PATH = BACKEND_DATA / "note_template_soe.json"
 ALIGNED_BY = "n-cycle-note-template-and-disclosure-completion"
 
 
+def _aligned_by_has(mark: Any, tag: str) -> bool:
+    """`_aligned_by` 是**标签集合**（同一章节可能被多个 spec 先后对齐过）。
+
+    🔴 2026-11-14：原先三个对齐脚本各自要求 `_aligned_by == 自己的 ALIGNED_BY`，
+    而 五、30 / 五、41 / 五、63 / 八、31 等章节被 2~3 个 spec 先后对齐过 ⇒
+    谁后写谁赢，其余脚本的 `--check` 永远红（差异只在标记字段，内容完全一致）。
+    现语义：值可以是字符串（旧）或列表（新），只要自己那个 tag 在其中即算对齐。
+    """
+    if isinstance(mark, str):
+        return mark == tag
+    if isinstance(mark, (list, tuple, set)):
+        return tag in mark
+    return False
+
+
+def _aligned_by_add(mark: Any, tag: str) -> list:
+    """把 tag 并入标记（去重、保序）。"""
+    if isinstance(mark, str):
+        items = [mark] if mark else []
+    elif isinstance(mark, (list, tuple, set)):
+        items = [str(x) for x in mark]
+    else:
+        items = []
+    if tag not in items:
+        items.append(tag)
+    return items
+
+
+
 def _load_json(path: Path) -> tuple[dict, list]:
     """加载模板 JSON，返回 (root_obj, sections_list)."""
     root = json.loads(path.read_text("utf-8"))
@@ -490,7 +519,7 @@ def _apply_plan(dry_run: bool = True) -> list[str]:
                     needs_update = True
                     break
 
-        if not needs_update and sec.get("_aligned_by") == ALIGNED_BY:
+        if not needs_update and _aligned_by_has(sec.get("_aligned_by"), ALIGNED_BY):
             continue
 
         # 应用变更
@@ -511,7 +540,7 @@ def _apply_plan(dry_run: bool = True) -> list[str]:
 
         if not dry_run:
             sec["_tables"] = target_tables
-            sec["_aligned_by"] = ALIGNED_BY
+            sec["_aligned_by"] = _aligned_by_add(sec.get("_aligned_by"), ALIGNED_BY)
             _save_json(path, root)
 
     return changes

@@ -15880,7 +15880,10 @@
       "sort_index": 29,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "n1-deferred-tax-disclosure-template-alignment",
+      "_aligned_by": [
+        "n1-deferred-tax-disclosure-template-alignment",
+        "n-cycle-note-template-and-disclosure-completion"
+      ],
       "_tables": [
         {
           "name": "未经抵销的递延所得税资产和递延所得税负债",
@@ -17839,7 +17842,10 @@
       "sort_index": 40,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "n-cycle-tax-disclosure-alignment",
+      "_aligned_by": [
+        "n-cycle-tax-disclosure-alignment",
+        "n-cycle-note-template-and-disclosure-completion"
+      ],
       "_tables": [
         {
           "name": "应交税费",
@@ -22255,7 +22261,10 @@
       "sort_index": 62,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "n-cycle-tax-disclosure-alignment",
+      "_aligned_by": [
+        "n-cycle-tax-disclosure-alignment",
+        "n-cycle-note-template-and-disclosure-completion"
+      ],
       "_tables": [
         {
           "name": "税金及附加",
@@ -23953,7 +23962,10 @@
       "sort_index": 76,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "n-cycle-tax-disclosure-alignment",
+      "_aligned_by": [
+        "n-cycle-tax-disclosure-alignment",
+        "n-cycle-note-template-and-disclosure-completion"
+      ],
       "_tables": [
         {
           "name": "所得税费用明细",

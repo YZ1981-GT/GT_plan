@@ -170,7 +170,7 @@ def sections_of(tpl: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def plan(variant: str, tpl: dict[str, Any]) -> list[str]:
-    """返回待办清单（空 = 已收敛）。同时**就地修改** tpl。"""
+    """返回待办清单（空 = 已收敛）。同时就地修改 tpl。"""
     todo: list[str] = []
     by_num = {str(s.get("section_number") or ""): s for s in sections_of(tpl)}
 
