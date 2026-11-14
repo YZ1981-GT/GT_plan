@@ -16050,58 +16050,6 @@
       "variant": "listed"
     },
     {
-      "page_key": "note:三、工程物资【不适用",
-      "target_cell": "note-formula:sum:listed:三、工程物资【不适用:T0:R6C1",
-      "expression": "ROW('R1C1') + ROW('R2C1') + ROW('R3C1') + ROW('R4C1') + ROW('R5C1')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R1C1')"
-        },
-        {
-          "formula_ref": "ROW('R2C1')"
-        },
-        {
-          "formula_ref": "ROW('R3C1')"
-        },
-        {
-          "formula_ref": "ROW('R4C1')"
-        },
-        {
-          "formula_ref": "ROW('R5C1')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "项  目·合  计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
-      "page_key": "note:三、工程物资【不适用",
-      "target_cell": "note-formula:sum:listed:三、工程物资【不适用:T0:R6C2",
-      "expression": "ROW('R1C2') + ROW('R2C2') + ROW('R3C2') + ROW('R4C2') + ROW('R5C2')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R1C2')"
-        },
-        {
-          "formula_ref": "ROW('R2C2')"
-        },
-        {
-          "formula_ref": "ROW('R3C2')"
-        },
-        {
-          "formula_ref": "ROW('R4C2')"
-        },
-        {
-          "formula_ref": "ROW('R5C2')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "项  目·合  计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
       "page_key": "note:三、长期待摊费用",
       "target_cell": "note-formula:movement:listed:三、长期待摊费用:T0:R2C4",
       "expression": "ROW('R2C1') + ROW('R2C2') - ROW('R2C3')",
@@ -16260,185 +16208,8 @@
       "variant": "listed"
     },
     {
-      "page_key": "note:三、现金流量表项目注",
-      "target_cell": "note-formula:sum:listed:三、现金流量表项目注:T8:R6C1",
-      "expression": "ROW('R1C1') + ROW('R2C1') + ROW('R3C1') + ROW('R4C1') + ROW('R5C1')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R1C1')"
-        },
-        {
-          "formula_ref": "ROW('R2C1')"
-        },
-        {
-          "formula_ref": "ROW('R3C1')"
-        },
-        {
-          "formula_ref": "ROW('R4C1')"
-        },
-        {
-          "formula_ref": "ROW('R5C1')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "项  目·合计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
-      "page_key": "note:三、现金流量表项目注",
-      "target_cell": "note-formula:sum:listed:三、现金流量表项目注:T8:R6C4",
-      "expression": "ROW('R1C4') + ROW('R2C4') + ROW('R3C4') + ROW('R4C4') + ROW('R5C4')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R1C4')"
-        },
-        {
-          "formula_ref": "ROW('R2C4')"
-        },
-        {
-          "formula_ref": "ROW('R3C4')"
-        },
-        {
-          "formula_ref": "ROW('R4C4')"
-        },
-        {
-          "formula_ref": "ROW('R5C4')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "项  目·合计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
-      "page_key": "note:三、在合营安排或联营",
-      "target_cell": "note-formula:sum:listed:三、在合营安排或联营:T5:R2C1",
-      "expression": "ROW('R1C1')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R1C1')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "项  目·投资账面价值合计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
-      "page_key": "note:三、在合营安排或联营",
-      "target_cell": "note-formula:sum:listed:三、在合营安排或联营:T5:R2C2",
-      "expression": "ROW('R1C2')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R1C2')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "项  目·投资账面价值合计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
-      "page_key": "note:三、在合营安排或联营",
-      "target_cell": "note-formula:sum:listed:三、在合营安排或联营:T5:R8C1",
-      "expression": "ROW('R4C1') + ROW('R5C1') + ROW('R6C1') + ROW('R7C1')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R4C1')"
-        },
-        {
-          "formula_ref": "ROW('R5C1')"
-        },
-        {
-          "formula_ref": "ROW('R6C1')"
-        },
-        {
-          "formula_ref": "ROW('R7C1')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "项  目·投资账面价值合计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
-      "page_key": "note:三、在合营安排或联营",
-      "target_cell": "note-formula:sum:listed:三、在合营安排或联营:T5:R8C2",
-      "expression": "ROW('R4C2') + ROW('R5C2') + ROW('R6C2') + ROW('R7C2')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R4C2')"
-        },
-        {
-          "formula_ref": "ROW('R5C2')"
-        },
-        {
-          "formula_ref": "ROW('R6C2')"
-        },
-        {
-          "formula_ref": "ROW('R7C2')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "项  目·投资账面价值合计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
-      "page_key": "note:三、在合营安排或联营",
-      "target_cell": "note-formula:sum:listed:三、在合营安排或联营:T6:R2C3",
-      "expression": "ROW('R1C3')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R1C3')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "被投资单位名称·小计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
-      "page_key": "note:三、在合营安排或联营",
-      "target_cell": "note-formula:sum:listed:三、在合营安排或联营:T6:R4C3",
-      "expression": "ROW('R3C3')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R3C3')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "被投资单位名称·小计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
-      "page_key": "note:三、在未纳入合并财务",
-      "target_cell": "note-formula:sum:listed:三、在未纳入合并财务:T1:R5C2",
-      "expression": "ROW('R1C2') + ROW('R2C2') + ROW('R3C2') + ROW('R4C2')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R1C2')"
-        },
-        {
-          "formula_ref": "ROW('R2C2')"
-        },
-        {
-          "formula_ref": "ROW('R3C2')"
-        },
-        {
-          "formula_ref": "ROW('R4C2')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "结构化主体<br/>类型·合计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:movement:listed:三、计入递延收益的政:T0:R1C4",
+      "target_cell": "note-formula:movement:listed:八、计入递延收益的政府补助:T0:R1C4",
       "expression": "ROW('R1C1') + ROW('R1C2') - ROW('R1C3')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16458,7 +16229,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:movement:listed:三、计入递延收益的政:T0:R2C4",
+      "target_cell": "note-formula:movement:listed:八、计入递延收益的政府补助:T0:R2C4",
       "expression": "ROW('R2C1') + ROW('R2C2') - ROW('R2C3')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16478,7 +16249,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T0:R3C1",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T0:R3C1",
       "expression": "ROW('R1C1') + ROW('R2C1')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16495,7 +16266,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T0:R3C2",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T0:R3C2",
       "expression": "ROW('R1C2') + ROW('R2C2')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16512,7 +16283,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T0:R3C3",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T0:R3C3",
       "expression": "ROW('R1C3') + ROW('R2C3')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16529,7 +16300,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T0:R3C4",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T0:R3C4",
       "expression": "ROW('R1C4') + ROW('R2C4')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16546,7 +16317,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T1:R2C1",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T1:R2C1",
       "expression": "ROW('R1C1')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16560,7 +16331,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T1:R2C5",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T1:R2C5",
       "expression": "ROW('R1C5')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16574,7 +16345,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T1:R4C1",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T1:R4C1",
       "expression": "ROW('R3C1')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16588,7 +16359,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T1:R4C5",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T1:R4C5",
       "expression": "ROW('R3C5')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16602,7 +16373,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T2:R2C1",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T2:R2C1",
       "expression": "ROW('R1C1')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16616,7 +16387,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T2:R2C3",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T2:R2C3",
       "expression": "ROW('R1C3')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16630,7 +16401,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T2:R2C5",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T2:R2C5",
       "expression": "ROW('R1C5')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16644,7 +16415,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T2:R2C6",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T2:R2C6",
       "expression": "ROW('R1C6')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16658,7 +16429,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T2:R4C1",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T2:R4C1",
       "expression": "ROW('R3C1')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16672,7 +16443,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T2:R4C3",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T2:R4C3",
       "expression": "ROW('R3C3')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16686,7 +16457,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T2:R4C5",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T2:R4C5",
       "expression": "ROW('R3C5')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16700,7 +16471,7 @@
     },
     {
       "page_key": "note:三、计入递延收益的政",
-      "target_cell": "note-formula:sum:listed:三、计入递延收益的政:T2:R4C6",
+      "target_cell": "note-formula:sum:listed:八、计入递延收益的政府补助:T2:R4C6",
       "expression": "ROW('R3C6')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16714,7 +16485,7 @@
     },
     {
       "page_key": "note:三、采用净额法冲减相",
-      "target_cell": "note-formula:sum:listed:三、采用净额法冲减相:T0:R2C1",
+      "target_cell": "note-formula:sum:listed:八、采用净额法冲减相关成本费用的政府补助情况:T0:R2C1",
       "expression": "ROW('R1C1')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16728,7 +16499,7 @@
     },
     {
       "page_key": "note:三、采用净额法冲减相",
-      "target_cell": "note-formula:sum:listed:三、采用净额法冲减相:T0:R2C2",
+      "target_cell": "note-formula:sum:listed:八、采用净额法冲减相关成本费用的政府补助情况:T0:R2C2",
       "expression": "ROW('R1C2')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16742,7 +16513,7 @@
     },
     {
       "page_key": "note:三、采用净额法冲减相",
-      "target_cell": "note-formula:sum:listed:三、采用净额法冲减相:T0:R2C3",
+      "target_cell": "note-formula:sum:listed:八、采用净额法冲减相关成本费用的政府补助情况:T0:R2C3",
       "expression": "ROW('R1C3')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16756,7 +16527,7 @@
     },
     {
       "page_key": "note:三、采用净额法冲减相",
-      "target_cell": "note-formula:sum:listed:三、采用净额法冲减相:T0:R4C1",
+      "target_cell": "note-formula:sum:listed:八、采用净额法冲减相关成本费用的政府补助情况:T0:R4C1",
       "expression": "ROW('R3C1')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16770,7 +16541,7 @@
     },
     {
       "page_key": "note:三、采用净额法冲减相",
-      "target_cell": "note-formula:sum:listed:三、采用净额法冲减相:T0:R4C2",
+      "target_cell": "note-formula:sum:listed:八、采用净额法冲减相关成本费用的政府补助情况:T0:R4C2",
       "expression": "ROW('R3C2')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16784,7 +16555,7 @@
     },
     {
       "page_key": "note:三、采用净额法冲减相",
-      "target_cell": "note-formula:sum:listed:三、采用净额法冲减相:T0:R4C3",
+      "target_cell": "note-formula:sum:listed:八、采用净额法冲减相关成本费用的政府补助情况:T0:R4C3",
       "expression": "ROW('R3C3')",
       "formula_type": "auto_calc",
       "refs": [
@@ -16794,158 +16565,6 @@
       ],
       "source": "note_formula_derivation",
       "description": "种  类·小计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
-      "page_key": "note:三、风险管理目标和政",
-      "target_cell": "note-formula:sum:listed:三、风险管理目标和政:T0:R6C1",
-      "expression": "ROW('R1C1') + ROW('R2C1') + ROW('R3C1') + ROW('R4C1') + ROW('R5C1')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R1C1')"
-        },
-        {
-          "formula_ref": "ROW('R2C1')"
-        },
-        {
-          "formula_ref": "ROW('R3C1')"
-        },
-        {
-          "formula_ref": "ROW('R4C1')"
-        },
-        {
-          "formula_ref": "ROW('R5C1')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "表·合计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
-      "page_key": "note:三、风险管理目标和政",
-      "target_cell": "note-formula:sum:listed:三、风险管理目标和政:T1:R4C1",
-      "expression": "ROW('R1C1') + ROW('R2C1') + ROW('R3C1')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R1C1')"
-        },
-        {
-          "formula_ref": "ROW('R2C1')"
-        },
-        {
-          "formula_ref": "ROW('R3C1')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "表·合计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
-      "page_key": "note:三、风险管理目标和政",
-      "target_cell": "note-formula:sum:listed:三、风险管理目标和政:T5:R15C1",
-      "expression": "ROW('R1C1') + ROW('R2C1') + ROW('R3C1') + ROW('R4C1') + ROW('R5C1') + ROW('R6C1') + ROW('R7C1') + ROW('R8C1') + ROW('R9C1') + ROW('R10C1') + ROW('R11C1') + ROW('R12C1') + ROW('R13C1') + ROW('R14C1')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R1C1')"
-        },
-        {
-          "formula_ref": "ROW('R2C1')"
-        },
-        {
-          "formula_ref": "ROW('R3C1')"
-        },
-        {
-          "formula_ref": "ROW('R4C1')"
-        },
-        {
-          "formula_ref": "ROW('R5C1')"
-        },
-        {
-          "formula_ref": "ROW('R6C1')"
-        },
-        {
-          "formula_ref": "ROW('R7C1')"
-        },
-        {
-          "formula_ref": "ROW('R8C1')"
-        },
-        {
-          "formula_ref": "ROW('R9C1')"
-        },
-        {
-          "formula_ref": "ROW('R10C1')"
-        },
-        {
-          "formula_ref": "ROW('R11C1')"
-        },
-        {
-          "formula_ref": "ROW('R12C1')"
-        },
-        {
-          "formula_ref": "ROW('R13C1')"
-        },
-        {
-          "formula_ref": "ROW('R14C1')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "项  目·金融负债和或有负债合计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
-      "variant": "listed"
-    },
-    {
-      "page_key": "note:三、风险管理目标和政",
-      "target_cell": "note-formula:sum:listed:三、风险管理目标和政:T6:R15C1",
-      "expression": "ROW('R1C1') + ROW('R2C1') + ROW('R3C1') + ROW('R4C1') + ROW('R5C1') + ROW('R6C1') + ROW('R7C1') + ROW('R8C1') + ROW('R9C1') + ROW('R10C1') + ROW('R11C1') + ROW('R12C1') + ROW('R13C1') + ROW('R14C1')",
-      "formula_type": "auto_calc",
-      "refs": [
-        {
-          "formula_ref": "ROW('R1C1')"
-        },
-        {
-          "formula_ref": "ROW('R2C1')"
-        },
-        {
-          "formula_ref": "ROW('R3C1')"
-        },
-        {
-          "formula_ref": "ROW('R4C1')"
-        },
-        {
-          "formula_ref": "ROW('R5C1')"
-        },
-        {
-          "formula_ref": "ROW('R6C1')"
-        },
-        {
-          "formula_ref": "ROW('R7C1')"
-        },
-        {
-          "formula_ref": "ROW('R8C1')"
-        },
-        {
-          "formula_ref": "ROW('R9C1')"
-        },
-        {
-          "formula_ref": "ROW('R10C1')"
-        },
-        {
-          "formula_ref": "ROW('R11C1')"
-        },
-        {
-          "formula_ref": "ROW('R12C1')"
-        },
-        {
-          "formula_ref": "ROW('R13C1')"
-        },
-        {
-          "formula_ref": "ROW('R14C1')"
-        }
-      ],
-      "source": "note_formula_derivation",
-      "description": "项  目·金融负债和或有负债合计：合计 = 上一合计行之后至本行之前的非合计行之和（与 _backfill_totals 同口径）（仅登记可见，计算真源为 _backfill_totals）",
       "variant": "listed"
     },
     {
@@ -28149,7 +27768,11 @@
       "target_cell": "L1-adj-tb-amount-opening",
       "expression": "TB('2001','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2001')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2001')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L1短期借款TB核对（期初，负债贷方）"
     },
@@ -28158,7 +27781,11 @@
       "target_cell": "L1-adj-tb-amount-ending",
       "expression": "TB('2001','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2001')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2001')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L1短期借款TB核对（期末，负债贷方）"
     },
@@ -28167,7 +27794,11 @@
       "target_cell": "L2-adj-tb-amount-opening",
       "expression": "TB('2231','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2231')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2231')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L2应付利息TB核对（期初，负债贷方）"
     },
@@ -28176,7 +27807,11 @@
       "target_cell": "L2-adj-tb-amount-ending",
       "expression": "TB('2231','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2231')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2231')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L2应付利息TB核对（期末，负债贷方）"
     },
@@ -28185,7 +27820,11 @@
       "target_cell": "L3-adj-tb-amount-opening",
       "expression": "TB('2501','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2501')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2501')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L3长期借款TB核对（期初，负债贷方）"
     },
@@ -28194,7 +27833,11 @@
       "target_cell": "L3-adj-tb-amount-ending",
       "expression": "TB('2501','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2501')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2501')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L3长期借款TB核对（期末，负债贷方）"
     },
@@ -28203,7 +27846,11 @@
       "target_cell": "L4-adj-tb-amount-opening",
       "expression": "TB('2502','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2502')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2502')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L4应付债券TB核对（期初，负债贷方）"
     },
@@ -28212,7 +27859,11 @@
       "target_cell": "L4-adj-tb-amount-ending",
       "expression": "TB('2502','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2502')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2502')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L4应付债券TB核对（期末，负债贷方）"
     },
@@ -28221,7 +27872,11 @@
       "target_cell": "L5-adj-tb-amount-opening",
       "expression": "TB('2701','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2701')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2701')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L5长期应付款TB核对（期初，负债贷方）"
     },
@@ -28230,7 +27885,11 @@
       "target_cell": "L5-adj-tb-amount-ending",
       "expression": "TB('2701','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2701')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2701')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L5长期应付款TB核对（期末，负债贷方）"
     },
@@ -28239,7 +27898,11 @@
       "target_cell": "L6-adj-tb-amount-opening",
       "expression": "TB('2601','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2601')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2601')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L6专项应付款TB核对（期初，负债贷方）"
     },
@@ -28248,7 +27911,11 @@
       "target_cell": "L6-adj-tb-amount-ending",
       "expression": "TB('2601','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2601')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2601')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L6专项应付款TB核对（期末，负债贷方）"
     },
@@ -28257,7 +27924,11 @@
       "target_cell": "L7-adj-tb-amount-opening",
       "expression": "TB('2801','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2801')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2801')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L7其他非流动负债TB核对（期初，负债贷方）"
     },
@@ -28266,7 +27937,11 @@
       "target_cell": "L7-adj-tb-amount-ending",
       "expression": "TB('2801','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2801')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2801')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L7其他非流动负债TB核对（期末，负债贷方）"
     },
@@ -28275,7 +27950,11 @@
       "target_cell": "L8-adj-tb-amount-occurrence",
       "expression": "TB('6603','借方发生额')-TB('6603','贷方发生额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('6603')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('6603')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "L8财务费用TB核对（发生额=借-贷，损益借方）"
     },
@@ -28284,7 +27963,11 @@
       "target_cell": "M1-adj-tb-amount-opening",
       "expression": "TB('2232','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2232')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2232')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M1应付股利TB核对（期初，负债贷方）"
     },
@@ -28293,7 +27976,11 @@
       "target_cell": "M1-adj-tb-amount-ending",
       "expression": "TB('2232','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2232')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2232')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M1应付股利TB核对（期末，负债贷方）"
     },
@@ -28302,7 +27989,11 @@
       "target_cell": "M2-adj-tb-amount-opening",
       "expression": "TB('4001','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4001')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4001')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M2实收资本TB核对（期初，权益贷方）"
     },
@@ -28311,7 +28002,11 @@
       "target_cell": "M2-adj-tb-amount-ending",
       "expression": "TB('4001','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4001')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4001')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M2实收资本TB核对（期末，权益贷方）"
     },
@@ -28320,7 +28015,11 @@
       "target_cell": "M3-adj-tb-amount-net",
       "expression": "TB('4002','借方发生额')-TB('4002','贷方发生额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4002')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4002')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M3库存股TB核对（净额=借-贷，权益备抵借方）"
     },
@@ -28329,7 +28028,11 @@
       "target_cell": "M4-adj-tb-amount-opening",
       "expression": "TB('4002','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4002')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4002')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M4资本公积TB核对（期初，权益贷方）"
     },
@@ -28338,7 +28041,11 @@
       "target_cell": "M4-adj-tb-amount-ending",
       "expression": "TB('4002','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4002')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4002')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M4资本公积TB核对（期末，权益贷方）"
     },
@@ -28347,7 +28054,11 @@
       "target_cell": "M5-adj-tb-amount-opening",
       "expression": "TB('4101','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4101')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4101')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M5盈余公积TB核对（期初，权益贷方）"
     },
@@ -28356,7 +28067,11 @@
       "target_cell": "M5-adj-tb-amount-ending",
       "expression": "TB('4101','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4101')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4101')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M5盈余公积TB核对（期末，权益贷方）"
     },
@@ -28365,7 +28080,11 @@
       "target_cell": "M6-adj-tb-amount-opening",
       "expression": "TB('4104','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4104')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4104')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M6利润分配TB核对（期初，权益贷方）"
     },
@@ -28374,7 +28093,11 @@
       "target_cell": "M6-adj-tb-amount-ending",
       "expression": "TB('4104','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4104')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4104')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M6利润分配TB核对（期末，权益贷方）"
     },
@@ -28383,7 +28106,11 @@
       "target_cell": "M7-adj-tb-amount-opening",
       "expression": "TB('4201','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4201')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4201')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M7专项储备TB核对（期初，权益贷方）"
     },
@@ -28392,7 +28119,11 @@
       "target_cell": "M7-adj-tb-amount-ending",
       "expression": "TB('4201','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4201')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4201')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M7专项储备TB核对（期末，权益贷方）"
     },
@@ -28401,7 +28132,11 @@
       "target_cell": "M8-adj-tb-amount-audited",
       "expression": "SUM_TB('4104','审定数')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "SUM_TB('4104')"}],
+      "refs": [
+        {
+          "formula_ref": "SUM_TB('4104')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M8一般风险准备TB核对（审定数，金融专属）"
     },
@@ -28410,7 +28145,11 @@
       "target_cell": "M9-adj-tb-amount-opening",
       "expression": "TB('4103','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4103')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4103')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M9其他综合收益TB核对（期初，权益贷方）"
     },
@@ -28419,7 +28158,11 @@
       "target_cell": "M9-adj-tb-amount-ending",
       "expression": "TB('4103','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4103')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4103')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M9其他综合收益TB核对（期末，权益贷方）"
     },
@@ -28428,7 +28171,11 @@
       "target_cell": "M10-adj-tb-amount-opening",
       "expression": "TB('4003','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4003')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4003')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M10其他权益工具TB核对（期初，权益贷方）"
     },
@@ -28437,7 +28184,11 @@
       "target_cell": "M10-adj-tb-amount-ending",
       "expression": "TB('4003','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('4003')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('4003')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "M10其他权益工具TB核对（期末，权益贷方）"
     },
@@ -28446,7 +28197,11 @@
       "target_cell": "N1-adj-tb-amount-opening",
       "expression": "TB('1811','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('1811')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('1811')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "N1递延所得税资产TB核对（期初，资产借方）"
     },
@@ -28455,7 +28210,11 @@
       "target_cell": "N1-adj-tb-amount-ending",
       "expression": "TB('1811','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('1811')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('1811')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "N1递延所得税资产TB核对（期末，资产借方）"
     },
@@ -28464,7 +28223,11 @@
       "target_cell": "N2-adj-tb-amount-opening",
       "expression": "TB('2221','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2221')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2221')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "N2应交税费TB核对（期初，负债贷方）"
     },
@@ -28473,7 +28236,11 @@
       "target_cell": "N2-adj-tb-amount-ending",
       "expression": "TB('2221','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2221')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2221')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "N2应交税费TB核对（期末，负债贷方）"
     },
@@ -28482,7 +28249,11 @@
       "target_cell": "N3-adj-tb-amount-opening",
       "expression": "TB('2901','期初余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2901')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2901')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "N3递延所得税负债TB核对（期初，负债贷方）"
     },
@@ -28491,7 +28262,11 @@
       "target_cell": "N3-adj-tb-amount-ending",
       "expression": "TB('2901','期末余额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('2901')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('2901')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "N3递延所得税负债TB核对（期末，负债贷方）"
     },
@@ -28500,7 +28275,11 @@
       "target_cell": "N4-adj-tb-amount-occurrence",
       "expression": "TB('6403','借方发生额')-TB('6403','贷方发生额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('6403')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('6403')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "N4税金及附加TB核对（发生额=借-贷，损益借方）"
     },
@@ -28509,7 +28288,11 @@
       "target_cell": "N5-adj-tb-amount-occurrence",
       "expression": "TB('6801','借方发生额')-TB('6801','贷方发生额')",
       "formula_type": "auto_calc",
-      "refs": [{"formula_ref": "TB('6801')"}],
+      "refs": [
+        {
+          "formula_ref": "TB('6801')"
+        }
+      ],
       "source": "lmn_four_table_extraction",
       "description": "N5所得税费用TB核对（发生额=借-贷，损益借方）"
     }
