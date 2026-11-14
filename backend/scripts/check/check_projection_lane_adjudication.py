@@ -430,9 +430,13 @@ def _is_untracked(path: Path) -> bool:
 def _capability_discipline() -> dict[str, Any]:
     """manifest 出现 `bidirectional` 时，复核门不得被绕过（Requirement 7.8）。"""
     from app.services.workpaper_sync.adapters.registry import manifest_entries_by_id
+    # 🔴 用 `effective_capability` 而非 `capability_of`：后者对 pending entry
+    #    （`capability=null` + pending schema）**抛 EntryProfileError**，本脚本会直接
+    #    崩在 `docx/gt-a10-bundle` 上（rc=2）。pending 的正确答案是「还没启用任何能力」
+    #    而不是异常 —— 这正是 1.1 收出 `effective_capability` 的用途。
     from app.services.workpaper_sync.entry_profile import (
         Capability,
-        capability_of,
+        effective_capability,
         load_entry_manifest,
     )
 
@@ -441,7 +445,7 @@ def _capability_discipline() -> dict[str, Any]:
     bidirectional = sorted(
         entry_id
         for entry_id, entry in entries.items()
-        if capability_of(entry) is getattr(Capability, "bidirectional", None)
+        if effective_capability(entry) is getattr(Capability, "bidirectional", None)
     )
     stats = manifest.get("stats") if isinstance(manifest, dict) else {}
     counts = (stats or {}).get("capability_counts") or {}

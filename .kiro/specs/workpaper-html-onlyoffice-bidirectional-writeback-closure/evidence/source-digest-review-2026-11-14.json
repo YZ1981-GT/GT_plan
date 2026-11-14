@@ -1,0 +1,38 @@
+{
+  "decision": "approved",
+  "approved_source_digest_before": "f4bdfe883f681e88cc105157c4429d710d272ac3a21f95ea87ba30712fefa506",
+  "approved_source_digest_after": "b76adb534403f61d2d592ad2f7689f9d4c5668a68d741f89d1bf4a22dd390fb6",
+  "reviewed_at": "2026-11-14",
+  "reviewer": "本轮 CI 红修复（自动化复核 + 逐字段对拍）",
+  "method": "在内存里把 overlay 的 approved_source_digest 换成当前源码实测值后调用 build_manifest()，与磁盘 manifest 逐 entry 全字段对拍",
+  "findings": {
+    "entry_count": {
+      "disk": 197,
+      "rebuilt": 197
+    },
+    "entry_set_identical": true,
+    "business_field_changes": 0,
+    "changed_fields": {
+      "mounts": 2,
+      "profile_source": 1
+    },
+    "nature_of_change": "pure line-number shift（模板增删无关行导致 mount 的 sourceSpan 与 profile source_refs 行号后移）"
+  },
+  "examples": [
+    {
+      "entry_id": "xlsx/gt-a182-regulatory-communication",
+      "field": "mounts[0].sourceSpan.startLine",
+      "before": 187,
+      "after": 196,
+      "note": "component/condition/wpExpression/attributes 逐值相同"
+    },
+    {
+      "entry_id": "docx/gt-a16-bundle",
+      "field": "mounts[0].sourceSpan.startLine",
+      "before": 103,
+      "after": 177,
+      "note": "profile_source.source_refs 的 L103 同步为 L177，其余业务字段不变"
+    }
+  ],
+  "conclusion": "零能力损失：entry 集合、stats、capability/adapter_id/canonical_resolver/html_store/migration_state/editability 全部逐值相同，仅源码行号位移。按 Requirement 7.8 的人工复核口径批准，可安全更新 approved_source_digest。"
+}
