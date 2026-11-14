@@ -24,7 +24,9 @@ def register_formula_settings_startup() -> None:
 
     # 导入即注册（formula_settings.outbox_registration 模块底部 _register()）
     import app.services.formula_settings.outbox_registration  # noqa: F401
-    from app.services.import_event_outbox_service import registered_typed_event_types
+    # 查 core 里的中立注册表（🔴 不放 import-export 的 outbox service 里：
+    # 那会让 core 反向依赖 import-export，见 typed_event_dispatch 文档头）
+    from app.core.typed_event_dispatch import registered_typed_event_types
 
     if "formula_config.changed" not in registered_typed_event_types():
         raise RuntimeError(

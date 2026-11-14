@@ -49,6 +49,28 @@ KIND_FORBIDDEN = "forbidden_edge"
 KIND_CYCLE = "cycle"
 KIND_AMBIGUOUS_OWNER = "ambiguous_owner"
 
+#: **技术分层兜底域** —— 它们不是业务域，与业务域不在同一个对等平面上：
+#:   * ``backend-services`` = ``backend/app/services/**``（未归属具体业务域的 service）
+#:   * ``backend-workers``  = ``backend/app/workers/**``
+#:   * ``backend-routers``  = ``backend/app/routers/**`` + ``router_registry/**``
+#:
+#: 🔴 2026-11-14：manifest 原先把「业务域」（consolidation / notes / reports /
+#: qc-review …）与这三个**技术分层**画在同一张对等依赖图里，于是出现两类系统性误报：
+#:   - ``evidence -> backend-services``（evidence 用 attachment_service 这类通用 service）
+#:   - ``consolidation -> backend-workers``、``procedures -> backend-routers`` …
+#: 这些不是「业务域越界」，而是**分层引用**：业务实现本就落在 services/routers/workers
+#: 这一层。要求每个业务域把它们写进 ``may_depend_on`` 只会让 manifest 退化成
+#: 「所有域都列出所有技术层」的冗余表，判据也随之失去信号。
+#:
+#: 现语义（分层而非对等）：
+#:   1. 业务域 -> 技术分层：**恒允许**（业务实现本就要落在这些层）
+#:   2. 技术分层 -> 任意：**恒允许**（兜底域可引用任何具体实现）
+#:   3. 业务域 -> 业务域：仍按 ``may_depend_on`` **严格判定** —— 真正的架构边界在这
+#: ``may_depend_on`` 里显式列出的技术层名字保留（向后兼容，不再起判据作用）。
+TECHNICAL_LAYERS: frozenset[str] = frozenset(
+    {"backend-services", "backend-workers", "backend-routers"}
+)
+
 EXCLUDE_DIR_NAMES = {
     "__pycache__",
     ".git",
@@ -421,7 +443,10 @@ def collect_edges(
                 continue
             domain_edges.add((src_domain, dst_domain))
             allowed = domains[src_domain].may_depend_on
-            if dst_domain not in allowed:
+            # 🔴 分层豁免（见 TECHNICAL_LAYERS 文档头）：
+            #   业务域 -> 技术分层 / 技术分层 -> 任意 ⇒ 分层引用，不是架构越界。
+            _layered = dst_domain in TECHNICAL_LAYERS or src_domain in TECHNICAL_LAYERS
+            if not _layered and dst_domain not in allowed:
                 identity = f"{KIND_FORBIDDEN}:{src_domain}->{dst_domain}:{rel}->{tgt}"
                 forbidden.append(
                     Violation(

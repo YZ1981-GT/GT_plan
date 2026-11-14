@@ -1,7 +1,7 @@
 {
   "metadata": {
     "description": "Exact domain-boundary debt identities. Checker fails on NEW identities only; shrink -> update this file.",
-    "count": 134
+    "count": 92
   },
   "entries": [
     {
@@ -65,21 +65,6 @@
       "detail": "ai may not depend on import-export (backend/app/services/ai_chat/dsh_masking.py -> backend/app/services/export_mask_service.py)"
     },
     {
-      "identity": "forbidden_edge:ai->qc-review:backend/app/services/ai_chat/mcp_tools.py->backend/app/services/review_prompt_service.py",
-      "kind": "forbidden_edge",
-      "detail": "ai may not depend on qc-review (backend/app/services/ai_chat/mcp_tools.py -> backend/app/services/review_prompt_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:ai->qc-review:backend/app/services/ai_chat/review_mode.py->backend/app/services/review_prompt_service.py",
-      "kind": "forbidden_edge",
-      "detail": "ai may not depend on qc-review (backend/app/services/ai_chat/review_mode.py -> backend/app/services/review_prompt_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:backend-services->backend-routers:backend/app/services/m5_surplus_reserve_service.py->backend/app/routers/m5_surplus_reserve.py",
-      "kind": "forbidden_edge",
-      "detail": "backend-services may not depend on backend-routers (backend/app/services/m5_surplus_reserve_service.py -> backend/app/routers/m5_surplus_reserve.py)"
-    },
-    {
       "identity": "forbidden_edge:core->ai:backend/app/core/startup_registry.py->backend/app/services/ai_chat/run_coordinator.py",
       "kind": "forbidden_edge",
       "detail": "core may not depend on ai (backend/app/core/startup_registry.py -> backend/app/services/ai_chat/run_coordinator.py)"
@@ -130,11 +115,6 @@
       "detail": "core may not depend on import-export (backend/app/core/startup_registry.py -> backend/app/services/import_job_runner.py)"
     },
     {
-      "identity": "forbidden_edge:core->import-export:backend/app/main.py->backend/app/services/ledger_import/metrics.py",
-      "kind": "forbidden_edge",
-      "detail": "core may not depend on import-export (backend/app/main.py -> backend/app/services/ledger_import/metrics.py)"
-    },
-    {
       "identity": "forbidden_edge:core->procedures:backend/app/core/startup_registry.py->backend/app/services/procedure_table_auto_service.py",
       "kind": "forbidden_edge",
       "detail": "core may not depend on procedures (backend/app/core/startup_registry.py -> backend/app/services/procedure_table_auto_service.py)"
@@ -143,11 +123,6 @@
       "identity": "forbidden_edge:events->auth:backend/app/routers/events.py->backend/app/services/acnr/auth.py",
       "kind": "forbidden_edge",
       "detail": "events may not depend on auth (backend/app/routers/events.py -> backend/app/services/acnr/auth.py)"
-    },
-    {
-      "identity": "forbidden_edge:events->backend-workers:backend/app/workers/outbox_replay_worker.py->backend/app/workers/worker_helpers.py",
-      "kind": "forbidden_edge",
-      "detail": "events may not depend on backend-workers (backend/app/workers/outbox_replay_worker.py -> backend/app/workers/worker_helpers.py)"
     },
     {
       "identity": "forbidden_edge:events->import-export:backend/app/workers/outbox_replay_worker.py->backend/app/services/import_event_consumption_service.py",
@@ -220,36 +195,6 @@
       "detail": "events may not depend on workpapers (backend/app/workers/invalidation_dispatcher_worker.py -> backend/app/services/wp_visibility/invalidation_dispatcher.py)"
     },
     {
-      "identity": "forbidden_edge:evidence->backend-services:backend/app/routers/evidence_governance/attachments_router.py->backend/app/services/attachment_service.py",
-      "kind": "forbidden_edge",
-      "detail": "evidence may not depend on backend-services (backend/app/routers/evidence_governance/attachments_router.py -> backend/app/services/attachment_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:evidence->backend-services:backend/app/services/evidence_governance/attachment_security_gates.py->backend/app/services/file_scan_service.py",
-      "kind": "forbidden_edge",
-      "detail": "evidence may not depend on backend-services (backend/app/services/evidence_governance/attachment_security_gates.py -> backend/app/services/file_scan_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:evidence->backend-services:backend/app/services/evidence_governance/secure_attachment_gateway.py->backend/app/services/attachment_locator.py",
-      "kind": "forbidden_edge",
-      "detail": "evidence may not depend on backend-services (backend/app/services/evidence_governance/secure_attachment_gateway.py -> backend/app/services/attachment_locator.py)"
-    },
-    {
-      "identity": "forbidden_edge:evidence->backend-services:backend/app/services/evidence_governance/unified_graph_builder.py->backend/app/services/stale_propagation_engine.py",
-      "kind": "forbidden_edge",
-      "detail": "evidence may not depend on backend-services (backend/app/services/evidence_governance/unified_graph_builder.py -> backend/app/services/stale_propagation_engine.py)"
-    },
-    {
-      "identity": "forbidden_edge:formula->import-export:audit-platform/frontend/src/components/formula/FormulaManagerDialog.vue->audit-platform/frontend/src/components/import/UnifiedImportDialog.vue",
-      "kind": "forbidden_edge",
-      "detail": "formula may not depend on import-export (audit-platform/frontend/src/components/formula/FormulaManagerDialog.vue -> audit-platform/frontend/src/components/import/UnifiedImportDialog.vue)"
-    },
-    {
-      "identity": "forbidden_edge:formula->import-export:backend/app/services/formula_management/four_table_source.py->backend/app/services/ledger_import/direction_resolver.py",
-      "kind": "forbidden_edge",
-      "detail": "formula may not depend on import-export (backend/app/services/formula_management/four_table_source.py -> backend/app/services/ledger_import/direction_resolver.py)"
-    },
-    {
       "identity": "forbidden_edge:four-table->import-export:backend/app/routers/data_lifecycle.py->backend/app/services/import_queue_service.py",
       "kind": "forbidden_edge",
       "detail": "four-table may not depend on import-export (backend/app/routers/data_lifecycle.py -> backend/app/services/import_queue_service.py)"
@@ -288,16 +233,6 @@
       "identity": "forbidden_edge:frontend-shared->ai:audit-platform/frontend/src/utils/chatContextManifest.ts->audit-platform/frontend/src/components/ai/ChatContextInspector.vue",
       "kind": "forbidden_edge",
       "detail": "frontend-shared may not depend on ai (audit-platform/frontend/src/utils/chatContextManifest.ts -> audit-platform/frontend/src/components/ai/ChatContextInspector.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/layouts/ThreeColumnLayout.vue->audit-platform/frontend/src/components/ai/DshPanel.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/layouts/ThreeColumnLayout.vue -> audit-platform/frontend/src/components/ai/DshPanel.vue)"
-    },
-    {
-      "identity": "forbidden_edge:frontend-shell->ai:audit-platform/frontend/src/router/domains/standalone.ts->audit-platform/frontend/src/views/ai/AIChatView.vue",
-      "kind": "forbidden_edge",
-      "detail": "frontend-shell may not depend on ai (audit-platform/frontend/src/router/domains/standalone.ts -> audit-platform/frontend/src/views/ai/AIChatView.vue)"
     },
     {
       "identity": "forbidden_edge:frontend-shell->consolidation:audit-platform/frontend/src/layouts/DefaultLayout.vue->audit-platform/frontend/src/components/consolidation/ConsolCatalog.vue",
@@ -365,71 +300,6 @@
       "detail": "import-export may not depend on auth (audit-platform/frontend/src/components/deliverable/DeliverablePreview.vue -> audit-platform/frontend/src/stores/auth.ts)"
     },
     {
-      "identity": "forbidden_edge:import-export->backend-routers:backend/app/routers/archive.py->backend/app/routers/password_confirm.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on backend-routers (backend/app/routers/archive.py -> backend/app/routers/password_confirm.py)"
-    },
-    {
-      "identity": "forbidden_edge:import-export->backend-workers:backend/app/services/import_job_runner.py->backend/app/workers/worker_helpers.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on backend-workers (backend/app/services/import_job_runner.py -> backend/app/workers/worker_helpers.py)"
-    },
-    {
-      "identity": "forbidden_edge:import-export->backend-workers:backend/app/workers/export_cleanup_worker.py->backend/app/workers/_leader_lock.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on backend-workers (backend/app/workers/export_cleanup_worker.py -> backend/app/workers/_leader_lock.py)"
-    },
-    {
-      "identity": "forbidden_edge:import-export->backend-workers:backend/app/workers/export_cleanup_worker.py->backend/app/workers/worker_helpers.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on backend-workers (backend/app/workers/export_cleanup_worker.py -> backend/app/workers/worker_helpers.py)"
-    },
-    {
-      "identity": "forbidden_edge:import-export->backend-workers:backend/app/workers/import_recover_worker.py->backend/app/workers/worker_helpers.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on backend-workers (backend/app/workers/import_recover_worker.py -> backend/app/workers/worker_helpers.py)"
-    },
-    {
-      "identity": "forbidden_edge:import-export->evidence:backend/app/routers/archive_manifest_router.py->backend/app/routers/evidence_governance_common.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on evidence (backend/app/routers/archive_manifest_router.py -> backend/app/routers/evidence_governance_common.py)"
-    },
-    {
-      "identity": "forbidden_edge:import-export->evidence:backend/app/routers/archive_manifest_router.py->backend/app/services/evidence_governance/archive_manifest_service.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on evidence (backend/app/routers/archive_manifest_router.py -> backend/app/services/evidence_governance/archive_manifest_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:import-export->evidence:backend/app/routers/archive_manifest_router.py->backend/app/services/evidence_governance/facade.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on evidence (backend/app/routers/archive_manifest_router.py -> backend/app/services/evidence_governance/facade.py)"
-    },
-    {
-      "identity": "forbidden_edge:import-export->evidence:backend/app/routers/archive_manifest_router.py->backend/app/services/evidence_governance/frozen_contracts.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on evidence (backend/app/routers/archive_manifest_router.py -> backend/app/services/evidence_governance/frozen_contracts.py)"
-    },
-    {
-      "identity": "forbidden_edge:import-export->evidence:backend/app/routers/archive_manifest_router.py->backend/app/services/evidence_governance/offline_manifest_verifier.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on evidence (backend/app/routers/archive_manifest_router.py -> backend/app/services/evidence_governance/offline_manifest_verifier.py)"
-    },
-    {
-      "identity": "forbidden_edge:import-export->evidence:backend/app/routers/archive_manifest_router.py->backend/app/services/evidence_governance/scope_guard.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on evidence (backend/app/routers/archive_manifest_router.py -> backend/app/services/evidence_governance/scope_guard.py)"
-    },
-    {
-      "identity": "forbidden_edge:import-export->evidence:backend/app/routers/archive_manifest_router.py->backend/app/services/evidence_governance/unified_graph_builder.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on evidence (backend/app/routers/archive_manifest_router.py -> backend/app/services/evidence_governance/unified_graph_builder.py)"
-    },
-    {
-      "identity": "forbidden_edge:import-export->formula:backend/app/routers/import_templates.py->backend/app/services/cell_formula_evaluator.py",
-      "kind": "forbidden_edge",
-      "detail": "import-export may not depend on formula (backend/app/routers/import_templates.py -> backend/app/services/cell_formula_evaluator.py)"
-    },
-    {
       "identity": "forbidden_edge:import-export->frontend-features:audit-platform/frontend/src/components/ledger-import/DiagnosticPanel.vue->audit-platform/frontend/src/components/diagnostics/BalanceDiagnosticsDialog.vue",
       "kind": "forbidden_edge",
       "detail": "import-export may not depend on frontend-features (audit-platform/frontend/src/components/ledger-import/DiagnosticPanel.vue -> audit-platform/frontend/src/components/diagnostics/BalanceDiagnosticsDialog.vue)"
@@ -455,64 +325,9 @@
       "detail": "import-export may not depend on reports (backend/app/services/export_package_service.py -> backend/app/services/report_excel_exporter.py)"
     },
     {
-      "identity": "forbidden_edge:notes->import-export:backend/app/routers/note_ai.py->backend/app/services/export_mask_service.py",
-      "kind": "forbidden_edge",
-      "detail": "notes may not depend on import-export (backend/app/routers/note_ai.py -> backend/app/services/export_mask_service.py)"
-    },
-    {
       "identity": "forbidden_edge:notes->workpaper-rendering:backend/app/routers/disclosure_notes.py->backend/app/services/wp_render_schema_service.py",
       "kind": "forbidden_edge",
       "detail": "notes may not depend on workpaper-rendering (backend/app/routers/disclosure_notes.py -> backend/app/services/wp_render_schema_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:procedures->backend-routers:backend/app/routers/procedure_review.py->backend/app/routers/_wp_gate.py",
-      "kind": "forbidden_edge",
-      "detail": "procedures may not depend on backend-routers (backend/app/routers/procedure_review.py -> backend/app/routers/_wp_gate.py)"
-    },
-    {
-      "identity": "forbidden_edge:procedures->backend-routers:backend/app/routers/procedure_task_query.py->backend/app/routers/_wp_gate.py",
-      "kind": "forbidden_edge",
-      "detail": "procedures may not depend on backend-routers (backend/app/routers/procedure_task_query.py -> backend/app/routers/_wp_gate.py)"
-    },
-    {
-      "identity": "forbidden_edge:projects->backend-routers:backend/app/routers/project_wizard.py->backend/app/routers/password_confirm.py",
-      "kind": "forbidden_edge",
-      "detail": "projects may not depend on backend-routers (backend/app/routers/project_wizard.py -> backend/app/routers/password_confirm.py)"
-    },
-    {
-      "identity": "forbidden_edge:projects->reports:backend/app/routers/project_config.py->backend/app/services/report_note_sync_service.py",
-      "kind": "forbidden_edge",
-      "detail": "projects may not depend on reports (backend/app/routers/project_config.py -> backend/app/services/report_note_sync_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:qc-review->ai:backend/app/services/tsj_segmented_review_service.py->backend/app/services/ai_service.py",
-      "kind": "forbidden_edge",
-      "detail": "qc-review may not depend on ai (backend/app/services/tsj_segmented_review_service.py -> backend/app/services/ai_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:qc-review->evidence:backend/app/routers/review_evidence_router.py->backend/app/routers/evidence_governance_common.py",
-      "kind": "forbidden_edge",
-      "detail": "qc-review may not depend on evidence (backend/app/routers/review_evidence_router.py -> backend/app/routers/evidence_governance_common.py)"
-    },
-    {
-      "identity": "forbidden_edge:qc-review->evidence:backend/app/routers/review_evidence_router.py->backend/app/services/evidence_governance/facade.py",
-      "kind": "forbidden_edge",
-      "detail": "qc-review may not depend on evidence (backend/app/routers/review_evidence_router.py -> backend/app/services/evidence_governance/facade.py)"
-    },
-    {
-      "identity": "forbidden_edge:qc-review->evidence:backend/app/routers/review_evidence_router.py->backend/app/services/evidence_governance/frozen_contracts.py",
-      "kind": "forbidden_edge",
-      "detail": "qc-review may not depend on evidence (backend/app/routers/review_evidence_router.py -> backend/app/services/evidence_governance/frozen_contracts.py)"
-    },
-    {
-      "identity": "forbidden_edge:qc-review->evidence:backend/app/routers/review_evidence_router.py->backend/app/services/evidence_governance/review_evidence_service.py",
-      "kind": "forbidden_edge",
-      "detail": "qc-review may not depend on evidence (backend/app/routers/review_evidence_router.py -> backend/app/services/evidence_governance/review_evidence_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:qc-review->evidence:backend/app/routers/review_evidence_router.py->backend/app/services/evidence_governance/scope_guard.py",
-      "kind": "forbidden_edge",
-      "detail": "qc-review may not depend on evidence (backend/app/routers/review_evidence_router.py -> backend/app/services/evidence_governance/scope_guard.py)"
     },
     {
       "identity": "forbidden_edge:qc-review->frontend-features:audit-platform/frontend/src/views/eqcr/EqcrMetrics.vue->audit-platform/frontend/src/components/dashboard/DashboardViewSwitcher.vue",
@@ -533,21 +348,6 @@
       "identity": "forbidden_edge:reports->ai:backend/app/services/qc_annual_report_service.py->backend/app/services/ai_contribution_watermark.py",
       "kind": "forbidden_edge",
       "detail": "reports may not depend on ai (backend/app/services/qc_annual_report_service.py -> backend/app/services/ai_contribution_watermark.py)"
-    },
-    {
-      "identity": "forbidden_edge:reports->import-export:backend/app/services/qc_annual_report_service.py->backend/app/services/export_job_service.py",
-      "kind": "forbidden_edge",
-      "detail": "reports may not depend on import-export (backend/app/services/qc_annual_report_service.py -> backend/app/services/export_job_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:reports->import-export:backend/app/services/report_line_mapping_service.py->backend/app/services/ledger_import/direction_resolver.py",
-      "kind": "forbidden_edge",
-      "detail": "reports may not depend on import-export (backend/app/services/report_line_mapping_service.py -> backend/app/services/ledger_import/direction_resolver.py)"
-    },
-    {
-      "identity": "forbidden_edge:workpaper-rendering->backend-routers:backend/app/routers/wp_render_config.py->backend/app/routers/_wp_gate.py",
-      "kind": "forbidden_edge",
-      "detail": "workpaper-rendering may not depend on backend-routers (backend/app/routers/wp_render_config.py -> backend/app/routers/_wp_gate.py)"
     },
     {
       "identity": "forbidden_edge:workpaper-rendering->qc-review:backend/app/routers/wp_render_strategies/__init__.py->backend/app/routers/wp_render_strategies/_a177_independence_declaration.py",
@@ -635,11 +435,6 @@
       "detail": "workpapers may not depend on import-export (backend/app/services/workpaper_sync/outbox.py -> backend/app/services/import_event_outbox_service.py)"
     },
     {
-      "identity": "forbidden_edge:workpapers->import-export:backend/app/services/wp_ai_service.py->backend/app/services/export_mask_service.py",
-      "kind": "forbidden_edge",
-      "detail": "workpapers may not depend on import-export (backend/app/services/wp_ai_service.py -> backend/app/services/export_mask_service.py)"
-    },
-    {
       "identity": "forbidden_edge:workpapers->import-export:backend/app/services/wp_chat_service.py->backend/app/services/export_mask_service.py",
       "kind": "forbidden_edge",
       "detail": "workpapers may not depend on import-export (backend/app/services/wp_chat_service.py -> backend/app/services/export_mask_service.py)"
@@ -668,11 +463,6 @@
       "identity": "forbidden_edge:workpapers->qc-review:backend/app/services/wp_fill/_review_prompt.py->backend/app/services/review_prompt_service.py",
       "kind": "forbidden_edge",
       "detail": "workpapers may not depend on qc-review (backend/app/services/wp_fill/_review_prompt.py -> backend/app/services/review_prompt_service.py)"
-    },
-    {
-      "identity": "forbidden_edge:workpapers->reports:backend/app/routers/wp_html_save.py->backend/app/services/report_stale_service.py",
-      "kind": "forbidden_edge",
-      "detail": "workpapers may not depend on reports (backend/app/routers/wp_html_save.py -> backend/app/services/report_stale_service.py)"
     }
   ]
 }
