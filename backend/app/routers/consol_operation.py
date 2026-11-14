@@ -71,9 +71,9 @@ async def create_operation(
     except (OperationBoundaryError, OperationConflict, ValueError) as exc:
         await db.rollback()
         raise _http_error(exc) from exc
-    from app.workers.consol_operation_worker import wake
+    from app.core.worker_wakeup import wake_worker
 
-    wake()
+    wake_worker("consol_operation_worker")
     return {**operation_payload(result.operation), "disposition": result.disposition}
 
 

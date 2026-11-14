@@ -622,7 +622,7 @@ async def _run_queued(project_id: UUID, year: int, key: tuple[str, int]):
             trigger, user_id = _QUEUED.pop(key, (TRIGGER_MANUAL, None))
             from app.core.database import async_session
             from app.services.consol_operation_service import request_operation
-            from app.workers.consol_operation_worker import wake
+            from app.core.worker_wakeup import wake_worker
 
             async with async_session() as db:
                 requested = await request_operation(
@@ -635,7 +635,7 @@ async def _run_queued(project_id: UUID, year: int, key: tuple[str, int]):
                     triggered_by=user_id,
                 )
                 await db.commit()
-            wake()
+            wake_worker("consol_operation_worker")
             return requested.operation
     except Exception:  # noqa: BLE001 —— 事件已提交时不能向上反抛；入队失败留日志
         logger.exception("后台合并 operation 入队失败：项目=%s 年度=%s", project_id, year)

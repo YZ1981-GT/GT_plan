@@ -35,7 +35,7 @@ async def _push(event: Any, trigger: str) -> None:
 
         from app.core.database import async_session as async_session_factory
         from app.services.consol_operation_service import request_operation
-        from app.workers.consol_operation_worker import wake
+        from app.core.worker_wakeup import wake_worker
 
         source_id = (
             getattr(event, "entry_group_id", None)
@@ -52,7 +52,7 @@ async def _push(event: Any, trigger: str) -> None:
                 trigger_source=trigger,
             )
             await db.commit()
-        wake()
+        wake_worker("consol_operation_worker")
         logger.info(
             "分录%s → 合并 operation %s（项目 %s 年度 %s）",
             trigger, requested.operation.id, project_id, year,

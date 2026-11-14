@@ -57,9 +57,9 @@ async def trigger_refresh_all(
     except (OperationBoundaryError, OperationConflict, ValueError) as exc:
         await db.rollback()
         _raise_request_error(exc)
-    from app.workers.consol_operation_worker import wake
+    from app.core.worker_wakeup import wake_worker
 
-    wake()
+    wake_worker("consol_operation_worker")
     operation = requested.operation
     return {
         "job_id": str(operation.id),

@@ -22,6 +22,34 @@ from app.services.event_bus import event_bus
 logger = logging.getLogger(__name__)
 
 
+#: 业务域自注册的专用派发器（🔴 2026-11-14 解耦，替代原先硬编码的 formula 分支）。
+#:
+#: 背景：``_deliver`` 里曾内联 "if event_type == FORMULA_CONFIG_CHANGED: import formula 的
+#: deliver"——通用 outbox 因此反向依赖 formula_settings，形成
+#: ``formula -> import-export`` 与 ``import-export -> formula`` 双向边（domain-boundary 门禁
+#: 的两条 forbidden_edge）。问题不在「谁 import 谁」而在**位置**：事件派发是开放扩展点，
+#: 通用 outbox 不该知道任何具体业务域。
+#:
+#: 现语义：域自己调 :func:`register_typed_deliverer` 注册
+#: ``event_type -> (async deliverer(db, item, payload) -> None)``；outbox 只查表派发。
+#: 没有注册的分支照旧走事件总线（与原先 else 分支一致）。
+_TYPED_DELIVERERS: dict[str, Any] = {}
+
+
+def register_typed_deliverer(event_type: str, deliverer: Any) -> None:
+    """注册某事件类型的专用派发器（覆盖事件总线默认派发）。
+
+    ``deliverer`` 签名：``async (db, item: ImportEventOutbox, payload: EventPayload) -> None``。
+    各业务域在自己的模块导入期调用本函数（见 formula_settings/outbox.py 底部）。
+    """
+    _TYPED_DELIVERERS[str(event_type)] = deliverer
+
+
+def registered_typed_event_types() -> tuple[str, ...]:
+    """已注册专用派发器的事件类型（供守卫/诊断断言「注册确实发生」）。"""
+    return tuple(sorted(_TYPED_DELIVERERS))
+
+
 class ImportEventOutboxService:
     @staticmethod
     async def enqueue(
@@ -103,22 +131,12 @@ class ImportEventOutboxService:
             )
             return False
         try:
-            # S4 ADR-SDO-02：公式变更事件直接调传播处理器，不经事件总线（总线会吞异常）
-            if item.event_type == EventType.FORMULA_CONFIG_CHANGED.value:
-                from app.services.formula_settings.outbox import deliver as formula_deliver, ORIGIN as FORMULA_ORIGIN
-                origin = event_extra.get("origin", "")
-                if origin == FORMULA_ORIGIN:
-                    from app.services.workpaper_sync.outbox import PendingPublication
-                    pub = PendingPublication(
-                        outbox_id=item.id,
-                        event_type=EventType.FORMULA_CONFIG_CHANGED,
-                        project_id=item.project_id,
-                        year=item.year,
-                    )
-                    await formula_deliver(db, pub)
-                else:
-                    # 旧路径（非 outbox 入队的公式事件）仍走事件总线
-                    await event_bus.publish_immediate(payload)
+            # 🔴 2026-11-14：改为查**注册表**派发 —— 通用 outbox 不再 import 任何业务域
+            # （原先内联 formula 分支造成 formula <-> import-export 双向依赖）。
+            # 域未注册 ⇒ 走事件总线（与原先 else 分支一致，行为不变）。
+            deliverer = _TYPED_DELIVERERS.get(str(item.event_type))
+            if deliverer is not None:
+                await deliverer(db, item, payload)
             else:
                 await event_bus.publish_immediate(payload)
         except Exception:

@@ -240,7 +240,7 @@ async def test_event_without_year_is_backfilled_and_reaches_consol_note_operatio
     from app.services import consol_note_formula_service as cnfs
     from app.services import consol_operation_service
     from app.services import event_bus as event_bus_module
-    from app.workers import consol_operation_worker
+    from app.core import worker_wakeup
 
     requests, woken, fills = [], [], []
     real_request = consol_operation_service.request_operation
@@ -255,7 +255,9 @@ async def test_event_without_year_is_backfilled_and_reaches_consol_note_operatio
         return {}
 
     monkeypatch.setattr(consol_operation_service, "request_operation", recording_request)
-    monkeypatch.setattr(consol_operation_worker, "wake", lambda: woken.append(True))
+    # 🔴 2026-11-14：worker 唤醒已收口到 app.core.worker_wakeup 注册表
+    # （业务域不再 import app.workers.*）。拦 wake_worker 与原先拦 worker.wake 等价。
+    monkeypatch.setattr(worker_wakeup, "wake_worker", lambda _name: woken.append(True))
     monkeypatch.setattr(cnfs, "fill_note_sections", bypass_fill)
     async with make_db() as factory:
         async with factory() as db:

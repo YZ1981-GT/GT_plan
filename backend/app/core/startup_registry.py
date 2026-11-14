@@ -368,11 +368,12 @@ def _task_register_phase_handlers(_ctx: StartupContext) -> None:
         logging.getLogger("audit_platform").warning("[启动] 公式推送 handler 注册失败: %s", e)
 
     # formula-global-settings-sync R8：公式有效定义变化 → 报表标过期重算 / 底稿 / 附注 / 合并附注
+    # （🔴 2026-11-14 抽到伴生模块 startup_formula.py：本文件已超行数门禁，
+    #   且那里含「outbox 专用派发器注册已完成」的断言，见其文档头）
     try:
-        from app.services.event_bus import event_bus
-        from app.services.formula_settings.propagation import register_formula_settings_handlers
+        from app.core.startup_formula import register_formula_settings_startup
 
-        register_formula_settings_handlers(event_bus)
+        register_formula_settings_startup()
     except Exception as e:
         logging.getLogger("audit_platform").warning("[启动] 公式设置传播 handler 注册失败: %s", e)
 

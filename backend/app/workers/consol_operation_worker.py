@@ -125,3 +125,9 @@ async def run(stop_event: asyncio.Event) -> None:
             await asyncio.wait_for(stop_event.wait(), timeout=POLL_SECONDS)
         except asyncio.TimeoutError:
             pass
+
+#: 注册到统一唤醒表：业务域只调 `wake_worker("consol_operation_worker")`，不 import 本模块
+#: （🔴 2026-11-14 解 domain-boundary 的 `<domain> -> backend-workers` 反向依赖）。
+from app.core.worker_wakeup import register_waker as _register_waker
+
+_register_waker("consol_operation_worker", wake)

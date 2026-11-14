@@ -378,3 +378,11 @@ def _receipt(pub: PendingPublication, payload: dict[str, Any], domain: str, resu
         "operation_status": result.get("status") if operation_id else None,
         "last_error": error, "recorded_at": datetime.now(timezone.utc).isoformat(),
     })
+
+# 🔴 2026-11-14：注册逻辑已抽到伴生模块（本文件行数门禁），但**保持原语义**——
+# 任何 `import app.services.formula_settings.outbox` 仍然会触发专用派发器注册
+# （原先注册代码就在本文件底部）。漏掉这一行会让「只 import outbox 的调用方」
+# 静默退回事件总线派发（总线吞异常），是**不会报错的退化**。
+# 循环导入安全：outbox_registration 只在函数体/模块底部 import 本模块的符号，
+# 且 Python 会复用已加载的模块对象。
+from app.services.formula_settings import outbox_registration as _outbox_registration  # noqa: E402,F401
