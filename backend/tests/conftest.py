@@ -45,7 +45,6 @@ try:  # pragma: no cover - 测试环境配置
 except Exception:  # hypothesis 未安装或版本差异时不阻断测试收集
     pass
 
-import fakeredis.aioredis  # noqa: E402
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
@@ -55,6 +54,21 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine  # noqa: E4
 from app.core.database import get_db  # noqa: E402
 from app.core.redis import get_redis  # noqa: E402
 from app.models.base import Base  # noqa: E402
+
+#: ``fakeredis`` 是**可选**测试依赖：全量 requirements 里有它，但几十个 governance
+#: job 只 `pip install pytest`（+openpyxl），装不到它。conftest 顶层硬 import 会让
+#: 这些 job 在收集阶段就 ``ModuleNotFoundError`` ⇒ 整片门禁假红（2026-11-14 实测
+#: 102/183 个 job 因此失败）。
+#:
+#: 本文件对它的唯一用法是按模块名判断「用例是否把 redis 换成了 fakeredis」
+#: （见下方 ``_is_fake_redis``），不需要真的 import 它。故这里降级为软探测：
+#: 装了就记下模块名，没装就只影响「假 redis 不写共享链路」那条守卫的可用性，
+#: 其余测试不受影响。
+try:  # pragma: no cover - 环境探测
+    import fakeredis.aioredis  # noqa: F401,E402
+    _FAKEREDIS_AVAILABLE = True
+except ModuleNotFoundError:  # pragma: no cover - 精简依赖环境
+    _FAKEREDIS_AVAILABLE = False
 
 # ─── 模型注册：自动导入 app.models 全部子模块 ────────────────────────────────────
 # 🔴 原先是 44 行显式 import 清单，漏一个模块就让 `Base.metadata.create_all` 在解析跨模块外键时

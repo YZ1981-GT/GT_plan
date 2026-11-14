@@ -300,7 +300,7 @@ jobs:
       # 保证「守卫失效」这类回归不会被别的失败掩盖（与 note-inventory-structure /
       # procedure-delegation-architecture 两个 job 同款做法）。
       - name: Install guard self-test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run disclosure columns coverage guard self-tests
         run: python -m pytest backend/tests/scripts/test_check_disclosure_columns_coverage.py -q
       # R6.7：账龄档位标签披露口径扫描 —— **warn 级，明确不阻断**（各循环随批次收敛）。
@@ -322,7 +322,7 @@ jobs:
       - name: Check note inventory section alignment (五、9 / 八、10)
         run: python backend/scripts/fix/fix_note_inventory_structure.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note inventory structure contract tests
         run: python -m pytest backend/tests/services/test_note_inventory_structure.py -q
 
@@ -340,7 +340,7 @@ jobs:
       - name: Check note G-cycle section alignment (G8 / G9 / G12)
         run: python backend/scripts/fix/fix_note_g_cycle_structure.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note G-cycle structure contract tests
         run: python -m pytest backend/tests/services/test_note_g_cycle_structure.py -q
 
@@ -357,7 +357,7 @@ jobs:
       - name: Check G10/G11/G13/G14 note structure alignment
         run: python backend/scripts/fix/fix_note_g_liability_and_pl_structure.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run G liability/PL structure guard tests
         run: python -m pytest backend/tests/test_note_g_liability_and_pl_structure.py -q
 
@@ -400,7 +400,7 @@ jobs:
       - name: Check note J1 section alignment (五、40 / 八、40)
         run: python backend/scripts/fix/fix_note_j1_employee_comp_structure.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note J1 structure contract tests
         run: python -m pytest backend/tests/services/test_note_j1_employee_comp_structure.py -q
 
@@ -419,7 +419,7 @@ jobs:
       - name: Check note D1 section alignment (五、4 / 八、4)
         run: python backend/scripts/fix/fix_note_d1_notes_receivable_structure.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note D1 structure contract tests
         run: python -m pytest backend/tests/test_note_d1_structure.py -q
 
@@ -440,7 +440,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl
+        run: python -m pip install -r backend/requirements.txt
       - name: Run D1 AI section prompt guard
         run: python -m pytest backend/tests/test_review_dialog_section_prompts.py -q
       - name: Run D1 disclosure import/export column contract
@@ -522,7 +522,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl
+        run: python -m pip install -r backend/requirements.txt
       - name: Check note D2 section alignment (五、5 / 八、5)
         run: python backend/scripts/fix/fix_note_d2_ar_structure.py --check
       - name: Run note D2 structure contract tests
@@ -620,7 +620,7 @@ jobs:
       - name: Check note D-cycle rest section alignment
         run: python backend/scripts/fix/fix_note_d_cycle_rest_structure.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note D-cycle rest structure contract tests
         run: python -m pytest backend/tests/test_note_d_cycle_rest_structure.py -q
       - name: Run D-cycle note Word export two-level header guard
@@ -648,7 +648,7 @@ jobs:
       - name: Check note deferred-tax section alignment (五、30 / 八、31)
         run: python backend/scripts/fix/fix_note_deferred_tax_structure.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note deferred-tax structure contract tests
         run: python -m pytest backend/tests/services/test_note_deferred_tax_structure.py -q
       # 行集守卫（n1-four-table-extraction-and-disclosure-alignment R5）：
@@ -791,7 +791,7 @@ jobs:
       - name: Check note N-cycle tax section alignment
         run: python backend/scripts/fix/fix_note_n_cycle_tax_structure.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note N-cycle tax structure contract tests
         run: python -m pytest backend/tests/services/test_note_n_cycle_tax_structure.py -q
 
@@ -847,7 +847,7 @@ jobs:
       - name: Check note K2 section alignment (五、13 / 八、14)
         run: python backend/scripts/fix/fix_note_k2_structure.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note K2 structure contract tests
         run: python -m pytest backend/tests/services/test_note_k2_structure.py -q
 
@@ -875,7 +875,7 @@ jobs:
       - name: Check F1 formula presets
         run: python backend/scripts/fix/fix_f1_prefill_presets.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5 hypothesis==6.112.1
+        run: python -m pip install -r backend/requirements.txt
       - name: Run F1 four-table extraction guards
         run: python -m pytest backend/tests/test_f1_four_table_extraction.py backend/tests/four_table -q
       - name: Run note F1 structure contract tests (three-way vs source xlsx)
@@ -923,7 +923,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note G5 structure contract tests
         run: python -m pytest backend/tests/test_note_g5_structure.py -v --tb=short
 
@@ -943,7 +943,7 @@ jobs:
       - name: Check note H2 section alignment (五、23 / 八、23)
         run: python backend/scripts/fix/fix_note_h2_construction_structure.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note H2 structure contract tests
         run: python -m pytest backend/tests/test_note_h2_construction_structure.py -q
 
@@ -965,7 +965,7 @@ jobs:
       - name: Check note H3 section alignment (五、21 / 八、21)
         run: python backend/scripts/fix/fix_note_h3_investment_property_structure.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note H3 structure contract tests
         run: python -m pytest backend/tests/test_note_h3_investment_property_structure.py -q
 
@@ -986,7 +986,7 @@ jobs:
       - name: Check note H5 section alignment (八、25)
         run: python backend/scripts/fix/fix_note_h5_oil_gas_structure.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note H5 structure contract tests
         run: python -m pytest backend/tests/test_note_h5_oil_gas_structure.py -q
 
@@ -1007,7 +1007,7 @@ jobs:
       - name: Check no paired bold markers in note templates
         run: python backend/scripts/fix/fix_note_bold_markers.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 hypothesis==6.112.1
+        run: python -m pip install -r backend/requirements.txt
       - name: Run bold-marker hygiene tests
         run: python -m pytest backend/tests/test_note_bold_marker_hygiene.py -q
 
@@ -1026,7 +1026,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 hypothesis==6.112.1
+        run: python -m pip install -r backend/requirements.txt
       - name: Run stale-overwrite guard
         run: python -m pytest backend/tests/test_note_template_stale_overwrite_guard.py -q
 
@@ -1056,7 +1056,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run H cycle prompt registration guard
         run: python -m pytest backend/tests/test_review_dialog_h_cycle_prompts.py -q
 
@@ -1113,7 +1113,7 @@ jobs:
       - name: Check no stale report_row_code (offline snapshot)
         run: python backend/scripts/fix/remap_note_report_row_codes.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run report_row_code alignment tests
         run: python -m pytest backend/tests/test_note_report_row_code_alignment.py -q
 
@@ -1157,7 +1157,7 @@ jobs:
       - name: Check note H8 section alignment (五、25 / 八、26)
         run: python backend/scripts/fix/fix_note_h8_right_of_use_structure.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note H8 structure contract tests
         run: python -m pytest backend/tests/test_note_h8_right_of_use_structure.py -q
 
@@ -1200,7 +1200,7 @@ jobs:
       - name: Check note H7 section alignment (五、24 / 八、24)
         run: python backend/scripts/fix/fix_note_h7_biological_assets_structure.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note H7 structure contract tests
         run: python -m pytest backend/tests/test_note_h7_biological_assets_structure.py -q
 
@@ -1245,7 +1245,7 @@ jobs:
       - name: Check note H9/H10 section alignment
         run: python backend/scripts/fix/fix_note_h9_h10_structure.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note H9/H10 structure contract tests
         run: python -m pytest backend/tests/test_note_h9_h10_structure.py -q
 
@@ -1286,7 +1286,7 @@ jobs:
       - name: Check note L-cycle section alignment (五、52/八、57/五、67/八、68)
         run: python backend/scripts/fix/fix_note_l_cycle_structure.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note L-cycle structure contract tests
         run: python -m pytest backend/tests/test_note_l_cycle_structure.py -q
 
@@ -1308,7 +1308,7 @@ jobs:
       - name: Check note K-cycle P/L section alignment (K8~K13)
         run: python backend/scripts/fix/fix_note_k_pl_structure.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+        run: python -m pip install -r backend/requirements.txt
       - name: Check note K-cycle liability section alignment (K3/K4/K5/K7)
         run: python backend/scripts/fix/fix_note_k_liability_structure.py --check
       - name: Check note K-cycle complex section alignment (K1/K6)
@@ -1358,7 +1358,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5 hypothesis==6.135.26
+        run: python -m pip install -r backend/requirements.txt
       - name: Run four_table shared services tests (aux_aggregation / k1_aux_detail / k1_detail_seed)
         run: python -m pytest backend/tests/four_table -q
       - name: Run K1 aux-balance import endpoint + item_id consistency guards
@@ -1435,7 +1435,7 @@ jobs:
       - name: Check D4 store item ids fully wired (strict)
         run: python backend/scripts/check/check_store_item_ids_fully_wired.py
       - name: Install governance self-test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run store-item-ids guard self-tests
         run: python -m pytest backend/tests/scripts/test_check_store_item_ids_fully_wired.py -q
 
@@ -1454,7 +1454,7 @@ jobs:
       - name: Run procedure delegation architecture guard (strict)
         run: python backend/scripts/check/check_procedure_delegation_architecture.py --strict
       - name: Install governance self-test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run procedure delegation architecture self-tests
         run: python -m pytest backend/tests/scripts/test_check_procedure_delegation_architecture.py -q
       # Task 15 CI guard: 前后端通知类型同步（新增通知类型必须同步 backend + 前端字典）。
@@ -1829,7 +1829,7 @@ jobs:
       - name: Check note G7 SOE scope change structure (七、*)
         run: python backend/scripts/fix/fix_note_g7_soe_scope_change_structure.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note G7 structure contract tests (three-way vs source xlsx)
         run: python -m pytest backend/tests/test_note_g7_structure.py -v
       - uses: actions/setup-node@v4
@@ -1904,7 +1904,7 @@ jobs:
       - name: Check note M-equity section alignment (幂等脚本 --check)
         run: python backend/scripts/fix/fix_note_m_equity_structure.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note M-equity structure contract tests
         run: python -m pytest backend/tests/test_note_m_equity_structure.py -q
 
@@ -1923,7 +1923,7 @@ jobs:
       - name: Check note J2 section alignment (五、49 / 八、54 / 五、17)
         run: python backend/scripts/fix/fix_note_j2_dbp_structure.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note J2 structure contract tests
         run: python -m pytest backend/tests/four_table/test_note_j1_j2_structure.py -q
 
@@ -1939,7 +1939,7 @@ jobs:
       - name: Check J-cycle prefill presets alignment
         run: python backend/scripts/fix/fix_j_cycle_prefill_presets.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run J-cycle account scope & formula presets tests
         run: python -m pytest backend/tests/four_table/test_j_cycle_account_scope.py backend/tests/four_table/test_j_cycle_formula_presets.py -q
 
@@ -1973,7 +1973,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install test dependencies
-        run: pip install pytest openpyxl
+        run: python -m pip install -r backend/requirements.txt
       - name: Run I-cycle note structure tests
         run: python -m pytest backend/tests/test_note_i_cycle_structure.py -q
       - name: Check idempotent script (12 sections)
@@ -1990,7 +1990,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install test dependencies
-        run: pip install pytest hypothesis
+        run: python -m pip install -r backend/requirements.txt
       # 🔴 2026-08-12（本 spec Task 21 的 CI 接线守卫首跑即抓出）：
       #    原先引用的 `test_i1_asset_categories.py` **从未存在**（其判据并入了
       #    `test_i_cycle_accounts.py`），`test_i_cycle_leaf_aggregation.py` 实名是
@@ -2053,7 +2053,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install test dependencies
-        run: pip install pytest openpyxl hypothesis
+        run: python -m pip install -r backend/requirements.txt
       - name: Run I-cycle extraction closure guards
         run: python -m pytest backend/tests/four_table/test_i_cycle_row_code_evidence.py backend/tests/four_table/test_i_cycle_accounts.py backend/tests/four_table/test_i5_absent_account.py backend/tests/test_i_cycle_formula_presets.py -q
       - name: Run I-cycle note structure guards (source defects + md5 freeze)
@@ -2082,7 +2082,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 hypothesis
+        run: python -m pip install -r backend/requirements.txt
       - name: Run K-cycle four_table guards (科目声明 + 损益纯函数 + 预设)
         run: python -m pytest backend/tests/four_table/test_k_cycle_specs.py backend/tests/four_table/test_pl_occurrence.py backend/tests/four_table/test_k_cycle_formula_presets.py -q
       - name: Check K-cycle prefill presets alignment (幂等脚本 --check)
@@ -2259,7 +2259,7 @@ jobs:
       - name: Check note E1 section alignment (五、1 / 八、1 / 五、73 / 八、92)
         run: python backend/scripts/fix/fix_note_e1_monetary_fund_structure.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note E1 structure contract tests (openpyxl 直读源 xlsx 三向比对)
         run: python -m pytest backend/tests/four_table/test_note_e1_structure.py -q
 
@@ -2376,7 +2376,7 @@ jobs:
       - name: Check shared-table manifest drift (29 tables = listed 23 / soe 6)
         run: python backend/scripts/gen/gen_note_shared_table_segments.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 pytest-asyncio==0.24.0 hypothesis==6.112.1 sqlalchemy==2.0.35
+        run: python -m pip install -r backend/requirements.txt
       - name: Run row-level merge guards
         run: >-
           python -m pytest -q
@@ -2450,7 +2450,7 @@ jobs:
       - name: Check restricted-assets note structure (idempotent, 0 pending)
         run: python backend/scripts/fix/fix_note_restricted_assets_structure.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 pytest-asyncio==0.24.0 hypothesis==6.112.1 openpyxl==3.1.5
+        run: python -m pip install -r backend/requirements.txt
       - name: Run restricted-assets structure guards
         run: >-
           python -m pytest -q
@@ -2554,7 +2554,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 hypothesis==6.152.4 openpyxl==3.1.5 pyyaml==6.0.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run E0 send list source facts
         run: >-
           python -m pytest
@@ -2634,7 +2634,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl
+        run: python -m pip install -r backend/requirements.txt
       - name: Check note F3 structure alignment (五、36 / 八、36)
         run: python backend/scripts/fix/fix_note_notes_payable_structure.py --check
       - name: Check note F4 structure alignment (五、37 / 八、37)
@@ -2674,7 +2674,7 @@ jobs:
       - name: Check note D4 revenue section alignment (五、62 / 八、64)
         run: python backend/scripts/fix/fix_note_d4_revenue_structure.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+        run: python -m pip install -r backend/requirements.txt
       - name: Run note D4 structure contract tests
         run: python -m pytest backend/tests/test_note_d4_revenue_structure.py -q
 
@@ -2714,7 +2714,7 @@ jobs:
       - name: Check N-cycle note template structure (7 chapters / 16 tables)
         run: python backend/scripts/fix/fix_note_n_cycle_full_structure.py --check
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+        run: python -m pip install -r backend/requirements.txt
       - name: Run N-cycle note structure contract tests
         run: python -m pytest backend/tests/test_note_n_cycle_full_structure.py -q
       - name: Run N-cycle formula preset guard
@@ -2821,7 +2821,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pytest -q
+      - run: python -m pip install -r requirements.txt -q
       - name: Semantic resolver coverage guard
         run: python -m pytest tests/four_table/test_semantic_resolver_coverage.py -v --tb=short
 
@@ -2838,7 +2838,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pytest -q
+      - run: python -m pip install -r requirements.txt -q
       - name: Render fetch smoke (fail-open detection)
         run: python -m pytest tests/four_table/test_render_fetch_smoke.py -v --tb=short
 
@@ -2855,12 +2855,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pytest -q
+      - run: python -m pip install -r requirements.txt -q
       - name: Cycle specs account evidence
         run: python -m pytest tests/four_table/test_cycle_specs_account_evidence.py -v --tb=short
       # F2 的 `account` 字段是展示/兜底元数据（取数走 classify_f2_leaf 按名称），
       # 但「只是展示」不等于可以写全库零命中的码：1410/1412 曾如此（Task 29 已修）。
-      - run: pip install -r requirements.txt -q 2>/dev/null || pip install sqlalchemy -q
       - name: F2 display account codes exist in account_chart
         run: python -m pytest tests/four_table/test_f2_display_account_codes.py -v --tb=short
       # 旧制编码守卫的**不连库**部分（行级判定纯函数 + 白名单反向锁死 + skip 可见性）。
@@ -3150,7 +3149,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 hypothesis==6.112.1
+        run: python -m pip install -r backend/requirements.txt
       # 🔴🔴 连库文件必须**各自独立 pytest 进程**：连接池绑定首个事件循环，同一进程里
       # 第二个连库文件必炸 `AttributeError: 'NoneType' object has no attribute 'send'`，
       # 而 fixture 会把它 `except → skip` → **连库断言静默不执行 = 假绿**。
@@ -3258,7 +3257,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 pytest-asyncio==0.24.0 hypothesis==6.112.1 python-docx==1.1.2 aiosqlite==0.20.0 sqlalchemy==2.0.36
+        run: python -m pip install -r backend/requirements.txt
       - name: Run anchor scan + export wiring guards
         run: >-
           python -m pytest
@@ -3419,7 +3418,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 pytest-asyncio==0.24.0 hypothesis==6.112.1 sqlalchemy==2.0.36
+        run: python -m pip install -r backend/requirements.txt
 
       # R1：撤销回填必须同步软删两张投影表（改造前撤销后投影仍活着 →
       # 跨底稿排除/重复检测/项目级统计四个消费方全部被污染）
@@ -4108,7 +4107,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install pytest==8.4.2 python-docx==1.1.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Check note table names (空名 / 表头泄漏 / 章节内重名)
         run: python backend/scripts/fix/fix_note_table_names.py --check
       - name: Check note columns coverage (规则内欠账必须为 0)
@@ -5809,7 +5808,7 @@ jobs:
       - name: Run domain boundary checker (exact debt baseline)
         run: python backend/scripts/check/check_domain_boundaries.py
       - name: Install governance self-test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run domain boundary checker self-tests
         run: python -m pytest backend/tests/scripts/test_check_domain_boundaries.py -q
       - name: Assert domain-boundary artifacts exist
@@ -5880,7 +5879,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install backend test deps
-        run: python -m pip install pytest==8.4.2 pytest-asyncio aiosqlite sqlalchemy
+        run: python -m pip install -r backend/requirements.txt
       - name: APFE legacy/API/DTO baseline
         run: python -m pytest backend/tests/attachment_preview_format_expansion/ -c backend/pytest.ini -q
       - name: APFE mutation anchors (read-only)
@@ -5906,8 +5905,7 @@ jobs:
           python-version: "3.12"
       - name: Install backend test deps
         run: >
-          python -m pip install pytest==8.4.2 pytest-asyncio aiosqlite
-          sqlalchemy pydantic fastapi httpx
+          python -m pip install -r backend/requirements.txt -q
       - name: Guidance directed pytest (contract/inventory/resolution/handoff)
         run: >
           python -m pytest
@@ -6025,7 +6023,7 @@ jobs:
       # 守卫自身单测（stdlib-only）：验证「真能拦 + 不误报注释/测试/事件名/table 值」。
       # 与本仓其他 check_* 守卫同款做法（ci.yml 全量 pytest 带 -x 会被前序失败截断，故独立跑一遍）。
       - name: Install guard self-test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run TB-writeback direct-call guard self-tests
         run: python -m pytest backend/tests/scripts/test_check_tb_writeback_no_direct_call.py -q
       # 第二道守卫（复盘补强 6 / Req 1,2 = Property 1+2）：上面只管「不调旧端点」，
@@ -6204,7 +6202,7 @@ jobs:
         run: python backend/scripts/check/check_store_item_two_way_parity.py
       # 卡点自身的变异反证自测（stdlib + pytest，不依赖 tests/workpaper_sync 既存失败分母）
       - name: Install guard self-test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       # 🔴 接入层对账（2026-09-28 新增）——「workflow 声明的每个 backend/*.py 都必须
       #    在版本控制里」。本轮实测：Gate 5/6 的 2 个门禁 + 2 个自测本地全绿、tasks.md
       #    也登记了「立成 CI 卡点」，但四个文件**从未提交**，接线的 yml 改动也没提交
@@ -6277,7 +6275,7 @@ jobs:
           pip install "uv>=0.7"
           uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run E1 canary & static_region declaration guards
         run: >-
           python -m pytest
@@ -6326,7 +6324,7 @@ jobs:
           pip install "uv>=0.7"
           uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install -r backend/requirements.txt
       - name: Run lazy import resolvability guard
         run: python -m pytest backend/tests/test_lazy_import_resolvability.py -q
 

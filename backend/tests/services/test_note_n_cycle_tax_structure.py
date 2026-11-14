@@ -155,7 +155,20 @@ def test_each_table_has_title_paragraph(label, path, number) -> None:
 
 @pytest.mark.parametrize(("label", "path", "number"), _CASES)
 def test_section_marked_aligned(label, path, number) -> None:
-    assert _section(path, number).get("_aligned_by") == fx.ALIGNED_BY
+    """`_aligned_by` 是**标签集合**（旧值字符串 / 新值列表），只要求含本 spec 标签。
+
+    同一章节常被 2~3 个 spec 先后对齐过；若这里要求「恰好等于自己那个标签」，
+    谁后写谁赢，其余 spec 的 `--check` 会永久红（差异只在标记字段、内容一致）。
+    语义与 `fix_note_n_cycle_full_structure._aligned_by_has` 同一口径。
+    """
+    mark = _section(path, number).get("_aligned_by")
+    if isinstance(mark, str):
+        marks = [mark]
+    elif isinstance(mark, (list, tuple, set)):
+        marks = [str(m) for m in mark]
+    else:
+        marks = []
+    assert fx.ALIGNED_BY in marks, f"{label} 的 _aligned_by 未含 {fx.ALIGNED_BY}：{mark!r}"
 
 
 @pytest.mark.parametrize(("label", "path", "number"), _CASES)
