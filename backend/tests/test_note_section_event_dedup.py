@@ -32,7 +32,7 @@ async def test_two_note_sections_both_dispatch_through_real_debounce(monkeypatch
 
     monkeypatch.setattr(bus, "_persist_to_stream", no_redis)
     bus.subscribe(EventType.NOTE_SECTION_SAVED, handler)
-    queue = bus.create_sse_queue()
+    queue = await bus.create_sse_queue()
 
     await bus.publish(_payload("八、1"))
     await bus.publish(_payload("八、2"))

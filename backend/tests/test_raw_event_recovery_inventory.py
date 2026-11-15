@@ -102,7 +102,7 @@ def test_frontend_and_backend_inventory_are_identical():
 @pytest.mark.asyncio
 async def test_unknown_raw_event_is_visible_but_not_blocked(caplog):
     bus = EventBus()
-    queue = bus.create_sse_queue()
+    queue = await bus.create_sse_queue()
     bus._persist_raw_to_stream = AsyncMock(return_value=None)  # type: ignore[method-assign]
     with caplog.at_level(logging.ERROR):
         bus.broadcast_raw("totally.new.raw.event", {"project_id": "p1"})

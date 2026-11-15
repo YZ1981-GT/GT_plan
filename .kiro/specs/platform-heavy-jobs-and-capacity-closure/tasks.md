@@ -200,14 +200,27 @@
   - 🔴 需部署环境（PgBouncer 进程 + 真实后端 + RLS/SET LOCAL 验证），本机无法伪造，保持阻塞。
   - 2026-11-06 复核：仓库里没有灰度脚本；Compose 的 backend 仍直连 PG、单 worker，PgBouncer 服务存在但
     不在默认数据路径上。
-- [ ] E2 EventBus、任务、配额、进度和失效状态外置；2/4/8 worker 零丢失/零重复验证。
+- [~] E2 EventBus、任务、配额、进度和失效状态外置；2/4/8 worker 零丢失/零重复验证。
   - 🔴 platform_jobs / AI tasks 已 DB 耐久，SSE 跨标签已共享；但 EventBus、配额和失效状态仍有进程内部分，
     尚未完成跨 worker 外置和 2/4/8 worker 验证。2026-11-06 增量：接口骨架落地
     `app/services/event_bus_state_adapter.py`（`EventBusStateAdapter` ABC + `InMemoryEventBusStateAdapter`
     默认实现 + `install_event_bus_state_adapter` / `get_event_bus_state_adapter` /
     `reset_event_bus_state_adapter` 注入 hook）：debounce pending + per-project SSE quota 两面可注入；
-    内存默认实现与当前 `EventBus._pending` 行为等价。11 单测全绿。EventBus / platform_jobs 真实切到
-    adapter 以及 2/4/8 worker 验证仍待专用容量环境。
+    内存默认实现与当前 `EventBus._pending` 行为等价。11 单测全绿。
+  - **2026-11-15 更新（SSE quota 面已真实接线，`[ ]`→`[~]`）**：~~adapter 在生产代码里零调用~~ **已修**：
+    `EventBus.create_sse_queue` 改 **async** 并接 `get_event_bus_state_adapter().acquire_sse_quota`，
+    `remove_sse_queue` 用 `ensure_future` 异步释放（同步上下文不能 await，失败只记日志），
+    新增 `SSESubscriptionLimitReached` 异常与 `_sse_queue_projects` 队列→项目映射；
+    生产调用方 `routers/events.py:132` 改 `await`。**默认 `max_per_project=0` = 不限**，
+    与改造前行为 100% 等价（单 worker 部署零变化），多 worker 部署注入 Redis 实现后配额才真正跨进程生效。
+    **架构约束（如实记录）**：`EventBus._pending` 存的是 `asyncio.TimerHandle`（本进程事件循环句柄），
+    **无法序列化到 Redis** ⇒ debounce pending 侧只能保持内存实现，这一半不在可外置范围；
+    quota 只是整数计数，天然可外置，所以只接了这一面。
+    **验证**：`test_event_bus_state_adapter.py` 新增 5 例（默认零行为变化 / 配额申请与释放 / 项目间隔离 /
+    `create_sse_queue` 必须 async 的反向钉住 / 生产调用方必须 await），与 `test_event_bus.py` 合计 **44 passed**；
+    连带改 6 个测试文件的 16 处同步调用为 `await`（脚本按 AST 判断所在函数是否 async）。
+    **仍未做**：真实 2/4/8 worker 零丢失/零重复验证（需专用容量环境部署）、
+    任务/进度/失效状态外置（`platform_jobs` 已 DB 耐久，进度与失效状态仍在进程内）。
   - 2026-11-06 复核：adapter 在生产代码里零调用，`EventBus` 仍直接读写 `_pending` / `_sse_queues`；
     骨架只是可注入接口，不能算外置。
 - [x] E3 修正 Locust UUID/信封/账号池/端点；6000 阶段无样本强制 FAIL。

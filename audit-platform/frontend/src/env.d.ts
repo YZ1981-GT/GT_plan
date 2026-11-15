@@ -10,6 +10,12 @@ interface ImportMeta {
   readonly env: ImportMetaEnv
 }
 
+// ─── 候选验证实例（spec platform-global-display-settings-closure 13A / AC-25）───
+// 由 `vite.config.ts` 的 `define` 只在候选模式注入；普通模式不注入，运行时必须容忍缺失
+// （消费方用 `typeof x === 'undefined'` 判存，见 utils/candidateTreeMarker.ts）。
+declare const __GT_CANDIDATE_TREE_EXPECTED__: string | undefined
+declare const __GT_CANDIDATE_TREE_ACTUAL__: string | undefined
+
 // ─── Route Meta 类型扩展 ───
 // @see R7.1 路由守卫统一
 import 'vue-router'

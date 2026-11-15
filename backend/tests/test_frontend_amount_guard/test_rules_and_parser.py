@@ -418,8 +418,16 @@ class TestCLI:
         ])
         assert exit_code == 1  # Refuses to raise baseline
 
-    def test_update_baseline_refuses_historical_upper_limit(self, tmp_path: Path, monkeypatch):
-        """即使不存在旧基线，--update-baseline 也不能写出超过硬上限的新基线。"""
+    def test_update_baseline_refuses_candidate_upper_limit(self, tmp_path: Path, monkeypatch):
+        """即使不存在旧基线，--update-baseline 也不能写出超过候选上限的新基线。
+
+        🔴 2026-11-15 勘误：原用例名 `..._historical_upper_limit` 并 monkeypatch
+        `cli._HISTORICAL_UPPER_LIMIT` —— 该常量已被拆成
+        `_CORE_VIOLATION_UPPER_LIMIT` / `_CANDIDATE_UPPER_LIMIT`（88 与 1451 是两个
+        不同的量，塞进一个常量必然有一头错），于是 `monkeypatch.setattr` 对不存在的
+        属性抛 AttributeError ⇒ 用例一直红。语义（拒绝写出越上限的基线）不变，
+        改指向真实常量。
+        """
         from scripts.check.frontend_amount_guard import cli
 
         src = tmp_path / "src"
@@ -429,10 +437,18 @@ class TestCLI:
             '<template><el-table-column prop="amt" align="right">{{ v }}</el-table-column></template>',
             encoding="utf-8",
         )
-        monkeypatch.setattr(cli, "_HISTORICAL_UPPER_LIMIT", 0)
+        monkeypatch.setattr(cli, "_CANDIDATE_UPPER_LIMIT", 0)
         baseline = tmp_path / "baseline.json"
         assert cli.main(["--update-baseline", "--force", "--src", str(src), "--baseline", str(baseline)]) == 1
         assert not baseline.exists()
+
+    def test_core_violation_upper_limit_is_zero(self) -> None:
+        """AC-23：核心面必须零违规（与候选上限分开，不得混用）。"""
+        from scripts.check.frontend_amount_guard import cli
+
+        assert cli._CORE_VIOLATION_UPPER_LIMIT == 0
+        assert cli._CANDIDATE_UPPER_LIMIT > 0
+        assert not hasattr(cli, "_HISTORICAL_UPPER_LIMIT")
 
 
 # ═══════════════════════════════════════════════════════════════

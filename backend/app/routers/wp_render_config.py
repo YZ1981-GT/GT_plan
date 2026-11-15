@@ -54,6 +54,15 @@ from app.services.project_audit_year import (
 )
 from app.schemas.render_config_contract import RenderConfigResponse
 
+from app.routers.wp_render_config_sheet_classify import (
+    SHEET_CODE_RE as _SHEET_CODE_RE,
+    apply_g_prefix_onlyoffice,
+    classify_sheet,
+    compute_real_sheets,
+    is_multi_sheet,
+    resolve_sheet_override,
+)
+
 # ─── 纯辅助函数/常量抽离到 helpers 模块（行为保持一致的重构）─────────────────
 # 这些名字 re-import 回本模块命名空间，故既有调用点无需改动。
 # _SEMANTIC_REGISTRY_CACHE 有意不在此 re-import：其经 `global` 变更，仅由被移动的
@@ -199,7 +208,11 @@ def _get_template_sheet_order(tpl_path: str) -> dict[str, int]:
 # 「审定表D2-1」→「D2-1」、「应收票据审计程序表D1A」→「D1A」）。
 # 用于多 sheet 底稿按 sheet 级编码查 _WP_CODE_OVERRIDE（协作者 confirmation-* 精细组件）。
 # 「-新增」尾缀为模板修订版标记（如「存货采购入库检查表F2-33-新增」），提取编码时忽略。
-_SHEET_CODE_RE = re.compile(r"([A-Z]\d+(?:-\d+)*[A-Z]?)(?:-新增)?\s*$")
+#
+# 🔴 2026-11-15：定义已移到 `wp_render_config_sheet_classify.SHEET_CODE_RE`，
+# 本模块改为 `from ... import SHEET_CODE_RE as _SHEET_CODE_RE`（见文件头 import 块）。
+# 抽出纯函数时若保留两份同名正则，`--新增` 尾缀与尾部锚点这类细节迟早漂移
+# （`tests/test_render_sheet_classify_wiring.py` 反向钉住「本文件不再自带定义」）。
 
 # ─── 整册专属组件（多 sheet 但整册路由到同一 componentType，靠 sheetName v-if 分发） ──
 # 这类底稿本身没有 account_package_registry 条目（非科目工作包），但设计上要求
@@ -742,12 +755,13 @@ async def _get_render_config_impl(
     # 多 sheet 底稿（如 D2 含 底稿目录/程序表/审定表/附注 等）：每个 sheet 按自己的
     # class_code 独立派生 componentType，不能用 wp_code 级 override 压平所有 sheet。
     # wp_code override 仅对单 sheet 底稿生效（如 D1 应收票据审定表整张走 d-form-table）。
-    _real_sheets = [c for c in classifications
-                    if not (c.sheet_name and "GT_Custom" in c.sheet_name)
-                    and not (getattr(c, "class_code", "") or "").startswith("I-")
-                    and _WP_CODE_OVERRIDE.get(c.sheet_name) != "skip"
-                    and not (c.sheet_name and (c.sheet_name.endswith("-原版") or c.sheet_name.endswith("-原")))]
-    _is_multi_sheet = len(_real_sheets) > 1
+    # 逐 sheet 判定的纯函数（spec platform-global-display-settings-closure 6A / design §18 H1①）。
+    # 口径与原先内联实现逐字一致；抽出后 `render_schema_measure_audit.py` 可在不连库、
+    # 不启动应用的前提下离线算 reached_by，并有 `tests/test_render_sheet_classify.py` 表驱动覆盖。
+    _real_sheets = compute_real_sheets(
+        classifications, wp_code_override=_WP_CODE_OVERRIDE
+    )
+    _is_multi_sheet = is_multi_sheet(_real_sheets)
 
     # 多 sheet 底稿 tab 排序：按模板 xlsx sheetnames 顺序排列
     # （DB created_at 顺序不可靠；openpyxl read_only 取 sheetnames → 按 index 排序）
@@ -838,50 +852,31 @@ async def _get_render_config_impl(
         # ovr 已在循环外固化（wp_code 级不变量），此处不再重复赋值。
         # 多 sheet 底稿：按 sheet 级编码查 override（协作者 confirmation-* 精细组件，
         # 如 D0-5→confirmation-alternative-d05）。sheet 级 override 优先于 class_code 派生。
-        _sheet_ovr = None
-        if _is_multi_sheet and cls.sheet_name:
-            _m = _SHEET_CODE_RE.search(cls.sheet_name)
-            if _m:
-                _sheet_ovr = _WP_CODE_OVERRIDE.get(_m.group(1))
-            # fallback: 按完整 sheet_name 查找（如「函证差异检查表（示例）」无尾部编码）
-            if not _sheet_ovr:
-                _sheet_ovr = _WP_CODE_OVERRIDE.get(cls.sheet_name)
-            # G/F 等循环附注页无尾部编码：用「{wp_code}-{sheet_name}」命中
-            # （如 G1-附注披露信息（上市公司）），避免被下方 G- class_code 强制改写为 OnlyOffice
-            if not _sheet_ovr and wp_code:
-                _sheet_ovr = _WP_CODE_OVERRIDE.get(f"{wp_code}-{cls.sheet_name}")
-        try:
-            if _is_multi_sheet:
-                if _sheet_ovr:
-                    # sheet 级 override 命中（精细 confirmation-* 组件 或 *A→专属组件内分发）→ 直接采用
-                    component_type = _sheet_ovr
-                elif ovr in _WHOLE_WP_MULTISHEET_DEDICATED:
-                    # 整册专属组件（如 C1→c1-entity-level-control）：所有 sheet 统一路由到
-                    # wp_code override，由前端专属组件按 sheetName v-if 内部分发（对齐 D4 标准）。
-                    component_type = ovr
-                elif pkg_sheets and ovr:
-                    # pkg_sheets（专属组件 registry）模式：非 b-index 的 sheet 统一用 wp_code override
-                    # （附注/明细/调整等都路由到同一专属组件由其内部按 sheetName 分发）
-                    # 但合成底稿目录（class_code 以 "B-" 开头）保留原生 b-index 渲染
-                    _cls_code_prefix = (getattr(cls, "class_code", "") or "")[:2]
-                    if _cls_code_prefix == "B-":
-                        try:
-                            component_type = derive_component_type(cls, ignore_wp_code_override=True)
-                        except ClassificationNotFoundError:
-                            component_type = "b-index"
-                    else:
-                        component_type = ovr
-                else:
-                    # 否则按 class_code 派生（跳过父码 wp_code override 避免压平）
-                    try:
-                        component_type = derive_component_type(cls, ignore_wp_code_override=True)
-                    except ClassificationNotFoundError:
-                        component_type = ovr if ovr else "skip"
-            else:
-                # 单 sheet：wp_code override 优先（保留原行为）
-                component_type = ovr if ovr else derive_component_type(cls)
-        except ClassificationNotFoundError:
-            component_type = "skip"
+        #
+        # 🔴 2026-11-15：三级回退与 componentType 判定已抽到
+        # `wp_render_config_sheet_classify`（design §18 H1①）。抽出后离线工具
+        # `render_schema_measure_audit.py` 可在不连库/不启动应用的前提下算 reached_by，
+        # 并有 `tests/test_render_sheet_classify.py` 表驱动覆盖每个分支。
+        _sheet_ovr = resolve_sheet_override(
+            cls.sheet_name,
+            is_multi=_is_multi_sheet,
+            wp_code=wp_code,
+            wp_code_override=_WP_CODE_OVERRIDE,
+        )
+        _route = classify_sheet(
+            sheet_name=cls.sheet_name,
+            class_code=(getattr(cls, "class_code", "") or ""),
+            is_multi=_is_multi_sheet,
+            wp_code_override_value=ovr,
+            sheet_override=_sheet_ovr,
+            whole_wp_dedicated=_WHOLE_WP_MULTISHEET_DEDICATED,
+            has_package_sheets=bool(pkg_sheets),
+            derive_component_type=lambda: derive_component_type(cls),
+            ignore_wp_code_override_deriver=lambda: derive_component_type(
+                cls, ignore_wp_code_override=True
+            ),
+        )
+        component_type = _route.component_type
         schema_data: dict | None = None
         try:
             if not manifest_only:
@@ -895,13 +890,15 @@ async def _get_render_config_impl(
         # G-OnlyOffice = 聚合 grid_table；G-替代程序 = 独立底稿替代程序检查表等
         # 例外：sheet 级 override 已命中，或整册 wp_code override 已路由到专属 HTML 组件
         # （如 G1 附注披露 → g1-trading-financial-assets，由前端双模式切换 OO）
+        # 🔴 判定已抽到 `wp_render_config_sheet_classify.apply_g_prefix_onlyoffice`。
         _cls_code = getattr(cls, "class_code", "") or ""
-        if (
-            _is_multi_sheet
-            and _cls_code.startswith("G-")
-            and not _sheet_ovr
-            and not (ovr and component_type == ovr)
-        ):
+        _route = apply_g_prefix_onlyoffice(
+            _route,
+            class_code=_cls_code,
+            is_multi=_is_multi_sheet,
+            wp_code_override_value=ovr,
+        )
+        if _route.component_type == "onlyoffice-sheet" and _route.reason == "g_prefix_onlyoffice":
             component_type = "onlyoffice-sheet"
             sheet_html_data = {"onlyoffice": True, "sheet_name": cls.sheet_name}
             sheets.append({"sheet_name": cls.sheet_name, "componentType": component_type,

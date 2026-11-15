@@ -204,6 +204,17 @@ def sse_payload_with_id(payload: EventPayload, event_id: str | None) -> EventPay
     return SSEEventPayload(**payload.model_dump(mode="python"), stream_event_id=event_id)
 
 
+class SSESubscriptionLimitReached(RuntimeError):
+    """per-project SSE 订阅数已达上限（E2 多 worker 配额）。"""
+
+    def __init__(self, project_id: UUID, max_per_project: int) -> None:
+        self.project_id = project_id
+        self.max_per_project = max_per_project
+        super().__init__(
+            f"项目 {project_id} 的 SSE 订阅已达上限 {max_per_project}"
+        )
+
+
 class EventBus:
     """进程内事件总线，基于 asyncio 实现，支持 debounce 去重 + Redis Stream 持久化"""
 
@@ -213,6 +224,8 @@ class EventBus:
         # raw dict 形如 {"_raw": True, "event_type": str, "project_id": str|None, "year": int|None, "extra": {...}}
         self._sse_queues: list[asyncio.Queue[EventPayload | dict | None]] = []
         self._pending: dict[str, dict] = {}  # debounce 缓冲区
+        # E2：SSE 队列 → project 映射，供 remove 时释放配额
+        self._sse_queue_projects: dict[int, UUID | None] = {}
         self._debounce_ms: int = debounce_ms
         self._redis_available: bool | None = None  # 延迟检测
         self._last_replay_report: dict[str, Any] = {
@@ -704,25 +717,78 @@ class EventBus:
     # ------------------------------------------------------------------
     # SSE support
     # ------------------------------------------------------------------
-    def create_sse_queue(self) -> asyncio.Queue[EventPayload | dict | None]:
+    async def create_sse_queue(
+        self,
+        *,
+        project_id: "UUID | None" = None,
+        max_per_project: int = 0,
+    ) -> asyncio.Queue[EventPayload | dict | None]:
         """创建一个 SSE 订阅队列，供 SSE endpoint 使用。
 
         队列同时接收：
         - EventPayload（publish/publish_immediate 强类型路径）
         - dict（broadcast_raw 路径，含 ``"_raw": True`` 标记）
         - None（关闭信号）
+
+        spec platform-heavy-jobs-and-capacity-closure E2：per-project 连接配额走
+        `event_bus_state_adapter`。**默认 `max_per_project=0` = 不限**，与改造前
+        行为 100% 等价（单 worker 部署零变化）；多 worker 部署时通过
+        `install_event_bus_state_adapter(RedisAdapter())` 注入后，配额才真正跨进程生效。
+
+        🔴 为什么 quota 能外置而 debounce pending 不能：`_pending` 存的是
+        `asyncio.TimerHandle`（本进程的事件循环句柄），无法序列化到 Redis；
+        quota 只是整数计数，天然可外置。
         """
+        if project_id is not None and max_per_project > 0:
+            from app.services.event_bus_state_adapter import get_event_bus_state_adapter
+
+            allowed = await get_event_bus_state_adapter().acquire_sse_quota(
+                project_id, max_per_project
+            )
+            if not allowed:
+                raise SSESubscriptionLimitReached(project_id, max_per_project)
         queue: asyncio.Queue[EventPayload | dict | None] = asyncio.Queue(maxsize=100)
         self._sse_queues.append(queue)
-        logger.info("EventBus: SSE queue created, total=%d", len(self._sse_queues))
+        # 记下队列 → project 的映射，供 remove 时释放 quota
+        self._sse_queue_projects[id(queue)] = project_id
+        logger.info(
+            "EventBus: SSE queue created, total=%d project=%s cap=%s",
+            len(self._sse_queues), project_id, max_per_project,
+        )
         return queue
 
     def remove_sse_queue(
         self, queue: asyncio.Queue[EventPayload | dict | None]
     ) -> None:
-        """移除 SSE 订阅队列"""
+        """移除 SSE 订阅队列。
+
+        同步方法（`_notify_sse` 在清理僵尸队列时也调用它），所以 quota 释放
+        必须**不阻塞**：用 `ensure_future` 调度，失败只记日志。
+
+        E2：`_sse_queue_projects` 里有该队列时，按 project 释放一个配额。
+        """
         if queue in self._sse_queues:
             self._sse_queues.remove(queue)
+            project_id = self._sse_queue_projects.pop(id(queue), None)
+            if project_id is not None:
+                # 同步上下文里不能 await；调度成任务，异常只记日志
+                import asyncio as _aio
+
+                async def _release() -> None:
+                    try:
+                        from app.services.event_bus_state_adapter import (
+                            get_event_bus_state_adapter,
+                        )
+
+                        await get_event_bus_state_adapter().release_sse_quota(project_id)
+                    except Exception as exc:  # noqa: BLE001 — 释放失败不阻断清理
+                        logger.warning("EventBus: release_sse_quota failed: %s", exc)
+
+                try:
+                    _aio.ensure_future(_release())
+                except RuntimeError:
+                    # 无运行中的事件循环（同步测试 / 进程退出）⇒ 静默跳过
+                    pass
             logger.info("EventBus: SSE queue removed, total=%d", len(self._sse_queues))
 
     async def _notify_sse(self, payload: EventPayload) -> None:

@@ -78,9 +78,35 @@ describe('D1 披露表金额输入组件', () => {
     ).toEqual([])
   })
 
-  it('比例与损失率仍是只读展示（走 fmtPct，不是输入框）', () => {
-    // 分类表与组合表的比率列一律读时推导 → 只能展示，不得提供输入
-    expect(src).toMatch(/fmtPct\(row\.ratio\)/)
-    expect(src).toMatch(/fmtPct\(row\.lossRate/)
+  it('比例与损失率仍是只读展示（走 GtMeasureCell，不是输入框）', () => {
+    // 分类表与组合表的比率列一律读时推导 → 只能展示，不得提供输入。
+    //
+    // 🔴 2026-11-15 更新（spec platform-global-display-settings-closure 6A /
+    // design §18 H1④）：展示组件从 `fmtPct()` 字符串换成 `GtMeasureCell`
+    // （`kind="ratio"` + `ratio-scale="fraction"`）。**语义未变**（仍是只读展示、
+    // 仍不提供输入框），只是走统一 measure formatter 而不是本文件自带实现。
+    // 判据改为「比例列必须是 GtMeasureCell」，并反向钉住「不是 WpAmountInput」。
+    expect(src).toMatch(/GtMeasureCell/)
+    expect(src).toMatch(/:kind="MEASURE_KIND_RATIO"/)
+    expect(src).toMatch(/:ratio-scale="RATIO_SCALE_FRACTION"/)
+    // 枚举常量必须来自 `types/measureKind`（不得在模板里写字符串字面量）
+    expect(src).toMatch(/import \{ MeasureKind as MK, RatioScale as RS \} from '@\/types\/measureKind'/)
+    // 反向：比例列不得出现在任何 WpAmountInput 上（上面的 NON_AMOUNT_HINTS 已覆盖）
+    expect(tags('GtMeasureCell').length).toBeGreaterThanOrEqual(10)
+  })
+
+  it('比例列不再走本文件自带的 fmtPct 字符串旁路', () => {
+    // `fmtPct` 的模板调用必须为 0（只剩函数定义本身，或已完全删除）
+    const templateCalls = [...src.matchAll(/\{\{\s*fmtPct\(/g)].length
+    expect(templateCalls).toBe(0)
+  })
+
+  it('金额格走 GtAmountCell（不再是 v-html="fmtAmt(...)" 字符串旁路）', () => {
+    // design §18 H1④：金额格改 GtAmountCell，`fmtAmt` 的模板调用必须为 0。
+    // 🔴 判据只认「模板属性形态」：注释里引用 `v-html="fmtAmt(...)"` 说明这次改造
+    // 时不能把它算成违规（本轮实测：首版全文匹配把注释命中成 1 处假红）。
+    const htmlCalls = [...src.matchAll(/<[^>]*\sv-html="fmtAmt\(/g)].length
+    expect(htmlCalls).toBe(0)
+    expect(tags('GtAmountCell').length).toBeGreaterThanOrEqual(30)
   })
 })

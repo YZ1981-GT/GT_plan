@@ -43,6 +43,77 @@ _DEFAULT_CORE_MANIFEST = (
 _CORE_VIOLATION_UPPER_LIMIT = 0          # AC-23：核心面必须零违规（实测 0）
 _CANDIDATE_UPPER_LIMIT = 1500            # 候选格上限（实测 1451，留 49 格余量，只许变短）
 
+#: CLI JSON 的 schema 版本（design §8.1：按阶段递增）。
+#: v2 = 加入 `ledger_read_surface_results`（阶段 B，spec 任务 11B）。
+#: v3 = 加入 `export_surface_results`（阶段 C，spec 任务 11C）。
+_CLI_SCHEMA_VERSION = 3
+
+
+def _collect_ledger_results() -> dict:
+    """三个 registry 摘要；导入失败时返回带 errors 的降级结构。
+
+    🔴 不能让 import 失败变成「没有这个键」：design §8.1 要求阶段 B 起
+    `ledger_read_surface_results`、阶段 C 起 `export_surface_results` **必含**，
+    缺键与空结果同样是判据失效。
+    """
+    try:
+        from app.services.ledger_registry_guard import collect_all_registry_results
+    except Exception as exc:  # noqa: BLE001 — 导入期任何失败都要如实上报
+        return {
+            "ledger_read_surface_results": {
+                "schema_version": 1,
+                "declared": 0,
+                "errors": [f"导入 ledger_registry_guard 失败：{type(exc).__name__}: {exc}"],
+            },
+            "export_surface_results": {
+                "schema_version": 1,
+                "declared": 0,
+                "errors": ["导入 ledger_registry_guard 失败，导出出口闭集未校验"],
+            },
+        }
+    app = _build_app_for_entrypoint_check()
+    try:
+        return collect_all_registry_results(app)
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ledger_read_surface_results": {
+                "schema_version": 1,
+                "declared": 0,
+                "errors": [f"收集账套 registry 摘要失败：{type(exc).__name__}: {exc}"],
+            },
+            "export_surface_results": {
+                "schema_version": 1,
+                "declared": 0,
+                "errors": [f"收集导出出口摘要失败：{type(exc).__name__}: {exc}"],
+            },
+        }
+
+
+def _build_app_for_entrypoint_check():
+    """构建真实 FastAPI 应用，供账套入口闭集与 `app.routes` 双向对拍。
+
+    🔴 必须用真实 app：任务 8 的复核记录模式②正是「登记表与实现不一致」——
+    只做静态自洽检查（不传 app）会让「声明 retired 但真的在跑」永远看不见。
+    导入失败返回 None，由 `_ledger_failures` 把「未与真实路由对拍」判成失败。
+    """
+    try:
+        from app.main import app
+    except Exception:  # noqa: BLE001 — 应用导入失败不应让守卫崩，但必须报失败
+        return None
+    return app
+
+
+def _ledger_failures(results: dict) -> list[str]:
+    """摊平 registry 摘要里的问题；导入失败也在这里兜住。"""
+    try:
+        from app.services.ledger_registry_guard import all_failures
+    except Exception:  # noqa: BLE001
+        return ["无法导入 ledger_registry_guard.all_failures，registry 校验未执行"]
+    try:
+        return all_failures(results)
+    except Exception as exc:  # noqa: BLE001
+        return [f"registry 摘要解析失败：{type(exc).__name__}: {exc}"]
+
 
 def _load_core_files(path: Path | None = None) -> frozenset[str]:
     """加载核心文件清单；缺失即**失败**（不能静默退化成空集）。
@@ -128,12 +199,28 @@ def _run_check(args: argparse.Namespace) -> int:
     scan = run_scan(_FRONTEND_SRC, exemptions, core_files)
     scan_json = scan.to_json()
 
+    # 账套 registry 摘要（spec platform-global-display-settings-closure 11B）。
+    # design §8.1：`ledger_read_surface_results` 自阶段 B 起为**必含键**，
+    # 且四表读取面 / 账套入口必须与实现双向相等。空注册表按失败处理
+    # （「空结果 = 判据恒绿」，不能算通过）。
+    ledger_results = _collect_ledger_results()
+    ledger_issues = _ledger_failures(ledger_results)
+    scan_json.update(ledger_results)
+    scan_json["schema_version"] = _CLI_SCHEMA_VERSION
+
     # Output the scan results
     if args.output:
         Path(args.output).write_text(
             json.dumps(scan_json, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
+
+    # 账套 registry 失败 ⇒ 退出（先于基线比对，避免基线问题掩盖真实缺陷）
+    if ledger_issues:
+        _emit(f"❌ 账套 registry 校验失败（{len(ledger_issues)} 项）：", err=True)
+        for issue in ledger_issues:
+            _emit(f"  {issue}", err=True)
+        return 1
 
     # Check for scan errors (SCAN_SCOPE_DRIFT etc.)
     drift_errors = [e for e in scan.errors if SCAN_SCOPE_DRIFT in e]

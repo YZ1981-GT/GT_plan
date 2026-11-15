@@ -29,6 +29,7 @@ import { installPushKeptNotice } from './utils/disclosureSyncPushNotice'
 import { startSessionHandoff } from './utils/crossWindowAuth'
 import { advanceRequestIdentityEpoch } from './services/requestIdentityEpoch'
 import { claimClientInstanceId } from './utils/clientInstance'
+import { installCandidateTreeMarker } from './utils/candidateTreeMarker'
 
 // 跨底稿事件传输桥（P0）：统一 window CustomEvent ⇄ mitt eventBus，
 // 归一 substantive:adjudicated / disclosure:note-text-updated payload。
@@ -44,6 +45,11 @@ clearOnUpgrade()
 // 多窗口：认领本标签页的窗口编号（「复制标签页」沿用了原标签页的编号时换新号，编辑锁才能区分两个窗口）
 // spec: workpaper-multi-window-lock-gaps R1；取锁前 useEditingLock 会等认领结果，这里不阻塞挂载
 void claimClientInstanceId()
+
+// 候选验证实例身份 marker（spec platform-global-display-settings-closure 13A / AC-25）：
+// 候选模式下 Vite 注入 expected/actual tree OID，这里写到 <html data-gt-candidate-tree-*>，
+// 供终验 Playwright 与后端 /api/health 的 candidate_tree 三方对拍；普通模式不改 DOM。
+installCandidateTreeMarker()
 
 const app = createApp(App)
 

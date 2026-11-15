@@ -66,6 +66,15 @@ import WpAmountInput from '../shared/WpAmountInput.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { handleDisclosureSyncError } from '../composables/disclosureSyncError'
+// 金额/比例格的统一组件（spec platform-global-display-settings-closure 6A / design §18 H1④）。
+// 金额走 GtAmountCell（内部 Decimal + displayPrefs 单一真源），比例走 GtMeasureCell
+// （ratio + fraction ⇒ 0.2 显示 20.00%），不再用 `v-html="fmtAmt(...)"` 字符串旁路。
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import GtMeasureCell from '@/components/common/GtMeasureCell.vue'
+// 模板里不能写字符串字面量（props 类型是 TS 枚举，字面量会 TS2322）
+import { MeasureKind as MK, RatioScale as RS } from '@/types/measureKind'
+const MEASURE_KIND_RATIO = MK.RATIO
+const RATIO_SCALE_FRACTION = RS.FRACTION
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -979,7 +988,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
               >
                 <template #default="{ row }">
                   <template v-if="col.derived || row.rowType === 'summary'">
-                    <span class="amount-cell" v-html="fmtAmt(row[col.field])" />
+                    <GtAmountCell class="amount-cell" :value="row[col.field]" />
                   </template>
                   <template v-else-if="canEditCategorySummary && !isReadonly">
                     <WpAmountInput
@@ -993,7 +1002,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                   </template>
                   <template v-else>
                     <el-tooltip content="取自审定表D1-1" placement="top">
-                      <span class="amount-cell auto-fetch-cell" v-html="fmtAmt(row[col.field])" />
+                      <GtAmountCell class="amount-cell auto-fetch-cell" :value="row[col.field]" />
                     </el-tooltip>
                   </template>
                 </template>
@@ -1061,7 +1070,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                 </el-table-column>
                 <el-table-column label="期末已质押金额" min-width="180" align="right">
                   <template #default="{ row }">
-                    <template v-if="row.rowType === 'summary'"><b class="amount-cell" v-html="fmtAmt(row.pledgedAmount)" /></template>
+                    <template v-if="row.rowType === 'summary'"><GtAmountCell class="amount-cell gt-amount-strong" :value="row.pledgedAmount" /></template>
                     <template v-else>
                       <WpAmountInput v-model="row.pledgedAmount" size="small" :disabled="isReadonly"
                         @change="updateCell('pledged', row.rowId, 'pledgedAmount', row.pledgedAmount)" style="width:100%" />
@@ -1109,7 +1118,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                 </el-table-column>
                 <el-table-column label="期末终止确认金额" min-width="160" align="right">
                   <template #default="{ row }">
-                    <template v-if="row.rowType === 'summary'"><b class="amount-cell" v-html="fmtAmt(row.derecognizedAmount)" /></template>
+                    <template v-if="row.rowType === 'summary'"><GtAmountCell class="amount-cell gt-amount-strong" :value="row.derecognizedAmount" /></template>
                     <template v-else>
                       <WpAmountInput v-model="row.derecognizedAmount" size="small" :disabled="isReadonly"
                         @change="updateCell('endorsed', row.rowId, 'derecognizedAmount', row.derecognizedAmount)" style="width:100%" />
@@ -1118,7 +1127,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                 </el-table-column>
                 <el-table-column label="期末未终止确认金额" min-width="160" align="right">
                   <template #default="{ row }">
-                    <template v-if="row.rowType === 'summary'"><b class="amount-cell" v-html="fmtAmt(row.notDerecognizedAmount)" /></template>
+                    <template v-if="row.rowType === 'summary'"><GtAmountCell class="amount-cell gt-amount-strong" :value="row.notDerecognizedAmount" /></template>
                     <template v-else>
                       <WpAmountInput v-model="row.notDerecognizedAmount" size="small" :disabled="isReadonly"
                         @change="updateCell('endorsed', row.rowId, 'notDerecognizedAmount', row.notDerecognizedAmount)" style="width:100%" />
@@ -1170,7 +1179,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                 </el-table-column>
                 <el-table-column label="期末转应收账款金额" min-width="180" align="right">
                   <template #default="{ row }">
-                    <template v-if="row.rowType === 'summary'"><b class="amount-cell" v-html="fmtAmt(row.transferAmount)" /></template>
+                    <template v-if="row.rowType === 'summary'"><GtAmountCell class="amount-cell gt-amount-strong" :value="row.transferAmount" /></template>
                     <template v-else>
                       <WpAmountInput v-model="row.transferAmount" size="small" :disabled="isReadonly"
                         @change="updateCell('transfer', row.rowId, 'transferAmount', row.transferAmount)" style="width:100%" />
@@ -1217,14 +1226,14 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                   </el-table-column>
                   <el-table-column label="期末数" align="center">
                     <el-table-column label="账面余额" align="center">
-                      <el-table-column label="金额" min-width="130" align="right"><template #default="{ row }"><span v-html="fmtAmt(row.balance)" /></template></el-table-column>
-                      <el-table-column label="比例(%)" min-width="90" align="right"><template #default="{ row }">{{ fmtPct(row.ratio) }}</template></el-table-column>
+                      <el-table-column label="金额" min-width="130" align="right"><template #default="{ row }"><GtAmountCell :value="row.balance" /></template></el-table-column>
+                      <el-table-column label="比例(%)" min-width="90" align="right"><template #default="{ row }"><GtMeasureCell :value="row.ratio" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_FRACTION" /></template></el-table-column>
                     </el-table-column>
                     <el-table-column label="坏账准备" align="center">
-                      <el-table-column label="金额" min-width="130" align="right"><template #default="{ row }"><span v-html="fmtAmt(row.provision)" /></template></el-table-column>
-                      <el-table-column label="预期信用损失率(%)" min-width="120" align="right"><template #default="{ row }">{{ fmtPct(row.lossRate) }}</template></el-table-column>
+                      <el-table-column label="金额" min-width="130" align="right"><template #default="{ row }"><GtAmountCell :value="row.provision" /></template></el-table-column>
+                      <el-table-column label="预期信用损失率(%)" min-width="120" align="right"><template #default="{ row }"><GtMeasureCell :value="row.lossRate" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_FRACTION" /></template></el-table-column>
                     </el-table-column>
-                    <el-table-column label="账面价值" min-width="130" align="right"><template #default="{ row }"><span v-html="fmtAmt(row.bookValue)" /></template></el-table-column>
+                    <el-table-column label="账面价值" min-width="130" align="right"><template #default="{ row }"><GtAmountCell :value="row.bookValue" /></template></el-table-column>
                   </el-table-column>
                 </el-table>
 
@@ -1235,14 +1244,14 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                   </el-table-column>
                   <el-table-column label="期初数" align="center">
                     <el-table-column label="账面余额" align="center">
-                      <el-table-column label="金额" min-width="130" align="right"><template #default="{ row }"><span v-html="fmtAmt(row.balance)" /></template></el-table-column>
-                      <el-table-column label="比例(%)" min-width="90" align="right"><template #default="{ row }">{{ fmtPct(row.ratio) }}</template></el-table-column>
+                      <el-table-column label="金额" min-width="130" align="right"><template #default="{ row }"><GtAmountCell :value="row.balance" /></template></el-table-column>
+                      <el-table-column label="比例(%)" min-width="90" align="right"><template #default="{ row }"><GtMeasureCell :value="row.ratio" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_FRACTION" /></template></el-table-column>
                     </el-table-column>
                     <el-table-column label="坏账准备" align="center">
-                      <el-table-column label="金额" min-width="130" align="right"><template #default="{ row }"><span v-html="fmtAmt(row.provision)" /></template></el-table-column>
-                      <el-table-column label="预期信用损失率(%)" min-width="120" align="right"><template #default="{ row }">{{ fmtPct(row.lossRate) }}</template></el-table-column>
+                      <el-table-column label="金额" min-width="130" align="right"><template #default="{ row }"><GtAmountCell :value="row.provision" /></template></el-table-column>
+                      <el-table-column label="预期信用损失率(%)" min-width="120" align="right"><template #default="{ row }"><GtMeasureCell :value="row.lossRate" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_FRACTION" /></template></el-table-column>
                     </el-table-column>
-                    <el-table-column label="账面价值" min-width="130" align="right"><template #default="{ row }"><span v-html="fmtAmt(row.bookValue)" /></template></el-table-column>
+                    <el-table-column label="账面价值" min-width="130" align="right"><template #default="{ row }"><GtAmountCell :value="row.bookValue" /></template></el-table-column>
                   </el-table-column>
                 </el-table>
 
@@ -1258,17 +1267,17 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                     </el-table-column>
                     <el-table-column label="账面余额" min-width="120" align="right">
                       <template #default="{ row }">
-                        <template v-if="row.rowType==='summary'"><b v-html="fmtAmt(row.balance)" /></template>
+                        <template v-if="row.rowType==='summary'"><GtAmountCell class="gt-amount-strong" :value="row.balance" /></template>
                         <template v-else><WpAmountInput :model-value="row.balance" size="small" :disabled="isReadonly" @change="(v: number) =>updateCell('individualEnd', row.rowId, 'balance', v)" style="width:100%" /></template>
                       </template>
                     </el-table-column>
                     <el-table-column label="坏账准备" min-width="120" align="right">
                       <template #default="{ row }">
-                        <template v-if="row.rowType==='summary'"><b v-html="fmtAmt(row.provision)" /></template>
+                        <template v-if="row.rowType==='summary'"><GtAmountCell class="gt-amount-strong" :value="row.provision" /></template>
                         <template v-else><WpAmountInput :model-value="row.provision" size="small" :disabled="isReadonly" @change="(v: number) =>updateCell('individualEnd', row.rowId, 'provision', v)" style="width:100%" /></template>
                       </template>
                     </el-table-column>
-                    <el-table-column label="预期信用损失率(%)" min-width="120" align="right"><template #default="{ row }">{{ fmtPct(row.lossRate || 0) }}</template></el-table-column>
+                    <el-table-column label="预期信用损失率(%)" min-width="120" align="right"><template #default="{ row }"><GtMeasureCell :value="row.lossRate || 0" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_FRACTION" /></template></el-table-column>
                     <el-table-column label="计提理由" min-width="160">
                       <template #default="{ row }">
                         <template v-if="row.rowType!=='summary'"><el-input :model-value="row.basis || ''" size="small" :disabled="isReadonly" @input="(v:string)=>updateCell('individualEnd', row.rowId, 'basis', v)" /></template>
@@ -1314,7 +1323,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                     </el-table-column>
                     <el-table-column label="账面余额" min-width="120" align="right">
                       <template #default="{ row }">
-                        <template v-if="row.rowKind === 'summary' || (row.rowKind === 'subtotal' && row.hasDetail)"><span :style="row.rowKind==='summary'?'font-weight:600':''" v-html="fmtAmt(row.balance)" /></template>
+                        <template v-if="row.rowKind === 'summary' || (row.rowKind === 'subtotal' && row.hasDetail)"><GtAmountCell :class="['gt-amount', row.rowKind==='summary' ? 'gt-amount-strong' : '']" :value="row.balance" /></template>
                         <template v-else-if="row.rowKind === 'subtotal'">
                           <WpAmountInput :model-value="row.balance" size="small" :disabled="isReadonly" @change="(v: number) =>updateBadDebtClassFixed('end', row.sourceType === 'bank' ? 'bank' : 'commercial', 'balance', v)" style="width:100%" />
                         </template>
@@ -1323,14 +1332,14 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                     </el-table-column>
                     <el-table-column label="坏账准备" min-width="120" align="right">
                       <template #default="{ row }">
-                        <template v-if="row.rowKind === 'summary' || (row.rowKind === 'subtotal' && row.hasDetail)"><span :style="row.rowKind==='summary'?'font-weight:600':''" v-html="fmtAmt(row.provision)" /></template>
+                        <template v-if="row.rowKind === 'summary' || (row.rowKind === 'subtotal' && row.hasDetail)"><GtAmountCell :class="['gt-amount', row.rowKind==='summary' ? 'gt-amount-strong' : '']" :value="row.provision" /></template>
                         <template v-else-if="row.rowKind === 'subtotal'">
                           <WpAmountInput :model-value="row.provision" size="small" :disabled="isReadonly" @change="(v: number) =>updateBadDebtClassFixed('end', row.sourceType === 'bank' ? 'bank' : 'commercial', 'provision', v)" style="width:100%" />
                         </template>
                         <template v-else><WpAmountInput :model-value="row.provision" size="small" :disabled="isReadonly" @change="(v: number) =>updateCell(`portfolio-${row.sourceType}-end`, row.rowId, 'provision', v)" style="width:100%" /></template>
                       </template>
                     </el-table-column>
-                    <el-table-column label="预期信用损失率(%)" min-width="120" align="right"><template #default="{ row }">{{ fmtPct(row.lossRate || 0) }}</template></el-table-column>
+                    <el-table-column label="预期信用损失率(%)" min-width="120" align="right"><template #default="{ row }"><GtMeasureCell :value="row.lossRate || 0" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_FRACTION" /></template></el-table-column>
                     <el-table-column v-if="!isReadonly" label="" width="50" align="center">
                       <template #default="{ row }">
                         <el-button v-if="row.rowKind==='detail'" :icon="Delete" text type="danger" size="small" @click="removePortfolioRow(row.rowId, row.sourceType, 'end')" />
@@ -1384,7 +1393,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                 <el-table-column label="期末余额" align="center">
                   <el-table-column label="金额" min-width="130" align="right">
                     <template #default="{ row }">
-                      <template v-if="row.rowKind === 'summary'"><b v-html="fmtAmt(row.balance)" /></template>
+                      <template v-if="row.rowKind === 'summary'"><GtAmountCell class="gt-amount-strong" :value="row.balance" /></template>
                       <template v-else-if="row.rowKind === 'hint'">-</template>
                       <template v-else-if="row.rowKind === 'individual'">
                         <WpAmountInput
@@ -1404,15 +1413,15 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                           style="width:100%"
                         />
                       </template>
-                      <template v-else><span v-html="fmtAmt(row.balance)" /></template>
+                      <template v-else><GtAmountCell :value="row.balance" /></template>
                     </template>
                   </el-table-column>
                   <el-table-column label="比例(%)" min-width="90" align="right">
-                    <template #default="{ row }"><span class="amount-cell">{{ fmtPct(row.ratio) }}</span></template>
+                    <template #default="{ row }"><span class="amount-cell"><GtMeasureCell :value="row.ratio" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_FRACTION" /></span></template>
                   </el-table-column>
                   <el-table-column label="坏账准备" min-width="130" align="right">
                     <template #default="{ row }">
-                      <template v-if="row.rowKind === 'summary'"><b v-html="fmtAmt(row.provision)" /></template>
+                      <template v-if="row.rowKind === 'summary'"><GtAmountCell class="gt-amount-strong" :value="row.provision" /></template>
                       <template v-else-if="row.rowKind === 'hint'">-</template>
                       <template v-else-if="row.rowKind === 'individual'">
                         <WpAmountInput
@@ -1432,14 +1441,14 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                           style="width:100%"
                         />
                       </template>
-                      <template v-else><span v-html="fmtAmt(row.provision)" /></template>
+                      <template v-else><GtAmountCell :value="row.provision" /></template>
                     </template>
                   </el-table-column>
                   <el-table-column label="预期信用损失率(%)" min-width="120" align="right">
-                    <template #default="{ row }"><span class="amount-cell">{{ fmtPct(row.lossRate) }}</span></template>
+                    <template #default="{ row }"><span class="amount-cell"><GtMeasureCell :value="row.lossRate" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_FRACTION" /></span></template>
                   </el-table-column>
                   <el-table-column label="账面价值" min-width="130" align="right">
-                    <template #default="{ row }"><span class="amount-cell" v-html="fmtAmt(row.bookValue)" /></template>
+                    <template #default="{ row }"><GtAmountCell class="amount-cell" :value="row.bookValue" /></template>
                   </el-table-column>
                 </el-table-column>
                 <!-- 底稿多留的审计列：源模板把「计提依据」放在独立的「按单项计提坏账准备的
@@ -1510,7 +1519,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                 <el-table-column label="上年年末余额" align="center">
                   <el-table-column label="金额" min-width="130" align="right">
                     <template #default="{ row }">
-                      <template v-if="row.rowKind === 'summary'"><b v-html="fmtAmt(row.balance)" /></template>
+                      <template v-if="row.rowKind === 'summary'"><GtAmountCell class="gt-amount-strong" :value="row.balance" /></template>
                       <template v-else-if="row.rowKind === 'hint'">-</template>
                       <template v-else-if="row.rowKind === 'individual'">
                         <WpAmountInput
@@ -1530,15 +1539,15 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                           style="width:100%"
                         />
                       </template>
-                      <template v-else><span v-html="fmtAmt(row.balance)" /></template>
+                      <template v-else><GtAmountCell :value="row.balance" /></template>
                     </template>
                   </el-table-column>
                   <el-table-column label="比例(%)" min-width="90" align="right">
-                    <template #default="{ row }"><span class="amount-cell">{{ fmtPct(row.ratio) }}</span></template>
+                    <template #default="{ row }"><span class="amount-cell"><GtMeasureCell :value="row.ratio" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_FRACTION" /></span></template>
                   </el-table-column>
                   <el-table-column label="坏账准备" min-width="130" align="right">
                     <template #default="{ row }">
-                      <template v-if="row.rowKind === 'summary'"><b v-html="fmtAmt(row.provision)" /></template>
+                      <template v-if="row.rowKind === 'summary'"><GtAmountCell class="gt-amount-strong" :value="row.provision" /></template>
                       <template v-else-if="row.rowKind === 'hint'">-</template>
                       <template v-else-if="row.rowKind === 'individual'">
                         <WpAmountInput
@@ -1558,14 +1567,14 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                           style="width:100%"
                         />
                       </template>
-                      <template v-else><span v-html="fmtAmt(row.provision)" /></template>
+                      <template v-else><GtAmountCell :value="row.provision" /></template>
                     </template>
                   </el-table-column>
                   <el-table-column label="预期信用损失率(%)" min-width="120" align="right">
-                    <template #default="{ row }"><span class="amount-cell">{{ fmtPct(row.lossRate) }}</span></template>
+                    <template #default="{ row }"><span class="amount-cell"><GtMeasureCell :value="row.lossRate" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_FRACTION" /></span></template>
                   </el-table-column>
                   <el-table-column label="账面价值" min-width="130" align="right">
-                    <template #default="{ row }"><span class="amount-cell" v-html="fmtAmt(row.bookValue)" /></template>
+                    <template #default="{ row }"><GtAmountCell class="amount-cell" :value="row.bookValue" /></template>
                   </el-table-column>
                 </el-table-column>
                 <el-table-column min-width="160">
@@ -1638,7 +1647,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                     <el-table-column label="期末余额" align="center">
                       <el-table-column label="应收票据" min-width="120" align="right">
                         <template #default="{ row }">
-                          <template v-if="row.name === '合计'"><b class="amount-cell" v-html="fmtAmt(row.endBalance)" /></template>
+                          <template v-if="row.name === '合计'"><GtAmountCell class="amount-cell gt-amount-strong" :value="row.endBalance" /></template>
                           <template v-else>
                             <WpAmountInput :model-value="row.endBalance" size="small" :disabled="isReadonly || !row.endRowId"
                               @change="(v: number) => updateCell(`portfolio-${pf.type}-end`, row.endRowId, 'balance', v)" style="width:100%" />
@@ -1647,7 +1656,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                       </el-table-column>
                       <el-table-column label="坏账准备" min-width="120" align="right">
                         <template #default="{ row }">
-                          <template v-if="row.name === '合计'"><b class="amount-cell" v-html="fmtAmt(row.endProvision)" /></template>
+                          <template v-if="row.name === '合计'"><GtAmountCell class="amount-cell gt-amount-strong" :value="row.endProvision" /></template>
                           <template v-else>
                             <WpAmountInput :model-value="row.endProvision" size="small" :disabled="isReadonly || !row.endRowId"
                               @change="(v: number) => updateCell(`portfolio-${pf.type}-end`, row.endRowId, 'provision', v)" style="width:100%" />
@@ -1655,13 +1664,13 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                         </template>
                       </el-table-column>
                       <el-table-column label="预期信用损失率(%)" min-width="120" align="right">
-                        <template #default="{ row }"><span class="amount-cell">{{ fmtPct(row.endLossRate) }}</span></template>
+                        <template #default="{ row }"><span class="amount-cell"><GtMeasureCell :value="row.endLossRate" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_FRACTION" /></span></template>
                       </el-table-column>
                     </el-table-column>
                     <el-table-column label="上年年末余额" align="center">
                       <el-table-column label="应收票据" min-width="120" align="right">
                         <template #default="{ row }">
-                          <template v-if="row.name === '合计'"><b class="amount-cell" v-html="fmtAmt(row.priorBalance)" /></template>
+                          <template v-if="row.name === '合计'"><GtAmountCell class="amount-cell gt-amount-strong" :value="row.priorBalance" /></template>
                           <template v-else>
                             <WpAmountInput :model-value="row.priorBalance" size="small" :disabled="isReadonly || !row.priorRowId"
                               @change="(v: number) => updateCell(`portfolio-${pf.type}-prior`, row.priorRowId, 'balance', v)" style="width:100%" />
@@ -1670,7 +1679,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                       </el-table-column>
                       <el-table-column label="坏账准备" min-width="120" align="right">
                         <template #default="{ row }">
-                          <template v-if="row.name === '合计'"><b class="amount-cell" v-html="fmtAmt(row.priorProvision)" /></template>
+                          <template v-if="row.name === '合计'"><GtAmountCell class="amount-cell gt-amount-strong" :value="row.priorProvision" /></template>
                           <template v-else>
                             <WpAmountInput :model-value="row.priorProvision" size="small" :disabled="isReadonly || !row.priorRowId"
                               @change="(v: number) => updateCell(`portfolio-${pf.type}-prior`, row.priorRowId, 'provision', v)" style="width:100%" />
@@ -1678,7 +1687,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                         </template>
                       </el-table-column>
                       <el-table-column label="预期信用损失率(%)" min-width="120" align="right">
-                        <template #default="{ row }"><span class="amount-cell">{{ fmtPct(row.priorLossRate) }}</span></template>
+                        <template #default="{ row }"><span class="amount-cell"><GtMeasureCell :value="row.priorLossRate" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_FRACTION" /></span></template>
                       </el-table-column>
                     </el-table-column>
                     <el-table-column v-if="!isReadonly" label="" width="50" align="center">
@@ -1741,7 +1750,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                       <template #default="{ row }">
                         <template v-if="row.rowKind === 'hint'">-</template>
                         <template v-else-if="row.rowKind === 'summary' || row.readonlyRow">
-                          <span :style="row.rowKind==='summary'?'font-weight:600':''" v-html="fmtAmt(row.sourceRow?.priorBalance || 0)" />
+                          <GtAmountCell :class="['gt-amount', row.rowKind==='summary' ? 'gt-amount-strong' : '']" :value="row.sourceRow?.priorBalance || 0" />
                         </template>
                         <template v-else>
                           <WpAmountInput :model-value="row.sourceRow?.priorBalance || 0" size="small" :disabled="isReadonly"
@@ -1760,7 +1769,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                         <template #default="{ row }">
                           <template v-if="row.rowKind === 'hint'">-</template>
                           <template v-else-if="row.rowKind === 'summary' || row.readonlyRow">
-                            <span :style="row.rowKind==='summary'?'font-weight:600':''" v-html="fmtAmt(row.sourceRow?.[mc.field] || 0)" />
+                            <GtAmountCell :class="['gt-amount', row.rowKind==='summary' ? 'gt-amount-strong' : '']" :value="row.sourceRow?.[mc.field] || 0" />
                           </template>
                           <template v-else>
                             <WpAmountInput :model-value="row.sourceRow?.[mc.field] || 0" size="small" :disabled="isReadonly"
@@ -1777,7 +1786,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                       </template>
                       <template #default="{ row }">
                         <template v-if="row.rowKind === 'hint'">-</template>
-                        <template v-else><span :style="row.rowKind==='summary'?'font-weight:600':''" v-html="fmtAmt(row.sourceRow?.endBalance || 0)" /></template>
+                        <template v-else><GtAmountCell :class="['gt-amount', row.rowKind==='summary' ? 'gt-amount-strong' : '']" :value="row.sourceRow?.endBalance || 0" /></template>
                       </template>
                     </el-table-column>
                     <el-table-column v-if="!isReadonly" label="" width="50" align="center">
@@ -1806,14 +1815,14 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                     </el-table-column>
                     <el-table-column label="转回或收回金额" min-width="130" align="right">
                       <template #default="{ row }">
-                        <template v-if="row.rowType==='summary'"><b class="amount-cell" v-html="fmtAmt(row.amount)" /></template>
+                        <template v-if="row.rowType==='summary'"><GtAmountCell class="amount-cell gt-amount-strong" :value="row.amount" /></template>
                         <template v-else><WpAmountInput :model-value="row.amount" size="small" :disabled="isReadonly" @change="(v: number) =>updateCell('reversalDetail', row.rowId, 'amount', v)" style="width:100%" /></template>
                       </template>
                     </el-table-column>
                     <!-- 源模板 C59==SUM(C55:C58) → 金额列，进合计行 -->
                     <el-table-column label="转回或收回前累计已计提坏账准备金额" min-width="210" align="right">
                       <template #default="{ row }">
-                        <template v-if="row.rowType==='summary'"><b class="amount-cell" v-html="fmtAmt(row.cumulativeProvision)" /></template>
+                        <template v-if="row.rowType==='summary'"><GtAmountCell class="amount-cell gt-amount-strong" :value="row.cumulativeProvision" /></template>
                         <template v-else><WpAmountInput :model-value="row.cumulativeProvision" size="small" :disabled="isReadonly" @change="(v: number) =>updateCell('reversalDetail', row.rowId, 'cumulativeProvision', v)" style="width:100%" /></template>
                       </template>
                     </el-table-column>
@@ -1853,7 +1862,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                   <el-table-column label="坏账准备金额" min-width="180" align="right">
                     <template #default="{ row }">
                       <template v-if="row.key === 'endBalance'">
-                        <span class="amount-cell" v-html="fmtAmt(row.value)" />
+                        <GtAmountCell class="amount-cell" :value="row.value" />
                       </template>
                       <template v-else>
                         <WpAmountInput
@@ -1929,7 +1938,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                   </el-table-column>
                   <el-table-column label="转回或收回金额" min-width="120" align="right">
                     <template #default="{ row }">
-                      <template v-if="row.rowType==='summary'"><b class="amount-cell" v-html="fmtAmt(row.amount)" /></template>
+                      <template v-if="row.rowType==='summary'"><GtAmountCell class="amount-cell gt-amount-strong" :value="row.amount" /></template>
                       <template v-else>
                         <WpAmountInput
                           :model-value="row.amount"
@@ -2023,7 +2032,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                 </el-table-column>
                 <el-table-column label="核销金额" min-width="110" align="right">
                   <template #default="{ row }">
-                    <template v-if="row.rowType==='summary'"><b class="amount-cell" v-html="fmtAmt(row.amount)" /></template>
+                    <template v-if="row.rowType==='summary'"><GtAmountCell class="amount-cell gt-amount-strong" :value="row.amount" /></template>
                     <template v-else>
                       <WpAmountInput
                         :model-value="row.amount"
@@ -2126,7 +2135,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                   >
                     <template #default="{ row }">
                       <template v-if="col.derived || row.rowType === 'summary'">
-                        <span class="amount-cell" v-html="fmtAmt(row[col.field])" />
+                        <GtAmountCell class="amount-cell" :value="row[col.field]" />
                       </template>
                       <template v-else-if="canEditCategorySummary && !isReadonly">
                         <WpAmountInput
@@ -2140,7 +2149,7 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
                       </template>
                       <template v-else>
                         <el-tooltip content="取自审定表D1-1" placement="top">
-                          <span class="amount-cell auto-fetch-cell" v-html="fmtAmt(row[col.field])" />
+                          <GtAmountCell class="amount-cell auto-fetch-cell" :value="row[col.field]" />
                         </el-tooltip>
                       </template>
                     </template>
@@ -2235,6 +2244,11 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
 }
 :deep(.negative-amount) {
   color: #f56c6c;
+}
+/* GtAmountCell 的 strong 态（对应原先 <b> 加粗的 summary/subtotal 行）。
+   GtAmountCell 本体是 <span>，加粗只能由外层 class 提供。 */
+:deep(.gt-amount-strong) {
+  font-weight: 600;
 }
 /* 源模板红字方法论上下文（琥珀色左边线 + 浅黄背景，平台统一样式） */
 .portfolio-methodology {
