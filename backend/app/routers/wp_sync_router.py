@@ -1017,6 +1017,110 @@ async def read_entry_readiness(
     return readiness.as_dict()
 
 
+#: entry 身份解析的**独立**前缀。
+#:
+#: 🔴 不能挂在 `USER_SYNC_PREFIX` 下：那个前缀自带 `{entry_id:path}`，本端点的
+#:    全部意义就是「先算出 entry_id」⇒ 挂进去会变成
+#:    `…/entries/{entry_id:path}/entry-identity`，前端仍得先知道 entry_id，
+#:    等于什么都没解决（实测注册出来确实是那个形状）。
+ENTRY_IDENTITY_PREFIX = "/api/projects/{project_id}/workpapers/{wp_id}/sync"
+
+
+@router.get(ENTRY_IDENTITY_PREFIX + "/entry-identity")
+async def resolve_entry_identity(
+    project_id: uuid.UUID,
+    wp_id: uuid.UUID,
+    sheet_name: str,
+    whole_workbook: bool = Query(default=False),
+    svc: _SyncServices = Depends(_services),
+) -> dict[str, Any]:
+    """按 `(wp_id, sheet_name)` 反查 room entry 身份与可用性 —— 前端**不必**自己造 entry_id。
+
+    ═══ 为什么需要这个端点（spec 任务 2.8 第 ② 步）═══
+
+    room `entry_id` 的派生规则是 ``xlsx-sheet/{wp_code}/{sheet_slug}``，而 `wp_code`
+    只有服务端能算准（聚合包内的独立子码会被 `_sheet_wp_code` 逻辑换掉）。实测前端
+    **29 个旧式调用方 / 22 个 composable 全部只持有 `wpId`，无一持有 `wpCode`** ⇒
+    让前端自己派生 entry_id 必然算错，表现为 readiness 恒 404「在线编辑永远不可用」，
+    而不会给出可归因的错误。
+
+    所以派生留在服务端**唯一的实现**（`onlyoffice_room_identity.sheet_entry_id`，
+    与 `/onlyoffice-config` 用的是同一个函数），前端只传它本来就有的两个标识。
+
+    ═══ 返回什么 ═══
+
+    * `entry_id` / `wp_code`：派生的 room 身份（前端拿去调 readiness / materialize）；
+    * `room_ready`：该 entry 的 room 供给是否就绪（= `readiness.runtime.ready`）；
+    * `reason`：不就绪时的中文原因（直接可展示，前端不必自己翻译 reason code）；
+    * `allowed_modes`：该 entry 真实可用的模式（前端据此决定显不显示切换入口）。
+
+    ═══ 为什么 not-ready 是 200 而不是 4xx ═══
+
+    与 `GET /readiness` 同口径：**未就绪是合法状态**，不是错误。前端要据此决定
+    「留在结构化视图 + 显示原因」，4xx 会让它走异常分支而丢掉原因文案。
+    """
+    from app.routers._wp_sheet_code_resolution import resolve_sheet_wp_code
+    from app.routers.wp_onlyoffice_router import _load_wp_or_404
+    from app.services import onlyoffice_room_identity as _room_identity
+    from app.services.workpaper_sync.entry_readiness import evaluate_entry_readiness
+
+    # 授权：与 `/onlyoffice-config` 同一条项目级门（entry-scoped 门要 entry_id，
+    # 而本端点的**目的**正是先把 entry_id 算出来 ⇒ 只能挂项目级）。
+    scope = await _guard(
+        svc,
+        project_id=project_id,
+        wp_id=wp_id,
+        entry_id="__entry_identity__",
+        action="read_entry_readiness",
+    )
+    _, wp_code = await _load_wp_or_404(svc.session, scope.wp_id)
+
+    # 换码判据与 `/onlyoffice-config` 共用同一实现 + 同一个模板谓词。
+    from app.services.wp_template_finder import find_template_file_any
+
+    sheet_code = resolve_sheet_wp_code(
+        wp_code,
+        sheet_name,
+        whole_workbook,
+        has_template=lambda code: find_template_file_any(code) is not None,
+    )
+    entry_id = _room_identity.sheet_entry_id(
+        wp_code=sheet_code, sheet_name=sheet_name, whole_workbook=whole_workbook
+    )
+
+    body: dict[str, Any] = {
+        "entry_id": entry_id,
+        "wp_code": sheet_code,
+        "room_ready": False,
+        "reason": None,
+        "allowed_modes": ["html"],
+    }
+    try:
+        readiness = await evaluate_entry_readiness(
+            session=svc.session,
+            registry=svc.registry,
+            project_id=scope.project_id,
+            wp_id=scope.wp_id,
+            entry_id=entry_id,
+        )
+    except Exception as exc:  # noqa: BLE001 — 未注册 adapter / entry 不在 manifest 都属「未就绪」
+        body["reason"] = f"该底稿尚未接入统一在线编辑（{type(exc).__name__}）"
+        return body
+
+    body["room_ready"] = bool(readiness.runtime.ready)
+    body["allowed_modes"] = list(readiness.allowed_modes)
+    if not body["room_ready"]:
+        reason = readiness.reason
+        detail = getattr(reason, "detail", None) if reason is not None else None
+        code = getattr(reason, "code", None) if reason is not None else None
+        body["reason"] = (
+            str(detail).strip() if isinstance(detail, str) and detail.strip()
+            else f"在线编辑暂不可用（{code}）" if code
+            else "该底稿的在线编辑暂时不可用"
+        )
+    return body
+
+
 @router.get(USER_SYNC_PREFIX + "/store-projection")
 async def read_store_projection(
     project_id: uuid.UUID,
