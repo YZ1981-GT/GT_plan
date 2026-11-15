@@ -231,26 +231,54 @@ class ExportPackageService:
                 "policy_digest": policy_digest,
             })
 
-            # ── 可选：审计报告 / 审定表 ──────────────────────────────────
+            # ── 可选：审计报告 / 审定表（接真件来源）────────────────────
             #
             # 🔴 改造前这两项写的是**真占位符字节**
             # （`b"Audit report placeholder"` / `b"Workpapers placeholder"`）：
             # 用户拿到的 zip 里那两个文件打不开，而 manifest 里还带着 sha256 与
             # size ⇒ 看起来像「有据可查的正式件」。
             # AC-20 明确「包内无空文件和 placeholder」⇒ 现在**要么产出真件、要么整包失败**。
-            # 真件来源尚未接入组合包（审计报告走 `word-exports/audit-report/generate`，
-            # 审定表走底稿导出），故当前显式拒绝而不是造假件。
             if include_audit_report:
-                raise ExportPackageBuildError(
-                    "审计报告真件来源尚未接入组合包（拒绝产出 placeholder）。"
-                    "请先用 word-exports/audit-report/generate 单独生成。"
+                audit_bytes = await self._build_audit_report_bytes(
+                    project_id=project_id, year=year
                 )
+                audit_filename = sanitize_filename(
+                    f"{company_short}_{year}年度审计报告.docx"
+                )
+                zf.writestr(audit_filename, audit_bytes)
+                manifest_files.append({
+                    "filename": audit_filename,
+                    "type": "audit_report",
+                    "format": "docx",
+                    "size_bytes": len(audit_bytes),
+                    "sha256": hashlib.sha256(audit_bytes).hexdigest(),
+                    "classification": "formal",
+                    "policy_digest": policy_digest,
+                })
 
             if include_workpapers:
-                raise ExportPackageBuildError(
-                    "审定表真件来源尚未接入组合包（拒绝产出 placeholder）。"
-                    "请先用底稿导出单独生成。"
+                adjudication_files = await self._build_adjudication_bytes(
+                    project_id=project_id
                 )
+                if not adjudication_files:
+                    raise ExportPackageBuildError(
+                        "本项目没有可导出的审定表底稿，组合包未生成（不产出 placeholder）"
+                    )
+                for wp_code, wp_name, wp_bytes in adjudication_files:
+                    wp_filename = sanitize_filename(
+                        f"{company_short}_{year}年度审定表_{wp_code}_{wp_name}.xlsx"
+                    )
+                    zf.writestr(wp_filename, wp_bytes)
+                    manifest_files.append({
+                        "filename": wp_filename,
+                        "type": "workpapers",
+                        "format": "xlsx",
+                        "wp_code": wp_code,
+                        "size_bytes": len(wp_bytes),
+                        "sha256": hashlib.sha256(wp_bytes).hexdigest(),
+                        "classification": "formal",
+                        "policy_digest": policy_digest,
+                    })
 
             # Warnings file (if force_export with failures)
             if warnings_text:
@@ -295,6 +323,117 @@ class ExportPackageService:
 
         zip_buffer.seek(0)
         return zip_buffer
+
+
+    async def _build_audit_report_bytes(
+        self, *, project_id: UUID, year: int
+    ) -> bytes:
+        """生成审计报告 docx 真件字节（`include_audit_report=True` 时用）。
+
+        🔴 为什么不能直接复用 `AuditReportService.generate_report`：
+        它只往 `audit_report` 表写段落，**不产出 docx 字节**（那是「报告正文」的
+        数据模型，不是文件）。组合包要的是可放进 zip 的**文件**，
+        所以走已有的 Word 导出链路 `word-exports/audit-report/generate` 的 service 层。
+
+        当前实现：读库里已生成的 `AuditReport` 段落 → 用 python-docx 落成 docx。
+        段落缺失 ⇒ 抛（不产出 placeholder）。
+        """
+        import sqlalchemy as sa
+        from docx import Document
+        from io import BytesIO
+
+        from app.models.report_models import AuditReport
+
+        result = await self.db.execute(
+            sa.select(AuditReport).where(
+                AuditReport.project_id == project_id,
+                AuditReport.year == year,
+                AuditReport.is_deleted == sa.false(),
+            )
+        )
+        report = result.scalar_one_or_none()
+        if report is None:
+            raise ExportPackageBuildError(
+                "本项目尚未生成审计报告（audit_report 无记录），组合包未生成"
+                "（不产出 placeholder）。请先调 audit-report/generate。"
+            )
+
+        paragraphs = getattr(report, "paragraphs", None) or {}
+        if not isinstance(paragraphs, dict) or not paragraphs:
+            raise ExportPackageBuildError(
+                "审计报告无段落内容，组合包未生成（不产出 placeholder）"
+            )
+
+        doc = Document()
+        for section_name, text in paragraphs.items():
+            doc.add_heading(str(section_name), level=1)
+            for line in str(text or "").split("\n"):
+                doc.add_paragraph(line)
+        buffer = BytesIO()
+        doc.save(buffer)
+        content = buffer.getvalue()
+        if not content:
+            raise ExportPackageBuildError(
+                "审计报告 docx 生成返回 0 字节，组合包未生成"
+            )
+        return content
+
+    async def _build_adjudication_bytes(
+        self, *, project_id: UUID
+    ) -> list[tuple[str, str, bytes]]:
+        """导出本项目全部审定表底稿的真件字节。
+
+        Returns:
+            `[(wp_code, wp_name, xlsx_bytes), ...]`；本项目没有审定表时返回空列表
+            （由调用方决定是拒绝还是跳过）。
+
+        审定表识别 = `AdjudicationExportTemplateService.is_adjudication_table`
+        （`^[A-N]\\d+-1$`，与模板生成器同一判据，不另写一份正则）。
+        """
+        import sqlalchemy as sa
+
+        from app.models.workpaper_models import WorkingPaper, WpIndex
+        from app.services.adjudication_export_template_service import (
+            AdjudicationExportTemplateService,
+        )
+        from app.services.wp_export.export_engine import WpExportEngine
+
+        stmt = (
+            sa.select(WorkingPaper, WpIndex)
+            .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+            .where(
+                WorkingPaper.project_id == project_id,
+                WorkingPaper.is_deleted == sa.false(),
+                WpIndex.is_deleted == sa.false(),
+            )
+        )
+        rows = (await self.db.execute(stmt)).all()
+
+        engine = WpExportEngine()
+        out: list[tuple[str, str, bytes]] = []
+        for wp, wp_index in rows:
+            wp_code = getattr(wp_index, "wp_code", "") or ""
+            if not AdjudicationExportTemplateService.is_adjudication_table(wp_code):
+                continue
+            try:
+                export_result = await engine.export_single(
+                    self.db, wp_id=wp.id, project_id=project_id
+                )
+            except Exception as e:  # noqa: BLE001
+                raise ExportPackageBuildError(
+                    f"审定表 {wp_code} 导出失败，组合包未生成（不产出半成品）: {e}"
+                ) from e
+            content = export_result.file_content
+            if isinstance(content, BytesIO):
+                content = content.getvalue()
+            if not content:
+                raise ExportPackageBuildError(
+                    f"审定表 {wp_code} 导出返回 0 字节，组合包未生成"
+                )
+            out.append(
+                (wp_code, getattr(wp_index, "wp_name", "") or "", content)
+            )
+        return out
 
 
 class ConsistencyCheckError(Exception):
