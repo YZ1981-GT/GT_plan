@@ -989,7 +989,7 @@
                   'gt-tb-var-warn': Math.abs((Number(row.audited) - Number(row.unadjusted)) / Number(row.unadjusted)) > 0.3,
                   'gt-tb-var-danger': Math.abs((Number(row.audited) - Number(row.unadjusted)) / Number(row.unadjusted)) > 0.5,
                 }">
-                  {{ ((Number(row.audited) - Number(row.unadjusted)) / Math.abs(Number(row.unadjusted)) * 100).toFixed(1) }}%
+                  <GtMeasureCell :value="((Number(row.audited) - Number(row.unadjusted)) / Math.abs(Number(row.unadjusted)) * 100)" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_PERCENT_POINTS" />
                 </span>
               </template>
             </template>
@@ -1402,10 +1402,9 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
 import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
-
-const route = useRoute()
-const router = useRouter()
-const projectStore = useProjectStore()
+import GtMeasureCell from '@/components/common/GtMeasureCell.vue'
+import { MeasureKind as MK, RatioScale as RS } from '@/types/measureKind'
+const MEASURE_KIND_RATIO = MK.RATIO, RATIO_SCALE_PERCENT_POINTS = RS.PERCENT_POINTS, route = useRoute(), router = useRouter(), projectStore = useProjectStore()
 const { canEdit, onContextChange } = useAuditContext()
 const { add: decAdd, sub: decSub } = useDecimalCalc()
 

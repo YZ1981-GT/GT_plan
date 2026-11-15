@@ -708,7 +708,7 @@
         <template #default="{ row }">
           <span v-if="Number(row.prior_period_amount) !== 0 && row.prior_period_amount != null"
                 :class="['gt-rv-change-rate', { 'gt-rv-change-rate--alert': Math.abs(((Number(row.audited_amount) || 0) - Number(row.prior_period_amount)) / Math.abs(Number(row.prior_period_amount)) * 100) > 20 }]">
-            {{ (((Number(row.audited_amount) || 0) - Number(row.prior_period_amount)) / Math.abs(Number(row.prior_period_amount)) * 100).toFixed(1) }}%
+            <GtMeasureCell :value="(((Number(row.audited_amount) || 0) - Number(row.prior_period_amount)) / Math.abs(Number(row.prior_period_amount)) * 100)" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_PERCENT_POINTS" />
           </span>
           <span v-else style="color: var(--gt-color-text-placeholder);">-</span>
         </template>
@@ -1037,6 +1037,10 @@ const staleRefresh = useStaleRefresh(projectId, {
 // R8-S2-03：Stale 状态追踪（上游数据变更提示）
 import { useStaleStatus } from '@/composables/useStaleStatus'
 import StaleIndicator from '@/components/StaleIndicator.vue'
+import GtMeasureCell from '@/components/common/GtMeasureCell.vue'
+import { MeasureKind as MK, RatioScale as RS } from '@/types/measureKind'
+const MEASURE_KIND_RATIO = MK.RATIO
+const RATIO_SCALE_PERCENT_POINTS = RS.PERCENT_POINTS
 const stale = useStaleStatus(projectId)
 
 // US-2：底稿保存后 report.stale SSE 订阅 → 黄色横幅 + 刷新
