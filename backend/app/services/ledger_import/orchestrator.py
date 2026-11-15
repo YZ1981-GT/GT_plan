@@ -23,6 +23,8 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.schemas.ledger_unit_contract import UnitConfirmationInput
+
 from .adapters import registry as adapter_registry
 from .detection_types import (
     FileDetection,
@@ -242,6 +244,7 @@ class ImportOrchestrator:
         force_activate: bool = False,
         created_by: UUID | None = None,
         adapter_id: str | None = None,
+        unit_confirmation: UnitConfirmationInput | None = None,
         append_strategy: str | None = None,
         balance_carry_confirmed: bool = False,
     ) -> dict:
@@ -342,6 +345,11 @@ class ImportOrchestrator:
                 "adapter_id": adapter_id,
                 "force_activate": force_activate,
                 "append": append_options,
+                **(
+                    {"unit_confirmation": unit_confirmation.model_dump(mode="json")}
+                    if unit_confirmation is not None
+                    else {}
+                ),
             },
             created_by=created_by,
         )

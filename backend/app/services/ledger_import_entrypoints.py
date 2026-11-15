@@ -331,6 +331,38 @@ def _is_ledger_import_path(path: str) -> bool:
     )
 
 
+def _route_methods(route: object) -> set[str] | None:
+    """读取真实 HTTP methods；没有 methods 的测试替身返回 None（未知）。"""
+    raw_methods = getattr(route, "methods", None)
+    if raw_methods is None:
+        return None
+    methods = {str(method).upper() for method in raw_methods}
+    # Starlette 可能为 GET 自动补 HEAD；注册表只登记业务 method。
+    if "GET" in methods:
+        methods.discard("HEAD")
+    return methods
+
+
+def _iter_route_candidates(app: "Starlette"):
+    """展开普通 route 与简单 Mount，返回完整路径和 route 对象。"""
+    for route in getattr(app, "routes", []):
+        path = getattr(route, "path", None)
+        if path is not None:
+            yield path, route
+            continue
+        for sub_route in getattr(route, "routes", []):
+            sub_path = getattr(sub_route, "path", None)
+            if not sub_path:
+                continue
+            prefix = getattr(route, "path", "") or ""
+            yield prefix.rstrip("/") + "/" + sub_path.lstrip("/"), sub_route
+
+
+def _format_route_key(key: tuple[str, str]) -> str:
+    path, method = key
+    return f"{method} {path}"
+
+
 def _endpoint_raises_410(endpoint: object) -> bool | None:
     """判定一个端点处理函数是否**无条件**以 410 结束。
 
@@ -405,38 +437,26 @@ def _collect_retired_not_410(app: "Starlette") -> list[str]:
 
     无法判定（假路由 / 取不到源码）的项不计入，避免把测试替身判成缺陷。
     """
-    retired_paths = {
-        _normalize_path(e.path): e.path
-        for e in LEDGER_IMPORT_ENTRYPOINTS
-        if e.kind == "retired"
+    retired_by_path = {
+        _normalize_path(entry.path): entry
+        for entry in LEDGER_IMPORT_ENTRYPOINTS
+        if entry.kind == "retired"
     }
-    if not retired_paths:
+    if not retired_by_path:
         return []
 
     offenders: list[str] = []
-    for route in getattr(app, "routes", []):
-        path = getattr(route, "path", None)
-        candidates = []
-        if path is None:
-            for sub in getattr(route, "routes", []):
-                sub_path = getattr(sub, "path", None)
-                if not sub_path:
-                    continue
-                prefix = getattr(route, "path", "") or ""
-                candidates.append(
-                    (prefix.rstrip("/") + "/" + sub_path.lstrip("/"), sub)
-                )
-        else:
-            candidates.append((path, route))
-
-        for full, r in candidates:
-            norm = _normalize_path(full)
-            if norm not in retired_paths:
-                continue
-            endpoint = getattr(r, "endpoint", None)
-            verdict = _endpoint_raises_410(endpoint)
-            if verdict is False:  # 只有「确定不是 410」才判红
-                offenders.append(retired_paths[norm])
+    for full_path, route in _iter_route_candidates(app):
+        normalized = _normalize_path(full_path)
+        entry = retired_by_path.get(normalized)
+        if entry is None:
+            continue
+        methods = _route_methods(route)
+        if methods is not None and entry.method not in methods:
+            continue
+        verdict = _endpoint_raises_410(getattr(route, "endpoint", None))
+        if verdict is False:
+            offenders.append(entry.path)
     return sorted(set(offenders))
 
 
@@ -449,37 +469,38 @@ def validate_entrypoints(app: "Starlette") -> None:
         存在未注册的导入相关路由、已注册路由不在 app.routes 中，
         或登记为 `retired` 的端点其实并不返回 410。
     """
-    # 收集 app 中实际注册的路由路径
-    registered_paths: set[str] = set()
-    for entry in LEDGER_IMPORT_ENTRYPOINTS:
-        registered_paths.add(_normalize_path(entry.path))
+    registered_keys = {
+        (_normalize_path(entry.path), entry.method.upper())
+        for entry in LEDGER_IMPORT_ENTRYPOINTS
+    }
+    registered_paths = {path for path, _method in registered_keys}
 
-    # 扫描 app.routes
-    actual_import_paths: set[str] = set()
-    all_app_paths: set[str] = set()
+    actual_keys: set[tuple[str, str]] = set()
+    unknown_paths: set[str] = set()
+    actual_unregistered_paths: set[str] = set()
 
-    for route in getattr(app, "routes", []):
-        path = getattr(route, "path", None)
-        if path is None:
-            # 可能是 Mount 或其他包装器
-            for sub_route in getattr(route, "routes", []):
-                sub_path = getattr(sub_route, "path", None)
-                if sub_path:
-                    # Mount 前缀 + sub_route.path
-                    prefix = getattr(route, "path", "")
-                    full = prefix.rstrip("/") + "/" + sub_path.lstrip("/")
-                    norm = _normalize_path(full)
-                    all_app_paths.add(norm)
-                    if _is_ledger_import_path(full):
-                        actual_import_paths.add(norm)
+    for full_path, route in _iter_route_candidates(app):
+        if not _is_ledger_import_path(full_path):
             continue
-        norm = _normalize_path(path)
-        all_app_paths.add(norm)
-        if _is_ledger_import_path(path):
-            actual_import_paths.add(norm)
+        normalized = _normalize_path(full_path)
+        methods = _route_methods(route)
+        if methods is None:
+            # 仅测试替身可能没有 methods；真实 FastAPI route 不走这个兼容分支。
+            unknown_paths.add(normalized)
+            if normalized not in registered_paths:
+                actual_unregistered_paths.add(normalized)
+            continue
+        actual_keys.update((normalized, method) for method in methods)
 
-    unregistered = sorted(actual_import_paths - registered_paths)
-    missing = sorted(registered_paths - all_app_paths)
+    unregistered = sorted(
+        [_format_route_key(key) for key in actual_keys - registered_keys]
+        + sorted(actual_unregistered_paths)
+    )
+    missing = sorted(
+        _format_route_key(key)
+        for key in registered_keys - actual_keys
+        if key[0] not in unknown_paths
+    )
     retired_not_410 = _collect_retired_not_410(app)
 
     if unregistered or missing or retired_not_410:

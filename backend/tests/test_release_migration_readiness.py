@@ -163,6 +163,12 @@ def _complete_readiness() -> MigrationReadiness:
     )
 
 
+def _migration_specs() -> tuple:
+    """按任务名选取迁移启动阶段，避免候选身份任务插入后切片错位。"""
+    names = {"run_migrations", "migration_mark_complete"}
+    return tuple(spec for spec in startup.STARTUP_TASKS if spec.name in names)
+
+
 @pytest.mark.asyncio
 async def test_initial_worker_runs_then_read_only_verifies(monkeypatch):
     events: list[str] = []
@@ -172,7 +178,7 @@ async def test_initial_worker_runs_then_read_only_verifies(monkeypatch):
     ctx = startup.StartupContext()
 
     results = await startup.run_startup_tasks(
-        startup.STARTUP_TASKS[1:3], context=ctx
+        _migration_specs(), context=ctx
     )
 
     assert [item.status for item in results] == ["ok", "ok"]
@@ -197,7 +203,7 @@ async def test_reload_worker_skips_execution_but_still_verifies(monkeypatch):
     startup.reset_startup_report()
 
     with pytest.raises(RuntimeError, match=r"pending_versions=\['229'\]"):
-        await startup.run_startup_tasks(startup.STARTUP_TASKS[1:3])
+        await startup.run_startup_tasks(_migration_specs())
 
     report = startup.get_startup_report()
     assert report is not None

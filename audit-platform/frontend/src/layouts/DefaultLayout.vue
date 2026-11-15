@@ -145,14 +145,10 @@ const route = useRoute()
 const router = useRouter()
 initGlobalBackspace(router)
 
-// ─── 显示偏好运行时（spec platform-global-display-settings-closure 任务 5）───
-// 🔴 两个 composable 此前在仓库里各有定义但**零生产调用方**（设计 §16 F10 / §16 F4），
-//    导致「改字号 / 密度立刻生效」与「改字号后表格重新 doLayout」都只存在于单测里：
-//    ① useDisplayPreferencesRuntime：按账号加载偏好 + 写根变量（--gt-display-font-size /
-//       --gt-table-row-height 等），换账号时重新加载；
-//    ② useGlobalTableLayout：字号变化后 nextTick 对所有 .el-table 调 doLayout，
-//       避免窄字号下列宽过宽、宽字号下过窄的错位。
-//    两者都要求已激活 Pinia，因此只在 setup 内调用一次（布局层是唯一挂载点）。
+// ─── 显示偏好运行时（platform-global-display-settings-closure 阶段 A）───
+// 布局层是已认证主应用的唯一挂载点：运行时按账号加载偏好并写根变量，
+// 全局表格监听器在字号/密度变化后重排已挂载的 Element Plus 表格。
+// 设置页、Aa 面板只读写同一个 store，不在子组件重复安装或发起 GET。
 useDisplayPreferencesRuntime()
 useGlobalTableLayout()
 

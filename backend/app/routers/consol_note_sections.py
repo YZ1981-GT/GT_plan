@@ -231,7 +231,8 @@ async def get_section_detail(standard: str, section_id: str):
         if sec["section_id"] == section_id:
             result = {
                 "section_id": sec["section_id"],
-                # 前端 CP-05 身份校验：回的是哪一版模板的章节（与请求的 standard 不符即拒用）
+                "id": sec.get("id"),
+                # 前端 CP-05 身份校验: 回的是哪一版模板的章节（与请求的 standard 不符即拒用）
                 "template_type": standard,
                 "title": sec["title"],
                 "parent_section": sec.get("parent_section", ""),
@@ -247,6 +248,9 @@ async def get_section_detail(standard: str, section_id: str):
                 result["_row_types"] = sec["_row_types"]
             if sec.get("text_after_table"):
                 result["text_after_table"] = sec["text_after_table"]
+            from app.services.note_table_measure_catalog import attach_consolidated_measure_metadata
+
+            attach_consolidated_measure_metadata(result, standard)
             return result
     return {"error": "章节不存在", "section_id": section_id}
 

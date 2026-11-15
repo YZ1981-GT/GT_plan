@@ -4003,22 +4003,22 @@ async function onTbSumImportFile(e: Event) {
   :deep(.gt-tb-font-xs),
   :deep(.gt-tb-font-xs) th .cell,
   :deep(.gt-tb-font-xs) td .cell,
-  :deep(.gt-tb-font-xs) .el-table__body { font-size: var(--gt-font-size-xs) !important; }
+  :deep(.gt-tb-font-xs) .el-table__body { font-size: var(--gt-display-font-size, 11px) !important; }
 
   :deep(.gt-tb-font-sm),
   :deep(.gt-tb-font-sm) th .cell,
   :deep(.gt-tb-font-sm) td .cell,
-  :deep(.gt-tb-font-sm) .el-table__body { font-size: var(--gt-font-size-xs) !important; }
+  :deep(.gt-tb-font-sm) .el-table__body { font-size: var(--gt-display-font-size, 12px) !important; }
 
   :deep(.gt-tb-font-md),
   :deep(.gt-tb-font-md) th .cell,
   :deep(.gt-tb-font-md) td .cell,
-  :deep(.gt-tb-font-md) .el-table__body { font-size: var(--gt-font-size-sm) !important; }
+  :deep(.gt-tb-font-md) .el-table__body { font-size: var(--gt-display-font-size, 13px) !important; }
 
   :deep(.gt-tb-font-lg),
   :deep(.gt-tb-font-lg) th .cell,
   :deep(.gt-tb-font-lg) td .cell,
-  :deep(.gt-tb-font-lg) .el-table__body { font-size: var(--gt-font-size-sm) !important; }
+  :deep(.gt-tb-font-lg) .el-table__body { font-size: var(--gt-display-font-size, 14px) !important; }
 
   :deep(.el-table th .cell) {
     font-weight: 600;

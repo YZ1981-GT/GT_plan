@@ -1,18 +1,11 @@
 /**
  * spec: platform-global-display-settings-closure 任务 5 / AC-07
  *
- * 这些断言守的是「接线」，不是「文件存在」。该 spec 的复核记录（2026-11-14）
- * 抓到整整六条「文件在但链路断」：
- *   ① DisplaySettingsView.vue 在，但 router 里没有 /display-settings ⇒ 普通用户进不去；
- *   ② useDisplayPreferencesRuntime / useGlobalTableLayout 各有定义与单测，但**零生产调用方**
- *      ⇒ 改字号 / 改密度对真实页面毫无作用；
- *   ③ useTableDensityMetrics 根本不存在；
- *   ④ gt-polish.css 仍靠固定 12px 覆盖字号；
- *   ⑤ SystemSettings / ThreeColumnLayout 都没挂 DisplayPreferencesPanel（各写一份手写面板）。
+ * 这些断言守的是「接线」，不是「文件存在」。当前 HEAD 已完成路由、布局运行时和面板复用，
+ * 本守卫继续钉住其单一入口，并覆盖阶段 A 新补的密度指标与虚拟表接线。
  *
- * 所以判据一律按「源码里是否真的引用了」而不是「文件是否在磁盘上」。
- * 🔴 每条判据都配了正向断言（引用必须出现）与反向断言（旧写法必须消失），
- *    只做单向断言的话，「删掉旧面板」这类改动可以让两侧同时变绿而功能其实断了。
+ * 所以判据一律按「源码里是否真的引用了」而不是「文件是否在磁盘上」；
+ * 正向断言与反向断言同时存在，避免删掉旧实现后测试因分母为空而假绿。
  */
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -54,10 +47,16 @@ describe('显示设置接线（AC-07）', () => {
     // 反向自检：不是只在 import 语句里出现一次，setup 里必须真调用
     const calls = layout.match(/^\s*useDisplayPreferencesRuntime\(\)/m)
     expect(calls, 'DefaultLayout 必须调用 useDisplayPreferencesRuntime()').not.toBeNull()
-    const calls2 = layout.match(/^\s*useGlobalTableLayout\(\)/m)
-    expect(calls2, 'DefaultLayout 必须调用 useGlobalTableLayout()').not.toBeNull()
+    const runtimeCalls = layout.match(/^\s*useDisplayPreferencesRuntime\(\)/gm) ?? []
+    const layoutCalls = layout.match(/^\s*useGlobalTableLayout\(\)/gm) ?? []
+    expect(runtimeCalls, 'DefaultLayout 只能安装一个显示偏好运行时').toHaveLength(1)
+    expect(layoutCalls, 'DefaultLayout 只能安装一个全局表格布局监听器').toHaveLength(1)
 
-    // 🔴 判据必须落在 FULLWIDTH_PREFIXES 的**赋值行**上：上一版只用
+    // 面板只消费 store，不另起 GET；避免同页多个入口把首屏请求放大。
+    const panel = read('components/settings/DisplayPreferencesPanel.vue')
+    expect(panel).not.toContain('loadForUser(')
+    expect(panel).not.toContain('getDisplayPreferences(')
+
     //    `toContain("'/display-settings'")` 判整个文件，而注释里也写了这个路径
     //    ⇒ 把数组元素删掉后注释仍能满足断言，变异存活（实测坐实）。
     const prefixesLine = layout
@@ -80,6 +79,18 @@ describe('显示设置接线（AC-07）', () => {
     // 必须真调 doLayout（否则字号变化后列宽不会重算）
     expect(layout).toContain('doLayout')
     expect(layout).toContain('nextTick')
+    expect(layout).toContain('displayPrefs.density')
+
+    const density = read('composables/useTableDensityMetrics.ts')
+    expect(density).toContain('useDisplayPrefsStore')
+    expect(density).toContain('estimatedRowHeight')
+    expect(density).toContain('remountKey')
+
+    const ledger = read('views/LedgerPenetration.vue')
+    expect(ledger).toContain('useTableDensityMetrics')
+    expect(ledger).toContain(':estimated-row-height="densityMetrics.estimatedRowHeight"')
+    expect(ledger).toContain(':header-height="densityMetrics.headerHeight"')
+    expect(ledger).not.toContain(':estimated-row-height="50"')
   })
 
   it('ThreeColumnLayout 的 Aa 面板复用 DisplayPreferencesPanel，不再手写面板', () => {
@@ -94,14 +105,13 @@ describe('显示设置接线（AC-07）', () => {
     expect(tcl).not.toContain('gridEditModeHint')
   })
 
-  it('顶栏系统设置入口按角色分流，非管理员不直推 /settings', () => {
-    const tcl = read('layouts/ThreeColumnLayout.vue')
-    // 正向：分流函数存在
-    expect(tcl).toContain('openSettingsEntry')
-    expect(tcl).toContain("'/display-settings'")
-    // 反向：不能再是无条件 router.push('/settings')
-    expect(tcl).not.toContain("router.push('/settings')")
+  it('Dashboard 快捷入口也按角色分流到普通用户显示设置', () => {
+    const dashboard = read('views/Dashboard.vue')
+    expect(dashboard).toContain("'/display-settings'")
+    expect(dashboard).toContain("authStore.user?.role === 'admin'")
+    expect(dashboard).not.toContain("{ label: '系统设置',   path: '/settings'")
   })
+
 })
 describe('显示设置：样式与复用（AC-07 剩余两条）', () => {
   it('gt-polish.css 的数据区字号读根变量而非固定 12px', () => {
@@ -124,6 +134,13 @@ describe('显示设置：样式与复用（AC-07 剩余两条）', () => {
         /font-size:\s*12px/.test(b),
     )
     expect(offenders, '数据区选择器不得用固定 12px 覆盖显示字号').toHaveLength(0)
+
+    const global = read('styles/global.css')
+    expect(global).toContain('--el-font-size-base: var(--gt-display-font-size')
+    expect(global).toContain('font-size: var(--gt-display-font-size, var(--gt-font-size-sm))')
+
+    const table = read('styles/gt-table.css')
+    expect(table).toContain('font-size: var(--gt-display-font-size, 12px) !important;')
   })
 
   it('SystemSettings 复用同一面板（管理页 Tab），且不重复实现', () => {

@@ -3,8 +3,8 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * 全局表格列宽自适应（Phase 1 D-5）
  *
- * 当用户在显示偏好里切换"表格字号"时，所有页面已挂载的 `<el-table>` 应当
- * 立即重新计算列宽，否则窄字号下列宽过宽 / 宽字号下列宽过窄会出现错位。
+ * 当用户在显示偏好里切换"表格字号"或"表格密度"时，所有页面已挂载的
+ * `<el-table>` 应当立即重新计算列宽，否则字号/行高变化后可能出现错位。
  *
  * 设计要点：
  * - **全局单点接入**：在 `DefaultLayout.vue` setup 阶段调用一次即可，
@@ -91,8 +91,8 @@ export function relayoutAllElTables(): number {
 }
 
 /**
- * 注册全局字号变更监听器：
- * - 监听 `displayPrefs.fontSize` 变化
+ * 注册全局字号/密度变更监听器：
+ * - 监听 `displayPrefs.fontSize` 与 `displayPrefs.density`
  * - `nextTick` 等 Vue 完成 :class 重渲染（gt-tb-font-* class 切换会触发
  *   行高/单元格 padding 变化）后再 doLayout
  *
@@ -102,7 +102,7 @@ export function useGlobalTableLayout(): void {
   const displayPrefs = useDisplayPrefsStore()
 
   watch(
-    () => displayPrefs.fontSize,
+    [() => displayPrefs.fontSize, () => displayPrefs.density],
     () => {
       nextTick(() => {
         relayoutAllElTables()

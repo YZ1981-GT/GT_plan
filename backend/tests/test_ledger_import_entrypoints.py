@@ -82,7 +82,7 @@ def _mock_app(routes: list[dict]) -> SimpleNamespace:
     """构造简单的模拟 app 对象。"""
     mock_routes = []
     for r in routes:
-        mock_routes.append(SimpleNamespace(path=r["path"], methods=r.get("methods", {"GET"})))
+        mock_routes.append(SimpleNamespace(path=r["path"], methods=r.get("methods")))
     return SimpleNamespace(routes=mock_routes)
 
 
@@ -113,6 +113,22 @@ class TestValidateEntrypoints:
             validate_entrypoints(app)
         assert exc_info.value.unregistered
 
+    def test_method_mismatch_is_not_hidden_by_same_path(self) -> None:
+        """同一路径的错误 method 必须进入未注册/缺失闭集。"""
+        routes = [
+            {"path": e.path, "methods": {e.method}}
+            for e in LEDGER_IMPORT_ENTRYPOINTS
+        ]
+        routes.append({
+            "path": "/api/projects/{project_id}/account-chart/import",
+            "methods": {"GET"},
+        })
+        app = _mock_app(routes)
+        with pytest.raises(EntrypointValidationError) as exc_info:
+            validate_entrypoints(app)
+        assert "GET /api/projects/{}/account-chart/import" in exc_info.value.unregistered
+        assert "POST /api/projects/{}/account-chart/import" not in exc_info.value.unregistered
+
     def test_non_import_extra_route_ignored(self) -> None:
         """非导入相关的额外路由不触发异常。"""
         routes = [{"path": e.path} for e in LEDGER_IMPORT_ENTRYPOINTS]
@@ -120,6 +136,7 @@ class TestValidateEntrypoints:
         routes.append({"path": "/api/users/me/display-preferences"})
         app = _mock_app(routes)
         validate_entrypoints(app)
+
 # ── 3. 「声明为 retired 但真的在跑」专用判据（模式②守卫） ─────────────
 
 class TestRetiredActuallyReturns410:

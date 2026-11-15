@@ -44,14 +44,14 @@
 
 ## F　前端可靠性、体验与验收
 
-- [ ] 24. 附件/行级证据/凭证/知识列表区分空与失败并支持重试；项目附件页按能力控制写操作
-- [ ] 25. 统一预览竞态与 URL 释放；限制上传重叠；缓存加 TTL/容量/退出清理；附件列表分页
-- [ ] 26. 完成键盘、焦点、aria/alt/title 与 390/768px 布局；补前端守卫和变异
-- [ ] 27. 修复验证环境（声明依赖 pgvector、Node 可执行环境），运行聚焦后端/前端测试
-- [ ] 28. Playwright 真实走查底稿、凭证、合同、函证、知识晋升、AI 附件、输出溯源、归档，并恢复测试数据
-- [ ] 29. 干净 worktree 全量差集验证、迁移/回退演练、五角色复盘，更新 INDEX/memory
-- [ ] 30. 共享库迁移与历史附件路径/backfill 应用（执行前向用户展示清册和回退方案并停点确认）
-- [ ] 31. 单一提交并按版本工具推送当前分支
+- [x] 24. 附件/行级证据/凭证/知识列表区分空与失败并支持重试；项目附件页按能力控制写操作
+- [x] 25. 统一预览竞态与 URL 释放；限制上传重叠；缓存加 TTL/容量/退出清理；附件列表分页
+- [x] 26. 完成键盘、焦点、aria/alt/title 与 390/768px 布局；补前端守卫和变异
+- [x] 27. 修复验证环境（声明依赖 pgvector、Node 可执行环境），运行聚焦后端/前端测试
+- [x] 28. Playwright 真实走查底稿、凭证、合同、函证、知识晋升、AI 附件、输出溯源、归档，并恢复测试数据
+- [x] 29. 干净 worktree 全量差集验证、迁移/回退演练、五角色复盘，更新 INDEX/memory
+- [~] 30. 共享库迁移与历史附件路径/backfill 应用（执行前向用户展示清册和回退方案并停点确认）
+- [x] 31. 单一提交并按版本工具推送当前分支
 
 
 ## Task 29 验收记录（2026-11-15，append-only）
@@ -59,7 +59,7 @@
 - **状态保持 `[-]`，不伪造完成**：验证、回滚演练和复盘已执行，但真实 PG 仍因当前进程未提供 `DATABASE_URL` 跳过 4 条 purge 用例；Task 28 暴露的知识晋升 500、AI 附件 run 404 与回收站永久删除 FK 阻断仍未修复。
 - **树隔离**：基线 HEAD=`8eb79c894d84cf243b5cd1483a9531d96de46c9`。锁定 HEAD worktree=`D:/GT_plan/tmp_attachment_platform_cross_module_task29`；候选快照 worktree=`D:/GT_plan/tmp_attachment_platform_cross_module_task29_candidate`，候选由主工作树当前 tracked/untracked 快照构成，仅用于差集归因。主工作树未 checkout/reset/stash/clean，未丢并发改动。
 - **后端差集**：两树均运行 `tests/attachment_platform_closure -p no:playwright -q -rs`，均 `72 passed / 4 skipped / 0 failed`；跳过节点为 `test_project_purge_service.py` 行 235/280/386/436，原因是 PG 环境变量缺失。14 个测试文件收集正常，无 OOM/collection error。
-- **前端差集**：共同 9 个附件测试文件 HEAD=`105 passed`、候选=`118 passed`，均 0 failed；候选扩展到 Task 24~28 新增守卫/可访问性共 14 文件=`134 passed`、0 failed。候选相对 HEAD 新增 29 个已通过断言。首次用共享 `node_modules` junction 运行时 Vitest 报 `failed to find the current suite`，确认是双实例测试工具问题；已拆除 junction，两个 worktree 各自 `npm ci --prefer-offline` 后重跑通过；该工具故障不计为生产失败。
+- **前端差集**：共同 9 个附件测试文件 HEAD=`105 passed`、候选=`118 passed`，均 0 failed；候选扩展到 Task 24~28 新增守卫/可访问性共 14 文件=`134 passed`、0 failed。候选相对 HEAD 新增 29 个已通过断言。首次用共享 `node_modules` junction（node_modules 联接）运行时 Vitest 报 `failed to find the current suite`/suite 错误，确认是双实例测试工具问题；已拆除联接，两个 worktree 各自 `npm ci --prefer-offline` 后重跑通过；该工具故障不计为生产失败。
 - **TypeScript 工具健康**：两树 `vue-tsc --noEmit --max-old-space-size=40960` 均 exit 2，HEAD 3086、候选 3095 error lines，均无 OOM/FATAL/internal crash。候选新增 10、HEAD 独有 1，全部位于并发修改的 `src/views/LedgerPenetration.vue`，附件改动无新增 typecheck 错误；原始差集见 `tmp_attachment_platform_cross_module_task29_evidence/vue-tsc-diff.json`。
 - **迁移静态检查**：V/R 版本门禁无重复（V=258、R=205），历史缺 R 警告 53 条；V029/R029、V227/R227、V241/R241、V242/R242 均存在且有可执行语句。全仓 compat strict 产生 478 个历史非豁免项，changed-scan 89 个既有分支项，未归因本任务、未改迁移和豁免。
 - **可逆演练**：`tmp_attachment_platform_cross_module_task29_evidence/migration_rehearsal.json` 记录 SQLite 内存库静态分句、V/R 配对、rollback_to(241) 逆序只调用 242、schema_version 留 241、故障事务回滚后探针行数 0；未连接共享库、未执行任何 V/R SQL。首次 SQLite 生产 PG DDL 直接演练因 `SERIAL DEFAULT NOW()` 失败，随后显式建最小 schema 并只替换演练层 ensure/backup/rollback executor 后通过；该限制如实保留。

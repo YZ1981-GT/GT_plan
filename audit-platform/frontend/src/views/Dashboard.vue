@@ -226,7 +226,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, type Component } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useRoleContextStore } from '@/stores/roleContext'
@@ -421,7 +421,16 @@ const statCards = computed(() => [
 ])
 
 // ── 快捷操作（8 个高频场景：4 任务 + 4 高频导航）──
-const quickActions = [
+type DashboardQuickAction = {
+  label: string
+  path?: string
+  action?: 'custom-query'
+  icon: Component
+  bg: string
+  color: string
+}
+
+const quickActions = computed<DashboardQuickAction[]>(() => [
   // 任务类（与左侧导航解耦）
   { label: '新建项目',   path: '/projects/new',     icon: Plus,         bg: 'var(--gt-color-primary-bg)',     color: 'var(--gt-color-primary)' },
   { label: '工时填报',   path: '/work-hours',       icon: Timer,        bg: 'var(--gt-color-wheat-light)',    color: 'var(--gt-color-wheat)' },
@@ -431,10 +440,16 @@ const quickActions = [
   { label: '项目列表',   path: '/projects',         icon: FolderOpened, bg: 'var(--gt-color-teal-light)',     color: 'var(--gt-color-teal)' },
   { label: '模板库',     path: '/template-library', icon: Document,     bg: 'var(--gt-color-success-light)',  color: 'var(--gt-color-success)' },
   { label: '知识库',     path: '/knowledge',        icon: Reading,      bg: 'var(--gt-color-primary-bg)',     color: 'var(--gt-color-primary)' },
-  { label: '系统设置',   path: '/settings',         icon: Setting,      bg: 'var(--gt-color-bg-light, #f5f5f7)', color: 'var(--gt-color-text-secondary)' },
-]
+  {
+    label: authStore.user?.role === 'admin' ? '系统设置' : '显示设置',
+    path: authStore.user?.role === 'admin' ? '/settings' : '/display-settings',
+    icon: Setting,
+    bg: 'var(--gt-color-bg-light, #f5f5f7)',
+    color: 'var(--gt-color-text-secondary)',
+  },
+])
 
-function onQuickActionClick(act: typeof quickActions[number]) {
+function onQuickActionClick(act: DashboardQuickAction) {
   if (act.action === 'custom-query') {
     eventBus.emit('open-custom-query')
     return

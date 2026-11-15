@@ -132,8 +132,8 @@
     新增 `mutate_note_by_id` 变体 + `disclosure_engine.update_note` 切至内核（保留 pushed_row_violations
     409 / note_edit_stamp 戳章语义，135 passed = pushed_row_guard + edit_stamp + ai_fill + section_write_kernel
     + module_attr + disclosure_notes_hardening）。
-  - 🔴 未完成：`note_followup` / 合并附注写入方尚未切到新内核；真实 PG 并发 barrier 必须在专用环境里
-    跑双连接重叠章节用例验证，保持未勾。
+  - ✅ 2026-11-15 补：**`note_followup` 链已取章节级 advisory 锁**。`note_section_write_kernel` 新增只取锁入口 `acquire_section_lock`（不读不写、不 deepcopy；非 PG 返回 False 不抛），`note_workpaper_pull_service._apply_note_formulas` 在 `db.begin_nested()` 内、`execute_note_formulas` **之前**逐章节取锁 ⇒ 同 `(project, year, section)` 的并发刷新/推送串行，不同章节仍并行；SAVEPOINT 只管失败隔离、不管并发的缺口补齐。顺带修内核健壮性：原先直接访问 `db.bind.dialect`，遇无 `bind` 的 session 替身（`test_note_workpaper_pull_service._NestedDb`）整条链抛 AttributeError 并被误记成「公式执行失败」⇒ 抽 `_dialect_name(db)` 用 `getattr` 兜底，非 PG 一律 no-op。守卫 `test_note_followup_section_lock_wiring.py`（4 例，AST 判「真调用 / 在公式执行之前 / 在 sections 循环内 / 内核有只取锁入口」），磁盘变异删锁调用 **3/3 RED**、逐字节还原。选集 25 passed（锁接线 + pull service + write kernel）+ 前一轮 30 passed。
+  - 🔴 仍未完成：**真实 PG 并发 barrier**（双连接重叠章节用例）必须在专用可销毁 PG 上跑，本机无法伪造，保持未勾；合并附注（C3）的差额节点与整章批取同属该项。
   - 2026-11-06 复核：未接内核的写入链具体是 `formula_push.note_followup →
     note_workpaper_pull_service._apply_note_formulas → note_formula_generator.execute_note_formulas`，
     仍直接改 `DisclosureNote.table_data` + `flag_modified` / flush，无章节 advisory lock。

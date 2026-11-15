@@ -119,10 +119,10 @@
 - [ ]* F4. 并发、故障恢复、RLS、签发/交付门、客户入账回滚验收
   - 2026-11-15：已覆盖 PG stale CAS、约束、FORCE RLS 元数据、outbox 故障/重放和客户入账回滚；回滚 active dataset 的 PostgreSQL 唯一 active 约束顺序缺陷已修复并回归通过。event-cascade health 当前 healthy、DLQ=0。双事务并发、非 superuser RLS 强制隔离、统一签发/交付故障门和全链恢复仍待专用环境。
 - [ ]* F5. 五角色 Playwright、刷新回读、通知深链、来源底稿、窄屏与键盘验收
-  - 2026-11-15：已完成调整大厅窄屏、接口、键盘聚焦、来源/协作原生按钮和合成分页性能走查，并用临时编制/复核账号完成 AJE 提交、通知、批准、客户入账、回滚、撤销和刷新路径。仍缺合伙人/QC/EQCR 五角色全矩阵、通知深链与来源底稿连续走查；worker supervisor 修复后 event-cascade health 已恢复 healthy。
+  - 2026-11-15：已完成调整大厅窄屏、接口、键盘聚焦、来源/协作原生按钮和合成分页性能走查，并用临时编制/复核账号完成 AJE 提交、通知、批准、客户入账、回滚、撤销和刷新路径。仍缺合伙人/QC/EQCR 五角色全矩阵、通知深链与来源底稿连续走查；本地复核记录 worker supervisor 修复后 event-cascade health 已恢复 healthy，远端复核记录此前曾暴露 outbox replay worker 未运行，两个时间点均保留。
 - [ ]* F6. 共享库 migration 与测试数据写入经用户放行后执行；逐表清理对账
   - 2026-11-15：只读查询确认共享库已应用 V212/V235，V235 的 MigrationRunner 规范化 checksum 与数据库记录一致；测试项目活动调整行已为 0，临时复核账号已停用、人员已删除、项目委派已撤销。本轮未执行共享库 migration、持久化 seed、物理清理或回滚，等待用户明确目标库与清理授权。
 - [x] F7. 磁盘变异汇总、临时产物清理、诊断与文档更新
   - ✅ 2026-11-15：本批临时产物清理 —— 删 `tmp_note_table_fix/`（一次性探针）与两处变异备份（`mutbak_nwps.py` / `mutbak_m1detail.ts`，均已逐字节还原后删除）；保留 `tmp_mcycle_audit/probe_m_contract_vs_frontend.py` 与 `probe_m_field_names.py` 两个**可复现探针**（M 循环形态冲突的证据来源，见 `oo-writeback-template-parity-closure` 9.2）。变异汇总见各批记录（显示设置 3/3、M 棘轮 2/2、附注章节锁 3/3）。
 - [ ]* F8. fetch 同步、单一提交、版本号与主要变动推送
-  - 2026-11-15：已 fetch --prune，HEAD 与 origin 同为 `8eb79c894`、ahead/behind=0；本批通过独立候选 worktree 生成单一 Conventional Commit `f52d97a5d`，使用 `push_version.py` 原子推送分支并生成附注标签 `v1.0.194`。
+  - 2026-11-15：本地工作记录曾在安全门拒绝时保留未提交状态，随后通过独立候选 worktree 生成单一 Conventional Commit `f52d97a5d`，使用 `push_version.py` 原子推送分支并生成附注标签 `v1.0.194`；两段时间点均保留，未在本次同步中重新提交或推送。

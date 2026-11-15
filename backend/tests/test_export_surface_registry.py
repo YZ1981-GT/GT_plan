@@ -98,3 +98,33 @@ class TestValidateRegistry:
         assert "data_exchange" in classes
         assert "template" in classes
         assert "non_amount" in classes
+
+    def test_duplicate_normalized_path_raises(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """同一路由被登记两次（即使参数名不同）必须打红。"""
+        key, entry = next(iter(EXPORT_SURFACE_REGISTRY.items()))
+        duplicate_path = entry.path.replace("{project_id}", "{another_project_id}")
+        monkeypatch.setitem(
+            EXPORT_SURFACE_REGISTRY,
+            f"{key}_duplicate",
+            ExportSurfaceEntry(
+                path=duplicate_path,
+                method=entry.method,
+                classification=(
+                    "data_exchange"
+                    if entry.classification != "data_exchange"
+                    else "formal"
+                ),
+                description="故障注入：重复登记同一归一化路径",
+            ),
+        )
+        app = _mock_app(
+            [{"path": item.path} for item in EXPORT_SURFACE_REGISTRY.values()]
+        )
+
+        with pytest.raises(RegistryValidationError) as exc_info:
+            validate_registry(app)
+
+        assert exc_info.value.duplicate_classification
+        assert "keys:" in exc_info.value.duplicate_classification[0]

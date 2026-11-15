@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.dataset_models import JobStatus
+from app.schemas.ledger_unit_contract import UnitConfirmationInput
 from app.services.import_job_service import ImportJobService
 from app.services.import_queue_service import ImportQueueService
 from app.services.ledger_import_upload_service import LedgerImportUploadService
@@ -781,12 +782,24 @@ class LedgerImportApplicationService:
         files: list[UploadFile] | None = None,
         file: UploadFile | None = None,
         upload_token: str | None = None,
+        unit_confirmation: UnitConfirmationInput | dict[str, Any] | str | None = None,
         year: int | None = None,
         custom_mapping: str | dict[str, Any] | None = None,
         payload_style: str = "ledger",
         append_strategy: str | None = None,
         balance_carry_confirmed: bool = False,
     ) -> dict[str, Any]:
+        from app.services.ledger_import.unit_confirmation_gate import (
+            confirmation_options,
+            require_direct_file_confirmation,
+        )
+
+        parsed_unit_confirmation = require_direct_file_confirmation(
+            files=files,
+            file=file,
+            upload_token=upload_token,
+            unit_confirmation=unit_confirmation,
+        )
         parsed_mapping = cls.parse_custom_mapping(custom_mapping)
         append_options = None
         if append_strategy is not None:
@@ -843,6 +856,7 @@ class LedgerImportApplicationService:
                 "upload_token": resolved_token,
                 "force_activate": False,
                 "append": append_options,
+                **confirmation_options(parsed_unit_confirmation),
             },
             created_by=created_by,
         )

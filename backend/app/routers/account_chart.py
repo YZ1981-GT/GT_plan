@@ -224,15 +224,30 @@ async def import_async(
     upload_token: str | None = Query(default=None, description="预览上传产物令牌"),
     year: int | None = Query(default=None, description="指定年度（不指定则自动提取）"),
     column_mapping: str | None = Form(None),
+    unit_confirmation: str | None = Form(
+        None,
+        description="单位确认合同 JSON（由预览结果确认后提交）",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
     """异步导入（多文件支持）：立即返回，后台处理，前端轮询进度。
 
-    适合大文件（>10MB）或多文件场景，避免 HTTP 超时。
+    适合大文件（>10MB）或多文件场景，避免 HTTP 超时。直传文件必须同时
+    携带预览令牌和经 schema 校验的单位确认合同；已有 token 的 bundle-only
+    客户端保持兼容。
     """
+    from app.services.ledger_import.unit_confirmation_gate import (
+        require_direct_file_confirmation,
+    )
     from app.services.ledger_import_application_service import LedgerImportApplicationService
 
+    confirmed_unit = require_direct_file_confirmation(
+        files=files,
+        file=file,
+        upload_token=upload_token,
+        unit_confirmation=unit_confirmation,
+    )
     return await LedgerImportApplicationService.submit_import_job(
         project_id=project_id,
         user_id=str(current_user.id),
@@ -240,6 +255,7 @@ async def import_async(
         files=files,
         file=file,
         upload_token=upload_token,
+        unit_confirmation=confirmed_unit,
         year=year,
         custom_mapping=column_mapping,
         payload_style="account_chart",

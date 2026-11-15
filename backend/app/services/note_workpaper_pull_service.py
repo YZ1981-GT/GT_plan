@@ -181,6 +181,7 @@ async def _apply_note_formulas(db: AsyncSession, project_id: UUID, year: int,
     系统路径（不写编辑人）；只写 auto 格；逐章节保存点 —— 一节失败只回滚这一节、回原因。跨表取数多章节共用一次预载。
     回 ``{章节: {updated, skipped, error}}``（只列有公式的章节）。
     """
+    from app.services.disclosure.note_section_write_kernel import acquire_section_lock
     from app.services.formula_settings.note_settings import materialize_quietly
     from app.services.note_formula_generator import execute_note_formulas
 
@@ -190,8 +191,16 @@ async def _apply_note_formulas(db: AsyncSession, project_id: UUID, year: int,
     shared: dict[str, Any] = {}
     out: dict[str, dict[str, Any]] = {}
     for sec in sections:
+        # 章节级 advisory lock（统一写入内核）+ 逐章节 SAVEPOINT：
+        # 同一 (project, year, section) 的并发推送 / 编辑串行，不同章节天然并行；
+        # 一节失败只回滚这一节，不影响其余章节与刷新。
         try:
             async with db.begin_nested():
+                # 章节级 advisory lock（统一内核只取锁，不代做读写）：
+                # 同 (project, year, section) 的并发推送 / 编辑串行，不同章节并行。
+                await acquire_section_lock(
+                    db, project_id=project_id, year=year, section_id=sec,
+                )
                 res = await execute_note_formulas(db, project_id, year, sec, cross_data=shared)
         except Exception as exc:  # noqa: BLE001 —— 一节公式失败不影响其余章节与刷新
             logger.warning("附注刷新：附注公式执行失败 project=%s section=%s: %s", project_id, sec, exc, exc_info=True)

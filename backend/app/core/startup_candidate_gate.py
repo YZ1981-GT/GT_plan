@@ -12,8 +12,12 @@ from app.core import candidate_identity
 CandidateIdentityError = candidate_identity.CandidateIdentityError
 
 
-def verify_tree_identity() -> None:
-    """在任何迁移或 worker 之前核对候选树身份。"""
+def verify_tree_identity(_context: Any | None = None) -> None:
+    """在任何迁移或 worker 之前核对候选树身份。
+
+    启动注册表统一向任务传入 ``StartupContext``；身份校验本身不依赖上下文，
+    因此显式接受并忽略该参数，避免注册表把无参函数当成有参任务调用。
+    """
     candidate_identity.verify_candidate_identity()
 
 

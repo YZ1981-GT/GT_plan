@@ -97,7 +97,12 @@ def _fingerprint(table: dict[str, Any]) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _standalone(variant: str, *, write_ids: bool) -> tuple[list[dict[str, Any]], bool]:
+def _standalone(
+    variant: str,
+    *,
+    write_ids: bool,
+    used_table_ids: set[str],
+) -> tuple[list[dict[str, Any]], bool]:
     path = DATA / f"note_template_{variant}.json"
     data = _read(path)
     entries: list[dict[str, Any]] = []
@@ -107,7 +112,19 @@ def _standalone(variant: str, *, write_ids: bool) -> tuple[list[dict[str, Any]],
         for index, table in enumerate(section.get("tables") or []):
             if not isinstance(table, dict):
                 continue
-            table_id = _uuid(table.get("table_id"), seed=f"standalone:{variant}:{section_id}:{index}")
+            seed = f"standalone:{variant}:{section_id}:{index}"
+            table_id = _uuid(table.get("table_id"), seed=seed)
+            # 历史模板曾复制同一 table_id 到不同章节。保留第一个稳定 ID，
+            # 对后续碰撞按位置生成确定性 UUID，避免目录运行期出现同 ID 两张表。
+            if table_id in used_table_ids:
+                suffix = 1
+                while True:
+                    candidate = _uuid(None, seed=f"{seed}:duplicate:{suffix}")
+                    if candidate not in used_table_ids:
+                        table_id = candidate
+                        break
+                    suffix += 1
+            used_table_ids.add(table_id)
             if table.get("table_id") != table_id:
                 table["table_id"] = table_id
                 changed = True
@@ -125,7 +142,7 @@ def _standalone(variant: str, *, write_ids: bool) -> tuple[list[dict[str, Any]],
     return entries, changed
 
 
-def _consolidated(variant: str) -> list[dict[str, Any]]:
+def _consolidated(variant: str, *, used_table_ids: set[str]) -> list[dict[str, Any]]:
     path = DATA / f"consol_note_sections_{variant}.json"
     data = _read(path)
     entries: list[dict[str, Any]] = []
@@ -136,6 +153,9 @@ def _consolidated(variant: str) -> list[dict[str, Any]]:
         table_id = _uuid(section.get("id"), seed=f"consolidated:{variant}:{section_id}")
         if str(section.get("id")) != table_id:
             raise ValueError(f"合并模板 {variant}:{section_id} 缺稳定 UUID id")
+        if table_id in used_table_ids:
+            raise ValueError(f"合并模板 {variant}:{section_id} 的 table_id 与其他表重复")
+        used_table_ids.add(table_id)
         entries.append({
             "variant": f"consol_{variant}",
             "section_id": section_id,
@@ -151,11 +171,16 @@ def _consolidated(variant: str) -> list[dict[str, Any]]:
 def build(*, write_ids: bool) -> tuple[dict[str, Any], bool]:
     entries: list[dict[str, Any]] = []
     ids_changed = False
+    used_table_ids: set[str] = set()
     for variant in ("soe", "listed"):
-        part, changed = _standalone(variant, write_ids=write_ids)
+        part, changed = _standalone(
+            variant,
+            write_ids=write_ids,
+            used_table_ids=used_table_ids,
+        )
         entries.extend(part)
         ids_changed = ids_changed or changed
-        entries.extend(_consolidated(variant))
+        entries.extend(_consolidated(variant, used_table_ids=used_table_ids))
     entries.sort(key=lambda row: (row["variant"], row["section_id"], row["table_index"]))
     table_ids = [row["table_id"] for row in entries]
     column_ids = [col["column_id"] for row in entries for col in row["columns"]]
