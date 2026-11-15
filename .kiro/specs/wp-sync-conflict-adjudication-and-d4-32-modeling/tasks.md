@@ -81,16 +81,33 @@
   - 前端：sync 目录 + D4 相关；区域类型检查相对基线 added 0。
   - 变异逐条 RED 并核对红在预期用例（至少含：读侧判据回退、成因不持久化、分组 merge 压平、
     骨架行一律新建 / 一律跳过、A 列回到受管集）。
-- [ ]* 12. 真库端到端（只用【测试】项目）　← 真库 UAT 未执行（见 §实施记录 2）
-  - 重发布测试底稿 representation 后，先把遗留 operation
-    `11809f53-a34e-44fc-8182-efc5bc68e019` 经**正式裁决端点**结算掉（它是缺陷一的真实样本）。
-  - D4-32 六组各填一行 → 切在线编辑 → OO 内改值 → forcesave → 回表单刷新 →
-    HTML / API / 已发布 representation 三方一致；分组归属与模板序号列逐项核对。
-  - 🔴 写入前存**全文快照**（不只存哈希 —— 上游 6.6 就因只存哈希而无法定位复原差异），
-    验收后逐字段复原并对账。
-- [ ] 13. 上游 spec 回填
+- [x] 12. 真库端到端（只用【测试】项目）　← 2026-11-15 实测完成（见 §实施记录 2）
+  - [x] 12.a 重发布测试底稿 representation（definition 链 `--apply` + `republish --apply`，
+        gen1 → gen2 / revision 1 → 2，文件落盘核验）
+  - [x] 12.b D4-32 六组各填一行 → store → combined projection → merge 往返逐项保真
+        （48 个受管 key / 分组结构 / 未受管字段 / 未知行落 `__unknown__` 全部实测）
+  - [x] 12.c 骨架行分流两形态（模板原值跳过、模板空行填值进 `__unknown__`）用真实
+        representation 字节建基线实测
+  - [x] 12.d 写入前存**全文快照**（11 张表逐行 JSON + 5 个磁盘文件全文 bytes），
+        写后逐表逐文件对账，业务侧零漂移
+  - [x] 12.e OO iframe 侧完整往返**已实测通过**（2026-11-15）：在 OO 内把 D4-32 `B14`
+        写成 `UAT8734690` → 点平台正式入口「保存并回到表单模式」
+        （`[data-testid="wp-sync-host-forcesave"]`）→ HTML store 立即出现该值 →
+        刷新页面后表单显示该值 → 已发布 representation（gen5 / revision 3）反读
+        `B14='UAT8734690'` ⇒ **HTML / API / representation 三方一致**，且该 operation
+        **冲突数 = 0**（缺陷一修好前同一操作恒产 24 条）。验收数据已复原
+  - [ ] 12.f 遗留 operation `11809f53…` 未能结算：它冻结旧契约 `75fca57d…`，本 spec 已把
+        契约改成 `645e0500…` ⇒ 预览按设计返回 `frozen_contract_digest_drift`（保护审计链，
+        不按 registry 当前 alias 重组历史 operation）。**这是正确行为，不是缺陷**；
+        结算它需要「按冻结 bundle 重建读侧投影」的能力，超出本 spec 范围，登记为后续项。
+- [x] 13. 上游 spec 回填
   - 把 `workpaper-writeback-data-loss-and-mirror-consistency-closure` 的 6.3 / 6.4 / 6.5
     由阻断改为实测结论，并在 6.6 / 6.7 标注本 spec 的交付结果。
+  - 2026-11-15 完成：6.3 记录 OO 往返完整证据链（三方一致 / 冲突 0 / A 列序号保留）与
+    遗留 operation 的 `frozen_contract_digest_drift` 属正确行为；6.4 / 6.5 记阻断已解除；
+    6.6 标注 ADR-D432-001/002/003 与连带基线清单（契约 digest / `EXTRACTED_FIELD_COUNT`
+    218→189 / `TEXT_VICTIM` 重选 / `_text_safe` 退役）；6.7 标注 ADR-CA-001/002 与
+    31 例对拍守卫；父任务 6 一并标 `[x]`。
 
 ## G. 收尾
 
@@ -125,15 +142,115 @@
 满足「漏写后反读会变」（4 处、字节差异恰落 `sheet35.xml`、单趟、extract 总数仍 189），
 机理同型（模板存 `1`、`boolean` 归一成 `True`）。
 
-### 2. 未执行：任务 12 真库 UAT
+### 2. 任务 12 真库 UAT（2026-11-15 执行）
 
-真库 UAT（结算 operation `11809f53-a34e-44fc-8182-efc5bc68e019`、D4-32 六组各填一行走完整
-OO↔HTML 往返）**本轮未执行**，连带 definition re-provision 也未做。原因是会话预算用尽，
-不是判定它不必要。**未执行就不标完成** —— 当前只能说「代码与离线判据到位」，不能说
-「真栈跑通」。执行前置：
-1. `backend/scripts/fix/fix_task76_provision_projection_definitions.py --apply --entry "xlsx/gt-d4-operating-revenue" --project-id "e8c40d30-de96-440d-a880-fafcf41f32f3"`
-   —— 契约 digest 变了，冻结的 definition 必须重发布，否则在线编辑会报「冻结身份与生产契约脱钩」；
-2. 只用【测试】项目（公式同步乙 `e8c40d30…` / wp `d7fa0522…`），写入前存**全文**快照、验收后逐值复原对账。
+环境：主后端 9980（HEAD 含本 spec 实施提交 `65709f0b2`）、OnlyOffice 容器 healthy、
+共享库 `audit_platform`、【测试】公式同步乙 `e8c40d30…` / wp `d7fa0522…` /
+entry `xlsx/gt-d4-operating-revenue`。全部写操作前存**全文快照**（`tmp_wp_sync_uat/snap_before/`，
+11 张表逐行 JSON + 5 个磁盘文件全文 bytes），写后同法取 `snap_after` 逐表逐文件对账。
+
+#### 2.1 开工即撞到的环境事实：该 entry 的 representation 文件已从磁盘消失
+
+冲突预览直接 422 `artifact_publish_failed`（"published artifact 指针指向的文件不存在"）。
+现算全库 `working_paper_artifact` 里 `state=published ∧ kind∈{canonical,projection}` 共
+**1069** 条，逐条判磁盘存在性 ⇒ **1076/1069 中只缺这 2 条**（canonical + projection），
+其余项目 0 缺失。即：不是全平台 storage 迁移，是这一张测试底稿的产物被清掉了
+（`.versions/` 与 `.incoming/` 目录整体不存在）。
+
+#### 2.2 顺带修掉的真缺陷：重建工具在它唯一的用途上崩
+
+`backend/scripts/fix/republish_entry_from_template.py` 的 `--check` 在读取当前 artifact
+做诊断时 `read_bytes()` 裸调用 ⇒ `FileNotFoundError`。而该工具**唯一的用途**就是
+「从权威模板重建已发布版本」，最常见的触发场景恰恰是当前 artifact 缺失/不可读。
+已抽出 `_business_row_of_artifact()`：文件不在盘就返回 `{"artifact_missing": true, path}`
+并继续，异常也只记 `artifact_unreadable` —— 诊断信息不再阻断重建，但也不静默（缺失如实进报告）。
+
+#### 2.3 重发布链（两条命令，均为正式宿主）
+
+1. `fix_task76_provision_projection_definitions.py --apply --entry … --project-id …`
+   ⇒ `status=ok`、`created_stages=[bundle, contract]`、`reused_stages=[authority_model,
+   instrumentation, template]`、`errors=[]`。契约 digest 从 `75fca57d…` 变 `645e0500…`。
+2. `republish_entry_from_template.py --apply --wp-id … --entry-id …`
+   ⇒ `status=republished`，`representation 4e87e088(gen1) → dc02b46b(gen2)`、`revision 1 → 2`，
+   `artifact_missing: false`，`skeleton_rows_above: 12`（模板 12 行骨架在业务行上方）。
+
+#### 2.4 D4-32 六段分组双向保真（Property 3 主体，真库实测）
+
+把六组各一行的载荷写进 `checklist_responses`（item `D4-32-groups`，1561 B，写入回读逐字节相等）：
+
+| 验证面 | 实测结果 |
+| --- | --- |
+| 契约受管字段 | `d4_32_groups` **8** 个（B..I），A 列不在集内 —— ADR-D432-001 成立 |
+| 展平（面 C） | `_d4_32_rows` 出 **6 行**，每组一行，身份 `d432-uat-001..006` |
+| projection | `build_combined_store_projection` 出 **48** 个 `d4_32_groups/*` key（6 行 × 8 字段），值与 store 逐项一致；`_uatMarker`（未受管）未进 projection |
+| 往返不变 | 6 组 → 6 组，各组 `key`/`label`/行数/`id`/未受管字段 `_uatMarker` **全部保留** |
+| 改值回写 | amount 9999、name「控股股东改名」正确落库，结构不变，未受管字段保留 |
+| 未知身份行 | 新行落 `__unknown__` 组（label「未映射分组」），不被丢弃、不被误归他组 |
+
+#### 2.5 骨架行分流（ADR-D432-003，用真实已发布 representation 建基线）
+
+用 gen2 representation 的真实模板字节建 `SkeletonBaseline`（34 行骨架、536 列映射），
+模板侧逐格核实与 spec §2.1 记载**完全吻合**：`A11='序号'`、`A13..A46` 里 24 个整数 +
+5 个「……」+ 5 个组标题行空格，组标题在 B 列（`B19/B26/B30/B34/B41` = 主要客户/控股股东/
+实际控制人/关键管理人员/其他关联方）。
+
+| 用例 | 实测结果 |
+| --- | --- |
+| A. 模板原值骨架行（含 `B19='主要客户'` 等 5 个组标题） | **PASS** —— 落进 store 的行 = `[]`，组标题不被当业务行 |
+| B. 模板空行（`GTROW-D432-0014`，模板只有 `A=2`）填了用户值 | **PASS** —— 进 store 且落 `__unknown__`，值 `name='用户新填的客户'` / `amount=8888` |
+
+两条形态各一个用例：单向用例会把其中一种判反（一律跳过 ⇒ B 丢数据；一律新建 ⇒ A 灌组标题）。
+
+#### 2.6 OO iframe 侧完整往返（12.e，2026-11-15 实测通过）
+
+用独立无头浏览器（固定 `sessionStorage['gt-client-instance-id']`，否则每次新上下文都被判成
+「他人正在编辑」而进只读）+ 真实 OnlyOffice 容器：
+
+| 步骤 | 实测结果 |
+| --- | --- |
+| 切「在线编辑」 | OO iframe 载入，`frameEditorId=wp-sync-oo-wpsync-…-g2-1`（g2 = 本次重发布的代际） |
+| OO 内写 D4-32 `B14` | `""` → `UAT8734690`（`getCell3(13,1).setValue(str)`；`getCell`/`getCell2` 签名不同会抛错） |
+| 点平台正式入口「保存并回到表单模式」 | `[data-testid="wp-sync-host-forcesave"]` 触发完整 forcesave → callback → oo_to_html |
+| HTML store | `d4_32_groups` 立即出现 `UAT8734690` |
+| 刷新页面 | 表单显示该值；store 仍为该值 |
+| 已发布 representation（gen5 / revision 3）反读 | `r14: [2, 'UAT8734690', …]` ⇒ **A 列序号 `2` 保留、B 列是新值** |
+| 该 operation 冲突数 | **0**（缺陷一修好前同一操作恒产 24 条） |
+| 控制台错误 | 0 |
+
+三方（HTML store / API / representation）逐项一致。**同时验证了 ADR-D432-001 的面 B**：
+canonical xlsx 的 `A14=2` 模板序号没有被清空（修好前投影恒 `None` ⇒ materialize 会写空）。
+
+🔴 **两条环境/工具纪律（本轮踩到）**：
+* 每次新建浏览器上下文都会换 `client_instance`，上一实例的编辑锁不释放 ⇒ 新会话被
+  `find_blocking_lock` 判成「他人正在编辑」而进只读。必须固定窗口编号（或先释放旧锁）；
+* `Ctrl+S` 在 OO 里**不触发** forcesave（平台把保存收口到自己的按钮/状态机）。
+  只有点 `wp-sync-host-forcesave` 才走完整链路 —— 用键盘验证会得出「保存没反应」的假结论。
+
+#### 2.7 遗留 operation 未能结算（正确行为，非缺陷）
+
+`11809f53…` 现在报 `frozen_contract_digest_drift`：它冻结的 contract slot 是 `75fca57d…`，
+而本 spec 已把契约改成 `645e0500…`。系统按设计**拒绝**「按 registry 当前 alias 重组历史
+operation」——那会破坏审计链。要结算它需要「按冻结 bundle 重建读侧投影」的能力，属另一
+改动面，本 spec 不吸收。spec §5 原把它当「缺陷一的第一个可裁决真实样本」，该前提在契约
+变更后不再成立；新契约下的可裁决性已由 Property 1（31 例对拍）与 2.4 / 2.6 的写读往返覆盖。
+
+#### 2.8 复原对账
+
+`snap_before` vs `snap_after`（第一次 republish 后）：**9 处变化全部是 republish 的应有产物** ——
+`artifact` 8→12 行、`content_representation` 1→2、`content_version` 1→2、`sync_entry_state`
+指针换代、`working_paper.content_revision` 1→2，新增 gen2 的 canonical xlsx / projection
+/ bundle / contract 四个磁盘文件。**业务侧零漂移**：`checklist_responses` 1 行（digest 相同）、
+`sync_conflict` 24 行、`sync_operation` 6 行、`sync_operation_event` 15 行全部逐字节相同。
+
+OO 往返（12.e）验收后：D4-32 的 store 行按快照**删除**（快照里本来没有该 item），
+`probe_d432.py restore` 回报 `deleted 1` / `now: None`，即回到开工前状态。
+
+#### 2.9 回归
+
+* `test_schema_conflict_adjudication_parity.py`（Property 1 主体）**31 passed**；
+* `test_single_pass_artifact_equivalence.py` **2 failed / 25 passed**，两条失败在
+  **干净基线 worktree（`65709f0b2`，即本 spec 实施提交）上逐字复现**（40≠39、144≠142）
+  ⇒ 与 §3 登记的预存失败同一条，非本轮引入（本会话只改了一个脚本文件，不参与该测试）。
 
 ### 3. 预存失败（非本轮引入，未吸收）
 

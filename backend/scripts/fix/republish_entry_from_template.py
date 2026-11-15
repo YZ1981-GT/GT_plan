@@ -131,6 +131,32 @@ async def _current(session: Any, *, wp_id: str, entry_id: str) -> dict[str, Any]
     return dict(row) if row is not None else None
 
 
+def _business_row_of_artifact(
+    relative_path: str, *, spec: Any, rehash_module: Any
+) -> dict[str, Any]:
+    """诊断用的「当前 artifact 首条业务行」；文件不在磁盘时**不抛**。
+
+    🔴 本工具唯一的用途就是「从权威模板重建已发布版本」，而最常见的触发场景恰恰是
+    当前 artifact 文件缺失/不可读（指针指向的文件被 GC 或从未落盘）。首版在这里直接
+    `read_bytes()` ⇒ `FileNotFoundError`，工具在真正需要它的那一刻崩掉。诊断信息是
+    可选的，**不得**让它阻断重建 —— 但也不能静默：把缺失如实写进报告让用户看见。
+
+    `rehash_module` 由调用方传入（`run()` 已加载一次）：本函数每次调用都重新
+    `exec` 模块会重复副作用，而它的产出只是可选诊断。
+    """
+    try:
+        path = rehash_module._artifact_path(relative_path)
+        if not path.is_file():
+            return {"artifact_missing": True, "artifact_path": str(path)}
+        return {"artifact_missing": False, **first_business_row(path.read_bytes(), spec=spec)}
+    except Exception as exc:  # noqa: BLE001 - 诊断失败不阻断重建
+        return {
+            "artifact_unreadable": True,
+            "artifact_path": str(relative_path),
+            "artifact_error": f"{type(exc).__name__}: {exc}",
+        }
+
+
 async def _live_editors(session: Any, *, wp_id: str, entry_id: str) -> int:
     """未过期房间里未过期的活跃参与者数（有人正在在线编辑）。"""
     return int(
@@ -191,10 +217,10 @@ async def run(*, wp_id: str, entry_id: str, apply: bool) -> dict[str, Any]:
                 report["status"] = "blocked"
                 report["reason"] = "该底稿还没有已发布的在线编辑版本（首版走首次打开自动发布）"
                 return report
-            artifact = RH._artifact_path(str(current["relative_path"]))
+            artifact_rel = str(current["relative_path"])
             report["current"] = {
                 **{k: current[k] for k in ("representation_id", "generation", "revision")},
-                **first_business_row(artifact.read_bytes(), spec=spec),
+                **_business_row_of_artifact(artifact_rel, spec=spec, rehash_module=RH),
             }
             store_map = await _store_map(session, wp_id=wp_id, provider=provider)
             report["store_bytes"] = {k: len(v.encode("utf-8")) for k, v in store_map.items()}
@@ -243,8 +269,8 @@ async def run(*, wp_id: str, entry_id: str, apply: bool) -> dict[str, Any]:
         }
         report["after"] = {
             **{k: after[k] for k in ("representation_id", "generation", "revision")},
-            **first_business_row(
-                RH._artifact_path(str(after["relative_path"])).read_bytes(), spec=spec
+            **_business_row_of_artifact(
+                str(after["relative_path"]), spec=spec, rehash_module=RH
             ),
         }
         return report

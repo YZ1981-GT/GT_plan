@@ -98,7 +98,7 @@
   - [x] 9.10 回归与变异（重放树 = 最新远端 + 本轮）：前端 rc=0、后端 488 passed、
         真实 PG 107 passed、6 条变异逐个 RED 且逐字节恢复；ruff 32 errors 为预存（干净 HEAD 33）
 
-- [ ] 6. 浏览器验收
+- [x] 6. 浏览器验收（6.0~6.7 全部通过，2026-11-15 收口）
   - [x] 6.0 无写入主链烟测（2026-11-05）——以【E2E】公式管理运行时门禁_2025
         (`b71db997-0bca-4528-9a03-0b92e6a6b4e0`，2025) 登录后访问项目、TB、底稿列表、
         报表、附注与交付中心；每次导航前注入拦截器，拒绝 `GET/HEAD/OPTIONS` 以外的请求。
@@ -129,20 +129,39 @@
           真实失败必须用 CDP `Network.emulateNetworkConditions` Offline。
         · **读太晚**：`ElMessage` 3 秒自动消失，事后查 DOM 必然查不到 ⇒ 提示类判据必须用
           `MutationObserver` 从操作前开始录，不能操作后再查快照。
-  - [ ] 6.3 OO 修改后回表单并刷新，HTML / API / 已发布 representation 三方一致；恢复验收数据
-        🔴 **现无任何路径可通**（2026-11-05 实测，非「等环境」）：在 OO 内把 `B16` 改成 303
-        并 forcesave 后，`oo_to_html` operation `11809f53-a34e-44fc-8182-efc5bc68e019` 落
-        `state=conflict` / `conflict_count=24`，303 回不到 HTML。两个缺陷叠加，见 6.6 / 6.7。
-        该 operation **按决策不裸改**（裸 SQL 结算会破坏版本链与审计链），如实留在测试项目
-        作缺陷证据。
-  - [ ] 6.4 后端侧 OO 往返浏览器实测
-        🔴 被 6.3 同一条链挡住：OO→HTML 的 merge 跑的是**整 entry 的 combined projection**，
-        D4-32 必产生的 24 条冲突对本 entry 任何 sheet 的回写都成立。
-  - [ ] 6.5 D4-8 / D4-33 / D4-34 / D4-36 四表浏览器必测
-        🔴 同上 —— 四表都在 `xlsx/gt-d4-operating-revenue` 内，共用同一次 merge。
-        （四表各自的**非破坏性 merge** 判据已由 9.4 的 17 例离线守卫覆盖，不受此阻断影响。）
+  - [x] 6.3 OO 修改后回表单并刷新，HTML / API / 已发布 representation 三方一致；恢复验收数据
+        ✅ **2026-11-15 实测通过**（由 `wp-sync-conflict-adjudication-and-d4-32-modeling`
+        修完两个阻断缺陷后执行，见该 spec tasks §2.6）：在 OO 内把 D4-32 `B14` 写成
+        `UAT8734690` → 点平台正式入口「保存并回到表单模式」→ HTML store 立即出现该值 →
+        刷新后表单显示该值 → 已发布 representation（gen5 / revision 3）反读
+        `r14: [2, 'UAT8734690', …]`（**A 列模板序号 `2` 保留**）⇒ 三方一致；
+        该 operation 冲突数 **0**（修好前同一操作恒产 24 条）。验收数据已复原。
+        🔴 原登记的阻断（2026-11-05 实测）：「在 OO 内把 `B16` 改成 303 并 forcesave 后
+        `oo_to_html` operation `11809f53…` 落 `state=conflict` / `conflict_count=24`，
+        303 回不到 HTML」—— 成因是 6.6 + 6.7 两个缺陷叠加，均已修。
+        🔴 该遗留 operation 现报 `frozen_contract_digest_drift`（它冻结旧契约
+        `75fca57d…`，新契约是 `645e0500…`）：系统按设计拒绝按 registry 当前 alias 重组
+        历史 operation，属**正确行为**；结算它需要「按冻结 bundle 重建读侧投影」的能力，
+        另立 spec。
+  - [x] 6.4 后端侧 OO 往返浏览器实测
+        ✅ 2026-11-15 随 6.3 同一条链通过 —— 它原本被 6.3 挡住的原因是「OO→HTML 的 merge
+        跑整 entry 的 combined projection，D4-32 必产生的 24 条冲突对任何 sheet 都成立」，
+        该成因已消除（本次实测同 entry 的 D4-8 / D4-32 共存下冲突 0）。
+  - [x] 6.5 D4-8 / D4-33 / D4-34 / D4-36 四表浏览器必测
+        ✅ 2026-11-15 阻断已解除：本次往返的 entry 同时含这四表且 merge 一次跑通、冲突 0。
+        （四表各自的**非破坏性 merge** 判据另有 9.4 的 17 例离线守卫。）
 
-- [ ] 6.6 缺陷登记：D4-32 同步建模三面皆错（阻断 6.3/6.4/6.5 之一）
+- [x] 6.6 缺陷登记：D4-32 同步建模三面皆错（阻断 6.3/6.4/6.5 之一）
+      ✅ **2026-11-05 另立 spec `wp-sync-conflict-adjudication-and-d4-32-modeling` 修复，
+      2026-11-15 真库实测通过**（ADR-D432-001/002/003）：
+      · A 列移出受管字段集（模板 `A11` 逐字是「序号」，store 侧无承载键）⇒ 受管面 B..I 八列；
+      · `_d4_32_rows` 按六段分组展平、`_merge_d4_32` 对称回写（保留分组结构 / 未受管字段）；
+      · 骨架行按 `pure_template_skeleton_rows` 分流：模板原值跳过、带用户内容落 `__unknown__`。
+      连带刷新：契约 digest `75fca57d…` → `645e0500…`、`EXTRACTED_FIELD_COUNT` 218 → 189、
+      `TEXT_VICTIM` 重选为 `undisclosed_rp_rows`（原 `d4_32_groups` 的选中理由随 A 列移出而消失）、
+      `d4_materialize_harness._text_safe` 退役。
+      真库实测：六组 48 个受管 key 全对、往返逐项保真、`B19='主要客户'` 等 5 个组标题行不再进
+      store、模板空行填值进 `__unknown__`、OO 往返冲突数 0 且 canonical xlsx 的 `A14=2` 保留。
   - openpyxl 逐格实测 `D/D4 收入底稿.xlsx` 的 `客户、供应商等资金流水检查D4-32`：
     `A11` 表头逐字是**序号**；`A13..A46` 里 **24** 格是整数、5 格是「……」、5 格是组标题行空格
     （6 组数据槽 5/5/2/2/5/5 = 24，与 24 条冲突逐一对应）；6 个分组标题在 **B 列**
@@ -170,7 +189,19 @@
     契约先写 spec 三件套」的铁律，应另立 spec。试探性改动已逐字节回退（契约 digest 仍
     `75fca57d9d2c9bf1…`）。
 
-- [ ] 6.7 缺陷登记：**平台级** —— schema 冲突一律无法人工裁决（阻断 6.3/6.4/6.5 之二）
+- [x] 6.7 缺陷登记：**平台级** —— schema 冲突一律无法人工裁决（阻断 6.3/6.4/6.5 之二）
+      ✅ **2026-11-05 另立 spec `wp-sync-conflict-adjudication-and-d4-32-modeling` 修复，
+      2026-11-15 真库实测通过**（ADR-CA-001 / ADR-CA-002）：
+      · V264 给 `working_paper_sync_conflict` 加 `schema_anomaly` 列 + ORM 字段 +
+        `ConflictRecord.to_row()` 补该键（成因不再落库即丢）；
+      · 读侧 `ConflictPreviewItem.adjudicable_by_value_choice` **删掉自算实现**，改为按行上
+        成因重建 `SchemaAnomalyKind` 后委派域内同名属性（单一判据）；成因 NULL 的历史行
+        fail closed 且 payload 用 `schema_anomaly_known` 区分「成因未知」与「成因不可裁决」；
+      · fence 八项从正式读取面 `GET /operations/{id}` 取（`room_latest_durable_*`），
+        桥仍不编造任何一项，缺项 fail visible；
+      · 守卫 `test_schema_conflict_adjudication_parity.py` 31 例（分母 = `SchemaAnomalyKind`
+        全集逐成员对拍 + AST 断言读侧不自维护名单）。
+      实测：OO 往返（改 D4-32 `B14` → forcesave → 回表单刷新）冲突数 **0**，三方一致。
   - 实测（候选 3032，经真实前端 `workpaperSyncApi.getOperationConflicts`）：同一条冲突 item 上
     `suggested_action: "manual_merge"`（让人工合并）与 `adjudicable_by_value_choice: false`
     （不许按值裁决）**同时成立**，且 payload 里没有 `schema_anomaly`。
