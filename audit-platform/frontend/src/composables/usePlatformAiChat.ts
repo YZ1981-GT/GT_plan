@@ -463,8 +463,9 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
         // 移除刚添加的用户消息（避免重复）
         const lastUserIdx = messages.value.findLastIndex(m => m.role === 'user' && m.text === text)
         if (lastUserIdx >= 0) messages.value.splice(lastUserIdx, 1)
-        // quota 信息已由 runStore.retryAfter / quotaRemaining 持有
-        // 前端 ChatQuotaCountdown 组件将渲染中文倒计时
+        // quota 信息已由 runStore.retryAfter / quotaRemaining 持有；
+        // 旧的 ChatQuotaCountdown 组件已于 2026-11-15 随零挂载 Chat 壳一并删除，
+        // 倒计时由 PlatformAiChatPanel 自身按 runStore.quotaRemaining 渲染。
       } else if (!messages.value.find((m) => m.status === 'failed' && m.id.startsWith('err_'))) {
         messages.value.push({
           id: `err_${Date.now()}`,

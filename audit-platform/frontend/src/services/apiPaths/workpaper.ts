@@ -118,7 +118,8 @@ export const wpAI = {
   refineExplanation: (pid: string, wpId: string) => `/api/projects/${pid}/wp-ai/${wpId}/refine-explanation`,
   reviewContent: (pid: string, wpId: string) => `/api/projects/${pid}/wp-ai/${wpId}/review-content`,
   aiFill: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/ai-fill`,
-  chat: (wpId: string) => `/api/workpapers/${wpId}/ai/chat`,
+  // chat 已于 2026-11-15 删除：旧链路 /{wp_id}/ai/chat 的唯一消费方（AiAssistantSidebar）已零挂载移除。
+  // 现役底稿对话走 PlatformAiChatPanel（POST /api/ai-chat/runs，单一 ContextPlan）。
   generateLedgerAnalysis: (pid: string) => `/api/workpapers/projects/${pid}/ai/generate-ledger-analysis`,
   recommendWorkpapers: (pid: string) => `/api/projects/${pid}/ai/recommend-workpapers`,
   annualDiffReport: (pid: string) => `/api/projects/${pid}/ai/annual-diff-report`,

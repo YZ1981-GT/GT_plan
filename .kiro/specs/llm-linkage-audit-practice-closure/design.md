@@ -346,3 +346,81 @@ Docker 已运行，本 spec 此前记为「不可达」的环境全部可用：
 - **一次性库要复用平台建表脚本**：自建 `Base.metadata.create_all(tables=[...])` 会因 `projects.accounting_standard_id` 等外键指向未列入的表而 `NoReferencedTableError`；改走 `scripts/seed/init_tables.py`（并把 `API_BASE_URL` 指向不可达端口跳过 seed 段），370 张表一次到位。
 - **「失败」不一定是缺陷**：批任务 12 项 `item_execution_failed`「没有生成可供采纳的附注草稿」是空章节的 fail-closed 正确行为，且没有写任何 artifact —— 判缺陷前先看它有没有造成错误状态。
 - **UI 缺陷只有真跑才看得到**：`undefined` 标题与漏 `eqcr` 两个缺陷，单测与类型检查都不会报（`undefined` 是合法字符串、角色数组少一项不报错）。浏览器实测 + 按后端声明逐值对拍是唯一有效手段。
+
+## 13. 任务 13 / 15 缺口收口（2026-11-15 第二轮）
+
+### 13.1 先确认其他 spec 未覆盖（避免重复造轮子）
+
+现扫活跃 18 个 spec + `_archive/` 149 个 spec，用 `draft_overlay` / `未保存草稿` / `overlay` 全文检索：
+- 仅 `disclosure-note-doc-upload-and-batch-fill` 提到「切换上传↔知识库需处理未保存草稿」（那是附注批量编制弹窗的交互，与本 spec 的 Chat 宿主 overlay 不同域）。
+- 无任何 spec 承接「Chat 宿主通用 draft overlay」「关系图证据/上年/知识接入」「旧 Chat 壳清理」。
+
+结论：这些缺口没有其他 spec 覆盖，但**只有一部分属于本 spec 范围**（见 13.2）。
+
+### 13.2 关系图 9 类关系的真实状态（真实 PG 实测）
+
+用真实项目跑生产 `build_audit_relation_context`（探针 `tmp_llm_closure/probes/p10/p11c/p12`）：
+
+| source_type | 实测结果 | 性质 |
+|---|---|---|
+| `workpaper` | 12 项（D0-1/D0-2/D0-3…，逐份过 `try_gate_wp`） | 已生效 |
+| `trial_balance` | 10 项（`1122 应收账款 未审数 624,025,343.06`） | 已生效 |
+| `report` | 1 项（`BS-002 货币资金 本期 350.00`） | 已生效 |
+| `note` | 1 项（`五、1 货币资金`） | 已生效 |
+| `prior_workpaper` | 1 项（`上年底稿 E1 货币资金`，和平药房 2024↔2025） | **已生效 —— 原记录「未接入」是错的** |
+| `adjustment` | 1 项（`AJE-003 科目 1122 贷方 1,000,000.00 冲回多确认营业收入`） | 已生效 |
+| `prior_note` | 0 | 数据前提（和平药房 2024 附注 0 条） |
+| `knowledge_relation` | 0 | 数据前提（共享库 0 篇活跃带标签文档） |
+| `evidence` | 0 | **真实缺陷，已修** |
+
+### 13.3 evidence 缺陷（本轮修复）
+
+**症状**：底稿宿主的 `evidence` 段永远 0 条，无任何报错。
+
+**根因**：原实现 `EvidenceRef.source_id == host.resource_id`（底稿 id）。真实库现查：29 条 active `evidence_refs` 的 `source_id` **全部是 `attachment_version` id**（`LEFT JOIN attachment_versions` 全部命中，与任何 `wp_id` 都不匹配）⇒ 该条件恒不成立，静默返回空。
+
+**修复**：底稿宿主改查底稿证据的权威来源 `evidence_links`（`wp_id`, `attachment_id`, `sheet_name`, `cell_ref`, `evidence_type`, `check_conclusion`），join `attachments` 限定同项目、未删除；内容拼 `sheet!cell` 位置 + 证据类型 + 核对结论，`jump_route=/attachments?attachment_id=…`。非底稿宿主（附注等）保留 `EvidenceRef.source_id` 语义 —— 该列对非底稿源是正确的。
+
+**反向证据**：`test_workpaper_evidence_uses_evidence_links_not_evidence_refs`（断言 SQL 里出现 `evidence_links`、不出现 `evidence_refs`）+ `test_note_host_still_uses_evidence_refs_source_id`（反向：附注宿主必须用 `evidence_refs`）。磁盘变异把底稿分支改成 `if False` ⇒ 打红 2 条（含既有用例），逐字节还原后 4 passed。
+
+### 13.4 旧 Chat 壳清理（任务 15）
+
+三层 0 调用证据（扫描 `src` 全量 5778 个非测试文件）：
+
+| 组件 | 模板挂载 | import | 名字符串 |
+|---|---|---|---|
+| `AiAssistantSidebar` | 0 | 1（仅 `components.d.ts`） | 0 |
+| `AiChatTab` | 0 | 1（同上） | 0 |
+| `ChatQuotaCountdown` | 0 | 1（同上） | 0 |
+| `AICommandBar` | 0 | 1（同上） | 0 |
+
+连带死代码：`useAiChat.ts`（只被 `AiAssistantSidebar` 与自己的 spec 引用）、`commonApi.wpChatSSE`（0 消费方）、`apiPaths.workpaper.chat`（仅 `wpChatSSE` 用）。
+
+删除：6 文件 **1975 行** + 空目录 `src/components/ai-chat/`；清 `components.d.ts` 4 条死条目（不清会指向不存在文件、类型检查必崩）。
+
+**不动后端**：`/{wp_id}/ai/chat`（`wp_chat.py`）与 `/{wp_id}/ai-chat`（`wp_guidance_chat.py`）仍有服务级测试覆盖（`test_ai_masking.py`），且后端端点删除需独立评估调用方。
+
+### 13.5 窄屏与键盘走查（任务 15 Verify 判据）
+
+390×700 视口实测：
+
+| 项 | 结果 |
+|---|---|
+| 底稿页横向溢出 | `scrollWidth == innerWidth == 390`，无溢出 |
+| AI 面板宽度 | `left=0 / width=390 / right=390`，完全贴合 |
+| 面板可聚焦元素 | 10 个，**全部有可访问名**（aria-label 或中文文本），无匿名按钮 |
+| Ctrl+Enter 发送 | 成功（消息 6→8、输入框清空、AI 真实回复） |
+| Escape 关闭 | 成功（面板隐藏、按钮标签回到「关闭 AI 助手」） |
+
+### 13.6 明确另立 spec 的一项
+
+**Chat 宿主通用 `draft_overlay`**：requirements.md 需求 3.4 写「未保存编辑必须明确提示未纳入；**后续**通过受限 `draft_overlay` 纳入时…」，design.md §8.5 写「…**接入 draft_overlay 后**显示"使用当前未保存草稿"」。两处都用「后续 / 接入后」把它定为下一阶段。本 spec 的判据只有前半句（明确提示未纳入），已实现并双态实测通过。
+
+附注侧 `note_ai.py` 的 `draft_overlay`（含 `host_id` / `baseline` / `content_hash` / `matches_saved`）是 ADR-LLM-014 附注生成链路的组成部分，**不等于** Chat 宿主的通用 overlay 能力 —— 后者需要绑定任意宿主（底稿/报表/TB）的未保存编辑并做版本对账，属独立设计。
+
+### 13.7 教训
+
+- **「未做」记录会过期**：tasks.md 记的「上年底稿/附注未接入关系图」在真实数据下一跑就有产出（`prior_workpaper` 1 项）。凡是凭印象或早期代码状态写的「未做」，收口前必须用真实数据重跑一次。
+- **0 条结果要分「数据前提」与「代码缺陷」**：同样返回 0，`prior_note` / `knowledge_relation` 是库里没数据（代码正确），`evidence` 是条件写错（代码缺陷）。判据是「换一个有数据的宿主/项目能否产出」——`evidence` 换了多个项目仍是 0，才定位到字段用错。
+- **模型自述不可信，manifest 才是事实**：键盘走查时 AI 回复称「根据您提供的《probe_zidian.txt》」，而该文档已删、本次 manifest 只有 `workpaper` + `project_summary`。核对 `context_manifest` 才能判定真实注入了什么。
+- **删生成文件里的条目不能只删源文件**：`components.d.ts` 由插件生成，但手工删源后不清理条目会让类型检查指向不存在文件；本次用脚本定点删 4 条，并在注释里写明由 dev/build 重建。

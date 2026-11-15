@@ -116,7 +116,10 @@
   - 受限未保存草稿 overlay，绑定宿主、基线和 hash
   - Verify：跨项目零注入、预算裁剪、overlay 版本冲突
   - 证据：`audit_relation_context`（同项目 TB / 已批准调整 / 报表行本期上期 / 附注 / 关联底稿，逐份可见性过滤，失败记 unavailable）；附注续写 / 改写 overlay 绑定宿主、基线与 hash，收尾补：改写选区与已保存正文不一致时调用模型前拒绝、续写记录 `matches_saved` 并提示（`test_ai_audit_relation_context.py`、`test_note_ai_overlay_conflict.py`）
-  - 未做：证据附件、上年底稿 / 附注、同行业同模板同科目知识未接入关系图；Chat 宿主的通用 draft overlay 未做
+  - **已实测（2026-11-15 真实 PG，探针 `p10/p11c/p12`）**：9 类关系里 **6 类真实产出** —— `workpaper` 12 项（关联底稿 D0-1/D0-2/D0-3…，逐份过 `try_gate_wp` 可见性门）、`trial_balance` 10 项（真实金额，如 `1122 应收账款 未审数 624,025,343.06`）、`report`（`BS-002 货币资金 本期 350.00`）、`note`（`五、1 货币资金`）、`prior_workpaper`（`上年底稿 E1 货币资金`，和平药房 2024↔2025）、`adjustment`（`AJE-003 科目 1122 贷方 1,000,000.00 冲回多确认营业收入`）。⇒ **原「上年底稿 / 附注未接入」的记录是错的**，`prior_workpaper` 早已实现并生效
+  - **剩余 3 类的真实性质**：`prior_note` 与 `knowledge_relation` 是**数据前提**（和平药房 2024 附注 0 条；共享库 0 篇活跃带标签知识文档），代码路径已在且写法正确；`evidence` 是**真实缺陷**（见下条已修）
+  - **已修复的真实缺陷（2026-11-15）**：`evidence` 段原用 `EvidenceRef.source_id == host.resource_id`（底稿 id）匹配，但真实库 29 条 active `evidence_refs` 的 `source_id` **全部是 `attachment_version` id**（都能在 `attachment_versions` 找到、与 wp_id 一条都不匹配）⇒ 底稿宿主的 evidence 段永远 0 条（静默失效）。改为底稿宿主查 `evidence_links(wp_id, attachment_id)` join `attachments`（同项目、未删除），内容带 `sheet!cell` 位置 + 证据类型 + 核对结论，`jump_route=/attachments?attachment_id=…`；非底稿宿主保留 `EvidenceRef.source_id` 语义。守卫 `test_workpaper_evidence_uses_evidence_links_not_evidence_refs` + `test_note_host_still_uses_evidence_refs_source_id`，磁盘变异（底稿分支改 False）打红 2 条，逐字节还原后 4 passed
+  - **另立 spec（不在本 spec 范围）**：Chat 宿主的通用 `draft_overlay`。依据 requirements.md 需求 3.4「未保存编辑必须明确提示未纳入；**后续**通过受限 `draft_overlay` 纳入时…」与 design.md §8.5「…**接入 draft_overlay 后**显示"使用当前未保存草稿"」—— 两处都把它定为下一阶段。本 spec 只要求前半句（明确提示未纳入），已实现并浏览器双态实测通过。附注侧 `note_ai.py` 的 `draft_overlay`（含 `host_id`/`baseline`/`content_hash`/`matches_saved`）属 ADR-LLM-014 附注生成链路，不等于 Chat 宿主通用 overlay 能力
 
 - [x] 14. 多 worker 状态与观测（ADR-LLM-018/019）
   - MCP budget/revocation、批任务锁/进度迁 Redis/DB
@@ -135,6 +138,9 @@
   - **已实测（2026-11-15 浏览器）**：复核面板真实分栏标题「AI 复核提示（不代表人工通过）」存在（B1-1 的 sheet 无 `systemChecks` 时「系统检查」分栏按 `v-if` 不渲染，符合实现）；真实批量复核产出 3 条疑点且状态为「AI 有待核实疑点」/「待处理」而非通过；总览计数 `AI 未发现新增疑点 0 / 有待核实疑点 1 / 总发现项 3`；附注待确认抽屉含双栏 diff 与「✅ 确认 / ✏️ 修订 / 拒绝」及提示「AI 仅负责起草…」
   - **已修复的真实缺陷（2026-11-15，`GtWpAiReviewToolbar.vue`）**：①弹窗标题渲染 `B1-1 undefined AI 复核`（`label` 是可选 prop，模板裸插值 `${label}`）→ 改 `reviewDialogTitle` computed 过滤空值；②`canStartAiReview` 角色数组漏 `eqcr`（后端 `review.workpaper` 的 `allowed_roles` 含 eqcr）→ 补齐并与后端逐值一致。守卫 `AiReviewToolbarTitleAndRoles.spec.ts`（10 例），两个磁盘变异各自打红，还原后 15 passed；浏览器复验标题为「B1-1 AI 复核」、console error 0
   - 未做：旧重复 Chat 与零挂载 AI 壳未清点、未下线；窄屏 / 键盘未走查（属真实缺口，非环境依赖）
+  - **已清理零挂载旧 Chat 壳（2026-11-15）**：三层 0 调用证据（扫描 `src` 全量 5778 个非测试文件）—— `AiAssistantSidebar` / `AiChatTab` / `ChatQuotaCountdown` / `AICommandBar` 模板挂载 **0**、import 仅 **1 处且全部是 `components.d.ts`（自动生成）**、名字符串引用 **0**。连带死代码 `useAiChat.ts`（只被 `AiAssistantSidebar` + 自己的 spec 引用）、`commonApi.wpChatSSE`（0 消费方）、`apiPaths.workpaper.chat`（仅 `wpChatSSE` 用）。已删 6 文件共 **1975 行** + 清空目录 `src/components/ai-chat/`；清 `components.d.ts` 4 条死条目（否则指向不存在文件必崩类型检查）；`commonApi` / `apiPaths` 留说明注释指向现役链路（`PlatformAiChatPanel` + `POST /api/ai-chat/runs`）。**不动后端**：`/{wp_id}/ai/chat` 与 `/{wp_id}/ai-chat` 仍有服务级测试覆盖（`test_ai_masking.py`）
+  - **窄屏 + 键盘走查通过（2026-11-15 浏览器 390×700）**：底稿页 `scrollWidth == innerWidth == 390`（无横向溢出）；AI 面板 `left=0 / width=390 / right=390` 完全贴合视口；面板内 10 个可聚焦元素**全部有可访问名**（无匿名按钮）；**Ctrl+Enter 真实发送成功**（消息 6→8、输入框清空、AI 真实回复）；**Escape 关闭面板成功**（面板隐藏、按钮标签回到「关闭 AI 助手」）
+  - 走查附带发现（非缺陷，记录方法论）：AI 回复自述「根据您提供的【关联知识】文件《probe_zidian.txt》」，但该文档已在上一批探针中删除，且本次 run 的 `context_manifest` 只有 `workpaper` + `project_summary`（`citation_count: 0`）⇒ **模型自述不可信，manifest 才是权威事实**；已删文档确实未进上下文
 
 - [x] 16. 金标、真实 canary、全回归与浏览器终验
   - 无客户数据金标：引用、数字、拒绝下结论、权限、stale、fallback、注入、OCR

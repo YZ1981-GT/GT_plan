@@ -16,12 +16,14 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.attachment_models import Attachment
 from app.models.audit_platform_models import Adjustment, ReviewStatus, TrialBalance
 from app.models.core import Project
 from app.models.evidence_governance_models import EvidenceRef
 from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
 from app.models.report_models import DisclosureNote, FinancialReport
 from app.models.workpaper_models import WorkingPaper, WpIndex
+from app.models.wp_optimization_models import EvidenceLink
 from app.services.ai_chat.contracts import HostType
 from app.services.ai_chat.host_context import AuthorizedHostContext
 from app.services.knowledge_access_policy import KnowledgeAccessPolicy, KnowledgeResource
@@ -271,23 +273,67 @@ async def build_audit_relation_context(
                     jump_route=f"/disclosure-notes/{row.id}",
                 ))
 
-    # ── 证据关系：EvidenceRef 关联的证据文件 ────────────────────────────────────────
+    # ── 证据关系：底稿证据按 evidence_links（wp_id → attachment_id）取 ────────────────
+    # 🔴 原实现用 `EvidenceRef.source_id == host.resource_id`，但 evidence_refs.source_id
+    #    存的是 **attachment_version id**（见真实库：29 条 active 全部能在 attachment_versions
+    #    里找到，而 wp_id 一条都匹配不上）⇒ 底稿宿主的 evidence 段永远 0 条（静默失效）。
+    #    底稿证据的权威来源是 evidence_links（wp_id, attachment_id, sheet_name, cell_ref）。
     resource_id_str = host.resource_id
-    evidence_rows = (await db.execute(sa.select(
-        EvidenceRef.id, EvidenceRef.label, EvidenceRef.evidence_type,
-        EvidenceRef.evidence_id, EvidenceRef.created_at,
-    ).where(
-        EvidenceRef.project_id == host.project_id,
-        EvidenceRef.source_id == resource_id_str,
-        EvidenceRef.status == "active",
-    ).order_by(EvidenceRef.created_at.desc()).limit(8))).all()
-    for row in evidence_rows:
-        result.append(AuditRelationItem(
-            "evidence", str(row.id),
-            f"关联证据 {row.label or row.evidence_type or ''}".strip(),
-            f"证据类型：{row.evidence_type or '通用'}；ID：{row.evidence_id or ''}",
-            version=str(row.created_at or ""),
-        ))
+    if host.resource_type is HostType.workpaper:
+        try:
+            current_wp_uuid = UUID(resource_id_str)
+        except (TypeError, ValueError):
+            current_wp_uuid = None
+        if current_wp_uuid is not None:
+            link_rows = (await db.execute(sa.select(
+                EvidenceLink.id, EvidenceLink.attachment_id, EvidenceLink.sheet_name,
+                EvidenceLink.cell_ref, EvidenceLink.evidence_type,
+                EvidenceLink.check_conclusion, EvidenceLink.created_at,
+                Attachment.file_name,
+            ).join(
+                Attachment, EvidenceLink.attachment_id == Attachment.id,
+            ).where(
+                EvidenceLink.wp_id == current_wp_uuid,
+                Attachment.project_id == host.project_id,
+                Attachment.is_deleted == sa.false(),
+            ).order_by(EvidenceLink.created_at.desc()).limit(8))).all()
+            for row in link_rows:
+                position = "".join(
+                    part for part in (
+                        f"{row.sheet_name}!" if row.sheet_name else "",
+                        row.cell_ref or "",
+                    ) if part
+                )
+                result.append(AuditRelationItem(
+                    "evidence", str(row.id),
+                    f"底稿证据 {row.file_name or row.evidence_type or ''}".strip(),
+                    "；".join(
+                        part for part in (
+                            f"位置 {position}" if position else "",
+                            f"类型 {row.evidence_type}" if row.evidence_type else "",
+                            f"核对结论 {row.check_conclusion}" if row.check_conclusion else "",
+                        ) if part
+                    ) or "已挂接附件",
+                    version=str(row.created_at or ""),
+                    jump_route=f"/attachments?attachment_id={row.attachment_id}",
+                ))
+    # 附注/其它宿主仍按 EvidenceRef 的 source_id 关联（该列对非底稿源语义正确）
+    if host.resource_type is not HostType.workpaper:
+        evidence_rows = (await db.execute(sa.select(
+            EvidenceRef.id, EvidenceRef.label, EvidenceRef.evidence_type,
+            EvidenceRef.evidence_id, EvidenceRef.created_at,
+        ).where(
+            EvidenceRef.project_id == host.project_id,
+            EvidenceRef.source_id == resource_id_str,
+            EvidenceRef.status == "active",
+        ).order_by(EvidenceRef.created_at.desc()).limit(8))).all()
+        for row in evidence_rows:
+            result.append(AuditRelationItem(
+                "evidence", str(row.id),
+                f"关联证据 {row.label or row.evidence_type or ''}".strip(),
+                f"证据类型：{row.evidence_type or '通用'}；ID：{row.evidence_id or ''}",
+                version=str(row.created_at or ""),
+            ))
 
     # ── 知识标签关系：按 template_file / 科目码找关联知识库文档 ─────────────────────
     if mapping:
