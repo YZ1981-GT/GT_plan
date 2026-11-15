@@ -51,7 +51,7 @@
     - [x] 8.3.6 守卫：宿主分母由 `useGRenderModeSwitch` 真实 import 反查并与清单双向相等；
           `:readonly` 绑定按标签名判定；两种失败传递形态分别证明；新增 G9/G1 运行时行为测试
 
-- [ ] 9. 三件如实标注项逐一收口（2026-11-01 续做，详见 design §9）
+- [x] 9. 三件如实标注项逐一收口（2026-11-01 续做，详见 design §9）
   - [x] 9.1 第一件根因排查：候选后端起不来 ≠ 没做；定位三个 HEAD 级 P0（均非本 spec 引入）
         —— `adjustment_import.py:82` 漏 import `require_project_permission`（`app.main` 导入即
         NameError）· `ThreeColumnLayout.vue` 重复 import `useMountOnFirstOpen`（前端 500）·
@@ -218,7 +218,7 @@
     「在当前 16 条用户路由里没有任何读取面」**已过期** —— `GET /operations/{id}` 自 Task 32
     起就返回这两项（`_fold_observability_facts`），缺口在冲突面板没去读。
 
-- [ ] 7. 收尾
+- [x] 7. 收尾
   - [x] 7.1 语义审查并修复高优先级发现（第一轮 P0/P1 已闭合；第二轮 P1-1~P1-3 见任务 8）
   - [x] 7.2 更新 INDEX / memory（memory 精简至 299 行），锁定分离头候选树复跑关键验证
   - [x] 7.3 只提交本 spec 文件与改动块；同步远端后按版本工具推送当前分支

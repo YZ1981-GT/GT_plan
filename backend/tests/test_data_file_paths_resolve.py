@@ -20,9 +20,10 @@ _SUFFIXES = ("json", "yaml", "yml", "txt", "csv", "xlsx", "md")
 KNOWN_MISSING: dict[tuple[str, str], str] = {
     ("core/build_version.py", "backend/app/_build_version.json"):
         "打包时生成的版本文件；开发环境不存在，代码有兜底值",
-    ("services/workpaper_sync/capacity_profile.py",
-     ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/requirements.md"):
-        "先找在用路径、找不到再找归档目录（_requirements_path）；spec 已归档",
+    # 已销账：`services/workpaper_sync/capacity_profile.py` 那条原登记「先找在用路径、找不到
+    # 再找归档目录」。2026-11-15 复核发现它已改走 `app.core.spec_docs.resolve_spec_dir`
+    # （按内容标记 `^14\.10\.` / `^14\.12\.` 择路，本 spec 0.6 修的），解析结果指向归档快照
+    # 里真实存在的那份 ⇒ 本判据再也看不到该路径，登记项按「已失效即删」的规则移除。
     # 已修（spec formula-fetch-followup-defect-closure A3）：parents[4]→parents[3] + JSON column_aliases 删除 + 内置补「核算类型」
 }
 
