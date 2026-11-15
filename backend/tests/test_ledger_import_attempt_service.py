@@ -351,3 +351,118 @@ class TestBaseTokenResolver:
         assert "unit_normalization" in src
         assert "contract" in src
         assert "contract_digest" in src
+
+
+# ── 6. pipeline / runner 接线（AST 判据）────────────────────
+
+
+class TestPipelineWiring:
+    """attempt 状态流转必须真的接进 pipeline 与 runner。"""
+
+    def _pipeline_src(self) -> str:
+        from pathlib import Path
+
+        p = Path(__file__).resolve().parents[1] / "app" / "services" / "ledger_import" / "pipeline.py"
+        return p.read_text(encoding="utf-8")
+
+    def _runner_src(self) -> str:
+        from pathlib import Path
+
+        p = Path(__file__).resolve().parents[1] / "app" / "services" / "import_job_runner.py"
+        return p.read_text(encoding="utf-8")
+
+    def test_pipeline_has_attempt_id_param(self) -> None:
+        import inspect
+
+        from app.services.ledger_import.pipeline import execute_pipeline
+
+        assert "attempt_id" in inspect.signature(execute_pipeline).parameters
+
+    def test_pipeline_attempt_id_is_optional(self) -> None:
+        """必须是可选（默认 None）：历史 job 没有 attempt_id，不能因此失败。"""
+        import inspect
+
+        from app.services.ledger_import.pipeline import execute_pipeline
+
+        param = inspect.signature(execute_pipeline).parameters["attempt_id"]
+        assert param.default is None, "attempt_id 不能是必填（历史 job 会全线失败）"
+
+    @pytest.mark.parametrize("name", ["seal_attempt", "begin_activation", "finish_activation"])
+    def test_pipeline_calls_attempt_transitions(self, name: str) -> None:
+        assert f"await {name}(" in self._pipeline_src(), (
+            f"pipeline 未调用 {name}；attempt 状态机成了死代码"
+        )
+
+    def test_pipeline_uses_base_token_resolver(self) -> None:
+        """三次 CAS 必须用同一份 base token 解析入口。"""
+        src = self._pipeline_src()
+        assert "resolve_base_token" in src
+        # 不应自己按 active 查数据集算 token
+        assert "DatasetStatus.active" not in src.split("seal_attempt")[0][-3000:], (
+            "pipeline 在 attempt 段自己查 active 数据集，应与 detect/submit 同走 resolver"
+        )
+
+    def test_pipeline_attempt_failure_does_not_block_import(self) -> None:
+        """attempt 流转失败必须**不阻断**导入（它有 try/except + warning）。"""
+        src = self._pipeline_src()
+        # 至少两处「不阻断」的保护（seal/begin 与 finish）
+        assert src.count("不阻断导入") >= 1
+        assert src.count("不阻断") >= 2
+
+    def test_runner_reads_attempt_id_from_options(self) -> None:
+        src = self._runner_src()
+        assert 'options.get("attempt_id")' in src, (
+            "runner 未从 ImportJob.options 读 attempt_id"
+        )
+
+    def test_runner_passes_attempt_id_to_pipeline(self) -> None:
+        """runner 必须真的把 attempt_id 传给 execute_pipeline（AST 判关键字实参）。
+
+        🔴 不能只查子串 `attempt_id=_attempt_id`：把它注释掉后子串仍在（注释里），
+        判据会存活（本轮实测 1 例存活变异）。
+        """
+        import ast
+        from pathlib import Path
+
+        p = Path(__file__).resolve().parents[1] / "app" / "services" / "import_job_runner.py"
+        tree = ast.parse(p.read_text(encoding="utf-8"))
+        found = False
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
+            if name != "execute_pipeline":
+                continue
+            for kw in node.keywords:
+                if kw.arg == "attempt_id":
+                    found = True
+        assert found, "execute_pipeline 调用里没有 attempt_id 关键字实参（不接受注释形式）"
+
+    def test_runner_handles_bad_attempt_id_gracefully(self) -> None:
+        """`attempt_id` 非法字符串不得让导入失败（应 warning 后按无 attempt 处理）。
+
+        🔴 用 AST 判「except 块里没有裸 raise」：只查 `"attempt_id 非法"` 子串
+        会让「except 里先 raise 再 warning」的变异存活（本轮实测 1 例）。
+        """
+        import ast
+        from pathlib import Path
+
+        p = Path(__file__).resolve().parents[1] / "app" / "services" / "import_job_runner.py"
+        src = p.read_text(encoding="utf-8")
+        tree = ast.parse(src)
+
+        target_except = None
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ExceptHandler):
+                continue
+            # 找吞 ValueError/TypeError 且提到 attempt_id 的那个
+            seg = ast.get_source_segment(src, node) or ""
+            if "attempt_id 非法" in seg:
+                target_except = seg
+                break
+        assert target_except is not None, "找不到处理非法 attempt_id 的 except 块"
+        assert "raise" not in target_except, (
+            "非法 attempt_id 的 except 块里有 raise —— 会让导入失败"
+        )
+        assert "logger.warning" in target_except

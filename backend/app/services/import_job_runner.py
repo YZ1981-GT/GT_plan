@@ -742,6 +742,18 @@ class ImportJobRunner:
 
             # ── Phase 4: Run pipeline ──
             force = bool(options.get("force_activate"))
+            # attempt_id 由 submit 写进 ImportJob.options（spec 任务 8）；
+            # 历史 job 没有该键 ⇒ None ⇒ pipeline 跳过 attempt 流转（不阻断导入）。
+            _attempt_id_raw = options.get("attempt_id")
+            _attempt_id: UUID | None = None
+            if _attempt_id_raw:
+                try:
+                    _attempt_id = UUID(str(_attempt_id_raw))
+                except (ValueError, TypeError):
+                    logger.warning(
+                        "ImportJob %s 的 attempt_id 非法（%r），按无 attempt 处理",
+                        job_id, _attempt_id_raw,
+                    )
             result: PipelineResult = await execute_pipeline(
                 job_id=job_id,
                 project_id=project_id,
@@ -754,6 +766,7 @@ class ImportJobRunner:
                 cancel_check=_cancel_check,
                 phase_marker=_phase_marker,
                 append_options=options.get("append"),
+                attempt_id=_attempt_id,
             )
 
             # ── Phase 5: writing → activating → completed（对齐状态机）──
