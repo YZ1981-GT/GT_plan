@@ -62,6 +62,26 @@ class Settings(BaseSettings):
     # ONLYOFFICE_JWT_ENFORCE=true|false）则完全尊重原值 —— 这就是不需代码回滚的 Rollback_Path：
     # 生产置 ONLYOFFICE_JWT_ENFORCE=false 即恢复启用前行为。
     ONLYOFFICE_JWT_ENFORCE: bool = False
+    # 旧式 OO 链路（`/sheets/{sheet}/onlyoffice-config` + 它签发的 `wopi/contents` /
+    # `/onlyoffice-callback` URL）**是否继续签发**。
+    #
+    # spec `workpaper-html-onlyoffice-bidirectional-writeback-closure` 任务 2.8 的第 ① 步：
+    # 「先停止签发旧 URL（bidirectional entry 走统一 room descriptor + room contents）」。
+    #
+    # 🔴 这不是「开关一关就完事」：旧链路的三个端点各自要自己解析目标文件
+    #    （config 算 doc_key、WOPI 再解析一次、callback 再解析一次落盘），
+    #    于是 writer gate 的 `multi_resolver` 判据把这三行全部点名。
+    #    只有停止签发旧 URL，这条优先级链才会真正从生产路径上消失。
+    #
+    # `True`（默认）= 沿用旧行为，旧调用方完全不受影响 ⇒ 零回归、可随时回滚。
+    # `False`         = 对**已具备 room 供给**的 entry 返回 409 + 可操作原因，引导前端走
+    #                   `sync/entries/{entry_id}/materialize` → descriptor → room contents。
+    #                   未具备 room 供给的 entry 仍照旧签发（fail-open 到旧路径），
+    #                   否则会有一批 entry 直接打不开在线编辑 —— 那是比 multi_resolver 更重的事故。
+    #
+    # drain 窗口：前端 29 个文件 78 处调用点迁完之后，把它置 False 观察一段，
+    # 再删旧端点本体。退回 `True` 即恢复启用前行为（与 `ONLYOFFICE_JWT_ENFORCE` 同一范式）。
+    ONLYOFFICE_LEGACY_URL_ISSUE: bool = True
     WOPI_BASE_URL: str = "http://backend:8000/wopi"
     # 文件存储
     STORAGE_ROOT: str = "./storage"

@@ -126,6 +126,13 @@ async def _gate_editor(
 # ---------------------------------------------------------------------------
 
 
+# 旧式 URL 停止签发门抽到伴生模块（行数门：本文件 1947 行 > 白名单基线 1820 +5%）。
+# 🔴 调用点名字保持 `_refuse_legacy_url_when_room_ready`，语义与判据完全不变。
+from app.routers._wp_onlyoffice_legacy_url_gate import (  # noqa: E402
+    refuse_legacy_url_when_room_ready as _refuse_legacy_url_when_room_ready,
+)
+
+
 def _onlyoffice_storage_dir(project_id: UUID) -> Path:
     """项目级 OO 目录 —— 段名/绝对化委派 canonical_paths（Task 58 / Req 9.3 见该模块）。"""
     from app.services.workpaper_sync.canonical_paths import onlyoffice_canonical_dir
@@ -740,6 +747,28 @@ async def get_sheet_onlyoffice_config(
     _room_entry_id = _room_identity.sheet_entry_id(
         wp_code=_sheet_wp_code, sheet_name=sheet_name, whole_workbook=whole_workbook
     )
+
+    # 4.5 旧 URL 停止签发门（spec `workpaper-html-onlyoffice-bidirectional-writeback-closure`
+    #     任务 2.8 第 ① 步）。
+    #
+    # 🔴 为什么这个门存在：本端点是**旧式**链路的入口 —— 它签发
+    #    `wopi/contents` + `/onlyoffice-callback` 两个 URL，而那三个端点各自要
+    #    **自己解析一次目标文件**，于是 writer gate 的 `multi_resolver` 判据把它们
+    #    全部点名。判据说的不是「这三个函数写得差」，而是「优先级链没有单一来源」。
+    #    只要本条路径还在生产上签发 URL，这条链就删不掉。
+    #
+    # 🔴 为什么 fail-open 到旧路径：只有**已具备 room 供给**（readiness.runtime.ready）
+    #    的 entry 才拒绝，其余照旧签发。反过来做（一律 409）会让一批 entry 直接打不开
+    #    在线编辑 —— 那是比 `multi_resolver` 更重的事故，且与本任务「不做假切换」的
+    #    原则冲突（Requirement 12.8）。
+    #
+    # 判据来源是 `evaluate_entry_readiness` —— 与前端展示「能不能双向回写」用的是
+    # **同一个**函数（3.1/3.5 建立的单一来源），不在这里另造一套资格判定。
+    if not settings.ONLYOFFICE_LEGACY_URL_ISSUE:
+        await _refuse_legacy_url_when_room_ready(
+            db, wp_id=wp_id, project_id=project_id, entry_id=_room_entry_id
+        )
+
     doc_key = await _room_identity.resolve_room_doc_key(db, wp_id=wp_id, entry_id=_room_entry_id)
 
     # 5. 构建 URL（download_url 嵌全 claim 有限时效签名 token，Req 10.1/10.10）
