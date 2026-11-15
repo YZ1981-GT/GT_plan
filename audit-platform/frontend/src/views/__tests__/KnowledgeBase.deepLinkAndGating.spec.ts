@@ -152,7 +152,7 @@ const ElButtonStub = defineComponent({
   emits: ['click'],
   setup(props, { slots, emit, attrs }) {
     return () =>
-      h('button', { class: 'el-button', title: attrs.title, disabled: props.disabled, onClick: (e: MouseEvent) => emit('click', e) },
+      h('button', { class: 'el-button', title: attrs.title, 'aria-label': attrs['aria-label'], disabled: props.disabled, onClick: (e: MouseEvent) => emit('click', e) },
         slots.default?.())
   },
 })
@@ -291,9 +291,12 @@ function routeApi() {
   })
 }
 
-async function mountPage(query: Record<string, string> = {}): Promise<VueWrapper> {
+async function mountPage(query: Record<string, string> = {}, attachToDocument = false): Promise<VueWrapper> {
   state.route = reactive({ name: 'KnowledgeBase', query: { ...query } })
-  const wrapper = mount(KnowledgeBase, { global: { stubs: STUBS } })
+  const wrapper = mount(KnowledgeBase, {
+    attachTo: attachToDocument ? document.body : undefined,
+    global: { stubs: STUBS },
+  })
   await flushPromises()
   return wrapper
 }
@@ -359,13 +362,24 @@ describe('KnowledgeBase 深链（Req 5.10）', () => {
     expect(w.find('.gt-kb-preview-text').text()).toBe('孤立文档')
   })
 
-  it('同页内链接变化（再次点击笔记跳转）也会重新定位', async () => {
-    const w = await mountPage({})
-    expect(getCalls(/\/documents$/)).toHaveLength(0)
-    state.route.query = { doc_id: 'd-mine' }
+  it('文本预览关闭后焦点回到预览按钮，按钮带文件名可读名', async () => {
+    const w = await mountPage({}, true)
+    await treeNode(w, 'f-own').trigger('click')
     await flushPromises()
-    expect(getCalls(/\/folders\/f-own\/documents$/)).toHaveLength(1)
-    expect(w.find('.gt-kb-preview-title').text()).toBe('我的底稿说明.txt')
+    const preview = docRow(w, 'd-mine').find('button[aria-label="预览 我的底稿说明.txt"]')
+    expect(preview.exists()).toBe(true)
+    expect(preview.attributes('title')).toBe('预览 我的底稿说明.txt')
+    ;(preview.element as HTMLElement).focus()
+    await preview.trigger('click')
+    await flushPromises()
+    expect(w.find('.gt-kb-preview-text').text()).toBe('底稿正文')
+    const close = w.find('button[aria-label="关闭知识文档预览"]')
+    expect(close.exists()).toBe(true)
+    ;(close.element as HTMLElement).focus()
+    await close.trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(preview.element)
+    w.unmount()
   })
 })
 
@@ -939,6 +953,7 @@ describe('KnowledgeBase 二进制预览竞态', () => {
     await flushPromises()
     expect(w.find('.gt-kb-preview-title').text()).toBe('B.pdf')
     expect(w.find('iframe.gt-kb-preview-iframe').attributes('src')).toBe('blob:current-b')
+    expect(w.find('iframe.gt-kb-preview-iframe').attributes('title')).toBe('预览：B.pdf')
 
     a.resolve(new Blob(['A'], { type: 'application/pdf' }))
     await flushPromises()

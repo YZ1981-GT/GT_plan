@@ -8,7 +8,7 @@
  * - 证据类型选项与上传入口同一份（`EVIDENCE_TYPE_OPTIONS`）；
  * - 列表走共享链接仓，与行级附件组件同一份数据。
  */
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Paperclip, Delete, Plus } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
@@ -45,8 +45,35 @@ const candidatesLoading = ref(false)
 
 const emptyForm = () => ({ attachment_id: '', sheet_name: '', cell_ref: '', page_ref: '', evidence_type: '' })
 const form = ref(emptyForm())
+let addDialogOpener: HTMLElement | null = null
 
-async function openAddDialog() {
+function rememberAddDialogOpener(source: Event | EventTarget | null | undefined) {
+  const eventLike = source && typeof source === 'object'
+    && ('currentTarget' in source || 'target' in source)
+  const candidate = eventLike
+    ? ((source as Event).currentTarget || (source as Event).target)
+    : source
+  const element = candidate instanceof Element
+    ? ((candidate.closest('button') as HTMLElement | null) || (candidate instanceof HTMLElement ? candidate : null))
+    : null
+  addDialogOpener = element
+}
+
+function restoreAddDialogFocus() {
+  const opener = addDialogOpener
+  addDialogOpener = null
+  if (!opener?.isConnected) return
+  void nextTick(() => {
+    if (opener.isConnected) opener.focus()
+  })
+}
+
+watch(showAddDialog, (open) => {
+  if (!open) restoreAddDialogFocus()
+})
+
+async function openAddDialog(event?: Event) {
+  rememberAddDialogOpener(event)
   form.value = emptyForm()
   showAddDialog.value = true
   candidatesLoading.value = true
@@ -115,7 +142,7 @@ function typeLabel(value: string | null): string {
         <el-icon><Paperclip /></el-icon>
         证据链接
       </span>
-      <el-button :icon="Plus" size="small" type="primary" data-testid="evidence-link-add" @click="openAddDialog">
+      <el-button :icon="Plus" size="small" type="primary" data-testid="evidence-link-add" aria-label="关联已有附件" title="关联已有附件" @click="openAddDialog($event)">
         关联附件
       </el-button>
     </div>
@@ -124,6 +151,12 @@ function typeLabel(value: string | null): string {
       <span>证据链接加载失败，不能据此判断为无证据</span>
       <el-button link type="primary" size="small" @click="store.reload">重试</el-button>
     </div>
+    <el-empty
+      v-else-if="!loading && !links.length"
+      description="暂无证据链接"
+      :image-size="60"
+      data-testid="evidence-link-empty"
+    />
     <el-table v-else :data="links" v-loading="loading" size="small" max-height="300" stripe>
       <el-table-column label="文件" min-width="120" show-overflow-tooltip>
         <template #default="{ row }">
@@ -213,6 +246,24 @@ function typeLabel(value: string | null): string {
   justify-content: space-between;
   margin-bottom: 8px;
 }
+.panel-header .el-button:focus-visible,
+.evidence-load-error :deep(.el-button):focus-visible {
+  outline: 2px solid var(--el-color-primary, #409eff);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .evidence-link-panel { padding-inline: 4px; }
+  .panel-header { align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+  .panel-header .title { flex: 1 1 auto; }
+}
+
+@media (max-width: 390px) {
+  .panel-header { flex-direction: column; align-items: stretch; }
+  .panel-header :deep(.el-button) { width: 100%; margin-left: 0; }
+  .evidence-load-error { align-items: flex-start; flex-direction: column; }
+}
+
 .panel-header .title {
   font-weight: 600;
   font-size: var(--gt-font-size-sm);

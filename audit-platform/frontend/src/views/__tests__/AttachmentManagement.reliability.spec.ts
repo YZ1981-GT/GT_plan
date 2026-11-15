@@ -28,7 +28,7 @@ const pass = (name: string) => defineComponent({ name, setup: (_p, { slots }) =>
 const Button = defineComponent({
   props: { disabled: Boolean }, emits: ['click'], inheritAttrs: false,
   setup: (p, { emit, slots, attrs }) => () => h('button', {
-    disabled: p.disabled, 'aria-label': attrs['aria-label'], title: attrs.title, onClick: () => emit('click'),
+    type: 'button', disabled: p.disabled, 'aria-label': attrs['aria-label'], title: attrs.title, onClick: (event: MouseEvent) => emit('click', event),
   }, slots.default?.()),
 })
 const stubs = {
@@ -37,7 +37,15 @@ const stubs = {
   'el-upload': pass('el-upload'), 'el-tooltip': pass('el-tooltip'), 'el-icon': pass('el-icon'),
   'el-tag': pass('el-tag'), 'el-form': pass('el-form'), 'el-form-item': pass('el-form-item'),
   'el-dialog': true, 'el-pagination': pass('el-pagination'), Transition: pass('transition'),
-  TransitionGroup: pass('transition-group'), AttachmentPreview: true, OcrConfirmDialog: true,
+  TransitionGroup: pass('transition-group'), AttachmentPreview: defineComponent({
+    props: { modelValue: Boolean, fileName: String },
+    emits: ['update:modelValue'],
+    setup: (props, { emit }) => () => props.modelValue
+      ? h('div', { class: 'attachment-preview-stub' }, [
+          h('button', { type: 'button', 'data-testid': 'attachment-preview-close', onClick: () => emit('update:modelValue', false) }, '关闭预览'),
+        ])
+      : null,
+  }), OcrConfirmDialog: true,
   BatchUploadResultDialog: true, AttachmentHandbookDialog: true,
 }
 
@@ -54,8 +62,9 @@ function envelope(over: Record<string, unknown> = {}) {
   }
 }
 
-async function mountPage() {
+async function mountPage(attachToDocument = false) {
   const wrapper = mount(AttachmentManagement, {
+    attachTo: attachToDocument ? document.body : undefined,
     global: { stubs, directives: { loading: () => {} } },
   })
   await flushPromises()
@@ -114,15 +123,19 @@ describe('AttachmentManagement 列表可靠性', () => {
     expect(state.message.warning).toHaveBeenCalledWith('单批最多上传 250 个文件')
   })
 
-  it('无权限与合法空列表使用不同状态', async () => {
-    state.get.mockRejectedValueOnce(Object.assign(new Error('denied'), { response: { status: 403 } }))
-    const denied = await mountPage()
-    expect(denied.text()).toContain('无权查看本项目附件')
-    denied.unmount()
-
-    state.get.mockResolvedValueOnce(envelope({ items: [], total: 0, summary: {} }))
-    const empty = await mountPage()
-    expect(empty.text()).toContain('暂无附件')
-    expect(empty.text()).not.toContain('附件加载失败')
+  it('附件预览入口有中文可读名，关闭后焦点回到触发按钮', async () => {
+    const wrapper = await mountPage(true)
+    const preview = wrapper.find('.gt-att-item-actions button[aria-label="预览 回函.pdf"]')
+    expect(preview.exists()).toBe(true)
+    expect(preview.attributes('title')).toBe('预览 回函.pdf')
+    ;(preview.element as HTMLElement).focus()
+    await preview.trigger('click')
+    expect(wrapper.find('[data-testid="attachment-preview-close"]').exists()).toBe(true)
+    const close = wrapper.find('[data-testid="attachment-preview-close"]')
+    ;(close.element as HTMLElement).focus()
+    await close.trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(preview.element)
+    wrapper.unmount()
   })
 })

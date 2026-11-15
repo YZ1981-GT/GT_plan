@@ -19,9 +19,9 @@
           <el-button class="gt-att-handbook-btn" :icon="Reading" @click="handbookVisible = true">使用手册</el-button>
         </div>
         <div class="gt-att-actions">
-          <el-input v-model="searchQuery" placeholder="搜索文件名..." size="default" clearable
+          <el-input v-model="searchQuery" placeholder="搜索文件名..." aria-label="搜索附件文件名" size="default" clearable
             :prefix-icon="Search" class="gt-att-search" @keyup.enter="onSearch" />
-          <el-select v-model="filterType" placeholder="全部类型" size="default" clearable class="gt-att-type-filter" @change="onFilterChange">
+          <el-select v-model="filterType" placeholder="全部类型" aria-label="按附件类型筛选" size="default" clearable class="gt-att-type-filter" @change="onFilterChange">
             <el-option label="PDF" value="pdf" />
             <el-option label="Word" value="word" />
             <el-option label="Excel" value="excel" />
@@ -79,8 +79,8 @@
     </div>
 
     <!-- 附件列表 -->
-    <div v-loading="loading" class="gt-att-body">
-      <!-- 加载失败与无权限不能伪装成业务空列表 -->
+    <div v-loading="loading" class="gt-att-body" :aria-busy="loading ? 'true' : 'false'">
+      <div v-if="loading" class="gt-att-loading-state" role="status" aria-live="polite">正在加载附件列表…</div>
       <div v-if="!loading && (listStatus === 'error' || listStatus === 'forbidden')" class="gt-att-empty" role="alert">
         <div class="gt-att-empty-icon">⚠️</div>
         <div class="gt-att-empty-title">{{ listStatus === 'forbidden' ? '无权查看本项目附件' : '附件加载失败' }}</div>
@@ -102,7 +102,7 @@
             {{ getFileEmoji(row.file_type) }}
           </div>
           <div class="gt-att-item-info">
-            <button type="button" class="gt-att-item-name" @click="preview(row)" :title="`预览 ${row.file_name}`">{{ row.file_name }}</button>
+            <button type="button" class="gt-att-item-name" @click="preview(row, $event)" :title="`预览 ${row.file_name}`">{{ row.file_name }}</button>
             <div class="gt-att-item-meta">
               <el-tag size="small" :type="typeTagType(row.file_type) || undefined" effect="plain">{{ row.file_type || '未知' }}</el-tag>
               <span class="gt-att-item-size">{{ formatSize(row.file_size) }}</span>
@@ -124,7 +124,7 @@
           </div>
           <div class="gt-att-item-actions">
             <el-tooltip content="预览" placement="top">
-              <el-button circle size="small" :aria-label="`预览 ${row.file_name}`" :title="`预览 ${row.file_name}`" @click="preview(row)"><el-icon><View /></el-icon></el-button>
+              <el-button circle size="small" :aria-label="`预览 ${row.file_name}`" :title="`预览 ${row.file_name}`" @click="preview(row, $event)"><el-icon><View /></el-icon></el-button>
             </el-tooltip>
             <el-tooltip v-if="capabilities.ocr_confirm && row.ocr_status === 'completed' && !row.ocr_confirmed" content="确认 OCR 结果" placement="top">
               <el-button circle size="small" type="warning" :aria-label="`确认 ${row.file_name} 的 OCR 结果`" title="确认 OCR 结果" @click="openOcrConfirm(row)"><el-icon><Check /></el-icon></el-button>
@@ -226,7 +226,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
@@ -243,6 +243,8 @@ import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services
 import { workpapers as P_wp, attachments as P_att } from '@/services/apiPaths'
 import { associateCandidates, type AssociateCandidate } from '@/components/attachment/workpaperEvidence'
 import { handleApiError } from '@/utils/errorHandler'
+import { clearAuthedObjectUrlCache } from '@/composables/useAuthedObjectUrl'
+import { ATTACHMENT_UPLOAD_BUSY_MESSAGE, acquireAttachmentUpload } from '@/composables/attachmentUploadGate'
 import { rules } from '@/utils/formRules'
 
 const route = useRoute()
@@ -327,6 +329,42 @@ const previewName = ref('')
 const previewType = ref('')
 const previewId = ref('')
 const previewDownloadUrl = ref('')
+let previewOpener: HTMLElement | null = null
+
+function rememberPreviewOpener(source: Event | EventTarget | null | undefined) {
+  const eventLike = source && typeof source === 'object'
+    && ('currentTarget' in source || 'target' in source)
+  const candidate = eventLike
+    ? ((source as Event).currentTarget || (source as Event).target)
+    : source
+  const element = candidate instanceof Element
+    ? ((candidate.closest('button') as HTMLElement | null) || (candidate instanceof HTMLElement ? candidate : null))
+    : null
+  previewOpener = element
+}
+
+function restorePreviewFocus() {
+  const opener = previewOpener
+  previewOpener = null
+  if (!opener?.isConnected) return
+  void nextTick(() => {
+    if (opener.isConnected) opener.focus()
+  })
+}
+
+watch(previewVisible, (open) => {
+  if (!open) restorePreviewFocus()
+})
+
+function resetPreview() {
+  previewOpener = null
+  previewVisible.value = false
+  previewUrl.value = ''
+  previewName.value = ''
+  previewType.value = ''
+  previewId.value = ''
+  previewDownloadUrl.value = ''
+}
 
 // OCR 确认弹窗（单文件）
 const ocrConfirmVisible = ref(false)
@@ -374,6 +412,11 @@ async function uploadBatch(files: File[]): Promise<void> {
     ElMessage.warning('单批文件总大小不能超过 250MB')
     return
   }
+  const releaseUpload = acquireAttachmentUpload(`project:${projectId.value}`)
+  if (!releaseUpload) {
+    ElMessage.warning(ATTACHMENT_UPLOAD_BUSY_MESSAGE)
+    return
+  }
   uploadBusy.value = true
   ElMessage.info(`正在上传 ${files.length} 个文件...`)
   const results: BatchUploadItem[] = []
@@ -408,6 +451,7 @@ async function uploadBatch(files: File[]): Promise<void> {
     await loadAttachments()
   } finally {
     uploadBusy.value = false
+    releaseUpload()
   }
 }
 
@@ -532,7 +576,8 @@ function onPageSizeChange() {
   void loadAttachments()
 }
 
-function preview(row: any) {
+function preview(row: any, opener?: Event | EventTarget | null) {
+  rememberPreviewOpener(opener)
   previewUrl.value = P_att.preview(row.id)
   previewName.value = row.file_name
   previewType.value = row.file_type
@@ -597,6 +642,11 @@ async function uploadAttachment(options: any) {
     if (uploadBusy.value) ElMessage.warning('已有附件批次正在上传，请等待完成')
     return
   }
+  const releaseUpload = acquireAttachmentUpload(`project:${projectId.value}`)
+  if (!releaseUpload) {
+    ElMessage.warning(ATTACHMENT_UPLOAD_BUSY_MESSAGE)
+    return
+  }
   uploadBusy.value = true
   const formData = new FormData()
   formData.append('file', options.file)
@@ -621,6 +671,7 @@ async function uploadAttachment(options: any) {
     handleApiError(error, '上传')
   } finally {
     uploadBusy.value = false
+    releaseUpload()
   }
 }
 
@@ -738,6 +789,16 @@ onMounted(async () => {
 //    旧实现用原生 EventSource 直连 `/api/sse/projects/{pid}`：该路由后端不存在、原生 EventSource 也无法带鉴权头
 //    ⇒ 连接即失败，「其他入口上传后本页自动刷新」从未生效。
 let attachmentSub: ProjectEventSubscription | null = null
+watch(projectId, (next, previous) => {
+  if (!previous || next === previous) return
+  // 项目切换时关闭旧预览并丢弃旧项目的 Blob 缓存，避免跨项目复用已鉴权字节。
+  resetPreview()
+  clearAuthedObjectUrlCache()
+  page.value = 1
+  attachments.value = []
+  listStatus.value = 'idle'
+  void loadAttachments()
+})
 function reloadAttachmentsAfterEvent() {
   // attachment.uploaded 是 raw 事件：重连后可能漏掉，按项目全量重拉列表。
   void loadAttachments()
@@ -757,6 +818,8 @@ onUnmounted(() => {
   dragCounter = 0
   isDragging.value = false
   attachmentSub?.close()
+  clearAuthedObjectUrlCache()
+  previewOpener = null
   if (highlightTimer) clearTimeout(highlightTimer)
 })
 </script>
@@ -978,6 +1041,15 @@ onUnmounted(() => {
 .gt-att-item:hover .gt-att-item-actions,
 .gt-att-item:focus-within .gt-att-item-actions { opacity: 1; }
 .gt-att-pagination { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+/* ─── 加载状态 ─── */
+.gt-att-loading-state {
+  min-height: 80px;
+  padding: 28px 12px;
+  text-align: center;
+  color: var(--gt-color-text-secondary);
+  font-size: 13px;
+}
 
 /* ─── 空状态 ─── */
 .gt-att-empty {

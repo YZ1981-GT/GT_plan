@@ -26,14 +26,14 @@
           <template #right>
             <el-input v-model="searchKeyword" placeholder="搜索文档..." aria-label="搜索知识库文档" size="small" clearable style="width: 180px"
               @keyup.enter="onSearch" />
-            <el-button size="small" @click="onSearch" :loading="searchLoading">搜索</el-button>
+            <el-button size="small" aria-label="搜索知识库" title="搜索知识库" @click="onSearch" :loading="searchLoading">搜索</el-button>
             <!-- 写按钮按系统角色门控：readonly / 未知角色一律不展示（后端同口径拒绝，见 canWriteKb） -->
             <el-button v-if="canWriteKb && !treeLoading && !hasPresetFolders" size="small" :loading="initPresetsLoading" @click="onInitPresets">初始化预设文件夹</el-button>
             <el-button v-if="canWriteKb" size="small" @click="onCreateFolder">新建文件夹</el-button>
             <el-button v-if="canWriteKb" size="small" :disabled="bgUploading" @click="onUploadDocs">上传文档</el-button>
             <el-button v-if="canWriteKb" size="small" :disabled="bgUploading" @click="onUploadFolder">上传文件夹</el-button>
             <el-button size="small" :disabled="!selectedFolder" @click="showDocAiChat = true">💬 AI 对话</el-button>
-            <el-button size="small" @click="loadTree" :loading="treeLoading">刷新</el-button>
+            <el-button size="small" aria-label="刷新知识库目录" title="刷新知识库目录" @click="loadTree" :loading="treeLoading">刷新</el-button>
           </template>
         </GtToolbar>
       </template>
@@ -45,6 +45,7 @@
       <el-col :xs="24" :sm="24" :md="7">
         <div class="gt-kb-panel gt-kb-tree-panel">
           <h4 class="gt-kb-panel-title">目录</h4>
+          <div v-if="treeLoading && !folderTree.length" class="gt-kb-load-state" role="status" aria-live="polite">正在加载知识目录…</div>
           <el-tree
             ref="treeRef"
             :data="folderTree"
@@ -101,7 +102,8 @@
           <!-- 文档表格 + 右侧预览分栏 -->
           <div class="gt-kb-doc-body">
             <div class="gt-kb-doc-table" :class="{ 'gt-kb-doc-table--narrow': !!previewDoc }">
-              <el-table v-if="documents.length" :data="documents" size="small" border stripe
+              <div v-if="docLoading" class="gt-kb-load-state" role="status" aria-live="polite">正在加载文档列表…</div>
+              <el-table v-else-if="documents.length" :data="documents" size="small" border stripe
                 @selection-change="onDocSelectionChange" highlight-current-row @row-click="onDocRowClick">
                 <el-table-column v-if="canWriteKb" type="selection" width="40" :selectable="isRowSelectable" />
                 <el-table-column prop="name" label="文档名称" min-width="200">
@@ -132,7 +134,7 @@
                 </el-table-column>
                 <el-table-column label="操作" width="320" align="center">
                   <template #default="{ row }">
-                    <el-button size="small" link type="primary" @click.stop="openPreviewFromButton(row, $event)">预览</el-button>
+                    <el-button size="small" link type="primary" :aria-label="`预览 ${row.name}`" :title="`预览 ${row.name}`" @click.stop="openPreviewFromButton(row, $event)">预览</el-button>
                     <el-button v-if="canWriteKb" size="small" link type="primary" @click.stop="onPromoteEvidence(row)">转为项目证据</el-button>
                     <!-- 管理权由后端逐行下发：非创建者（且非系统管理员）看不到改名 / 删除 / 重新识别 -->
                     <template v-if="canWriteKb && row.can_manage">
@@ -159,8 +161,8 @@
               <div class="gt-kb-preview-header">
                 <span class="gt-kb-preview-title">{{ previewDoc.name }}</span>
                 <div>
-                  <el-button size="small" link @click="onDownloadDoc(previewDoc)">下载</el-button>
-                  <el-button size="small" link @click="closePreview">关闭</el-button>
+                  <el-button size="small" link aria-label="下载当前知识文档" title="下载当前知识文档" @click="onDownloadDoc(previewDoc)">下载</el-button>
+                  <el-button size="small" link aria-label="关闭知识文档预览" title="关闭知识文档预览" @click="closePreview">关闭</el-button>
                 </div>
               </div>
               <div class="gt-kb-preview-body">
@@ -342,6 +344,8 @@
           type="button"
           class="gt-kb-folder-drop"
           :disabled="bgUploading"
+          aria-label="选择知识库文件夹"
+          title="选择知识库文件夹"
           @click="triggerFolderInput"
           @keydown.enter.prevent="triggerFolderInput"
           @keydown.space.prevent="triggerFolderInput"
@@ -416,7 +420,8 @@ import { knowledgeLibrary as P_kl, projects as P_proj } from '@/services/apiPath
 import { downloadFile } from '@/utils/http'
 import { getAuthHeaders } from '@/utils/authToken'
 import { handleApiError } from '@/utils/errorHandler'
-import { authedObjectUrlFailureText, useAuthedObjectUrl } from '@/composables/useAuthedObjectUrl'
+import { authedObjectUrlFailureText, clearAuthedObjectUrlCache, useAuthedObjectUrl } from '@/composables/useAuthedObjectUrl'
+import { acquireAttachmentUpload } from '@/composables/attachmentUploadGate'
 import { newUuid } from '@/utils/uuid'
 import { rules } from '@/utils/formRules'
 import PlatformAiChatPanel from '@/components/ai/PlatformAiChatPanel.vue'
@@ -1054,6 +1059,11 @@ async function startBackgroundUpload(files: File[], targetFolder: any, skipped =
     ElMessage.warning('已有文档批次正在上传，请等待完成')
     return
   }
+  const releaseUpload = acquireAttachmentUpload(`knowledge-folder:${String(targetFolder?.id || '')}`)
+  if (!releaseUpload) {
+    ElMessage.warning('已有文档批次正在上传，请等待完成')
+    return
+  }
   bgUploading.value = true
   bgUploadJustDone.value = false
   bgUploadTotal.value = files.length
@@ -1178,6 +1188,7 @@ async function startBackgroundUpload(files: File[], targetFolder: any, skipped =
     await refreshDocView()
   } finally {
     bgUploading.value = false
+    releaseUpload()
   }
 }
 
@@ -1510,7 +1521,9 @@ async function onPreviewDoc(doc: any, prefetched?: any, opener?: HTMLElement | n
 }
 
 function openPreviewFromButton(doc: any, event: Event) {
-  void onPreviewDoc(doc, undefined, event.currentTarget as HTMLElement)
+  const current = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  const target = event.target instanceof HTMLElement ? event.target.closest('button') : null
+  void onPreviewDoc(doc, undefined, current || target)
 }
 
 function retryPreview() {
@@ -1603,6 +1616,7 @@ onBeforeUnmount(() => {
   docAbort?.abort()
   textPreviewSeq += 1
   textPreviewAbort?.abort()
+  clearAuthedObjectUrlCache()
 })
 </script>
 
@@ -1678,6 +1692,15 @@ onBeforeUnmount(() => {
 .gt-kb-folder-drop:focus-visible { border-color: var(--gt-color-primary); }
 .gt-kb-folder-drop:focus-visible { outline: 2px solid var(--gt-color-primary); outline-offset: 2px; }
 .gt-kb-folder-drop:disabled { cursor: not-allowed; opacity: 0.6; }
+.gt-kb-load-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  padding: 24px 12px;
+  color: var(--gt-color-text-secondary);
+  font-size: var(--gt-font-size-sm);
+}
 .gt-kb-load-error {
   display: flex; flex-direction: column; align-items: center; gap: 12px;
   padding: 48px 16px; color: var(--gt-color-danger);

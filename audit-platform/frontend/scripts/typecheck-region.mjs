@@ -27,7 +27,7 @@
  *   - 自动设 NODE_OPTIONS=--max-old-space-size=4096（单区域足够，不会 OOM）。
  */
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,7 +58,7 @@ function main() {
       isolatedModules: true,
       moduleDetection: 'force',
       jsx: 'preserve',
-      lib: ['ES2022', 'DOM', 'DOM.Iterable'],
+      lib: ['ES2023', 'DOM', 'DOM.Iterable'],
       paths: { '@/*': ['./src/*'] },
       baseUrl: '.',
       // 🔴 OOM 规避关键项：只重算直接依赖，避免 vue-tsc 回退到全图分析。
@@ -80,24 +80,31 @@ function main() {
     config.include = include.map((f) => join(FRONTEND_ROOT, f));
     writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
 
-    // Windows 下 npx 是 .cmd，不能直接 spawn（EINVAL），必须经 shell。
-    // shell:true 时用字符串命令，configPath 加引号以容忍临时目录里的空格。
-    const result = spawnSync(
-      `npx vue-tsc --noEmit -p "${configPath}"`,
-      {
-        cwd: FRONTEND_ROOT,
-        stdio: 'inherit',
-        shell: true,
-        env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=4096' },
-      },
-    );
-
-    if (result.error) {
-      console.error('启动 vue-tsc 失败:', result.error.message);
+    // 直接复用当前 Node 进程和项目内 vue-tsc 入口，避免 Windows 下 npx.cmd、shell
+    // 转义和 PATH 差异导致区域检查在不同终端中表现不一致。
+    const vueTsc = resolve(FRONTEND_ROOT, 'node_modules/vue-tsc/bin/vue-tsc.js');
+    if (!existsSync(vueTsc)) {
+      console.error(`找不到项目内 vue-tsc：${vueTsc}`);
       exitCode = 1;
     } else {
-      exitCode = result.status ?? 1;
+      const result = spawnSync(
+        process.execPath,
+        [vueTsc, '--noEmit', '-p', configPath],
+        {
+          cwd: FRONTEND_ROOT,
+          stdio: 'inherit',
+          env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=4096' },
+        },
+      );
+
+      if (result.error) {
+        console.error('启动 vue-tsc 失败:', result.error.message);
+        exitCode = 1;
+      } else {
+        exitCode = result.status ?? 1;
+      }
     }
+
   } finally {
     // 🔴 必须在 finally 里清理，且**不能**在 try 里调 process.exit —— process.exit
     //    会立即终止进程、跳过 finally，导致临时目录永久残留在 tmpdir（实测踩过）。

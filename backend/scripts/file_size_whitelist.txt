@@ -1984,3 +1984,6 @@ backend/scripts/check/check_projection_lane_adjudication.py 815
 # backend/app/routers/recycle_bin.py — 全仓 CI 红修复时补保存点与真实删除入口（修 2 处运行时 NameError）。HEAD 已 831 行。
 #   拆分方向：列表与恢复 / 永久删除（含级联与保存点）/ 附件清理三段拆 service。
 backend/app/routers/recycle_bin.py 837
+
+# attachment-platform-cross-module-closure Task 24~29（2026-11-15）：KnowledgeBase.vue 在本批之前已是历史大文件（远端基线 1733 行，超过 1500 上限）。本批仅补列表失败态/加载态、预览焦点与上传互斥等可靠性和可访问性接线，当前 1755 行，仍在基线 +5% 内；拆分按知识库树/文档列表/预览三块进行，另立前端瘦身任务，不能在本次提交混入。
+audit-platform/frontend/src/views/KnowledgeBase.vue  1733

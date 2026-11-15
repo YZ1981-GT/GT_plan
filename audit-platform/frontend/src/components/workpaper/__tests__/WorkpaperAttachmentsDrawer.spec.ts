@@ -46,7 +46,15 @@ vi.mock('element-plus', async () => {
 })
 
 vi.mock('@/components/extension/AttachmentPreview.vue', () => ({
-  default: { template: '<div class="att-preview-stub" />', props: ['modelValue', 'fileUrl', 'fileName', 'fileType'] },
+  default: {
+    template: `
+      <div v-if="modelValue" class="att-preview-stub">
+        <button type="button" data-testid="drawer-preview-close" @click="$emit('update:modelValue', false)">关闭预览</button>
+      </div>
+    `,
+    props: ['modelValue', 'fileUrl', 'fileName', 'fileType'],
+    emits: ['update:modelValue', 'close'],
+  },
 }))
 
 const globalStubs = {
@@ -59,8 +67,8 @@ const globalStubs = {
     props: ['type', 'size', 'effect', 'round', 'dataSource'],
   },
   'el-button': {
-    template: '<button class="el-button" :class="$attrs.class" @click="$emit(\'click\')"><slot /></button>',
-    props: ['type', 'circle', 'size', 'loading'],
+    template: '<button class="el-button" type="button" :class="$attrs.class" :aria-label="$attrs[\'aria-label\']" :title="$attrs.title" :disabled="disabled" @click="$emit(\'click\', $event)"><slot /></button>',
+    props: ['type', 'circle', 'size', 'loading', 'disabled'],
   },
   'el-empty': { template: '<div class="el-empty">{{ description }}</div>', props: ['description'] },
   'el-alert': {
@@ -417,6 +425,29 @@ describe('WorkpaperAttachmentsDrawer — 图标按钮可读名与空态（spec a
     expect(labels).not.toContain('解除关联 纯函证.pdf')
   })
 
+  it('预览按钮可用键盘聚焦，关闭预览后焦点回到触发按钮', async () => {
+    mockGet.mockResolvedValue({ items: sampleItems })
+    const wrapper = mount(WorkpaperAttachmentsDrawer, {
+      attachTo: document.body,
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', canEdit: true },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+
+    const preview = wrapper.find('button[aria-label="预览 回函.pdf"]')
+    expect(preview.attributes('type')).toBe('button')
+    expect(preview.attributes('aria-label')).toBe('预览 回函.pdf')
+    ;(preview.element as HTMLElement).focus()
+    await preview.trigger('click')
+    expect(wrapper.find('[data-testid="drawer-preview-close"]').exists()).toBe(true)
+    const close = wrapper.find('[data-testid="drawer-preview-close"]')
+    ;(close.element as HTMLElement).focus()
+    await close.trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(preview.element)
+    wrapper.unmount()
+  })
+
   it('无附件：可编辑时提示在上方上传，只读时不提上传', async () => {
     mockGet.mockResolvedValue({ items: [] })
     const editable = mount(WorkpaperAttachmentsDrawer, {
@@ -599,5 +630,61 @@ describe('WorkpaperAttachmentsDrawer — 抽凭样本逐笔统计（spec attachm
     })
     await flushPromises()
     expect(none.find('[data-testid="voucher-samples"]').exists()).toBe(false)
+  })
+})
+
+describe('WorkpaperAttachmentsDrawer — 主列表失败态与请求生命周期', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('加载失败不伪装成空态，重试后恢复且卸载会取消请求', async () => {
+    let reject!: (error: unknown) => void
+    mockGet.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+    const wrapper = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1' },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    const signal = mockGet.mock.calls[0][1].signal as AbortSignal
+    expect(signal).toBeInstanceOf(AbortSignal)
+    wrapper.unmount()
+    expect(signal.aborted).toBe(true)
+    reject(Object.assign(new Error('已取消'), { name: 'CanceledError' }))
+
+    mockGet.mockReset()
+    mockGet.mockRejectedValueOnce(Object.assign(new Error('500'), { response: { status: 500 } }))
+    const retryWrapper = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1' },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    expect(retryWrapper.find('[data-testid="wp-att-load-error"]').exists()).toBe(true)
+    expect(retryWrapper.text()).toContain('本底稿附件加载失败')
+    expect(retryWrapper.text()).not.toContain('本底稿暂无关联附件')
+    mockGet.mockResolvedValueOnce({ items: sampleItems })
+    await retryWrapper.find('[data-testid="wp-att-retry"]').trigger('click')
+    await flushPromises()
+    expect(retryWrapper.text()).toContain('回函.pdf')
+  })
+
+  it('上传按钮在列表加载或上传请求进行时不可重复触发', async () => {
+    const deferredUpload = new Promise(() => {})
+    mockGet.mockResolvedValueOnce({ items: sampleItems })
+    mockHttpPost.mockReturnValue(deferredUpload)
+    const wrapper = mount(WorkpaperAttachmentsDrawer, {
+      props: { modelValue: true, wpId: 'wp-1', projectId: 'proj-1', canEdit: true },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    const button = wrapper.find('[data-testid="wp-att-upload"]')
+    expect(button.attributes('disabled')).toBeUndefined()
+    await button.trigger('click')
+    const input = wrapper.find('input[type="file"]')
+    const file = new File(['x'], '证据.pdf', { type: 'application/pdf' })
+    Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+    await input.trigger('change')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="wp-att-upload"]').attributes('disabled')).toBeDefined()
   })
 })

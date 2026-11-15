@@ -21,7 +21,7 @@
 
     <!-- 上传进度提示 -->
     <Transition name="gt-fade">
-      <div v-if="uploading" class="gt-attachment-dropzone-uploading">
+      <div v-if="uploading" class="gt-attachment-dropzone-uploading" role="status" aria-live="polite" aria-label="附件上传进度">
         <el-icon class="is-loading"><Loading /></el-icon>
         <span>正在上传附件...{{ uploadProgress > 0 ? ` ${uploadProgress}%` : '' }}</span>
         <el-progress
@@ -111,6 +111,10 @@ async function onDrop(e: DragEvent) {
     clearTimeout(dragLeaveTimer)
     dragLeaveTimer = null
   }
+  if (uploading.value) {
+    ElMessage.warning('已有附件正在上传，请等待完成')
+    return
+  }
 
   const files = e.dataTransfer?.files
   if (!files || files.length === 0) return
@@ -123,6 +127,10 @@ async function onDrop(e: DragEvent) {
 
 // ─── 文件处理 ───
 async function processFile(file: File) {
+  if (uploading.value) {
+    ElMessage.warning('已有附件正在上传，请等待完成')
+    return
+  }
   // 1. 类型白名单校验
   if (!validateFileType(file)) {
     ElMessage.warning({

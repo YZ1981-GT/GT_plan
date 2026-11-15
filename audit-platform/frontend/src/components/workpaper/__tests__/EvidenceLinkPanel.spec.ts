@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { defineComponent, h, inject, provide } from 'vue'
+import { defineComponent, h, inject, provide, nextTick } from 'vue'
 
 const mockApiGet = vi.fn()
 const mockApiPost = vi.fn()
@@ -78,8 +78,9 @@ const stubs = {
     template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
     props: ['modelValue', 'placeholder', 'maxlength'],
   },
-  'el-button': { template: '<button :data-testid="$attrs[\'data-testid\']" :aria-label="$attrs[\'aria-label\']" @click="$emit(\'click\')"><slot /></button>', inheritAttrs: false },
+  'el-button': { template: '<button type="button" :data-testid="$attrs[\'data-testid\']" :aria-label="$attrs[\'aria-label\']" :title="$attrs.title" @click="$emit(\'click\', $event)"><slot /></button>', inheritAttrs: false },
   'el-icon': { template: '<i><slot /></i>' },
+  'el-empty': { template: '<div class="el-empty" v-bind="$attrs">{{ description }}</div>', props: ['description'] },
 }
 
 function link(id: string, fileName: string, cellRef: string, evidenceType: string | null = 'voucher') {
@@ -90,8 +91,9 @@ function link(id: string, fileName: string, cellRef: string, evidenceType: strin
   }
 }
 
-function mountPanel() {
+function mountPanel(attachToDocument = false) {
   return mount(EvidenceLinkPanel, {
+    attachTo: attachToDocument ? document.body : undefined,
     props: { projectId: 'p1', wpId: 'w1' },
     global: { stubs, directives: { loading: {} } },
   })
@@ -112,6 +114,14 @@ describe('EvidenceLinkPanel', () => {
     expect(text).toContain('凭证.pdf')
     expect(text).toContain('D2A · 第 3 项')
     expect(text).toContain('凭证 / 原始单据')
+  })
+
+  it('空列表显示明确空态，不与加载失败混淆', async () => {
+    mockHttpGet.mockResolvedValueOnce({ data: { items: [] } })
+    const wrapper = mountPanel()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="evidence-link-empty"]').text()).toBe('暂无证据链接')
+    expect(wrapper.find('.evidence-load-error').exists()).toBe(false)
   })
 
   it('新增链接从本底稿附件里选，提交后重取清单', async () => {
@@ -153,17 +163,23 @@ describe('EvidenceLinkPanel', () => {
     expect(typeValues).toEqual(EVIDENCE_TYPE_OPTIONS.map((o) => o.value))
   })
 
-  it('删除链接走 DELETE（附件保留）', async () => {
-    mockHttpGet
-      .mockResolvedValueOnce({ data: { items: [link('l1', '凭证.pdf', 'item:3')] } })
-      .mockResolvedValueOnce({ data: { items: [] } })
-    mockHttpDelete.mockResolvedValueOnce({ data: { ok: true } })
-    confirmDelete.mockResolvedValueOnce(undefined)
-    const wrapper = mountPanel()
+  it('关联附件按钮语义完整，取消弹窗后焦点回到触发按钮', async () => {
+    mockHttpGet.mockResolvedValueOnce({ data: { items: [] } })
+    mockApiGet.mockResolvedValueOnce({ items: [] })
+    const wrapper = mountPanel(true)
     await flushPromises()
-    await wrapper.find('button[aria-label="删除证据链接 凭证.pdf"]').trigger('click')
+    const add = wrapper.find('[data-testid="evidence-link-add"]')
+    expect(add.attributes('aria-label')).toBe('关联已有附件')
+    expect(add.attributes('title')).toBe('关联已有附件')
+    ;(add.element as HTMLElement).focus()
+    await add.trigger('click')
     await flushPromises()
-    expect(mockHttpDelete).toHaveBeenCalledWith('/api/projects/p1/workpapers/w1/evidence/l1', expect.anything())
-    expect(wrapper.text()).not.toContain('凭证.pdf')
+    expect(wrapper.find('.el-dialog').exists()).toBe(true)
+    const cancel = wrapper.find('.el-dialog button')
+    ;(cancel.element as HTMLElement).focus()
+    await cancel.trigger('click')
+    await nextTick()
+    expect(document.activeElement).toBe(add.element)
+    wrapper.unmount()
   })
 })
