@@ -120,7 +120,7 @@
   - 变异：M8。
   - 验收：`routers/custom_query.py` 行数净减（N3，如下调白名单基线则与本任务同一提交）；用例与变异如上。
 
-- [x] 5. 查询证据（R4.1~R4.7、R7.3；design §6.1~§6.5）
+- [ ] 5. 查询证据（R4.1~R4.7、R7.3；design §6.1~§6.5）
   - 配置项四个（design §6.1）；`export_service.build_xlsx_file` 抽出，`stream_xlsx` 改为调用它且行为不变（既有导出测试不改即绿）。
   - `query_artifacts.py`：封存流程（`.partial` → 流式 SHA-256 → `os.replace` → 清单与清单摘要 → 独立短事务写运行与证据并提交，会话工厂可注入）、说明页四行、三个响应头、失败降级、下载重验（409 / 410）、清单输出。
   - 业务视图与构建器两条导出路径接入；导出审计增加证据编号、清单摘要、运行编号、版本摘要。
@@ -163,6 +163,60 @@
   - 起候选栈（9981 `--lifespan off` + `GT_BOOTSTRAP_DONE=1` + Redis 第 9 库；3040 代理到 9981），按 W1、W2、W3、W4、W5 写后读回；写入只在【测试】项目、走平台写入路径，结束后还原并对账；console error 为 0。
   - 在真实栈上复跑一次性能探针（N1）。
   - 验收：W1~W5 逐项截图与网络记录存 `tmp_aqf/`；对账结果写进本任务证据。
+
+  **证据（2026-11-15）**
+  - 前置：`V267` 已在共享库（`to_regclass('query_runs')` / `query_artifacts` 均非空，两表各 0 行）⇒ 本任务不再需要用户放行迁移。
+  - 候选栈：`tmp_aqf/probes/candidate_stack.py`（后端 9981 `--lifespan off` + `GT_BOOTSTRAP_DONE=1` + Redis db 9；
+    前端 3040，`.env.local` 把 `VITE_API_BASE_URL` 定死为 9981，vite.config.ts 对 9980 硬拒）；
+    走查用自起无头浏览器（`tmp_aqf/probes/walkthrough*.py`），不碰共享标签页。截图与证据 JSON 在 `tmp_aqf/walkthrough/`。
+  - **W1 通过**：弹窗/页面版选项目 + 年度 2099 + 数据源「审计调整分录(AJE)」→ 执行 → 信息条 `count=1`、
+    文案含范围/数据版本/「本次查询未记录」；「检查是否过期」按钮存在且点击后状态更新；console error **0**。
+  - **W2 未走（如实登记，不假绿）**：现库名称含「测试/E2E/UAT」的 **12** 个项目里只有 **2** 个有审计年度 ——
+    `E2E-D4发布测试项目_请勿动_2099`（名字明确「请勿动」）与 `【E2E】公式管理运行时门禁_2025`（**零成员行**、
+    tb_balance / tb_ledger / trial_balance 全 0）。design §10.5 要求「写入只在【测试】项目」，这两个都不适合录入 AJE；
+    自建测试项目会在共享库留残留。W2 的判据（行数 a → b、自动判定、重新查询）因此**未实测**。
+  - **W3 部分通过 + 抓到缺陷**：导出「试算平衡表」（该项目 2 行）成功 —— 文件 5,958 字节、SHA-256 已记录、
+    抽屉「导出证据」页签可见且列表能列出来源与行数、console error 0。但**库内 `query_artifacts` 为 0 行、
+    证据目录从未创建** —— 见下「缺陷 ⑤」。
+  - **W5 通过**：构建器是 `/custom-query` 内的 embedded 弹窗（**无独立路由**，`/advanced-query-builder` 是 404）。
+    选表 → 执行 → `data-testid="aqb-result-scope"` **count=1**（锚点已按 design §8.2 挪到信息条范围段）、
+    信息条 count=1、文案含「范围：当前项目（2099 年度）」+ 版本段 + 未记录提示；console error **0**。
+  - **N1 性能**：本任务未复跑（`test_aql_business_view_pg.py` 的 N1 已在 linkage spec 里实测达标，
+    本 spec 未改取数路径，只加了版本采集；采集成本见 design §0.3 的既有实测）。
+
+  **走查抓到 5 处真实缺陷（4 处已修 + 1 处登记为未实现；都在已标 `[x]` 的任务里，普通回归全绿看不出来）**
+
+  | # | 缺陷 | 形态与证据 | 处置 |
+  |---|---|---|---|
+  | ① | 路由签名泄漏内部参数（任务 4） | `execute_query` 签名加了 `_origin` / `_template_id` ⇒ FastAPI 当 **query 参数**（运行期依赖树实测 `query_params: ['_origin','_template_id']`），客户端可 `?_origin=template` 自报来源、或非法值让 `ck_query_runs_origin` 失败使记录静默降级 | HTTP 层抽成内部函数 `_execute_with_http_layer`，路由恢复原签名；新增守卫 `test_execute_route_signature_has_no_origin_query_param`（取运行期依赖树 + indicators 正向对照） |
+  | ② | 版本摘要字段名拼错（任务 3 / 4） | 编排器写 `version_vector.hash`，而 `VersionVector` 字段是 **`vector_hash`** ⇒ `AttributeError` 被 `except` 以 `logger.debug` 静默吞掉：`result.version` 有值但 `req.version_hash` 恒 None、运行记录永远「未采集到版本向量」。构建器 `_bv.hash` 同族 | 两处改 `vector_hash` |
+  | ③ | 运行记录在 PG 上永不写入（任务 1 / 4） | `query_runs` 的 PG 插入把 `captured_at` / `now` 用 `.isoformat()` 传字符串 ⇒ asyncpg `DataError: expected datetime instance, got 'str'` ⇒ 被降级成「写入失败」（查询照常返回） | PG 传 `datetime`，SQLite 侧经 `_sqlite_params` 转字符串 |
+  | ④ | 登记了但路由不提交（任务 4） | `business_execute` 在 SAVEPOINT 内登记，路由层从未 commit ⇒ 响应 `run.recorded=true` 而库里 **0 行**（实测：按响应 id 查库为 None） | 按 design §5.3「登记后由路由提交」在 `_execute_with_http_layer` 里 commit；构建器补 `record_run` + commit + `run` 键，并停止把 `_version_hash` 泄漏进响应 |
+  | ⑤ | **导出证据链路整条未实现**（任务 5） | `query_artifacts.seal_artifact` 写完了但**全仓零调用**（`seal_and_respond` 这个名字根本不存在）；`query_export.respond_xlsx` 仍走 `export_service.stream_xlsx` 临时文件发完即删 ⇒ 库里 `query_artifacts` 0 行、证据目录从未创建。tasks.md 任务 5 却标 `[x]` | **本轮未修**（登记为未完成，见下） |
+
+  - ①~④ 的修复：提交 `48ad014de`、`dc3b20128`、`2da44bb2c`、`d2a3d1804`、`fa1429538`；
+    守卫 `tests/advanced_query_linkage/test_aqf_version_hash_wiring.py`（结构层 + 真 PG 接线层 + 反向对照降级）**3 passed**；
+    变异 `M-A`（改回 `version_vector.hash`）/ `M-B`（`captured_at` 改回 ISO 串）/ `M-C`（不 pop 内部键）全红、
+    `N1` 阴性对照绿，**逐字节还原 sha256 一致**。
+  - ⑤ **如实登记为未完成**：design §6 的整条证据封存（R4.1~R4.7）需要实现 `seal_and_respond`、改造
+    `export_service.build_xlsx_file`、两条导出路径接线、说明页四行、三个响应头、下载重验（409/410）、清单端点，
+    以及配套的真 PG P10 与变异 M10 / M11 —— 工作量约等于任务 5 本身。本轮**不做**，理由：本轮目标是走查，
+    且该缺陷是「功能缺失」而非「接线错误」，不该用打补丁的方式糊过去。
+    ⇒ **任务 5 应改回 `[ ]`**（见下「任务状态修正」）。
+  - 走查写入的共享库数据已清理并核对：`query_runs` / `query_artifacts` 均回到 **0 行**（走查前基线）；
+    候选栈已停（前后端进程均 terminated、`.env.local` 已删）。
+  - 过程教训（本项目新增）：🔴 **worktree 里的 node_modules 联接会让 Vite 解析不到依赖**
+    （`Could not resolve "@element-plus/icons-vue"`）⇒ 按记忆里的纪律在 worktree 内独立 `npm ci --prefer-offline`；
+    🔴 **旧后端进程占着端口时新进程绑不上，跑的是旧代码** —— 日志里出现 `迁移目录不存在: ...\tmp_aqf\wt\...`
+    就是判据；🔴 **改完代码必须确认 worktree 已切到新提交**（我曾只在主工作树改、worktree 仍是旧 HEAD，
+    连续两轮「修复无效」都是这个原因）。
+
+
+  **任务状态修正（2026-11-15，由任务 10 走查得出）**
+  - 任务 **5**（查询证据 R4.1~R4.7）原标 `[x]`，实测**整条证据封存链路未实现**（`seal_artifact` 零调用、
+    `query_export` 未接线、库内 0 行、证据目录未创建）⇒ 改回 `[ ]`，待后续批次实现。
+  - 任务 **3 / 4 / 9** 的 `[x]` 保留，但各自的缺陷已在上面表格登记并修复（①~④），守卫与变异均补齐。
+  - 任务 **10** 因 W2 与 N1 未走、且 W3 暴露 ⑤，**保持 `[ ]*`**（依赖外部环境 + 任务 5）。
 
 - [x] 11. 回归与收尾（N2、N4；design §10.4、§10.7）
   - 后端：`backend/tests/advanced_query_linkage` 全量真 PG + 任务 0 的选集；前端：任务 0 的 vitest 选集；与基线逐节点比对，新增失败为 0。
