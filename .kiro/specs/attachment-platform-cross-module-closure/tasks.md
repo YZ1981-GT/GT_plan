@@ -72,3 +72,9 @@
   - 证据：附件跨模块套件 **72 passed / 4 skipped**；附件安全守卫 **285 passed / 3 skipped**；路由挂载 + AI run/对话聚焦 **28 passed**；Ruff 通过。共享 PG 回滚演练对 Task 28 四个已软删附件均返回 `rollback-ok`（每个根+版本 2 个文件引用），回滚后附件仍为 4 行、版本各 1 行；未触碰原有回收站数据。
   - 独占 `start-dev.bat` 重启后浏览器对 `/api/ai-chat/runs` 的无认证请求返回 401、登录态非法体返回 422，均不再是 404；历史 404 归因于未重启/旧运行栈，当前源码 `app.routes` 与挂载守卫均含该端点。
   - **仍保持未完成**：四个 Task 28 附件的真实永久删除是不可逆操作，本批只做共享 PG 回滚演练，未在共享库执行提交式删除；需用户明确放行后再走回收站服务端点并做前后清单核对。
+
+- **2026-11-15 Task 29 最终验收收口**：
+  - 真实 admin 浏览器会话经 `/api/recycle-bin/attachment/{id}` 服务端路径永久删除四个 Task 28 测试附件；四次均 HTTP 200，回执 `file_cleanup.deleted=1`、`kept_referenced=0`、`failed=0`。没有使用 SQL 直删。
+  - 删除后 PG 核对：目标附件 0 行、对应 `attachment_versions` 0 行、`legacy_attachment_alias` 0 行；四个物理文件均不存在。Task28 两个项目仍未软删，项目可见附件 0、近期知识文档可见行 0，项目状态/年度未变。
+  - 原有回收站两条附件 `k10-browser-smoke.png`、`r4-voucher.pdf` 删除前后仍保持软删除且未被操作。
+  - 重载首页后浏览器 console 无 error/warn；最终附件平台/AI/路由挂载聚焦套件 **126 passed / 6 skipped**（跳过项均为既有 PG-only 项），Task 29 最终验收完成。
