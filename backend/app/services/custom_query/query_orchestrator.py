@@ -448,7 +448,10 @@ class QueryOrchestrator:
                 scope={"project_id": req.project_id, "year": req.year},
                 acnr_targets=acnr_targets,
             )
-            req.version_hash = version_vector.hash
+            # 🔴 字段名是 `vector_hash`（VersionVector 的定义，见 version_capture.py）；
+            # 曾写成 `version_vector.hash` ⇒ AttributeError 被下面的 except 静默吞掉，
+            # 表现为 result.version 有值但 req.version_hash 恒 None、运行记录永远「未采集到版本向量」。
+            req.version_hash = version_vector.vector_hash
         except Exception as _ve:
             logger.debug("AQF 版本采集失败，降级为无版本查询: %s", _ve)
 

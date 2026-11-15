@@ -371,7 +371,9 @@ async def execute_query(
             db, _all_tables,
             scope={"projects": [str(p) for p in (scope.project_ids or [])], "year": getattr(body, "year", None)},
         )
-        _builder_version_hash = _bv.hash
+        # 🔴 字段名是 `vector_hash`（VersionVector 定义）；写 `_bv.hash` 会 AttributeError
+        # 被下面的 except 静默吞掉 ⇒ 缓存键与运行记录永远拿不到版本摘要（与 execute 同一处缺陷）。
+        _builder_version_hash = _bv.vector_hash
         _builder_version = _bv.as_dict()
     except Exception as _bve:
         logger.debug("AQF 构建器版本采集失败: %s", _bve)

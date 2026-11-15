@@ -187,10 +187,24 @@ def _build_params(
         "version_vector": canonical_json(version_vector),
         "vector_hash": vector_hash,
         "vector_weak": vector_weak,
-        "captured_at": captured_at.isoformat(),
+        # 🔴 PG（asyncpg）要求 timestamptz 参数是 datetime 实例，传 ISO 字符串会
+        # `DataError: expected a datetime.date or datetime.datetime instance, got 'str'`
+        # ⇒ 运行记录在 PostgreSQL 上永远写不进去（被下面的 except 降级成「写入失败」，
+        # 查询本身照常返回，因此普通回归全绿也看不出来）。SQLite 侧仍用字符串。
+        "captured_at": captured_at,
         "last_total": last_total,
-        "now": datetime.now(timezone.utc).isoformat(),
+        "now": datetime.now(timezone.utc),
     }
+
+
+def _sqlite_params(params: dict) -> dict:
+    """SQLite 绑定只接受字符串时间（aiosqlite 不做 datetime 适配）。"""
+    out = dict(params)
+    for key in ("captured_at", "now"):
+        value = out.get(key)
+        if isinstance(value, datetime):
+            out[key] = value.isoformat()
+    return out
 
 
 async def record_run(
@@ -257,16 +271,17 @@ async def record_run(
                 if row is not None:
                     return {"recorded": True, "id": str(row[0]), "execution_count": row[1]}
             else:
-                # SQLite 单测
-                await db.execute(_INSERT_SQLITE, params)
+                # SQLite 单测（时间必须是字符串，aiosqlite 不做 datetime 适配）
+                sqlite_params = _sqlite_params(params)
+                await db.execute(_INSERT_SQLITE, sqlite_params)
                 await db.execute(_UPDATE_SQLITE, {
-                    "user_id": params["user_id"], "entry": entry,
+                    "user_id": sqlite_params["user_id"], "entry": entry,
                     "definition_hash": def_hash, "vector_hash": vhash,
-                    "last_total": last_total, "now": params["now"],
+                    "last_total": last_total, "now": sqlite_params["now"],
                 })
                 sel = await db.execute(
                     text("SELECT id, execution_count FROM query_runs WHERE user_id=:u AND entry=:e AND definition_hash=:d AND vector_hash=:v LIMIT 1"),
-                    {"u": params["user_id"], "e": entry, "d": def_hash, "v": vhash},
+                    {"u": sqlite_params["user_id"], "e": entry, "d": def_hash, "v": vhash},
                 )
                 row = sel.first()
                 if row is not None:
