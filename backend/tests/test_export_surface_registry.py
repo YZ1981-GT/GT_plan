@@ -62,7 +62,13 @@ class TestValidateRegistry:
 
     def test_all_registered_present_passes(self) -> None:
         """app.routes 包含全部注册路径时不抛异常。"""
-        routes = [{"path": e.path} for e in EXPORT_SURFACE_REGISTRY.values()]
+        # 🔴 只造**非退役**条目的路由：`retired=True` 的条目现算确认无真实路由，
+        # 把它们造进 mock 会让 validate_registry 判成「未注册」（口径反转）。
+        routes = [
+            {"path": e.path}
+            for e in EXPORT_SURFACE_REGISTRY.values()
+            if not e.retired
+        ]
         app = _mock_app(routes)
         validate_registry(app)
 
@@ -75,7 +81,11 @@ class TestValidateRegistry:
 
     def test_unregistered_export_path_raises(self) -> None:
         """app.routes 包含未注册的导出路由时抛异常。"""
-        routes = [{"path": e.path} for e in EXPORT_SURFACE_REGISTRY.values()]
+        routes = [
+            {"path": e.path}
+            for e in EXPORT_SURFACE_REGISTRY.values()
+            if not e.retired
+        ]
         routes.append({"path": "/api/projects/{project_id}/export-secret"})
         app = _mock_app(routes)
         with pytest.raises(RegistryValidationError) as exc_info:
@@ -84,7 +94,11 @@ class TestValidateRegistry:
 
     def test_non_export_extra_route_ignored(self) -> None:
         """非导出相关的额外路由不触发异常。"""
-        routes = [{"path": e.path} for e in EXPORT_SURFACE_REGISTRY.values()]
+        routes = [
+            {"path": e.path}
+            for e in EXPORT_SURFACE_REGISTRY.values()
+            if not e.retired
+        ]
         routes.append({"path": "/api/health"})
         routes.append({"path": "/api/projects/{project_id}/config"})
         routes.append({"path": "/api/users/me/display-preferences"})
@@ -120,7 +134,11 @@ class TestValidateRegistry:
             ),
         )
         app = _mock_app(
-            [{"path": item.path} for item in EXPORT_SURFACE_REGISTRY.values()]
+            [
+                {"path": item.path}
+                for item in EXPORT_SURFACE_REGISTRY.values()
+                if not item.retired
+            ]
         )
 
         with pytest.raises(RegistryValidationError) as exc_info:
@@ -128,3 +146,84 @@ class TestValidateRegistry:
 
         assert exc_info.value.duplicate_classification
         assert "keys:" in exc_info.value.duplicate_classification[0]
+
+
+# ── 闭合性棘轮（spec platform-global-display-settings-closure 任务 10 / AC-20）──
+#
+# 🔴 背景：`EXPORT_SURFACE_REGISTRY` 里曾挂 12 条**从未存在过**的路径
+# （`missing=12`），而其中第一条就是**活的用户缺陷** —— 前端
+# `views/TrialBalance.vue` 的「导出」按钮一直在调 `/trial-balance/export`，
+# 后端从来没实现 ⇒ 点一次 404。其余 11 条同样「注册表登记 ≠ 路由存在」。
+#
+# 这组守卫把「登记了就必须真的存在」变成自动可检出的判据：
+# 1. 每条**非 retired** 条目必须能在 `app.routes` 里找到（方法也要对）；
+# 2. `missing` 必须为 **0**（不允许回升）；
+# 3. `retired=True` 的条目**必须真的没有路由** —— 否则「退役」被当成
+#    「删不掉就标退役」的后门，真实路由反而脱管。
+
+
+class TestRegistryClosureRatchet:
+    """注册表与实际路由的闭合性棘轮（只许变好）。"""
+
+    def test_every_non_retired_entry_has_real_route(self) -> None:
+        """每条非退役条目必须真的挂在 `app.routes` 上，且方法一致。
+
+        只断言「注册表非空」会漏掉整类缺陷：登记齐全但路由从未实现。
+        """
+        from app.main import app
+
+        actual: set[tuple[str, str]] = set()
+        for r in app.routes:
+            p = getattr(r, "path", None)
+            if not p:
+                continue
+            for m in getattr(r, "methods", None) or set():
+                actual.add((p, m))
+
+        missing: list[str] = []
+        for key, entry in EXPORT_SURFACE_REGISTRY.items():
+            if entry.retired:
+                continue
+            if (entry.path, entry.method) not in actual:
+                missing.append(f"{key}: {entry.method} {entry.path}")
+
+        assert not missing, f"注册表登记但无真实路由: {missing}"
+
+    def test_retired_entries_really_have_no_route(self) -> None:
+        """退役条目必须真的没有路由 —— 防止「删不掉就标退役」掩盖真实出口。"""
+        from app.main import app
+
+        actual_paths = {getattr(r, "path", None) for r in app.routes}
+        offenders = [
+            f"{key}: {entry.path}"
+            for key, entry in EXPORT_SURFACE_REGISTRY.items()
+            if entry.retired and entry.path in actual_paths
+        ]
+        assert not offenders, (
+            f"标了 retired 但路由真实存在（应从 retired 撤下并参与闭合）: {offenders}"
+        )
+
+    def test_missing_is_zero(self) -> None:
+        """`missing` 必须为 0（原 12，2026-11-16 已逐条治理完毕）。
+
+        🔴 这是一条**棘轮**：任何新增「登记了但没实现」的路径都会打红。
+        """
+        from app.main import app
+
+        try:
+            validate_registry(app)
+        except RegistryValidationError as exc:
+            assert not exc.missing, f"注册表 missing 不为 0: {exc.missing}"
+            # unregistered 是既有的历史漂移（303 条，属独立工作量），
+            # 本判据只管 missing。
+            return
+
+    def test_retired_flag_defaults_false(self) -> None:
+        """`retired` 默认 False —— 否则新加条目会静默不参与闭合判定。"""
+        entry = ExportSurfaceEntry(
+            path="/api/x/export",
+            method="GET",
+            classification="formal",
+            description="probe",
+        )
+        assert entry.retired is False
