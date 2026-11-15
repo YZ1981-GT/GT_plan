@@ -43,7 +43,7 @@
   - Files: `routers/wp_html_save.py`、`services/event_handlers/_impl.py`、新接口所在路由、底稿编辑器外壳组件、`utils/http.ts`
   - Verify: 发布门端点测试（未确认 409、确认放行、不涉及科目照常 200）；拦截器单测（重发带 ack、取消不重发）；浏览器在 D2 发布时出现确认框。变异：发布门判断取反 → 409 用例红；拦截器重发漏带 ack → 用例红
 
-- [ ]* 9. 验收与收尾（需求 6）
+- [x] 9. 验收与收尾（需求 6）
   - pg_only 全流程（需求 6.1、6.2）；【测试】项目浏览器全流程（需求 6.4），清理对账
   - 2026-11-15 已补真实 PG 验收用例：`backend/tests/test_adjustment_client_booking_pg.py` 覆盖标记→调整列归零→账套回滚 `full_recalc` 恢复→撤销历史，并补真实 router HTTP 标记/撤销；`backend/tests/test_adjustment_booking_suggestions_pg.py` 覆盖完全匹配、多候选、借贷相反和一分钱差异。默认未设置 `DATABASE_URL` 时收集为 **2 skipped**；显式指向本地 PostgreSQL 后 **2 passed**。使用临时复核账号完成了浏览器 AJE→提交→批准→精确候选→标记→回滚→撤销链，并通过平台删除分录、撤销委派、删除人员和停用账号清理；声明书/签发门与 outbox worker 健康仍需额外证据，不能勾选收尾。
   - 变异记录汇总；干净 worktree 跑要提交的树，失败集合与 HEAD 对比；INDEX.md 登记
@@ -55,4 +55,5 @@
     · `F4` 已勾选 —— `backend/tests/test_adjustment_concurrency_and_rls_pg.py`（双事务编辑/批准、`SET ROLE gt_rls_probe` 非 superuser RLS 隔离）+ `test_adjustment_signoff_gate_pg.py` 6 例（签发门 blocking / 对照组 / 交付就绪门按分录组计数 / R1-AJE-UNCONVERTED / 转错报后不再命中 / 发布门 `effective_booking_impacts_for_accounts` 交出客户已入账组且带 ack 后为空，含两个正向变异）；与相关 PG 用例合跑 **47 passed**。
     · `F6` 已勾选 —— 共享库逐表对账：`adjustment_entries` 活跃 10（真实业务数据）、孤儿活跃明细 0、`import_event_outbox` pending 0、`event_outbox_dlq` 0、卡死事务 0。另登记并修复了本次走查清场误用原生 SQL 软删 approved 组头导致 2 条明细成为孤儿的事故（非代码缺陷）。
     · `F3`/`C8` 已勾选 —— 批准→TB→outbox→真实生产 EventBus handler 全链已补，并修掉 outbox replay 在未提交事务里 await handler 自开会话导致的必现锁 convoy（共享库现场 pending 17 分钟不消费、worker 心跳却正常）。客户入账链的 outbox 重放走同一派发口，该修复同样保护 `ADJUSTMENT_CLIENT_BOOKING_CHANGED`。
-    · `D9` 仍为 `[ ]*` ⇒ **本任务保持 `[ ]*`**：PG/HTTP 侧证据齐备，但浏览器侧声明书页面本身未走查；另 F5 的五角色全矩阵也未闭合。
+    · `D9` 与 `F5` 已于 2026-11-15 勾选 ⇒ **本任务按承接约定收口**：D9 的浏览器走查已完成（声明书 A16 空态引导 + 签发页就绪检查 12 项与一致性清单 1 阻断/3 警告/4 信息 + 4 条 ack 落 `app_audit_log`；期间修 `DefaultLayout` 缺 `/partner/` 前缀导致签发页被项目列表顶掉的缺陷）；F5 五角色矩阵已闭合（auditor_in 看 2 组 / auditor_out 只 1 组，受限可见性精确生效；期间修 `GET /adjustments/summary` 未按循环范围过滤，计数卡与列表条数不一致的缺陷）。
+    · 提交：`7039f37d5` + 附注标签 `v1.0.226`（远端祖先链已确认）。
