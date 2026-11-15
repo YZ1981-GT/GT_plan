@@ -8,7 +8,7 @@
       class="platform-ai-chat-panel__scope"
       :class="{ 'is-global': !hostRequest.projectToolsEnabled }"
       role="status"
-      :aria-label="`AI 对话范围：${scopeHint}`"
+      :aria-label="`AI 对话范围：${scopeHintWithDraft}`"
     >
       <el-tag
         :type="hostAvailable ? 'info' : 'warning'"
@@ -17,7 +17,7 @@
       >
         {{ hostRequest.label }}
       </el-tag>
-      <span class="platform-ai-chat-panel__hint">{{ scopeHint }}</span>
+      <span class="platform-ai-chat-panel__hint">{{ scopeHintWithDraft }}</span>
       <!-- 选择模式入口按钮 -->
       <el-button
         v-if="noteCapture.hasSelectableMessages.value && !noteCapture.selectionMode.value"
@@ -140,6 +140,21 @@
             v-html="renderMarkdown(msg.text)"
           />
           <div v-else class="plain-content">{{ msg.text }}</div>
+
+          <!--
+            本轮未保存草稿的纳入结果（需求 2.5 / design §5.5）
+            🔴 内联在消息下方，不弹窗、不阻断：denied 只是"这份草稿没进上下文"，
+            用户仍应看到本轮的正常回答。
+          -->
+          <div
+            v-if="msg.draftOverlay"
+            class="platform-ai-chat-panel__draft-notice"
+            :class="`is-${msg.draftOverlay.status}`"
+            role="note"
+          >
+            <el-icon aria-hidden="true"><DocumentCopy /></el-icon>
+            <span>{{ draftOverlayNoticeText(msg.draftOverlay) }}</span>
+          </div>
 
           <!-- 引用来源 -->
           <div v-if="msg.citations && msg.citations.length > 0" class="platform-ai-chat-panel__citations">
@@ -286,6 +301,27 @@
         @change="onProjectAttachmentChange"
       />
 
+      <!--
+        未保存草稿纳入开关（spec chat-host-draft-overlay / Task 5 / 需求 4.4）
+        🔴 只在**宿主真有未保存修改**时出现：没有修改时这里不渲染任何东西，
+        范围文案保持既有「已同步」态（需求 6.1：默认关闭时与现状完全一致）。
+      -->
+      <div
+        v-if="draftOverlayAvailable"
+        class="platform-ai-chat-panel__draft-overlay"
+      >
+        <el-switch
+          v-model="includeDraftOverlay"
+          size="small"
+          :disabled="loading"
+          :active-text="DRAFT_OVERLAY_TOGGLE_LABEL"
+          aria-label="纳入当前未保存草稿（默认关闭，开启后本轮 AI 将读取编辑器里尚未保存的内容）"
+        />
+        <span class="platform-ai-chat-panel__draft-overlay-hint">
+          {{ includeDraftOverlay ? draftOverlayOnHint : '当前有未保存修改，开启后本轮可一并参考' }}
+        </span>
+      </div>
+
       <!-- 状态描述（屏幕阅读器可见） -->
       <span id="chat-input-status" class="gt-sr-only">
         {{ inputStatusHint }}
@@ -374,9 +410,19 @@ import {
 } from '@/composables/useAiNoteCapture'
 import {
   canAdoptInPlace,
+  hostDraftBaselineVersion,
+  hostHasUnsavedDraft,
   hostScopeHint,
+  readHostDraftOverlay,
   type AiHostRequest,
 } from '@/composables/useAiHostContext'
+import {
+  DRAFT_OVERLAY_TOGGLE_LABEL,
+  buildDraftOverlayPayload,
+  draftOverlayNoticeText,
+  formatDraftBaselineVersion,
+  hostScopeHintWithDraft,
+} from '@/composables/aiDraftOverlay'
 import {
   MENTION_TYPE_LABELS,
   type MentionItem,
@@ -447,6 +493,62 @@ const attachmentPickerRef = ref<InstanceType<typeof ChatAttachmentPicker> | null
 const projectAttachmentPickerRef = ref<InstanceType<typeof ChatProjectAttachmentPicker> | null>(null)
 const pendingAttachmentIds = ref<string[]>([])
 const pendingProjectAttachmentIds = ref<string[]>([])
+
+// ---------------------------------------------------------------------------
+// 未保存草稿纳入开关（spec chat-host-draft-overlay / Task 5）
+//
+// Requirements:
+//   - 4.4：默认关闭，用户显式开启才把未保存草稿送进本轮上下文；
+//   - 5.2：关闭时范围文案**逐字不变**（走既有 `hostScopeHint`），开启时才改尾句；
+//   - 2.5：服务端的裁决结果标在消息上（`msg.draftOverlay`）。
+//
+// 三个判据都从 `useAiHostContext` 读，不在这里判断"是不是底稿"——
+// 宿主类型分派只该有一处（`hostHasUnsavedDraft` / `hostDraftBaselineVersion`）。
+// ---------------------------------------------------------------------------
+
+/** 开关状态：**默认关闭**（需求 4.4）。 */
+const includeDraftOverlay = ref(false)
+
+/** 该宿主此刻是否有未保存修改（决定开关是否出现）。 */
+const draftOverlayAvailable = computed(() => hostHasUnsavedDraft(hostRequest.value))
+
+/**
+ * 草稿的基线版本（只读版本、不序列化正文）。
+ *
+ * 用 `hostDraftBaselineVersion` 而不是 `readHostDraftOverlay(...).baselineVersion`：
+ * 后者会把最多 20 万字符的正文序列化一遍，而这里只为了显示「基于版本 v…」。
+ */
+const draftOverlayBaselineVersion = computed(() => hostDraftBaselineVersion(hostRequest.value))
+
+/** 开关打开时输入区里的说明（与范围文案同一口径）。 */
+const draftOverlayOnHint = computed<string>(() => {
+  const version = draftOverlayBaselineVersion.value
+  if (!version) return '将纳入当前未保存草稿'
+  return `将纳入当前未保存草稿（基于版本 v${formatDraftBaselineVersion(version)}）`
+})
+
+/**
+ * 范围文案（需求 5.2）。
+ *
+ * 关闭时返回**既有** `hostScopeHint()` 的输出（逐字不变，需求 6.1）；
+ * 打开时只替换尾句（前缀仍由 `hostScopeHint()` 产出，见 `aiDraftOverlay` 的注释）。
+ */
+const scopeHintWithDraft = computed<string>(() => {
+  if (!includeDraftOverlay.value) return scopeHint.value
+  return hostScopeHintWithDraft(props.host, draftOverlayBaselineVersion.value)
+})
+
+// 宿主换了 / 未保存修改消失（用户保存了）⇒ 开关归零，避免"下一份底稿静默继承上一次的选择"。
+// 默认关闭是需求 4.4 的硬要求，自动重置方向是保守的（关掉 = 不纳入）。
+watch(draftOverlayAvailable, (available) => {
+  if (!available) includeDraftOverlay.value = false
+})
+watch(
+  () => hostRequest.value.host?.id,
+  () => {
+    includeDraftOverlay.value = false
+  },
+)
 
 // ---------------------------------------------------------------------------
 // Mention（Task 15 / Req 5.1, 5.4, 5.5 / Properties 12, 13）
@@ -767,6 +869,7 @@ function handleSend() {
     projectAttachmentIds: [...pendingProjectAttachmentIds.value],
     reviewMode: reviewModeEnabled.value,
     sheetName: props.sheetName ?? null,
+    draftOverlay: resolveDraftOverlayForSubmit(),
   })
   // 本轮引用已随请求提交 ⇒ 清空并重建 picker，避免悄悄跟到下一轮
   selectedMentions.value = []
@@ -774,6 +877,33 @@ function handleSend() {
   mentionPickerEpoch.value += 1
   pendingProjectAttachmentIds.value = []
   projectAttachmentPickerRef.value?.clear()
+}
+
+/**
+ * 提交那一刻读取未保存草稿（**不是**开关切换时读）。
+ *
+ * 用户可能先开开关、再改一格 —— 在开关回调里取快照会把那格漏掉（`WorkpaperDraftAccessor`
+ * 的三个值都是取值函数而不是 ref 快照，正是为了这里）。
+ *
+ * 三道保护，**任何一道都不阻断发送**：
+ *
+ * 1. 开关关闭 ⇒ 不提交（需求 6.1：行为与现状完全一致）；
+ * 2. `readHostDraftOverlay` 返回 `null`（用户刚保存了 / 正文超 20 万字符 / 取不到基线）⇒
+ *    不提交，并给一句中文提示说明"这份草稿没带上"，避免用户以为带上了；
+ * 3. 宿主不是可用底稿 ⇒ `buildDraftOverlayPayload` 返回 `null`，同上。
+ *
+ * 🔴 为什么用 `ElMessage.warning` 而不是弹窗 / 阻断发送：需求 4.4 的语义是"用户可选"，
+ * 草稿没带上不该让用户连问题都问不了（design §3 同口径：overlay 任何失败都不阻断整轮对话）。
+ */
+function resolveDraftOverlayForSubmit() {
+  if (!includeDraftOverlay.value) return null
+  const overlay = readHostDraftOverlay(hostRequest.value)
+  const payload = buildDraftOverlayPayload(hostRequest.value, overlay)
+  if (!payload) {
+    ElMessage.warning('未保存草稿本轮未纳入（可能刚刚保存或内容超过长度上限），已按已保存内容提问')
+    return null
+  }
+  return payload
 }
 
 function handleCancel() {
@@ -1070,6 +1200,46 @@ function renderMarkdown(text: string): string {
   align-items: center;
   gap: 8px;
   margin-top: 8px;
+}
+
+/* 未保存草稿纳入开关（spec chat-host-draft-overlay / Task 5） */
+.platform-ai-chat-panel__draft-overlay {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
+  flex-wrap: wrap;
+}
+
+.platform-ai-chat-panel__draft-overlay-hint {
+  font-size: 11px;
+  color: var(--el-color-warning-dark-2, #a77730);
+}
+
+/* 消息下方的草稿纳入结果（内联提示，不弹窗） */
+.platform-ai-chat-panel__draft-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  background: var(--el-fill-color-light, #f2f6fc);
+  color: var(--el-text-color-secondary, #909399);
+}
+
+.platform-ai-chat-panel__draft-notice.is-denied {
+  background: var(--el-color-warning-light-9, #fdf6ec);
+  color: var(--el-color-warning-dark-2, #a77730);
+}
+
+.platform-ai-chat-panel__draft-notice.is-included {
+  background: var(--el-color-success-light-9, #f0f9eb);
+  color: var(--el-color-success-dark-2, #529b2e);
 }
 
 /* Streaming 动画 */

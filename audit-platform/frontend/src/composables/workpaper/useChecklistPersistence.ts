@@ -12,6 +12,7 @@ import {
 } from '@/components/workpaper/sync/backgroundMergeRegistry'
 import { persistenceMetrics } from './usePersistenceMetrics'
 import { createChecklistCasClient } from './checklistCas'
+import { publishHtmlDraftSource } from './workpaperDraftOverlay'
 
 export interface ChecklistResponse {
   item_id: string
@@ -130,6 +131,20 @@ export function useChecklistPersistence(
   const inFlight = new Map<string, Promise<void>>()
   const controllers = new Map<string, AbortController>()
   const cas = createChecklistCasClient()
+  /**
+   * `pending` 的响应式镜像（只读计数）。
+   *
+   * `pending` 本身是普通 `Set`：AI 面板的「有没有未保存修改」是 computed，普通 Set 的增删
+   * 不触发任何重算 ⇒ 面板会一直显示打开时那一态。这里只镜像**数量**，不复制内容。
+   */
+  const pendingCount = ref(0)
+
+  /** 唯一的 pending 增删入口（顺手推进响应式计数）。 */
+  function setPending(itemId: string, on: boolean): void {
+    if (on) pending.add(itemId)
+    else pending.delete(itemId)
+    pendingCount.value = pending.size
+  }
 
   function stateOf(itemId: string): PersistenceState {
     let state = states.get(itemId)
@@ -179,7 +194,7 @@ export function useChecklistPersistence(
       // 结果重载，此刻写进去要么被覆盖、要么盖掉合并结果 ⇒ 拒写并丢弃（表单已只读，正常走不到这里）。
       const error = new Error(BACKGROUND_MERGE_WRITE_REFUSED_MESSAGE)
       setState(itemId, { status: 'error', serverVersion: stateOf(itemId).serverVersion, lastError: error.message })
-      pending.delete(itemId)
+      setPending(itemId, false)
       throw error
     }
 
@@ -201,7 +216,7 @@ export function useChecklistPersistence(
       const currentRevision = revisions.get(itemId) ?? 0
       if (revision === currentRevision) {
         responses.value.set(itemId, persisted)
-        pending.delete(itemId)
+        setPending(itemId, false)
         setState(itemId, { status: 'saved', serverVersion: versionOf(persisted) })
         persistenceMetrics.untrackDirty(itemId)
       } else {
@@ -231,7 +246,7 @@ export function useChecklistPersistence(
       } else {
         persistenceMetrics.recordSaveError()
       }
-      pending.add(itemId)
+      setPending(itemId, true)
       throw error
     } finally {
       if (controllers.get(itemId) === controller) controllers.delete(itemId)
@@ -303,13 +318,13 @@ export function useChecklistPersistence(
     if (timer) clearTimeout(timer)
     timers.delete(itemId)
     applyPatch(itemId, patch)
-    pending.add(itemId)
+    setPending(itemId, true)
     await flushOne(itemId)
   }
 
   function saveDebounced(itemId: string, patch: Partial<ChecklistResponse>): void {
     applyPatch(itemId, patch)
-    pending.add(itemId)
+    setPending(itemId, true)
     const timer = timers.get(itemId)
     if (timer) clearTimeout(timer)
     timers.set(itemId, setTimeout(() => {
@@ -339,7 +354,7 @@ export function useChecklistPersistence(
       controllers.get(id)?.abort()
       controllers.delete(id)
       generations.set(id, currentGeneration(id) + 1)
-      pending.delete(id)
+      setPending(id, false)
       const previous = committed.get(id)
       if (previous) {
         responses.value.set(id, normalizedItem(id, previous))
@@ -352,6 +367,36 @@ export function useChecklistPersistence(
   }
 
   if (getCurrentScope()) onScopeDispose(() => { void flush().catch(() => undefined) })
+
+  /**
+   * 把「本宿主有未保存修改」这件事登记给 AI 面板（spec chat-host-draft-overlay Task 4）。
+   *
+   * 未保存内容的**唯一**真源就是这里的 `pending`（`applyPatch` 一写就进、落库成功才出），
+   * 所以不另建一套 dirty 标记。正文按 `item_id` 排序后逐条序列化成 JSON：
+   *
+   * * 用 JSON 而不是拼字符串 —— 审计底稿的备注里常有 `|` / 换行 / 全角标点，拼字符串
+   *   会把两格的内容混成一句，模型据此作答就是错的；
+   * * 排序保证同一次未保存状态每次取值**逐字相同**（服务端按 sha256 判重，顺序抖动会让
+   *   同一份草稿算出不同 hash）。
+   *
+   * 只取 `pending` 里的条目：已经落库的内容服务端自己读得到，重复纳入既浪费 token 又让
+   * 模型看到两份「同一格的两个值」。
+   */
+  const unregisterDraftSource = publishHtmlDraftSource(wpId.value, {
+    label: 'useChecklistPersistence',
+    hasUnsaved: () => pendingCount.value > 0,
+    currentDraftContent: () => {
+      if (pendingCount.value === 0) return null
+      const items = [...pending]
+        .sort((left, right) => left.localeCompare(right))
+        .flatMap((itemId) => {
+          const item = responses.value.get(itemId)
+          return item ? [item] : []
+        })
+      return items.length > 0 ? JSON.stringify(items) : null
+    },
+  })
+  if (getCurrentScope()) onScopeDispose(unregisterDraftSource)
 
   return { responses, load, reloadItems, hydrate, save, saveDebounced, flush, cancel, stateOf }
 }

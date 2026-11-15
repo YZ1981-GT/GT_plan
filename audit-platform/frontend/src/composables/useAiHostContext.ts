@@ -24,6 +24,16 @@
  * 服务端只把 `projectId` / `year` 当**一致性断言**：本模块宁可传 `null`，也不猜。
  */
 
+import {
+  hasWorkpaperDraftOverlay,
+  normalizeBusinessVersion,
+  readWorkpaperDraftOverlay,
+  workpaperDraftAccessorOf,
+  type WorkpaperDraftOverlay,
+} from '@/composables/workpaper/workpaperDraftOverlay'
+
+// ---------------------------------------------------------------------------
+// 后端枚举镜像（单一真源在后端；此处只做取值镜像并由测试对账）
 // ---------------------------------------------------------------------------
 // 后端枚举镜像（单一真源在后端；此处只做取值镜像并由测试对账）
 // ---------------------------------------------------------------------------
@@ -343,4 +353,55 @@ export function hostPathSegments(host: AiHostRef): { docType: string; docId: str
 /** 历史 / 清除请求的 project 查询串（无项目绑定时**不发**该参数）。 */
 export function hostQueryString(host: AiHostRef): string {
   return host.projectId ? `?project_id=${encodeURIComponent(host.projectId)}` : ''
+}
+
+// ---------------------------------------------------------------------------
+// 未保存草稿（draft overlay）—— spec chat-host-draft-overlay / Task 4
+// ---------------------------------------------------------------------------
+
+/**
+ * 面板侧统一读取「当前宿主有没有未保存草稿」。
+ *
+ * 任务正文要求由 `useAiHostContext` 统一读取、**无未保存修改时返回 `null`**。
+ * 这里只做宿主维度的一次分派：目前只有 `workpaper` 宿主有未保存草稿语义
+ * （附注宿主已有自己的 `note_ai.py` overlay，报表 / TB / 合并多为只读派生视图）。
+ *
+ * 三处 fail-closed 由 `readWorkpaperDraftOverlay` 承担（无登记 / 空正文 / 空基线 / 超限）。
+ * 宿主不可用（`available=false`）时也返回 `null` —— 没有已授权宿主就没有可绑定的草稿。
+ */
+export function readHostDraftOverlay(
+  request: AiHostRequest | null | undefined,
+): WorkpaperDraftOverlay | null {
+  const host = request?.host
+  if (!request?.available || !host || host.type !== 'workpaper' || !host.id) return null
+  return readWorkpaperDraftOverlay(host.id)
+}
+
+/** 该宿主此刻是否有未保存修改（面板据此决定是否显示「纳入当前未保存草稿」开关）。 */
+export function hostHasUnsavedDraft(request: AiHostRequest | null | undefined): boolean {
+  const host = request?.host
+  if (!request?.available || !host || host.type !== 'workpaper' || !host.id) return false
+  return hasWorkpaperDraftOverlay(host.id)
+}
+
+/**
+ * 该宿主草稿的**基线版本**（`openedBaselineVersion()`，归一后）。
+ *
+ * 与 :func:`readHostDraftOverlay` 的区别只有一个但很关键：**不序列化正文**。
+ * 面板的范围文案要在渲染期显示「基于版本 v…」，而正文可能有 20 万字符 ——
+ * 拿 `readHostDraftOverlay(...).baselineVersion` 会让每次重算都整篇序列化一遍。
+ * 版本在编辑器打开时就冻结了（见 `useWorkpaperDraftAccessor`），读它不产生正文开销。
+ *
+ * 没有未保存修改 / 没有登记 / 基线读不出来 ⇒ `null`（与 `readHostDraftOverlay` 的
+ * fail-closed 口径一致：那时本来就没有可纳入的草稿）。
+ */
+export function hostDraftBaselineVersion(
+  request: AiHostRequest | null | undefined,
+): string | null {
+  const host = request?.host
+  if (!request?.available || !host || host.type !== 'workpaper' || !host.id) return null
+  if (!hasWorkpaperDraftOverlay(host.id)) return null
+  const accessor = workpaperDraftAccessorOf(host.id)
+  const normalized = normalizeBusinessVersion(accessor?.openedBaselineVersion())
+  return normalized || null
 }

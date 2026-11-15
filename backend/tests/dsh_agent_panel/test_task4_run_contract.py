@@ -388,6 +388,11 @@ class TestRequestRejectsPrivilegedFields:
         assert fields == {
             "host", "query", "idempotency_key", "session_id",
             "mentions", "attachment_ids", "project_attachment_ids", "review_mode", "sheet_name",
+            # chat-host-draft-overlay Task 1：唯一新增字段。它的 ``content`` 是
+            # ``PRIVILEGED_REQUEST_FIELDS`` 的**窄到键路径**的豁免（未保存正文只存在于
+            # 编辑器内存里，服务端读不到），因此下面那条交集断言必须仍然为空 ——
+            # 豁免实现在 ``_scan_privileged`` 的路径判定里，不是把 ``content`` 从清单删掉。
+            "draft_overlay",
         }, f"请求体字段集合漂移：{sorted(fields)}"
         assert not (fields & PRIVILEGED_REQUEST_FIELDS), (
             f"请求体声明了越权字段：{sorted(fields & PRIVILEGED_REQUEST_FIELDS)}"

@@ -23,6 +23,8 @@ function setup() {
     univerCatalog: ref<UniverCatalogFacts | null>(null),
     univerSheetIdentityReady: ref(false),
     activeSheetContext: ref<WorkpaperSheetContext>(emptyContext()),
+    wpId: () => 'wp-1',
+    currentBusinessVersion: () => null,
   }
   return { s, facts: useEditorRendererFacts(s) }
 }

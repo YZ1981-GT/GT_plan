@@ -114,3 +114,56 @@ draft_overlay?: {
   底稿两个编辑器的 `currentDraftContent` / `openedBaselineVersion`。
 - 重叠风险：`PlatformAiChatPanel.vue` 在多个 spec 中被改过，实施时按文件当前状态定点编辑。
 - 不做迁移（纯请求侧字段 + manifest 扩展，无新表）。
+
+### 9.1 与设计的偏离（代码为准）
+
+| # | 设计原文 | 实际实现 | 理由 |
+|---|---|---|---|
+| D1 | 请求字段写在 contracts.py | 新增 backend/app/services/ai_chat/draft_overlay.py，ChatRunRequest 只加 draft_overlay 字段 | run_contract.py 已 751 行（门禁 800），按「行数门超限优先抽模块不抬白名单」抽出；contracts.py 只提供 HostType 真源 |
+| D2 | 「服务端重算 hash」未指定字段命名 | 线上仍叫 content_hash（与附注侧 note_ai.py 一致），Python 侧落 client_content_hash；权威值只能经 content_hash property 取 | 两者不共名，误用读不到值 |
+| D3 | content_length 未说明与客户端值的关系 | 服务端覆盖（不并存）为实际长度 | 并存时下游任何一处误读都会拿到可伪造值 |
+| D4 | manifest 顶层加 draft_overlay_included | 只在提交 overlay 时出现；缺省请求不含该键 | 需求 6.1「默认关闭时行为与现状完全一致」——多一个恒 false 的键同样是契约变更 |
+| D5 | 未规定 overlay 预算占比 | overlay 最多占 doc_excerpt 槽位一半 | 草稿是补充而非替代，已保存正文必须仍有预算；缺省路径该计算得 0，既有分配逐值不变 |
+| D6 | 「宿主当前业务版本」未指定列 | working_paper.updated_at（常量 WORKPAPER_BUSINESS_VERSION_SOURCE） | content_revision 在 univer-save / checklist-responses PUT / wp_editor_router 三条保存路径上不推进，且无通用端点可读 ⇒ 拿它当版本号会把「刚保存过」判成「版本未变」，旧草稿被静默纳入（需求 6.3 禁止的 fail-open） |
+| D7 | 未提及定界器逃逸 | dsh_masking.wrap_untrusted_block 增 _neutralize_delimiters（转义为可见占位） | 原实现原样透传正文：草稿写结束标记即可让结束标记早于真块尾，后半段指令落在定界之外 |
+| D8 | 未提及 422 detail 与 repr | error_handler.py 增 _redact_draft_overlay_detail；DraftOverlayRef.__repr_args__ 隐藏正文 | 实测两处真实泄漏：超长草稿的 422 input 回显全文；repr(overlay) / repr(ChatRunRequest) 打印正文 |
+### 9.2 端到端验证（独立后端实例加载新代码；共享开发后端仍是旧进程）
+
+共享开发后端未热重载本 spec 的新代码（_PRIVILEGED_EXEMPT_PATHS 未生效，draft_overlay.content 被判越权字段 422），因此端到端在独立实例（GT_BACKEND_NO_RELOAD=1 + uvicorn，监听另一个本地端口）上执行，连同一套共享 PG 与本地 vLLM。
+
+| 场景 | 请求 | 观测结果 |
+|---|---|---|
+| A 版本一致 | 带 draft_overlay（baseline_version = 库内 updated_at），正文含哨兵 888888 | draft_overlay_included: true；条目 status: included + content_hash: sha256:169b3363... + baseline_version: 2026-10-29T09:33:47.746189+00:00 + used_tokens: 15；模型回答 888888 |
+| B 关闭开关 | 不带 draft_overlay | 顶层 draft_overlay_included 键不存在；无草稿条目；回答明确「上下文不足」，不含哨兵 |
+| C 版本过期 | baseline_version = 2020-01-01T00:00:00+00:00 | draft_overlay_included: false；条目 status: denied + 中文原因「草稿基于旧版本 v2020-01-01T00:00:00+00:00，当前 v2026-10-29T09:33:47.746189+00:00，请先保存或刷新」；Run 仍成功（完整回答、无 error 事件）；模型未看到旧草稿 |
+| D 字段校验 | host_id 不符 / 空正文 / 全空白 / 200001 字符 / host_type=report | 全部 422（不裁剪、不静默忽略） |
+
+不落库判据（真库逐条核对，哨兵 777777）：
+
+| 检查 | 结果 |
+|---|---|
+| user 消息含草稿正文 | no（只存用户提问原文） |
+| assistant 消息含哨兵 | YES（模型回答复述，非草稿落库） |
+| ai_chat_runs.context_request_snapshot 含 draft_overlay 键 | clean |
+| context_request_snapshot / capability_snapshot 含正文 | clean / clean |
+| ai_chat_message.context_manifest 含正文 | clean，只存 content_hash + baseline_version + used_tokens |
+| audit_log_entries.payload 含正文 | 0 |
+
+验证产物（3 条 run + 6 条 message）已按 run id 精确删除；底稿数据未改动（全部为只读请求）。
+
+### 9.3 测试与变异
+
+| 项 | 结果 |
+|---|---|
+| 后端本 spec 三文件 | 91 passed |
+| 后端本 spec + 既有 Chat 回归（task4 / task24 / context_plan_wiring） | 240 passed |
+| 前端本 spec 六文件 | 122 passed |
+| 变异：versions_match 改恒真 | 13 failed（全部为「过期 / 不可解析 / 空值应 denied」类，形态与预期一致）→ 逐字节还原，sha256 校验一致 |
+| 变异（Task 1~5 各自） | 13/13、3 组、6/6、5+1、2/2 全 RED |
+
+### 9.4 已知边界（有意接受）
+
+1. HTML 侧只覆盖已接入 useChecklistPersistence 的 16 个 K/J 宿主；其余宿主（自管 flushPendingSave 防抖的 D/E/F/G/H 等）本期不报草稿——面板如实显示「无未保存修改」，不误报。接入方式 = 一行 publishHtmlDraftSource。
+2. 只改 checklist_responses 的保存不推进 working_paper.updated_at ⇒ 这类并发改动检测不到。收窄它需让 checklist 保存也推进 updated_at（跨模块，另立任务）。方向安全：多判 denied（拒绝纳入），不会静默用旧草稿。
+3. 复核状态 / 分派变更也推进 updated_at ⇒ 会多判一些 denied（同上，方向保守）。
+4. 共享开发后端未加载本 spec 新代码（未热重载）⇒ 浏览器 UI 走查无法在共享实例上验证开关；已用独立实例完成 API 层端到端，UI 层由 39 条前端单测覆盖（开关默认关闭、显示条件、文案切换、提交时读取、denied 内联提示）。

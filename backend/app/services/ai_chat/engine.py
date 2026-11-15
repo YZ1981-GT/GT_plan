@@ -421,6 +421,9 @@ class AuthorizedChatRunRequest:
     mentions: tuple[tuple[Any, str], ...] = ()
     attachment_ids: tuple[UUID, ...] = ()
     project_attachment_ids: tuple[UUID, ...] = ()
+    #: 当前未保存草稿（``run_contract.DraftOverlayRef``）；None = 本轮不纳入。
+    #: 只在一轮 Run 内有效，不落库（``context_snapshot`` 刻意不含它）。
+    draft_overlay: Any = None
     context_plan: Any = None
 
     @classmethod
@@ -457,6 +460,7 @@ class AuthorizedChatRunRequest:
             mentions=tuple(creation.request.mention_pairs()),
             attachment_ids=tuple(creation.request.attachment_ids),
             project_attachment_ids=tuple(creation.request.project_attachment_ids),
+            draft_overlay=getattr(creation.request, "draft_overlay", None),
         )
 
     @classmethod
