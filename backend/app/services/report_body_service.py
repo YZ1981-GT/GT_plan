@@ -170,8 +170,18 @@ class ReportBodyService:
         year: int,
         *,
         report_date: date | None = None,
+        export_policy: "ExportUnitPolicy | None" = None,
     ) -> dict:
-        """按 Placeholder_Mapping_Registry 填充自动/财务类占位符"""
+        """按 Placeholder_Mapping_Registry 填充自动/财务类占位符。
+
+        ``export_policy``（spec platform-global-display-settings-closure 任务 10 / AC-21）：
+        给出时五个财务占位符按 `policy.divisor` 折算（Decimal `ROUND_HALF_UP` 到 0.01），
+        并在 `placeholders_resolved` 里记 `unit` 与 `divisor` —— **数值与标注同源**，
+        避免「按万元折算但标注写元」这类错配。
+
+        🔴 默认 `None` = **不折算、不标注**：保持既有调用方行为逐字节不变
+        （本参数是加法式扩展，不是行为变更）。
+        """
         registry = _load_registry()
         basic_info = await self._audit_svc._get_project_basic_info(project_id)
         financial_data = await self._audit_svc._fetch_financial_data(project_id, year)
@@ -182,6 +192,19 @@ class ReportBodyService:
         fin_values = await self._resolve_financial_placeholders(
             project_id, year, registry.get("financial", {}), financial_data
         )
+
+        # 按 export_policy 折算财务值（只在给出 policy 时）
+        unit_label = ""
+        divisor = None
+        if export_policy is not None:
+            divisor = export_policy.divisor
+            # 🔴 字段名是 `unit`（Literal['yuan','qian','wan']），不是 `unit_label` ——
+            # 现读 `ExportUnitPolicy.model_fields` 实证；按命名习惯猜会 AttributeError。
+            unit_label = _UNIT_LABELS.get(str(export_policy.unit), str(export_policy.unit))
+            fin_values = {
+                key: _convert_amount_string(value, divisor)
+                for key, value in fin_values.items()
+            }
 
         filled = json.loads(json.dumps(body, ensure_ascii=False))
         for section in filled.get("sections", []):
@@ -196,15 +219,23 @@ class ReportBodyService:
             for key, meta in registry.get("financial", {}).items():
                 value = fin_values.get(key, financial_data.get(key, "0"))
                 content = content.replace(f"{{{key}}}", value)
-                resolved[key] = {
+                entry = {
                     "type": "financial",
                     "value": value,
                     "source": meta.get("row_code"),
                 }
+                if divisor is not None:
+                    # 🔴 数值与标注同源：divisor 与 unit 都来自同一份 policy
+                    entry["unit"] = unit_label
+                    entry["divisor"] = str(divisor)
+                resolved[key] = entry
 
             section["content"] = content
             section["placeholders_resolved"] = resolved
 
+        if divisor is not None:
+            # 整份 body 级也记一份（下游按 body 读单位时不必逐 section 翻）
+            filled["export_unit"] = {"unit": unit_label, "divisor": str(divisor)}
         return filled
 
     def _resolve_auto_placeholders(
@@ -641,3 +672,44 @@ class ReportBodyService:
             eqcr_pass_date=eqcr_pass_date,
             extra_floors=extra_floors or None,
         )
+
+
+# ── 导出单位折算（spec platform-global-display-settings-closure 任务 10 / AC-21）──
+
+#: 单位 → 中文标签（数值与标注必须同源）。
+_UNIT_LABELS: dict[str, str] = {
+    "yuan": "元",
+    "qian": "千元",
+    "wan": "万元",
+}
+
+
+def _convert_amount_string(value: object, divisor: int) -> str:
+    """把金额字符串按 divisor 折算（Decimal ROUND_HALF_UP 到 0.01）。
+
+    🔴 三条纪律：
+    1. **非数字原样返回**（占位符未解析时是 `[被审计单位名称]` 之类的文本，
+       折算它们没有意义，且会抛异常打断整份报告）。
+    2. **`divisor == 1` 原样返回**（元口径不做任何量化，避免把 `1234.5`
+       变成 `1234.50` 这种无意义变化）。
+    3. **None / 空串原样返回**（不是 0 —— 缺数与零是两件事）。
+    """
+    from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    if divisor is None or int(divisor) == 1:
+        return text
+    try:
+        amount = Decimal(text.replace(",", ""))
+    except (InvalidOperation, ValueError, TypeError):
+        return text  # 非数字（占位文本 / 单位后缀）原样保留
+    if not amount.is_finite():
+        return text
+    converted = (amount / Decimal(int(divisor))).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    return str(converted)
