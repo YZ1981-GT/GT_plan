@@ -276,3 +276,73 @@ MCP budget/revocation、批任务锁/进度迁 Redis/DB。候选冷却可继续�
 - 声明式规格字段要同时写“该字段改变行为”的用例；只登记不读取的字段等于没有（第 2 条）。
 - 门禁读不到状态时的默认值决定安全性：吞异常后放行就是假绿（第 1 条）。
 - 并发会话会把本 spec 未提交的文件整体带进它的提交，也会清掉仓库根全部 `tmp_*`（含已 lock 的基线 worktree，回归跑到一半被删）；回归产物要能用脚本重建，结论以重跑为准。
+
+## 12. 真实环境验收（2026-11-15）
+
+### 12.1 环境
+
+Docker 已运行，本 spec 此前记为「不可达」的环境全部可用：
+
+| 依赖 | 状态 |
+|---|---|
+| PostgreSQL | 5432 可用；V236~V239 已于 2026-11-03 落共享库 `audit_platform`（schema_version 现查） |
+| Redis | 6379 可用（`audit-redis` healthy） |
+| 后端 | 9980 healthy（`database` / `redis` 均 connected，`startup.status=complete`） |
+| 前端 | 3030 可用（`http://127.0.0.1:3030`） |
+| 本机模型 | vLLM 8100 真实可调用（`Kbenkhaled/Qwen3.5-27B-NVFP4`，context 32768） |
+| 致同服务器 | `https://ai.gt-china.com.cn:10010/v1` `qwen3.8` 真实可调用（用户确认可用；平台解密 Key 走生产 `chat_sync` 验证非空回答） |
+
+### 12.2 验收结果（全部为真实环境，无 mock）
+
+| 任务 | 方式 | 结果 |
+|---|---|---|
+| 1 ContextPlan | 浏览器 + SSE 抓包 | 请求体真实带 `mentions[]`；`context_ready` 返回 `manifest_version=context-plan-v1`、`included[]` 逐项带 `source_type/source_id/status/label/used_tokens`，mention 以 `mention:workpaper` 独立登记并带 `jump_route` |
+| 2 引用与留痕 | 浏览器 + 真实 PG + 真实模型 | 无知识命中时 `referenced_sources=null`（正确）；上传探针知识文档后落库完整（含 `doc_version` / `paragraph_index` / `is_stale` / `jump_route` / `excerpt`），`citation_count=1`，模型真实引用该段作答；`model_used` / `tokens_used` 真实落库 |
+| 3 范围文案 | 浏览器双态对照 | 全局模式「全局知识模式：…不读取项目数据，项目工具不可用」+ 复核开关 `disabled`；底稿页「当前范围：底稿；…当前未保存修改不会纳入本轮」+ 开关可点 |
+| 4 角色能力 | 真实执行器矩阵探针 20/20 | `draft` 不含 QC/EQCR、`review` 必含；QC/EQCR 的 draft 全 `ai_role_denied` 且 `model=None`；越界动作 `ai_action_denied`；缺角色 `ai_role_missing`；QC/EQCR 的 review 真被放行 |
+| 8 信任域 | 真实 PG 探针 7/7 | 三种任务政策过滤逐值正确；无合格候选抛 typed `route_policy_denied`；路由信任域与库逐值一致 |
+| 8 兜底留痕 | 真实本机 → 真实服务器 | 本机回「收到」`deployment=local/fallback=False`；本机端点故障后落 qwen3.8 `deployment=server/fallback=True/attempts=('…连接被拒绝',)` |
+| 9 事实包 / DraftArtifact | 真实模型 + 真实 PG | artifact 字段完整（`target_cell` / `baseline_version` / `before_hash` / `proposed_hash` / `preview_diff`）；浏览器抽屉真实渲染双栏 diff |
+| 10 疑点定位 | 浏览器 | 真实跑出 3 条疑点带 `📍 B1-1!A1:Z100` 且可点；单格走 `workpaper:locate-cell`、区域走 `navigate-sheet` |
+| 11 耐久批任务 | 真实 PG 探针 9/9 + 浏览器 | SKIP LOCKED 两 worker 拿不同项；租约围栏、过期接管、取消、幂等重放、快照持久全部通过；浏览器真实创建 166 项任务并取消（`cancelled=154` / `failed=12`，失败为 `item_execution_failed` 空章节 fail-closed，未写 artifact） |
+| 12 CAS 写回与撤销 | 真实 PG | 确认后 `applied_hash==proposed_hash`、`artifact_version 0→1`、receipt 含 before/after 版本与 hash；撤销后正文 md5 与操作前基线**逐字节相同**、`artifact_version 1→2`；重复撤销 409；并发编辑后确认 409「附注在预览后已被修改」 |
+| 14 分布式状态 | 真实 Redis 探针 10/10 | 10 并发 Lua 原子累加 `calls=10`；独立连接读同一计数；超限 / 字节超限跨 worker 一致；release 真删 key；token 撤销跨实例立即可见 |
+| 16 真实 canary | `ai_live_canary.py` 非 dry-run | 6 条 live 用例：3 条真实成功、2 条调用前正确拒绝（`model=None`）、1 条正确 `invalid_output` |
+
+### 12.3 本轮抓到并修复的真实缺陷
+
+| # | 缺陷 | 修复 |
+|---|---|---|
+| 1 | AI 复核弹窗标题渲染 `B1-1 undefined AI 复核`（`label` 是可选 prop，模板裸插值 `${label}`） | `GtWpAiReviewToolbar.vue` 改 `reviewDialogTitle` computed，过滤空值并按需拼接 |
+| 2 | 复核按钮可见角色漏 `eqcr`，与后端 `review.workpaper` 的 `allowed_roles` 不一致（ADR-LLM-008 要求逐值一致）⇒ EQCR 看不到按钮而后端允许其复核 | 角色数组补齐 `eqcr`，注释写明后端声明来源 |
+| 3 | `check_ai_task_call_coverage.py` 债务基线含已不存在的 scope（`a813aede4` 把 `WpChatService.chat_stream` 的 LLM 调用抽到 `stream_prepared`，AST scope 名变了但调用点数不变） | 按「等价重命名」精确替换基线行（保持 `direct_calls_count=132`）；`--shrink` 正确拒绝（它只允许减少），故不用它 |
+
+守卫与反向证据：新增 `AiReviewToolbarTitleAndRoles.spec.ts`（10 例，含 `it.each` 遍历后端角色集合）；两个磁盘变异分别打红（title 变异红 2 条、roles 变异红 eqcr 1 条），逐字节还原后 15 passed（含 `AiReviewPanelLocate` 2 + `findingLocation` 3）。
+
+### 12.4 验证汇总
+
+| 项 | 结果 |
+|---|---|
+| 本 spec 聚焦后端用例（28 文件，5 批） | **231 passed / 0 failed**（design §11.3 记录的 2 条 `jsonpath_ng` 失败本轮未复现） |
+| 前端用例（本轮新增 + 相关） | 15 passed |
+| 真实 PG 探针 | `p1` 7/7、`p4` 9/9 |
+| 真实 Redis 探针 | `p5` 10/10 |
+| 真实执行器矩阵探针 | `p6` 20/20 |
+| 真实兜底探针 | `p2` 2/2 |
+| 真实模型 canary | PASS（6 条 live，3 条真实成功） |
+| 债务棘轮 | `direct=132/132`、`prompt=43/43` |
+| 浏览器 | 登录 / 项目 / 底稿页 / 附注页全通，console error 0 |
+
+### 12.5 剩余未做（真实缺口，非环境依赖）
+
+- 任务 13：证据附件、上年底稿 / 附注、同行业同模板同科目知识未接入关系图；Chat 宿主的通用 draft overlay 未做。
+- 任务 15：旧重复 Chat 与零挂载 AI 壳未清点、未下线；窄屏 / 键盘未走查。
+- 任务 11：浏览器端任务进度的实时刷新动画未走查（接口与持久快照已实测）。
+
+### 12.6 教训（本轮新增）
+
+- **「环境不可达」是会过期的结论**：本 spec 曾把 11 项标成 `[ ]*` 并写进「模型 / PG 不可达」，实际 Docker 起来后本机 vLLM 与致同服务器都能真调。凡以环境为由挂起的验收，重开时必须先重测可达性，不要沿用旧结论。用户提示「致同服务器应该也可以」直接让 3 个任务从「无法验证」变成「已验证」。
+- **探针必须按真实接口写，否则会把探针缺陷当成产品缺陷**：本轮在 `ResolvedLLMConfig`（`endpoint_url` 而非 `base_url`）、`request_cancel`（需 `project_id`）、`McpScopedToken`（`token_id` 在 `payload` 内）、附注保存（`PUT /{note_id}` 而非按 section）、批任务端点（`/api/projects/{pid}/ai-task-jobs/{job_id}`）上各踩一次。每次都是先打印真实签名 / 字段再改，成本 3 秒。
+- **一次性库要复用平台建表脚本**：自建 `Base.metadata.create_all(tables=[...])` 会因 `projects.accounting_standard_id` 等外键指向未列入的表而 `NoReferencedTableError`；改走 `scripts/seed/init_tables.py`（并把 `API_BASE_URL` 指向不可达端口跳过 seed 段），370 张表一次到位。
+- **「失败」不一定是缺陷**：批任务 12 项 `item_execution_failed`「没有生成可供采纳的附注草稿」是空章节的 fail-closed 正确行为，且没有写任何 artifact —— 判缺陷前先看它有没有造成错误状态。
+- **UI 缺陷只有真跑才看得到**：`undefined` 标题与漏 `eqcr` 两个缺陷，单测与类型检查都不会报（`undefined` 是合法字符串、角色数组少一项不报错）。浏览器实测 + 按后端声明逐值对拍是唯一有效手段。
