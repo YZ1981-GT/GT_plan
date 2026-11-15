@@ -973,6 +973,22 @@ async def _execute_with_http_layer(
     if result.get("cache_hit"):
         response.headers["X-Cache"] = "HIT"
 
+    # ── 运行记录提交（AQF §5.3：登记在 SAVEPOINT 内，由路由提交）──────────
+    # 🔴 不提交等于没登记：`get_db` 只开会话不提交，登记语句只活在本请求的 SAVEPOINT 里，
+    # 响应一返回就被回滚 ⇒ 响应里 run.recorded=true 但库里 0 行（任务 10 走查实测）。
+    # 只在真的写入过（recorded）时提交；登记失败时 SAVEPOINT 已回滚，不提交以免把
+    # 半截的只读事务提交掉。
+    run_info = result.get("run") or {}
+    if run_info.get("recorded"):
+        try:
+            await db.commit()
+            logger.info("AQF 运行记录已提交 run_id=%s entry=%s", run_info.get("id"), run_info.get("entry"))
+        except Exception:  # 提交失败不能让查询结果丢掉（R1.6 降级方向）
+            logger.warning("AQF 运行记录提交失败，查询结果照常返回", exc_info=True)
+            result["run"] = {"recorded": False, "reason": "运行记录提交失败"}
+    else:
+        logger.info("AQF 运行记录未写入：%s", run_info.get("reason"))
+
     return result
 
 

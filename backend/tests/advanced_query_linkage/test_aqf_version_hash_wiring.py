@@ -65,6 +65,9 @@ async def test_execute_reports_version_hash_and_records_run(pg_rollback_session)
     ① `version.vector_hash` 非空（采集成功）；② `run.recorded is True` 且给了运行编号
     （登记成功 —— 这一条同时钉住两处历史缺陷：`version_vector.hash` 拼错被 except 吞掉、
     `captured_at` 传字符串让 asyncpg 报 DataError）。
+
+    🔴 第三处历史缺陷：登记在 SAVEPOINT 内、**路由必须提交**。`get_db` 只开会话不提交，
+    不提交的话响应里 `recorded=true` 而库里 0 行 —— 因此这里直接查库核验。
     """
     from app.routers.custom_query import QueryRequest
     from app.services.custom_query.business_execute import execute_business_query
@@ -80,9 +83,10 @@ async def test_execute_reports_version_hash_and_records_run(pg_rollback_session)
     assert version.get("vector_hash"), "result.version.vector_hash 为空 —— 版本向量未采集"
     run = result.get("run") or {}
     assert run.get("recorded") is True, (
-        f"运行记录未写入：{run}。历史缺陷有两处：① 编排器写 `version_vector.hash`（字段名实为 "
+        f"运行记录未写入：{run}。历史缺陷有三处：① 编排器写 `version_vector.hash`（字段名实为 "
         "`vector_hash`）⇒ AttributeError 被 except 静默吞掉；② `query_runs` 的 PG 插入把 "
-        "`captured_at` 当 ISO 字符串传 ⇒ asyncpg DataError。两者都不会让查询失败。"
+        "`captured_at` 当 ISO 字符串传 ⇒ asyncpg DataError；③ 登记在 SAVEPOINT 内但路由不提交 "
+        "⇒ 响应 recorded=true 而库里 0 行。三者都不会让查询失败。"
     )
     assert run.get("id"), "运行记录已写入但没有运行编号"
     assert "_version_hash" not in result, (

@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 
 _DEFINITION_EXCLUDE_BUSINESS = frozenset({"limit", "offset", "count_token"})
 _DEFINITION_EXCLUDE_EXPORT = frozenset({"limit", "offset", "count_token", "headers", "file_name"})
+#: 构建器 DSL 的分页 / 翻页字段：同一定义换页不该产生新的运行身份（R1.2 / M8）
+_DEFINITION_EXCLUDE_BUILDER = frozenset({"limit", "offset", "page", "page_size", "count_token"})
 
 
 def _canonical_value(value: Any) -> Any:
@@ -50,10 +52,16 @@ def normalize_definition(body: Any, *, entry: str = "business") -> dict:
     """从请求体生成规范化定义 dict（去掉分页与凭证字段）。
 
     业务视图：去掉 limit / offset / count_token；
-    导出请求：另外去掉 headers / file_name。
+    导出请求：另外去掉 headers / file_name；
+    构建器：去掉 limit / offset / page / page_size / count_token（翻页不产生新的运行身份）。
     结果键排序、UUID 统一小写，与 PBT 证明一致（R1.2）。
     """
-    exclude = _DEFINITION_EXCLUDE_EXPORT if entry == "export" else _DEFINITION_EXCLUDE_BUSINESS
+    if entry == "export":
+        exclude = _DEFINITION_EXCLUDE_EXPORT
+    elif entry == "builder":
+        exclude = _DEFINITION_EXCLUDE_BUILDER
+    else:
+        exclude = _DEFINITION_EXCLUDE_BUSINESS
     if hasattr(body, "model_dump"):
         raw = body.model_dump(mode="json")
     elif hasattr(body, "__dict__"):
