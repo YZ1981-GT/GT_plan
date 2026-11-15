@@ -44,24 +44,37 @@ from app.services.workpaper_sync.contracts import parse_contract  # noqa: E402
 from app.services.workpaper_sync.definitions import canonical_digest  # noqa: E402
 from tests.workpaper_sync import h_cycle_facts as F  # noqa: E402
 
-_EVIDENCE = (
-    _REPO
-    / ".kiro"
-    / "specs"
-    / "h-cycle-sync-foundation-and-first-canary"
-    / "evidence"
-    / "task19-canary-db-evidence.json"
-)
+_SPEC_NAME = "h-cycle-sync-foundation-and-first-canary"
+_EVIDENCE_NAME = "evidence/task19-canary-db-evidence.json"
+
+
+def _resolve_evidence() -> Path:
+    """spec 目录会在归档时整体移到 ``.kiro/specs/_archive/<序号>-<批名>/`` 下。
+
+    原来把路径写死成 ``.kiro/specs/<spec>/evidence/...``，归档后 6 个用例在 setup 阶段
+    ``FileNotFoundError``（R9 清红：不是断言失败，是证据文件找不到）。这里先找活跃目录、
+    再按名字扫归档目录，两处都没有才报错。
+    """
+    specs = _REPO / ".kiro" / "specs"
+    active = specs / _SPEC_NAME / _EVIDENCE_NAME
+    if active.is_file():
+        return active
+    archived = sorted(specs.glob(f"_archive/*/{_SPEC_NAME}/{_EVIDENCE_NAME}"))
+    if archived:
+        return archived[0]
+    raise FileNotFoundError(
+        f"找不到 {_SPEC_NAME} 的 canary 真库证据（已查 {active} 与 _archive/*/{_SPEC_NAME}/）"
+    )
+
+
+@pytest.fixture(scope="module")
+def db_evidence() -> dict:
+    return json.loads(_resolve_evidence().read_text(encoding="utf-8"))
 
 
 @pytest.fixture(scope="module")
 def contract():
     return parse_contract(M.build_contract_payload(), adapter_id=M.ADAPTER_ID)
-
-
-@pytest.fixture(scope="module")
-def db_evidence() -> dict:
-    return json.loads(_EVIDENCE.read_text(encoding="utf-8"))
 
 
 # ═══════════════════════════════════════════════════════════════════════════

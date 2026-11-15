@@ -471,3 +471,238 @@
 - 并发会话代码入库后，逐个跑 xfail 标记的用例；若通过（xpassed）则删除 `@pytest.mark.xfail` 标记
 - 删除 xfail 标记时同步删除本清单对应行
 - 禁止把新增失败标为 xfail 来凑绿——新失败必须修代码或修断言
+
+## §12 变异验证与预存红收口（2026-11-15）
+
+任务 2.3 / 3.3 / 5.3 / 7.2 的守卫此前只跑过一次绿，**从未做过磁盘变异**。本轮补齐，并把
+R9 里两条真实过期判据修掉。
+
+### §12.1 变异脚本（两个，均支持 `--check-anchors` 只读校验）
+
+| 脚本 | 覆盖 | 靶点数 | 结果 |
+|---|---|---|---|
+| `backend/scripts/check/mutate_oo_writeback_parity_guards.py` | 任务 2.3 / 3.3 / 5.3 | 11 | 11/11 RED |
+| `backend/scripts/check/mutate_template_parity_frontend_guards.py` | 任务 7.2 | 6 | 6/6 RED |
+
+两个脚本**读写一律 LF**（`newline="\n"`）：`core.autocrlf=true` 下 `Path.write_text` 会按平台
+换行写回，复原后与 HEAD 不是逐字节相同 ⇒ `git diff` 为空但 `git status` 报 M 的整文件 churn。
+本轮首版就踩了这个坑（3 个后端文件 + 1 个前端文件），改用 LF 读写并逐字节复核后消失。
+
+> 另注：`git status` 报 M 而 `git diff` / `git diff --cached --numstat` 全空、且磁盘字节与
+> `git show HEAD:<path>` 逐字节相同时，是 index 的 stat 缓存陈旧，`git add <path>` 刷新即可
+> （不要当成真实改动去「恢复」）。
+
+### §12.2 任务 2.3 受保护口径（4 靶点，全 RED）
+
+| id | 退化形态 | 打红用例 |
+|---|---|---|
+| P1 | `PROTECTED_MODES` 退回不含 cross_sheet | `test_three_definitions_agree` |
+| P2 | `FieldValue.is_protected` 退回只认 formula / auto_source | `test_three_definitions_agree` |
+| P3 | `merge._protection` 只认本表 formula（cross_sheet 当可编辑） | `test_real_cross_sheet_fields_locate_as_formula` |
+| P4 | `FORMULA_MODES` 退回只含 formula | `test_formula_modes_partition` |
+
+三处口径各有一条独立靶点 —— 只改一处不会被打红以外的地方掩盖（这正是修前三处互相不一致的病因）。
+
+### §12.3 任务 3.3 公式还原（3 靶点，全 RED）
+
+| id | 退化形态 | 打红用例 |
+|---|---|---|
+| R1 | `wanted_formula` 恒返回 None（去掉还原） | `test_keep_server_writes_the_template_formula_back` |
+| R2 | 签名落到 `row+1`（还原到错行） | `test_keep_server_writes_the_template_formula_back` |
+| R3 | 去掉 `is_protected` 的「只允许 keep_current」禁令（选 OO 值也还原） | `test_protected_conflict_cannot_be_resolved_by_taking_incoming` |
+
+🔴 **R3 的口径订正**：任务书写的是「选 OO 值也还原」，但受保护冲突**不允许**选 OO 值 ——
+`conflicts.resolved_value_for` 对 `record.locator.is_protected` 只放行 `keep_current`，其余
+`ResolutionKind`（含 `take_incoming` / `manual`）一律抛 `ProtectedFieldOverrideError`（AC 6.6）。
+需求 4.2 说的「行为与现在一致」即指此。因此第三条靶点改为注入**该禁令本身被去掉**：一旦放行，
+用户在公式格上「选 OO 值」就会真的把公式覆盖掉 —— 与任务书要防的后果同型，且是这条语义在
+当前契约下唯一可达的退化形态。
+
+### §12.4 任务 5.3 签名几何（4 靶点，全 RED）
+
+| id | 退化形态 | 打红用例 |
+|---|---|---|
+| S1 | 给了 frame 也不归一他行引用（不做归一） | `test_signature_survives_insert_and_delete` |
+| S2 | 表内他行偏移量 `+1`（偏一行） | `test_tokens` |
+| S3 | 表下方 `{end+k}` 偏移量 `+1` | `test_tokens` |
+| S4 | `instantiate_signature` 丢 frame（还原落不回新位置） | `test_instantiate_into_shifted_geometry` |
+
+🔴 **S3 首轮写成 `test_signature_survives_insert_and_delete` 时是 WRONG-TEST**：那条参数化里
+`$C$24` 在插行前后**两侧同时**从 `{end+2}` 变成 `{end+2}`（frame 也一起从 22 变 24），
+偏移量整体平移后签名仍相等 ⇒ 用例结构上抓不到「偏移量常数错」。改挂 `test_tokens`（它逐字
+断言 `$C${end+2}`）才红得对。**这正是「变异 RED 要核对红在哪条用例」的实例**：只看
+「变红了」会把一条抓不到该缺陷的用例当成有效守卫。
+
+### §12.5 任务 7.2 前端按模板对齐（6 靶点，全 RED）
+
+| id | 退化形态 | 守卫 |
+|---|---|---|
+| F1 / F2 / F3 | D1-15 / D2-9 / D2 引擎的差异退回「实际 − 应计」 | `templateParityDBatch.spec.ts` |
+| F4 | D6-3 期末未审退回从期初审定起算 | 同上 |
+| F5 | 变动率：期初 0 且本期减少记 −1（模板 #DIV/0!） | `templateParityFGBatch.spec.ts` |
+| F6 | 变动率两者都 0 时退回 `'N/A'`（丢 `blank` 参数语义） | 同上 |
+
+### §12.6 R9 收口的两条真实过期判据
+
+1. **`test_h9_canary_and_contract.py` 的证据路径硬编码归档前位置**（6 errors）。
+   spec 目录整体移进 `.kiro/specs/_archive/16-workpaper-sync-cycle-lanes/` 之后，
+   `.kiro/specs/h-cycle-sync-foundation-and-first-canary/evidence/task19-canary-db-evidence.json`
+   不存在 ⇒ `TestHfP17CanaryDatabaseEvidence` 六例全在 **setup 阶段** `FileNotFoundError`
+   （不是断言失败，所以看起来像「环境问题」而被长期放着）。改为 `_resolve_evidence()`：
+   先查活跃目录、再按名字扫 `_archive/*/<spec>/`，两处都没有才报错。修后 43 passed。
+2. **`test_aos_adopt_endpoint_injection_and_atomicity.py` 的多 item 用例写死 5 个 item**
+   （3 xfailed + 1 xpassed，xfail 一直掩盖着）。F3 provider 的受管 store item 已由 5 扩到 9
+   （`F3-1-adj-seed-rows` / `F3-1-adj-slot-rows` / `F3-2-rows` / `F3-4-rows` 新增），
+   于是「seeded 了 5 个」与「changed_item_count == 5」都不再成立。处置：
+   ① 断言改为按 `phase5_f3_notes_payable.all_store_item_ids()` 现算；
+   ② `aos8_endpoint_world.identities_of` 原来只认 `rowId`，而 F3-1 两区声明的是 `rowKey`
+   ⇒ 取到空串把「键名不同」误报成「行没 seed 进去」，改为两键都认（两者都没有才算空）；
+   ③ 删掉 `@pytest.mark.xfail`（按 §11「解除纪律」）。修后该文件 59 passed。
+
+### §12.7 任务 1.2 字段名现算裁定（收口）
+
+现算（`backend/tests/workpaper_sync/contract_field_names_scan.py`，2026-11-15）：
+
+| 口径 | 值 |
+|---|---|
+| 现算缺口组数 / 字段名数 | **28 组 / 337 名** |
+| 登记表组数 / 字段名数 | **28 组 / 337 名**（逐值相等） |
+| 未登记的新缺口 | **0** |
+| 起始基线（批 A1 之前） | 50 组 / 473 名 |
+| 累计接通 | **22 组 / 136 名** |
+
+28 组逐条裁定（理由全文在 `backend/tests/workpaper_sync/data/contract_field_names_frontend_exceptions.json`，
+本节只按裁定类型归类，逐条理由以该文件为准）：
+
+| 类型 | 组数 | 组 | 裁定 |
+|---|---|---|---|
+| store item 形态冲突（M 循环 10 张） | 10 | `m1`~`m10`（`placeholder`） | 契约 `store_item_id` 写成 `placeholder`，前端真实 store item 与字段名**两套都没接**。M 循环是「明细表整表 JSON + 审定表 flat 键」并存形态（§4.10 附的现算结论），改任一侧都要动 10 个宿主的读写语义 + 真实 OO 往返验证 ⇒ 不在本 spec 擅自改；由 `test_m_detail_keys_match_provider.py` 的棘轮冻结（8 例，只许减小） |
+| 转置表契约未声明 store item | 3 | `g3` / `g4` / `g6`（空 item） | 契约表未声明 store item（两方向都未接），字段名与前端不同。接通时一并按前端定名；R5 已实证这三张转置表无公式字段（§7） |
+| R2 结构差异（待用户裁决） | 7 | D1-13 期后检查表 / D2-10 / F2-47 / F3-1 两区 / F4-1 账龄两区 / G5-2 / K2-3 / N3 / N4 / N5 | 前端行模型与模板**不同构**（不是字段改名能解决）：①D1-13 契约把模板「期后贴现\背书\调整等检查」凭证表（16 列，同区①）接到前端「特定样本」清单（项目描述 / 金额 / 原因），前端根本没有期后检查表；②D2-10 前端嵌套 `scenarios[]`、单一现值，模板平铺情景行、两年现值；③K2-3 前端一行两科目（借方 / 贷方分列），模板一行一科目；④N3 / N4 / N5 前端无两期暂时性差异 / 调整 / 审定列。改结构要迁移已存数据并改推送格式 ⇒ 登记待裁 |
+| 表头元信息 / 行身份口径 | 4 | B60-1 编制复核日期 / D4-31 `singleton` / G7 `rowUuid`+`ordinal` / G5-2 | 表头元信息（编制 / 复核日期）与行身份键口径：契约声明了前端没有的键，接通时一并定名 |
+| 计数合计 | **28 组 / 337 名** | | |
+
+结论：任务 1.2 的分母已闭合 —— 现算与登记**逐值相等、无未登记缺口**，且 28 组每组都有具体
+理由（守卫 `test_registry_only_shrinks_and_every_group_has_a_reason` 断言理由 ≥8 字符、字段名
+去重排序、组数 / 名数等于基线）。这不是「把缺陷藏起来」：任何**新增**的字段名不通都会因
+`test_every_mismatch_is_registered` 打红，任何**已接通却不删登记**会因
+`test_registry_has_no_stale_entries` 打红。
+
+### §12.8 任务 11 / 12.1 回归对比（2026-11-15）
+
+口径：`backend/tests/workpaper_sync` 全量，候选工作树与干净 HEAD 工作树
+（`git worktree add --detach`）各跑一次，junit 逐节点对比（不比计数 —— 参数化 id 内嵌时间戳会漂）。
+
+| 树 | failed | errors | passed | 红节点 |
+|---|---|---|---|---|
+| 候选（本 spec） | 1144 | 625 | 15585 | 1769 |
+| 干净 HEAD（`564c50aab`） | 1131 | 643 | 15571 | 1774 |
+
+逐节点：**共存红 1759 · 本批修复 15 · 新增 10**。
+
+#### 本批修复（15 条）
+
+`test_h9_canary_and_contract` 的 6 条（证据路径归档后失效，§12.6 第 1 条）+ 9 条随并发会话
+重放而转过（`test_d1_full_book_gate_open_pg` 2 / `test_task68` 2 / `test_task73` 4 /
+`test_template_override_lossless` 1）。
+
+#### 新增 10 条逐条归因（均为并发会话区域，**不是本 spec 引入**）
+
+| 测试 | 归因（现算证据） |
+|---|---|
+| `test_f2_p11…::test_contract_file_unchanged[_example.candidate.json / h1.disposal_check.json]` | 这两个契约 JSON 在磁盘上是 **CRLF** 而 index 是 LF（内容归一后逐字节相同）⇒ digest 差。`test_task42_h1_grouped_dynamic_pilot` 的 `test_disk_contract_is_lf_and_byte_stable` 正是要求 LF。**已按 index 的 LF 版归一回写**（`tmp_parity_mut/fix_crlf.py`，先验证「归一后与 index 相等」才写），复跑 15 passed |
+| `test_f2_p11…::test_contract_file_unchanged[d4.revenue_detail.json]` | 该 digest 基线过期；**干净 HEAD 工作树单跑同样红** ⇒ 基线既有红，非本批 |
+| `test_legacy_onlyoffice_url_retirement_gate::test_gate_delegates_to_the_single_readiness_source` | 并发会话（`4774e2ed4` / `564c50aab` 一批）正在改 legacy OO URL 退役 + readiness 单一来源；该文件在候选树单跑 2 passed，全量跑时被共享状态带红 |
+| `test_sync_editor_host_discovery_contract`（5 条） | 并发会话的 host discovery manifest 契约；干净 HEAD 工作树单跑**同样 7 条红**（含本组 5 条）⇒ 基线既有 |
+| `test_task42_h1…::test_disk_contract_is_lf_and_byte_stable` | 与上表第 1 行同一根因（h1 契约 CRLF）；修后单跑全绿 |
+| `test_task61_oo94_word_pilot_gate`（2 条） | 真库 pilot 门；干净 HEAD 工作树单跑同红 ⇒ 基线既有 |
+| `test_task75_entry_adapter_roundtrip` / `test_task75_published_identity_observer` | 登记表落后于现实（`f2.inventory_main: 真实注册成功而登记 adapter_registered=False`）⇒ 并发会话刚接通 f2、登记表未跟；干净 HEAD 工作树单跑 5 passed、候选树单跑红 ⇒ 候选树里该 provider 状态已被并发会话推进 |
+
+**归因方法与证据强度（如实标注）**：
+- 每条都在**干净 HEAD 工作树单跑**做过对照（这是 §12.8 的硬要求），但其中 3 条（legacy URL /
+  h1 LF / task75 两条）在对照时结果与全量跑不一致 —— 根因是并发会话在本轮运行期间持续推进
+  这些文件（HEAD 从 `82c2f52e0` → `564c50aab`），**两棵树的对照天然带时序噪声**。
+- 因此另做一次更强的判据：**只跑本 spec 触碰过的 7 个测试文件** →
+  **144 passed / 1 xfailed / 0 failed**。本 spec 的改动面零新增红，这一点不受时序噪声影响。
+- 未把这 10 条标 xfail 凑绿（§11 解除纪律最后一条）。
+
+#### 结论
+
+- 本 spec 改动面（3 个测试文件 + 2 个 spec 文档 + 2 个变异脚本）：**新增失败 0**。
+- `workpaper_sync` 全量仍有 1759 条共存红，主要来自归档 spec 证据目录缺失、旧 lane 锚点漂移、
+  真库快照漂移，以及并发会话正在做的 manifest / host discovery / task75 登记表 —— **不归因给本 spec**，
+  已逐类登记（§9 / §11 / §12.8）。
+
+## §13 任务 12.2 浏览器实测（2026-11-15，【测试】公式同步甲有限公司_2025）
+
+环境：后端 9980 healthy（47 个启动任务 ok / schema drift 0）、前端 3030、OnlyOffice `audit-onlyoffice` healthy、
+PG / Redis 通。项目 `4c77f3e8-3938-4628-8836-1435dda4ddea`。
+
+### §13.1 数据准备
+
+现有【测试】项目只有 12 个底稿码（A16 / A18-2 / D2 / E1 / H3 / I1~I6 / K10），**不含**本 spec 的验收目标表。
+按用户「只做【测试】项目」的裁定，用平台生成端点
+`POST /api/projects/{pid}/working-papers/generate`（模板集「标准年审」`a948a03c…`，1025 码）按
+`selected_templates` 白名单分两批生成 14 份：
+
+| 批 | 生成（created） | 说明 |
+|---|---|---|
+| 1 | D5 / D5-1 / D5-2 | D5-4 被 rejected（不在所选模板集里，非本 spec 范围） |
+| 2 | D3 / D6 / D6-3 / F3 / F3-4 | D3-4 同上去重（不在模板集） |
+| 3 | D1 / D1-1 / D1-2 / D1-4 / D2-1 / D2-2 | D2 已存在，未重复生成 |
+
+全部 `failures=[]` / `blank_codes=[]`。实测完 14 份全部按 `is_deleted` 软删（逐份打印 wp_code + 项目名，
+非【测试】项目一律 REFUSE）。
+
+### §13.2 D5-2 双向改值（R2.1，通过）
+
+页面上「期末未审 / 期末AJE / 期末RJE / 期末审定」四列齐全。逐格录入后用页面值反算：
+
+| 录入 | 页面算出 |
+|---|---|
+| 期初未审 1000 | 期初审定 1000 · 期末余额 1000 · 期末未审 1000 · 期末审定 1000 |
+| 本期增加 500 | 期末余额 1500 · 期末未审 1500 · 期末审定 1500 |
+| 期末AJE 100、期末RJE 50 | **期末审定 1650** |
+
+判据：`期末审定 == 期末未审(L) + AJE(M) + RJE(N)` → **1650 == 1500 + 100 + 50 ✓**
+（原口径 `J+N+M` 不含重分类，会是 1550 —— 与模板 #1 修正一致）。
+
+落库核对（`checklist_responses`，item `D5-2-rows`，content_version 1）：
+`priorUnadjusted:1000 / periodIncrease:500 / endBalance:1500 / endUnadjusted:1500 / endAje:100 / endRje:50 / endAudited:1650`
+—— 逐值等于页面显示。**刷新页面后重读四值不变**（存储 → HTML 方向也成立）。
+
+### §13.3 D6-3 期末未审起算口径（R2.2 / 批 A2 的核心，通过）
+
+新增一行录入：期初未审 1000、期初AJE **200**、计提 300、其他增加 40、转回 60、核销 20、其他减少 10。
+
+| 口径 | 期望 | 页面实测 |
+|---|---|---|
+| 新（模板 K = B + F − H − I − J，从**期初未审**起算） | 1000+300+40−60−20−10 = **1250** | **1250 ✓** |
+| 旧（从期初审定起算） | (1000+200)+300+40−60−20−10 = 1450 | 1450 ✗（页面不是这个值） |
+
+🔴 这一格**只有把期初AJE 填成非 0** 才能区分两种口径（先填 0 时两者同值 1250，区分不出来 ——
+首轮就踩了这个，补填 200 后才有决定性证据）。落库 `endUnadjusted: 1250` / `endAudited: 1250` 逐值一致。
+
+### §13.4 公式格敲数字 → 裁决保留服务器值 → 核对发布文件（**未完成，环境限制**）
+
+- D5-2 / D6-3 / F3-4 的 `working_paper_sync_entry_state` **无任何行** ⇒ 这三张表没有已发布在线编辑产物，
+  页面上「在线编辑」段显示「两侧数据未互通 / 该底稿尚未完成双向能力裁决（BP-1, BP-3, BP-4, BP-5）」
+  ⇒ **D5-2 上做不了这一项**。
+- 改用 D1-2（entry `xlsx/gt-d1-notes-receivable`，manifest 中 capability 已是 `bidirectional`）：
+  已真实打开在线编辑 —— OnlyOffice 编辑器加载了 D1-2 模板（截图确认表头含「期末未审数 / 账项调整 /
+  重分类调整 / 期末审定数」），首次打开即发布版本。
+- **阻塞点**：OO 编辑器在 `http://localhost:8080/...` 的 iframe 里，与主页面
+  `http://127.0.0.1:3030` **跨域**（`contentDocument` 抛 cross-origin），无法脚本化点击单元格；
+  而「保存」只能由 DocServer 自己 POST `onlyoffice-callback`（带独立签名的 callback route token，
+  不接受用户 Bearer）。⇒ 用自动化完成「在 OO 里把公式格敲成数字 → 保存 → 裁决 → 核对发布文件」
+  需要人工在 OO 界面操作，或另建 OO 侧的自动化通道。
+
+**已做到的替代证据（不是同一件事，如实标注）**：R4 的还原逻辑由
+`test_tamper_keep_current_restores_formula.py` 在**真 D4 world**（40 binding、真模板字节）上端到端覆盖 ——
+`N13` 共享公式从属格被换成纯数字 999 → 生产 `adapter.extract` + `merge_projections` 判受保护冲突 →
+保留服务器值 → `adapter.materialize(substrate=incoming)` 写出文件 → **逐格读回 `=SUM(B13:M13)` 且缓存值 100**；
+同列其他行共享公式与输入格不受影响；物化反读逐字段等于合并结果。三条磁盘变异（去掉还原 / 还原到错行 /
+去掉 keep_current 禁令）全部 RED（§12.3）。
+
+⇒ 12.2 第 3 项标为**部分完成**：自动化可达的部分（真实浏览器 + 真实模板 + 真库落库）已验；
+需要人在 OO 界面上点的那一步未做，**不当作已验证**。

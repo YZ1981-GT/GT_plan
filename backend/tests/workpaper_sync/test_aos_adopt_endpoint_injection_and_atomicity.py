@@ -40,6 +40,7 @@ from aos8_endpoint_world import (
     identities_of,
     unwrap,
 )
+from app.services.workpaper_sync import phase5_f3_notes_payable as MULTI
 from test_aos_adopt_endpoint_http import collect_once
 
 _HARNESS_PY = Path(__file__).resolve().parent / "test_aos_adopt_endpoint_http.py"
@@ -423,7 +424,6 @@ class TestAtomicityUnderInjection:
         )
 
 
-@pytest.mark.xfail(reason="F3 provider store items 从 5 扩展到 9（并发会话改动），item 数量和内容变化", strict=False)
 class TestMultiItemPartialWriteIsRolledBack:
     """多 item 场景（上游实测过的「部分写入」事故形态）。
 
@@ -435,23 +435,30 @@ class TestMultiItemPartialWriteIsRolledBack:
     """
 
     def test_all_five_items_were_seeded(self, snap: dict[str, Any]) -> None:
+        """全部受管 item 都 seed 成功（数量按 provider 现算，不写字面量）。
+
+        F3 provider 的受管 store item 由 5 个扩到 9 个（并发会话扩展），写死 5 会让本条在
+        provider 正常演化时假红 —— 口径改为 `MULTI.all_store_item_ids()` 现算。
+        """
         obs = snap["scenarios"]["multi_item_positive_control"]
-        assert len(obs["seeded_items"]) == 5, obs["seeded_items"]
-        assert len(obs["store_before"]) == 5
+        expected = sorted(MULTI.all_store_item_ids())
+        assert obs["seeded_items"] == expected, obs["seeded_items"]
+        assert len(obs["store_before"]) == len(expected)
         for row in obs["store_before"]:
             assert identities_of(row["remark"]) == (KEEP_ID, DROP_ID), row["item_id"]
 
     def test_positive_control_pruned_every_item(self, snap: dict[str, Any]) -> None:
         obs = snap["scenarios"]["multi_item_positive_control"]
+        n = len(MULTI.all_store_item_ids())
         assert obs["status"] == 200, obs["body"]
         body = unwrap(obs["body"])
-        assert body["changed_item_count"] == 5, body
-        assert len(obs["store_after"]) == 5, [r["item_id"] for r in obs["store_after"]]
+        assert body["changed_item_count"] == n, body
+        assert len(obs["store_after"]) == n, [r["item_id"] for r in obs["store_after"]]
         for row in obs["store_after"]:
             ids = identities_of(row["remark"])
             assert DROP_ID not in ids and KEEP_ID in ids, (row["item_id"], ids)
-        assert obs["store_writes"] >= 5, (
-            f"跨 item 的写少于 5 条 ⇒ 部分写入形态构不出来：{obs['store_writes']}"
+        assert obs["store_writes"] >= n, (
+            f"跨 item 的写少于 {n} 条 ⇒ 部分写入形态构不出来：{obs['store_writes']}"
         )
         assert obs["commits"] == 1 and obs["rollbacks"] == 0
 

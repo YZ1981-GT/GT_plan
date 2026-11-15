@@ -169,10 +169,19 @@ def base_substrate_payload() -> str:
 
 
 def identities_of(payload: str | None) -> tuple[str, ...]:
-    """从 store 载荷取身份序列（保序）。判据侧的**独立**读法，不复用生产 reader。"""
+    """从 store 载荷取身份序列（保序）。判据侧的**独立**读法，不复用生产 reader。
+
+    🔴 身份键按 spec 而异：F3 大多数条目是 `rowId`（`CARRIER_IDENTITY_KEY`），但 F3-1 的
+    两区（`F3-1-adj-seed-rows` / `F3-1-adj-slot-rows`）声明的是 `rowKey`。原来只读 `rowId`，
+    provider 从 5 个 item 扩到 9 个之后那两区取到空串 ⇒ 断言把「键名不同」误报成
+    「行没 seed 进去」。这里按两个已知键取值，两者都没有才算真空。
+    """
     if not payload:
         return ()
-    return tuple(str(row.get(CARRIER_IDENTITY_KEY) or "") for row in json.loads(payload))
+    rows = json.loads(payload)
+    return tuple(
+        str(row.get(CARRIER_IDENTITY_KEY) or row.get("rowKey") or "") for row in rows
+    )
 
 
 def identities_in_store(rows: list[dict[str, Any]]) -> tuple[str, ...]:
