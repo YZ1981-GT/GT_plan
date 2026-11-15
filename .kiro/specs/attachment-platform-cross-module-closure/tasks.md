@@ -65,3 +65,10 @@
 - **可逆演练**：`tmp_attachment_platform_cross_module_task29_evidence/migration_rehearsal.json` 记录 SQLite 内存库静态分句、V/R 配对、rollback_to(241) 逆序只调用 242、schema_version 留 241、故障事务回滚后探针行数 0；未连接共享库、未执行任何 V/R SQL。首次 SQLite 生产 PG DDL 直接演练因 `SERIAL DEFAULT NOW()` 失败，随后显式建最小 schema 并只替换演练层 ensure/backup/rollback executor 后通过；该限制如实保留。
 - **五角色复盘结论**：合伙人不放行晋升/AI/归档；项目经理保留 Task 30 迁移/backfill/purge 与 Task 31 提交推送停点；质控确认下载/预览/合同/函证/溯源证据但要求 500/404 fail-closed；审计助理确认上传/预览/合同/函证可用而 AI 发送 404；EQCR 确认候选/HEAD 附件差集无新增失败，PG skipped 与全量类型债已分开归因。
 - **Task 28 生产阻断留痕**：知识晋升写 promotion 早于 attachment 导致 `target_attachment_id` FK 500；AI 页面真实带 `project_attachment_ids` 但 `/api/ai-chat/runs` 404 且无 resource 写入；四个 Task 28 附件软删后永久删除被 `fk_av_parent_scope` 阻断，未直接 SQL 删除；D4/公式项目附件、函证、底稿证据、知识文档可见面已恢复为空，项目 business_category 已恢复 NULL。详见 `tmp_attachment_platform_task28/task28_report.md` 与各 JSON 快照。
+
+- **2026-11-15 Task 29 阻断修复批次（代码已改，真实四附件永久删除未执行）**：
+  - 知识文档晋升改为在同一 SAVEPOINT 内按 `Attachment → AttachmentVersion → current_version_id → KnowledgeEvidencePromotion` 逐层 `flush`；避免无 ORM relationship 时 PostgreSQL 先写 provenance 触发 `target_attachment_id` / `target_attachment_version_id` FK 500。原知识晋升、AI 项目附件、路由挂载聚焦套件均通过。
+  - 附件单条 / 批量 / 两条清空入口统一经 `attachment_permanent_delete_service`：根行加 `FOR UPDATE` 并复核 `is_deleted`，先断 current、清理失效 legacy alias、倒序删除版本、再删根；外部治理 FK 在 SAVEPOINT 内转为 409/批量 referenced，不绕过服务层。根文件和版本 `storage_key` 均进入提交后清理引用，清理前二次核查引用集合。
+  - 证据：附件跨模块套件 **72 passed / 4 skipped**；附件安全守卫 **285 passed / 3 skipped**；路由挂载 + AI run/对话聚焦 **28 passed**；Ruff 通过。共享 PG 回滚演练对 Task 28 四个已软删附件均返回 `rollback-ok`（每个根+版本 2 个文件引用），回滚后附件仍为 4 行、版本各 1 行；未触碰原有回收站数据。
+  - 独占 `start-dev.bat` 重启后浏览器对 `/api/ai-chat/runs` 的无认证请求返回 401、登录态非法体返回 422，均不再是 404；历史 404 归因于未重启/旧运行栈，当前源码 `app.routes` 与挂载守卫均含该端点。
+  - **仍保持未完成**：四个 Task 28 附件的真实永久删除是不可逆操作，本批只做共享 PG 回滚演练，未在共享库执行提交式删除；需用户明确放行后再走回收站服务端点并做前后清单核对。

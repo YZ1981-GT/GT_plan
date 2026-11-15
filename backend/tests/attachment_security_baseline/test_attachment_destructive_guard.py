@@ -263,6 +263,47 @@ async def test_purge_single(world):
     assert (await _exists(world, ok.id), await _exists(world, referenced.id)) == (False, True)
 
 
+async def test_purge_single_deletes_versions_before_root(world):
+    """回收站永久删除必须先断 current_version，再按版本倒序删除根行。"""
+    attachment = await add_attachment(world, world.target, is_deleted=True)
+    actor = await world.user()
+    version = await world._add(AttachmentVersion(
+        attachment_id=attachment.id,
+        project_id=world.target.id,
+        audit_year=2025,
+        version_no=1,
+        storage_type="local",
+        storage_key=attachment.file_path,
+        availability="available",
+        actor_type="user",
+        actor_user_id=actor.id,
+    ))
+    attachment.current_version_id = version.id
+    await world.db.commit()
+
+    user = await _user(world, "edit")
+    async with world.client(RB_ROUTER, user=user) as client:
+        response = await client.delete(f"/api/recycle-bin/attachment/{attachment.id}")
+
+    assert response.status_code == 200, response.text
+    assert await _exists(world, attachment.id) is False
+    assert (await world.db.execute(sa.select(sa.func.count()).select_from(AttachmentVersion)
+                                    .where(AttachmentVersion.id == version.id))).scalar_one() == 0
+
+
+async def test_purge_service_rechecks_restored_state(world):
+    """即使调用方拿到旧对象，服务层也不能删除已恢复附件。"""
+    from app.services.attachment_permanent_delete_service import (
+        AttachmentPurgeBlocked,
+        permanently_delete_attachment,
+    )
+
+    attachment = await add_attachment(world, world.target, is_deleted=False)
+    with pytest.raises(AttachmentPurgeBlocked, match="已恢复"):
+        await permanently_delete_attachment(world.db, attachment)
+    assert await _exists(world, attachment.id) is True
+
+
 async def test_purge_single_on_archived_project_is_423_even_for_admin(world):
     att = await add_attachment(world, world.target, is_deleted=True)
     await world.archived_edit_member()  # 目标项目置为已归档

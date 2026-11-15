@@ -52,6 +52,12 @@ async def unlink_unreferenced_files(
         resolved = plan.canonical_path
         try:
             referenced = await referenced_local_paths(db, project_id=ref.project_id)
+            if normalized_path(resolved) in referenced:
+                stats["kept_referenced"] += 1
+                continue
+            # 物理 unlink 前再次读取引用集合，缩短提交后的 TOCTOU 窗口。正常
+            # 上传使用不可预测存储键；若有并发复用同一路径，宁可保留文件。
+            referenced = await referenced_local_paths(db, project_id=ref.project_id)
         except Exception:  # noqa: BLE001 — 查不出引用就不删（宁可留孤儿，不误删共用文件）
             logger.warning("附件文件引用查询失败，保留文件", exc_info=True)
             stats["failed"] += 1
