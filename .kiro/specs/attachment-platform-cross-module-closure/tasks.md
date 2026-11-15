@@ -50,7 +50,7 @@
 - [x] 27. 修复验证环境（声明依赖 pgvector、Node 可执行环境），运行聚焦后端/前端测试
 - [x] 28. Playwright 真实走查底稿、凭证、合同、函证、知识晋升、AI 附件、输出溯源、归档，并恢复测试数据
 - [x] 29. 干净 worktree 全量差集验证、迁移/回退演练、五角色复盘，更新 INDEX/memory
-- [~] 30. 共享库迁移与历史附件路径/backfill 应用（执行前向用户展示清册和回退方案并停点确认）
+- [x] 30. 共享库迁移与历史附件路径/backfill 应用（执行前向用户展示清册和回退方案并停点确认）
 - [x] 31. 单一提交并按版本工具推送当前分支
 
 
@@ -84,3 +84,9 @@
   - 新增显式 `dry_run=True`：不创建 checkpoint/version/alias，不更新附件根，只输出 planned/alias-only/blocked/skipped 统计；新增 `assess_existing_version_chain` 守卫用例。
   - 共享 PG dry-run 结果（事务前后计数一致，未写入）：安徽项目扫描 247、聚合 247、`alias_only_roots=247`、`aliases_planned=247`、`versions_planned=0`、阻断 0；和平项目扫描 118、因年度无法证明全部 `skipped_no_audit_year=118`；`attachment_versions=269`、`legacy_attachment_alias=2`、`evidence_migration_checkpoints=0` 前后不变。
   - 后端 backfill/治理回归 **33 passed**；本批只提交 runner 兼容修复和 dry-run 能力，**未执行真实 apply**，等待用户对安徽 247 条 alias-only 计划再次确认。
+
+- **2026-11-15 Task 30 apply 最终记录**：
+  - 用户明确放行后，使用 `EvidenceBackfillRunner` 在单一事务内对重药控股安徽有限公司_2025 执行 alias-only apply；预期报告逐值满足：scanned=247、aggregates=247、alias_only_roots=247、aliases_created=247、versions_created=0、blocked_existing_roots=0、checkpoints_done=5。
+  - apply 前生成备份 `tmp_attachment_task30/evidence/task30_alias_apply_backup.json`，canonical SHA-256=`280feb5e7951d69afeea716db0655131a6c66bbcc5c3dec6322fc692c6cf4ca9`；回退 SQL=`tmp_attachment_task30/evidence/task30_alias_apply_rollback.sql`（仅删除本批 247 条 alias 与 5 条 V106 checkpoint，带数量保护）。
+  - 提交后 PG 核对：`attachment_versions` 总数仍 269；安徽 alias=247（root=227/current_version=20）；V106 done checkpoint=5；安徽附件根行未变化；原有两条回收站 alias 未变化。和平药房 118 条因 `audit_year=NULL` 继续 pending，未写入；无文件系统路径改写。
+  - 最终回归：Ruff 通过；附件平台 + Task 30 backfill 套件 **105 passed / 4 skipped**，跳过项为既有 PG-only 项。Task 30 完成，Task 30 apply 未执行任何 V/R 删除或物理文件操作。
