@@ -567,6 +567,22 @@
       - 🔴 顺带钉下一个口径差异：**生产错误信封是 `{"code": 410, "message": {"error_code": ...}}`**，而 `tests.authz_world.build_app` 自建应用给的是 `{"detail": {"error_code": ...}}`（既有 PG 用例按后者断言）。两者都真，但「自建 app 全绿」不能代表生产栈 —— 这正是本轮另写一份运行栈守卫的理由。
   - 另含任务 36 静态复核后保留的两个 e2e spec（`playwright test --list` 共 11 个用例，提交 70de92c38；运行前设 `E2E_BASE_URL` / `E2E_BACKEND_URL` 指向本次验收的那一套，只读核对设 `SKIP_E2E_SEED=1`）：`advanced-query-module-e2e.spec.ts` 6 个（业务视图入口标题与能力说明；选字段 → 条件 → 执行 → 导出不崩；结果下钻 GtIndexChip；高级构建器入口 → 表 → 字段 → SQL 预览 → 执行 → 导出；cell-writeback 端点前置校验；切换两入口后视图存活）、`advanced-query-consolidation-critical-path.spec.ts` 5 个（业务视图与构建器列名中文一致；导出 xlsx（「导出 ▾」→「导出当前页」）；cell_ref 下钻跳底稿编辑器；右键溯源跳 /template-library（页面版结果表没有右键菜单，按前置条件不满足记录）；查询 + 导出 + 切换视图 0 console error）
   - 进度（2026-11-04 阶段 0 第三轮，候选 = 远端 `8352d7b38`/v1.0.104 + 本 spec；详见 `closure.md` §16.8~§16.9）：**部分实测**。共享库迁移已由他人追平到 V251（`schema_version` 250 行、无待执行迁移）⇒ 上一条的「待放行第 ② 件」不再需要。候选栈 9981（`--lifespan off`）+ 3040 上：两个 e2e spec **11 / 11 通过**（`advanced-query-module-e2e` 的登录等待随登录落点「/」改为离开登录页即可）；§10.5 写后读回走查 5 项通过（模板公开保存 → 读回 → 载入执行 → 删除 → 回收站恢复 → 永久删除 → 库内 0 行；服务端导出 openpyxl 读回 22,716 = COUNT；W6 试算表 1002 = 5,479、报表 BS-002 = 10 两个宿主与 SQL 一致；W3 系统预置 10 条、载入不自动执行）。🔴 **抓到并修复 1 处真实缺陷**：业务页入口首次打开弹窗只套上下文、不查询（immediate watch 写在状态声明之前，落进 TDZ；`fix(web-query)`，补首次挂载用例，修复前版本打红）。未走：需专门测试账号的 4 项与其余 §10.5 项（清单见 closure §16.9），本条保持 `[ ]*`。
+  - 进度（2026-11-15 补充实测，候选栈 9981 + 3040，`tmp_aqf/probes/run_e2e.py` 与 `walkthrough_aql_rest*.py`，证据在 `tmp_aqf/walkthrough/`）：
+    - **两个 e2e spec 在新代码上重跑 11 / 11 passed**（`advanced-query-module-e2e` 6 + `advanced-query-consolidation-critical-path` 5，workers=1，`SKIP_E2E_SEED=1` 只读核对）。🔴 过程坑：`playwright.config.ts` 的 `webServer` 是 `reuseExistingServer: !process.env.CI` ⇒ 设 `CI=1` 会让它想自己起 3030（已被候选前端占用）并直接报 `already used`；跑候选栈 e2e 时**不要设 CI**。
+    - **新补走的 §10.5 项（admin 即可，不需要专门账号）**：
+      | 项 | 判据 | 结果 |
+      |---|---|---|
+      | 序时账翻页 | 和平药房_2025 序时账 → 「共 1,066,675 条」→ 翻到第 2 页内容不同（1,066,675 = SQL 生效数据集行数） | 通过 |
+      | 借方降序 | 点「借方发生额」列表头 → 首屏借方金额降序（1406.02 / -1,358,735.29 等，按金额绝对值排） | 通过 |
+      | 切项目后再开弹窗 | 切到「重药控股安徽_2025」→ 弹窗可选中、执行按钮状态随数据源重置 | 通过（`run_disabled_after_switch=true` = 换项目后未选源，符合预期） |
+      | 错误态中文与错误码 | 未登记源 → **400 `UNKNOWN_SOURCE`** + 中文「未知数据源：__no_such_source__」；非法 project_id → **403 `FORBIDDEN_PROJECT`** + 中文原因；不存在的项目 → 403 + 中文「无权访问该项目数据」 | 通过（三条信封均为平台 `{code, message:{error_code, message}}`，无英文、无 500） |
+      | 页面版结果表右键 | 执行序时账（100 行）后对首行右键 | **无右键菜单**（count=0）—— 与 e2e spec 里「按前置条件不满足记录」一致，不是缺陷 |
+      | 模板库「📊 高级查询」按钮 | 静态核实：`TemplateLibraryButton` 挂在 3 个宿主（`WpTemplateDetail` / `ReportConfigTab` / `NoteTemplateTab`），点击 `eventBus.emit('open-custom-query', {tab, source, project_id})`；`ThreeColumnLayout` 订阅并打开弹窗（`ThreeColumnLayout.customQuery.spec.ts` 有订阅守卫） | **链路完整**；但 `/template-library` **首页**没有该按钮（它在各模板详情页签内），我第一版探针在首页找所以 count=0 —— 是探针找错位置 |
+    - **仍未走（如实登记，不假绿）**：需专门测试账号的 4 项（审计员作者在回收站看到「恢复」「删除」、模板三档对审计员可见、经理清 `sessionStorage` 后刷新回收站、PM 身份构建器默认当前项目 / 只见可访问项目）—— 要在共享库建测试账号，本轮不建；另「附注右键与底稿工具栏两个宿主」「附注编辑器页内切年后再点入口」「A1 底稿没有登记对应科目提示」「复制引用粘到公式编辑器校验」「W3 大额预置的重要性提示与另存为我的模板」未逐项走。
+    - 走查全程 console error **0**（除一处脚本自身未带 token 的 401，已修正后复跑为 0）。
+    - 候选栈已停（前后端进程 terminated、`.env.local` 已删）；本轮走查未写业务数据（e2e 用 `SKIP_E2E_SEED=1`、页面走查只读 + 一次导出）。
+    - 本条**保持 `[ ]*`**：剩余项依赖外部账号。
+
 - [x] 38. 合并项目路径实测（tb_summary / ws_* / consol_unit / 合并附注）：现库 0 个合并项目；未实测时写「代码已改但未实测」
   - 证据（2026-11-01，真 PG，`tests/advanced_query_linkage/test_aql_consolidated_paths_pg.py`，**11 passed / 10.3 s**；本条把前置判断纠正后由 data-blocked 转为**已实测**）：
     - 🔴 **前置判断是错的，不是「现库 0 个合并项目」**：此前按 `projects.project_type = 'consolidated'` 判，而该列的 PG 枚举 `projecttype` **根本没有这个取值**（现查 = `annual` / `special` / `ipo` / `internal_control` / `capital_verification` / `tax_audit`）⇒ 那个条件**恒 0**，与有没有数据无关。生产代码的真实判据是 `fetchers/disclosure._report_scope` 读的 **`projects.report_scope`**：按它现查未删除项目 standalone 16 / **consolidated 3** / NULL 1。三个合并项目是 `某测试集团有限公司_2098`、`【测试】公式同步集团有限公司_2025`、`甲测试有限公司_2098`（`audit_period_end` 全为 NULL ⇒ 年度只能由数据侧给出）。用例把这条纠正钉成判据（枚举里出现 `consolidated` 即打红，提示重新评估）。

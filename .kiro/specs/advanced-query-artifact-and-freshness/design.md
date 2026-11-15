@@ -633,6 +633,70 @@ generated_at     generated_by {user_id, username}
 
 `check_router_registration`、`check_file_size`、`check_migration_versions`、`check_staged_tree_self_consistency` 全部 exit 0；端点鉴权基线（`test_project_endpoint_authorization_baseline.py`、`test_project_endpoint_authz_body_carried.py`）计数不增；`test_route_shadow_guard.py`、迁移完整性用例、`test_spec_index_consistency.py` 通过；单区域 vue-tsc 0 错误，并用注入错误证明它真的在检查。
 
+
+## §10.8 收口节（2026-11-15，任务 0 / 10 实测与偏离）
+
+本节只记**现算**结果与处置，不改前文原文。
+
+### 1. 现状重算与 §0 的偏离（任务 0）
+
+| 项 | 设计原文 | 现算（2026-11-15） | 处置 |
+|---|---|---|---|
+| 磁盘迁移 | 最高 V267 | **259 个 `V*.sql`、最高 V271、重复 0 组**、`R*.sql` 206 个 | 已在 §0.6 更正 |
+| 共享库 | 最高 V267 | **261 行、最高 V271**，`query_runs` / `query_artifacts` 均存在且各 0 行 | 已在 §0.6 更正；**任务 10 的「待放行」前提消失** |
+| 远端分支 | 最高 V267 | **259 个、最高 V271** | 同上 |
+| `query_orchestrator.py` | 743 → 预算 +30 | **777（+34）** | 超预算 4 行，仍在 800 硬上限内；不改判据、不抬白名单 |
+| `export_service.py` | 608 → 预算 +40 | **697（+89）** | 超预算 49 行，仍在 800 内（抽出 `build_xlsx_file` 带来的），登记不处置 |
+| `custom_query.py` | 1990 → 净减 | **1982（−8）** | 满足 |
+| 其余 5 个文件 | 各 +40~+60 / 净增 ≤0 | 全部在预算内（`QueryBuilder` +21、`query_export` ±0、`CustomQueryDialog` −20、`CustomQueryTab` +13、`AdvancedQueryBuilder` +12） | 满足 |
+| 端点鉴权基线 | 未列 | 路径含 `{project_id}` **446** / 真实无鉴权 **6** / 仅登录 **143**（基线 146）；前缀维 **735**（project 540 / identity **192**，基线 197）；body_carried **232**（project 150 / identity 78 / none 4） | 新增端点未使任何一维增加；已写进 §0.7 |
+
+- 补丁点清单（§5.3 的 5 条）**逐条 `importlib` 解析成功**；AST 扫描另得 18 条清单外的点，
+  其中真属本链路的两条已补进 §5.3（`custom_query._load_step_sheet_mapping`、`paged_fetch.stream_statement`）。
+
+### 2. 任务 10 走查抓到 5 处真实缺陷（都在已标 `[x]` 的任务里）
+
+逐条的证据、修复提交与变异证明见 `tasks.md` 任务 10 的表格。要点：
+
+1. **路由签名把 `_origin` / `_template_id` 变成客户端可传的 query 参数**（运行期依赖树实测）
+   ⇒ 违反 §5.3「路由函数名与签名不变」。修法：HTTP 层抽成内部函数 `_execute_with_http_layer`。
+2. **`version_vector.hash` 字段名拼错**（真名 `vector_hash`）⇒ `AttributeError` 被 `except` 以
+   `logger.debug` 静默吞掉，`result.version` 有值但 `req.version_hash` 恒 None。构建器 `_bv.hash` 同族。
+3. **`query_runs` 的 PG 插入把 `captured_at` 当 ISO 字符串** ⇒ asyncpg `DataError`，运行记录在
+   PostgreSQL 上**永远写不进去**（被降级成「写入失败」，查询照常返回）。
+4. **登记在 SAVEPOINT 内但路由不提交** ⇒ 响应 `run.recorded=true` 而库里 0 行；构建器则**根本没登记**。
+5. 🔴 **导出证据链路整条未实现**：`query_artifacts.seal_artifact` 写完了但**全仓零调用**，
+   `query_export.respond_xlsx` 仍走临时文件发完即删 ⇒ 库里 `query_artifacts` 0 行、证据目录从未创建。
+   **本轮不修**：这是 §6 整条 R4 需求（封存流程 / `build_xlsx_file` 拆分 / 两条导出路径接线 /
+   说明页四行 / 三个响应头 / 下载重验 / 清单端点 + P10 与 M10 / M11），不是接线补丁能糊过去的。
+   ⇒ `tasks.md` 任务 5 已从 `[x]` **如实改回 `[ ]`**。
+
+### 3. 回归基线（现算）
+
+| 项 | 结果 |
+|---|---|
+| 真 PG 全目录 `tests/advanced_query_linkage/` | **940 passed / 0 failed / 0 skipped** |
+| 非 PG 选集（29 文件） | **475 passed / 0 failed**（修复前 2 failed / 472 passed） |
+| 前端选集（35 文件） | **372 passed / 0 failed** |
+| 门禁 | `check_migration_versions` / `check_router_registration` / `check_file_size` / `test_spec_index_consistency` / `test_route_shadow_guard` 全 exit 0 |
+| 变异 | 接线 `V1/V2/V3` 红 + `N1` 绿；缺陷 `M-A/M-B/M-C` 红 + `N1` 绿，**逐字节还原 sha256 全部一致** |
+
+### 4. 预存失败（干净 HEAD `901cfd7a5` 上逐条同红，不属本 spec，未代改）
+
+- `test_project_endpoint_authz_body_carried.py::test_body_known_gaps_only_shrink` ——
+  `_BODY_KNOWN_GAPS` 里 `metabase.py::build_drilldown_url` / `get_embed_url` 两条已失效（现算非 none 档）。
+  删除登记等于代他域确认「已补鉴权」，本 spec 不代改。
+- `tests/scripts/test_hard_cap_ratchet.py` 3 条（`DisclosureEditor.vue` cap 3273 而实际 3263、余量 10；
+  `ReportView.vue` 同类；连带 `test_ratchet_detects_artificially_raised_cap`）。
+
+### 5. 遗留
+
+- **任务 5**（查询证据 R4.1~R4.7）待实现：见上第 2.5 条清单。
+- **任务 10** 的 W2 未走：现库 12 个名称含「测试/E2E/UAT」的项目里只有 2 个有审计年度
+  （`E2E-D4发布测试项目_请勿动_2099` 名字明确「请勿动」；`【E2E】公式管理运行时门禁_2025` 零成员行、四表全 0），
+  录入 AJE 会污染共享库 ⇒ 需一个可写的【测试】项目或用户放行自建。
+- **N1 性能**未在本任务复跑（本 spec 未改取数路径，只加版本采集；采集成本见 §0.3）。
+
 ## §11 Phase 2 预留（本 spec 不实施）
 
 - 证据转附件：把证据文件复制进附件根、登记 `asset_blobs`、建 `attachment_versions`，写法同 `knowledge_evidence_promotions`，记录来源证据编号与清单摘要。
