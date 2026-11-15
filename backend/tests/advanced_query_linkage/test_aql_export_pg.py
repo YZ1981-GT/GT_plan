@@ -53,10 +53,19 @@ INFO_KEYS = ["项目", "年度", "数据源", "条件", "行数", "导出时间"
 
 @pytest.fixture(autouse=True)
 def _gate_and_tempdir(monkeypatch, tmp_path):
-    """临时文件写进本例私有目录（结束时核对已删）；每例前后导出闸都必须是空的。"""
+    """临时文件写进本例私有目录（结束时核对已删）；每例前后导出闸都必须是空的。
+
+    另隔离 `QUERY_ARTIFACT_ROOT`：AQF 任务 5 起导出会封存证据，不隔离就会往真实的
+    `backend/storage/query_artifacts` 落文件（库行随回滚消失，磁盘文件会累积）。
+    """
+    from app.core.config import settings
+
     xlsx_tmp = tmp_path / "xlsx_tmp"
     xlsx_tmp.mkdir()
     monkeypatch.setattr(tempfile, "tempdir", str(xlsx_tmp))
+    artifact_root = tmp_path / "query_artifacts"
+    artifact_root.mkdir()
+    monkeypatch.setattr(settings, "QUERY_ARTIFACT_ROOT", str(artifact_root))
     assert export_gate.in_flight_count() == 0, "上一个用例泄漏了导出名额"
     yield xlsx_tmp
     leaked = export_gate.in_flight_count()

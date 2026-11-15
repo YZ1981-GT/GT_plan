@@ -61,7 +61,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException
 
@@ -337,12 +337,10 @@ class ExportService:
         表头、数据与查询说明里以 ``= + - @`` 开头的文本一律按文本写入（R8.5）。
 
         流程（R8.1/R8.2/R8.3/R8.4/R8.6/R7.7）：
-        1. 容量守卫：含来源列的总列数 > 16,384 → ``EXPORT_CAPACITY``（首字节前）。
-        2. write_only 工作簿写表头 + 数据来源标识列表头（R7.4）。
-        3. 以 ≤ ``memory_row_cap`` 的缓冲批量 ``append``，行随即增量写入磁盘临时文件，
-           单次行驻留受限（R8.3）；逐行计数，超 ``row_hard_limit`` / xlsx 行上限 →
-           首字节前 ``raise``（不产生部分文件，R8.4/R7.6）。
-        4. ``wb.save`` 落临时文件（executor 内执行），按 ``byte_chunk`` 字节块流式
+        1~3. 容量守卫、表头、逐行写入与行上限守卫 —— 与 ``build_xlsx_file`` **同一内核**
+           （:meth:`_build_workbook`，AQF §6.2 要求「``stream_xlsx`` 改为调用它且行为不变」；
+           曾有两份重复实现，改一处忘另一处是这类代码的典型缺陷形态）。
+        4. ``wb.save`` 落**系统**临时文件（executor 内执行），按 ``byte_chunk`` 字节块流式
            读出并 ``yield``（R8.2）；读毕删除临时文件。
 
         **中途错误**（R7.7/R8.6）：步骤 1–3 的任一失败都在 **首个字节 yield 之前**
@@ -352,100 +350,15 @@ class ExportService:
         **一致性**（R8.5）：数据行经 :func:`_row_export_values` 构造，与非流式
         ``export_xlsx`` 同源，保证流式与物化对同一结果集的行内容逐行一致。
         """
-        from openpyxl import Workbook
+        wb, row_count = await self._build_workbook(
+            result_iter, columns,
+            chunk_rows=chunk_rows, memory_row_cap=memory_row_cap, row_hard_limit=row_hard_limit,
+            info_rows=info_rows, sheet_title=sheet_title, extra_sheets=extra_sheets,
+        )
 
-        columns = list(columns)
-        source_cols = [c for c in columns if getattr(c, "addr_id", None)]
-        total_cols = len(columns) + len(source_cols)
-
-        # ── step1: 容量守卫（列，R7.6）——首字节前拦截 ──
-        if total_cols > XLSX_MAX_COLS:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error_code": "EXPORT_CAPACITY",
-                    "message": (
-                        f"结果集列数（含来源列 {total_cols}）超出 Excel 原生上限 "
-                        f"{XLSX_MAX_COLS:,} 列，已中止导出"
-                    ),
-                    "actual_cols": total_cols,
-                    "max_cols": XLSX_MAX_COLS,
-                },
-            )
-
-        wb = Workbook(write_only=True)
-        ws = wb.create_sheet(title=safe_sheet_title(sheet_title))
-
-        # ── step2–4: 构建并落临时文件（首字节 yield 之前完成，中途错误在此 raise）──
-        # 任一步失败（容量守卫 / 行迭代 / 硬上限 / 落盘）都在产出任何字节前发生，直接
-        # raise 中断；此处兜底 close 工作簿以释放 openpyxl write_only 内部 lxml 写入器
-        # 与其自建临时文件，避免中途 raise 时的资源泄漏（R7.7/R8.6）。
-        try:
-            # step2: 表头
-            ws.append(self._header_cells(ws, columns, source_cols))
-
-            # step3: 逐行 append（缓冲 ≤ memory_row_cap，行驻留受限 R8.3）
-            buffer: list[list[Any]] = []
-            cap = max(1, min(memory_row_cap, chunk_rows))
-            row_count = 0
-            async for row in self._aiter_rows(result_iter):
-                row_count += 1
-                # 硬上限 / xlsx 行上限守卫（首字节前，R8.4/R7.6）——防御式，即便 total 未知
-                if row_count > row_hard_limit:
-                    raise HTTPException(
-                        status_code=400,
-                        detail={
-                            "error_code": "EXPORT_ROW_HARD_LIMIT",
-                            "message": (
-                                f"结果集行数超出导出硬上限 {row_hard_limit:,} 行，"
-                                "已中止导出，请缩小查询范围"
-                            ),
-                            "row_hard_limit": row_hard_limit,
-                        },
-                    )
-                if row_count > XLSX_MAX_ROWS:
-                    raise HTTPException(
-                        status_code=400,
-                        detail={
-                            "error_code": "EXPORT_CAPACITY",
-                            "message": (
-                                f"结果集行数超出 Excel 原生上限 {XLSX_MAX_ROWS:,} 行，"
-                                "已中止导出"
-                            ),
-                            "max_rows": XLSX_MAX_ROWS,
-                        },
-                    )
-                buffer.append(_row_export_values(row, columns, source_cols, ws=ws))
-                if len(buffer) >= cap:
-                    for values in buffer:
-                        ws.append(values)
-                    buffer.clear()
-
-            # flush 剩余缓冲
-            for values in buffer:
-                ws.append(values)
-            buffer.clear()
-
-            # 空结果 → 仅标题行 + 空提示行（R7.5，防御式；流式通常不用于空集）
-            if row_count == 0:
-                ws.append([_EMPTY_NOTICE])
-
-            if info_rows is not None:
-                items = info_rows(row_count) if callable(info_rows) else info_rows
-                if items:
-                    _append_info_sheet(wb, list(items))
-            for title, table_rows in extra_sheets:
-                extra = wb.create_sheet(title=safe_sheet_title(title))
-                for values in table_rows:
-                    extra.append([_text_safe_cell(extra, _excel_cell_value(v)) for v in values])
-
-            # step4: 落临时文件（executor 内执行 openpyxl 保存）
-            loop = asyncio.get_event_loop()
-            tmp_path = await loop.run_in_executor(None, self._save_to_tempfile, wb)
-        except BaseException:
-            # 中途中断：best-effort 释放 write_only 内部写入器/临时文件后上抛
-            self._safe_close_workbook(wb)
-            raise
+        # step4: 落系统临时文件（executor 内执行 openpyxl 保存；发完即删，故用系统临时目录）
+        loop = asyncio.get_event_loop()
+        tmp_path = await loop.run_in_executor(None, self._save_to_tempfile, wb)
 
         # ── 按字节块流式读出并 yield（内存驻留仅一块）──
         try:
@@ -581,12 +494,20 @@ class ExportService:
                     pass
 
     @staticmethod
-    def _save_to_tempfile(wb: Any) -> str:
+    def _save_to_tempfile(wb: Any, directory: str | None = None, file_name: str | None = None) -> str:
         """将 write_only 工作簿保存到磁盘临时文件，返回路径（供分块读出）。
 
         write_only + 落盘避免将整个 xlsx 字节载入内存，配合按字节块读出保证大结果集
         流式导出的内存平稳（R8.3）。
+
+        ``directory`` / ``file_name`` 给出时**在该目录内**创建临时文件 —— 调用方随后会
+        `os.replace` 到同目录下的最终名，跨盘 replace 在 Windows 上必失败
+        （`WinError 17`）。不给时退回系统临时目录（`stream_xlsx` 的临时文件发完即删，无此问题）。
         """
+        if directory:
+            path = os.path.join(directory, file_name or f"xlsx_{uuid4().hex}.tmp")
+            wb.save(path)
+            return path
         fd, path = tempfile.mkstemp(suffix=".xlsx", prefix="aqm_export_")
         os.close(fd)
         wb.save(path)
@@ -601,6 +522,111 @@ class ExportService:
                 if not chunk:
                     break
                 yield chunk
+
+    async def _build_workbook(
+        self,
+        result_iter: Any,
+        columns: list["ColumnMeta"],
+        *,
+        chunk_rows: int = STREAM_CHUNK_ROWS,
+        memory_row_cap: int = STREAM_MEMORY_ROW_CAP,
+        row_hard_limit: int = EXPORT_ROW_HARD_LIMIT,
+        info_rows: Any = None,
+        sheet_title: str | None = None,
+        extra_sheets: Any = (),
+    ) -> tuple[Any, int]:
+        """建 write_only 工作簿（表头 / 数据 / 说明页 / 附加页），返回 ``(wb, row_count)``。
+
+        ``stream_xlsx`` 与 ``build_xlsx_file`` 共用这一份实现 —— 两处各自写一遍会让
+        「容量守卫 / 行上限 / 说明页 / 附加页」的任何一处改动只生效一半（AQF §6.2）。
+        容量与行上限守卫都在**返回之前**抛出（调用方据此保证「首字节之前失败」）。
+        """
+        from openpyxl import Workbook
+
+        columns = list(columns)
+        source_cols = [c for c in columns if getattr(c, "addr_id", None)]
+        total_cols = len(columns) + len(source_cols)
+
+        # ── step1: 容量守卫（列，R7.6）——首字节前拦截 ──
+        if total_cols > XLSX_MAX_COLS:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error_code": "EXPORT_CAPACITY",
+                    "message": (
+                        f"结果集列数（含来源列 {total_cols}）超出 Excel 原生上限 "
+                        f"{XLSX_MAX_COLS:,} 列，已中止导出"
+                    ),
+                    "actual_cols": total_cols,
+                    "max_cols": XLSX_MAX_COLS,
+                },
+            )
+
+        wb = Workbook(write_only=True)
+        ws = wb.create_sheet(title=safe_sheet_title(sheet_title))
+
+        # 任一步失败（行迭代 / 硬上限 / 写页）都直接 raise；此处兜底 close 工作簿以释放
+        # openpyxl write_only 内部 lxml 写入器与其自建临时文件（R7.7/R8.6）。
+        try:
+            ws.append(self._header_cells(ws, columns, source_cols))
+
+            buffer: list[list[Any]] = []
+            cap = max(1, min(memory_row_cap, chunk_rows))
+            row_count = 0
+            async for row in self._aiter_rows(result_iter):
+                row_count += 1
+                # 硬上限 / xlsx 行上限守卫（首字节前，R8.4/R7.6）——防御式，即便 total 未知
+                if row_count > row_hard_limit:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={
+                            "error_code": "EXPORT_ROW_HARD_LIMIT",
+                            "message": (
+                                f"结果集行数超出导出硬上限 {row_hard_limit:,} 行，"
+                                "已中止导出，请缩小查询范围"
+                            ),
+                            "row_hard_limit": row_hard_limit,
+                        },
+                    )
+                if row_count > XLSX_MAX_ROWS:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={
+                            "error_code": "EXPORT_CAPACITY",
+                            "message": (
+                                f"结果集行数超出 Excel 原生上限 {XLSX_MAX_ROWS:,} 行，"
+                                "已中止导出"
+                            ),
+                            "max_rows": XLSX_MAX_ROWS,
+                        },
+                    )
+                buffer.append(_row_export_values(row, columns, source_cols, ws=ws))
+                if len(buffer) >= cap:
+                    for values in buffer:
+                        ws.append(values)
+                    buffer.clear()
+
+            # flush 剩余缓冲
+            for values in buffer:
+                ws.append(values)
+            buffer.clear()
+
+            # 空结果 → 仅标题行 + 空提示行（R7.5，防御式；流式通常不用于空集）
+            if row_count == 0:
+                ws.append([_EMPTY_NOTICE])
+
+            if info_rows is not None:
+                items = info_rows(row_count) if callable(info_rows) else info_rows
+                if items:
+                    _append_info_sheet(wb, list(items))
+            for title, table_rows in extra_sheets:
+                extra = wb.create_sheet(title=safe_sheet_title(title))
+                for values in table_rows:
+                    extra.append([_text_safe_cell(extra, _excel_cell_value(v)) for v in values])
+        except BaseException:
+            self._safe_close_workbook(wb)
+            raise
+        return wb, row_count
 
     async def build_xlsx_file(
         self,
@@ -618,66 +644,21 @@ class ExportService:
     ) -> "BuiltXlsx":
         """写出 xlsx 文件到指定目录，返回路径与行数；不流式（供查询证据封存使用，AQF §6.2）。
 
-        步骤与 ``stream_xlsx`` 相同，但以 ``os.replace`` 原子改名替代字节 yield。
-        ``file_stem`` 不含扩展名，实际文件名为 ``{file_stem}.xlsx``；
-        若传入以 ``.`` 开头的 stem（如 ``.{artifact_id}``），则先写 partial 再改名。
+        建表与 ``stream_xlsx`` **同一内核**（:meth:`_build_workbook`），只是以 ``os.replace``
+        原子改名替代字节 yield。``file_stem`` 不含扩展名，实际文件名为 ``{file_stem}.xlsx``。
         """
-        import asyncio
-        import os
-
-        from openpyxl import Workbook
-
-        columns = list(columns)
-        source_cols = [c for c in columns if getattr(c, "addr_id", None)]
-        total_cols = len(columns) + len(source_cols)
-
-        if total_cols > XLSX_MAX_COLS:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error_code": "EXPORT_CAPACITY",
-                    "message": f"结果集列数（{total_cols}）超出 Excel 原生上限 {XLSX_MAX_COLS:,} 列",
-                    "actual_cols": total_cols,
-                },
-            )
-
-        wb = Workbook(write_only=True)
-        ws = wb.create_sheet(title=safe_sheet_title(sheet_title))
-        try:
-            ws.append(self._header_cells(ws, columns, source_cols))
-            buffer: list[list[Any]] = []
-            cap = max(1, min(memory_row_cap, chunk_rows))
-            row_count = 0
-            async for row in self._aiter_rows(result_iter):
-                row_count += 1
-                if row_count > row_hard_limit or row_count > XLSX_MAX_ROWS:
-                    raise HTTPException(
-                        status_code=400,
-                        detail={"error_code": "EXPORT_ROW_HARD_LIMIT", "message": "结果集超出导出硬上限"},
-                    )
-                buffer.append(_row_export_values(row, columns, source_cols, ws=ws))
-                if len(buffer) >= cap:
-                    for values in buffer:
-                        ws.append(values)
-                    buffer.clear()
-            for values in buffer:
-                ws.append(values)
-            if row_count == 0:
-                ws.append([_EMPTY_NOTICE])
-            if info_rows is not None:
-                items = info_rows(row_count) if callable(info_rows) else info_rows
-                if items:
-                    _append_info_sheet(wb, list(items))
-            for title, table_rows in extra_sheets:
-                extra = wb.create_sheet(title=safe_sheet_title(title))
-                for values in table_rows:
-                    extra.append([_text_safe_cell(extra, _excel_cell_value(v)) for v in values])
-            loop = asyncio.get_event_loop()
-            tmp_path = await loop.run_in_executor(None, self._save_to_tempfile, wb)
-        except BaseException:
-            self._safe_close_workbook(wb)
-            raise
-
+        wb, row_count = await self._build_workbook(
+            result_iter, columns,
+            chunk_rows=chunk_rows, memory_row_cap=memory_row_cap, row_hard_limit=row_hard_limit,
+            info_rows=info_rows, sheet_title=sheet_title, extra_sheets=extra_sheets,
+        )
+        loop = asyncio.get_event_loop()
+        # 🔴 临时文件必须落在**目标目录内**：`tempfile.mkstemp` 默认在系统临时目录（常是 C:），
+        # 而证据根通常在数据盘，`os.replace` 跨盘会 `OSError: [WinError 17] 系统无法将文件移到
+        # 不同的磁盘驱动器`（2026-11-15 test_aql_export_gate 实测）⇒ 封存一律降级。
+        tmp_path = await loop.run_in_executor(
+            None, self._save_to_tempfile, wb, directory, f"{file_stem}.tmp",
+        )
         final_path = os.path.join(directory, f"{file_stem}.xlsx")
         os.replace(tmp_path, final_path)
         return BuiltXlsx(path=final_path, row_count=row_count)

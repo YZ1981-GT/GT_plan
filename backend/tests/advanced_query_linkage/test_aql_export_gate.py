@@ -250,10 +250,21 @@ async def test_stream_xlsx_cleans_the_data_and_extra_sheet_titles():
 
 @pytest_asyncio.fixture
 async def builder_app(monkeypatch, tmp_path):
-    """构建器 router + SQLite 会话（3 行试算表、1 行调整分录）+ 系统管理员；临时文件目录与审计都换成本例私有的。"""
+    """构建器 router + SQLite 会话（3 行试算表、1 行调整分录）+ 系统管理员；临时文件目录与审计都换成本例私有的。
+
+    另把 `QUERY_ARTIFACT_ROOT` 也指到本例私有目录：AQF 任务 5 起导出会**封存证据**
+    （`seal_and_respond` → `build_xlsx_file`），不隔离这个配置就会往真实的
+    `backend/storage/query_artifacts` 落文件 —— SQLite 上没有 `query_artifacts` 表，
+    库内 0 行看不出异常，只有磁盘上会一直累积（2026-11-15 实测 20 个残留）。
+    """
+    from app.core.config import settings
+
     xlsx_tmp = tmp_path / "xlsx_tmp"
     xlsx_tmp.mkdir()
     monkeypatch.setattr(tempfile, "tempdir", str(xlsx_tmp))
+    artifact_root = tmp_path / "query_artifacts"
+    artifact_root.mkdir()
+    monkeypatch.setattr(settings, "QUERY_ARTIFACT_ROOT", str(artifact_root))
     audits: list[dict] = []
 
     async def _record(**kwargs):  # 审计写入的下一层：只记录，不进共享 Redis

@@ -150,6 +150,15 @@ async def _furnish(world: AuthzWorld, row: Row, request: pytest.FixtureRequest) 
         # 底稿存储根换成本格的临时目录：只读预览若写文件（AQ-23），写在这里、可被断言，不落主树 storage
         ctx.storage = request.getfixturevalue("tmp_path") / "wp_storage"
         request.getfixturevalue("monkeypatch").setattr(wp_template_init_service, "STORAGE_DIR", ctx.storage)
+    # 导出的证据根**无条件**隔离：AQF 任务 5 起 `/custom-query/export` 会封存证据，
+    # 不隔离就按 `STORAGE_ROOT/query_artifacts` 往真实目录落文件（库行随回滚消失，
+    # 磁盘文件会一直累积；2026-11-15 实测每轮 9 个残留）。
+    from app.core.config import settings as _settings
+
+    _artifact_root = request.getfixturevalue("tmp_path") / "query_artifacts"
+    _artifact_root.mkdir(parents=True, exist_ok=True)
+    request.getfixturevalue("monkeypatch").setattr(
+        _settings, "QUERY_ARTIFACT_ROOT", str(_artifact_root))
     ctx.live_projects = {str(X), str(Y)}
     return ctx
 

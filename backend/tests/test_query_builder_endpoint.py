@@ -17,6 +17,8 @@ spec proposal-remaining-18 task 5.1
 from __future__ import annotations
 
 import io
+import shutil
+import tempfile
 import uuid
 from datetime import date
 from decimal import Decimal
@@ -53,13 +55,24 @@ USER_ID = uuid.uuid4()
 @pytest.fixture(autouse=True, scope="module")
 def _no_shared_audit():
     """审计写入换成空操作（advanced-query-linkage-closure 任务 26 起导出记审计 ``custom_query.export``）：真实写入经
-    ``audit_logger`` 推进本机 Redis 队列，再由共享开发环境的审计 worker 写进共享库——测试不该在那里留下假用户的审计行。"""
+    ``audit_logger`` 推进本机 Redis 队列，再由共享开发环境的审计 worker 写进共享库——测试不该在那里留下假用户的审计行。
+
+    同时把 ``QUERY_ARTIFACT_ROOT`` 指到模块私有的临时目录：AQF 任务 5 起导出会封存证据，
+    不隔离就会往真实的 ``backend/storage/query_artifacts`` 落文件。
+    """
     async def _no_audit(**_kwargs):
         return True
 
+    from app.core.config import settings
+
+    artifact_root = tempfile.mkdtemp(prefix="aqf_builder_artifacts_")
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(audit_helper, "_log_unthrottled", _no_audit)
-        yield
+        mp.setattr(settings, "QUERY_ARTIFACT_ROOT", artifact_root)
+        try:
+            yield
+        finally:
+            shutil.rmtree(artifact_root, ignore_errors=True)
 
 
 class _FakeUser:

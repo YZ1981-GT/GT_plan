@@ -578,7 +578,15 @@
       | 错误态中文与错误码 | 未登记源 → **400 `UNKNOWN_SOURCE`** + 中文「未知数据源：__no_such_source__」；非法 project_id → **403 `FORBIDDEN_PROJECT`** + 中文原因；不存在的项目 → 403 + 中文「无权访问该项目数据」 | 通过（三条信封均为平台 `{code, message:{error_code, message}}`，无英文、无 500） |
       | 页面版结果表右键 | 执行序时账（100 行）后对首行右键 | **无右键菜单**（count=0）—— 与 e2e spec 里「按前置条件不满足记录」一致，不是缺陷 |
       | 模板库「📊 高级查询」按钮 | 静态核实：`TemplateLibraryButton` 挂在 3 个宿主（`WpTemplateDetail` / `ReportConfigTab` / `NoteTemplateTab`），点击 `eventBus.emit('open-custom-query', {tab, source, project_id})`；`ThreeColumnLayout` 订阅并打开弹窗（`ThreeColumnLayout.customQuery.spec.ts` 有订阅守卫） | **链路完整**；但 `/template-library` **首页**没有该按钮（它在各模板详情页签内），我第一版探针在首页找所以 count=0 —— 是探针找错位置 |
-    - **仍未走（如实登记，不假绿）**：需专门测试账号的 4 项（审计员作者在回收站看到「恢复」「删除」、模板三档对审计员可见、经理清 `sessionStorage` 后刷新回收站、PM 身份构建器默认当前项目 / 只见可访问项目）—— 要在共享库建测试账号，本轮不建；另「附注右键与底稿工具栏两个宿主」「附注编辑器页内切年后再点入口」「A1 底稿没有登记对应科目提示」「复制引用粘到公式编辑器校验」「W3 大额预置的重要性提示与另存为我的模板」未逐项走。
+    - **仍未走（如实登记，不假绿）**：需专门测试账号的 4 项的**浏览器展示层**（审计员作者在回收站看到「恢复」「删除」、模板三档对审计员可见、经理清 `sessionStorage` 后刷新回收站、PM 身份构建器默认当前项目 / 只见可访问项目）。
+      🔴 **2026-11-15 复核：这 4 项的「服务端结论」全部已有判据，缺的只是浏览器把结果显示出来这一层**（现库没有 manager / partner 账号、auditor 的成员行全为 0，所以浏览器走查要新建账号 —— 属写共享库，未建）：
+      | 项 | 服务端判据落点（已通过） |
+      |---|---|
+      | 审计员作者在回收站看到「恢复」「删除」 | `test_aql_recycle_bin_templates.py::test_recycle_bin_shows_templates_to_author_and_admin_only`（作者 + admin 可见、他人含合伙人不可见）、`::test_restore_and_purge_are_for_author_and_admin`（操作权限）、`::test_only_owner_scoped_rows_carry_row_capabilities`（逐行 `can_restore` / `can_purge`，其余类型不带） |
+      | 模板三档对审计员可见 | `test_aql_templates.py::test_auditor_lists_admin_public_template`（公开档）、`::test_team_template_is_visible_to_anchor_members_only`（项目共享档）、`::test_save_private_project_and_legacy_global`（私有档）；三档保存见 `CustomQueryTab.linkage.spec.ts` 的「保存三档」例 |
+      | 经理清 `sessionStorage` 后刷新回收站 | `test_recycle_bin_templates.py::test_stats_count_templates_for_author_and_admin_only`（统计口径按作者/管理员，与前端清缓存后的请求同路径） |
+      | PM 身份构建器默认当前项目 / 只见可访问项目 | `test_aql_builder_access.py::test_system_role_admission`（`ROLE_CASES` 含 `manager`）、`::test_project_member_admission`（`manager-edit` 准入、`manager-review` 拒绝）、`::test_access_counts_the_builder_scope_and_explains_empty_scope`（`all_projects=False` + `CYCLE_SCOPED_REASON`，即「默认当前项目 / 只见可访问项目」的服务端结论） |
+另「附注右键与底稿工具栏两个宿主」「附注编辑器页内切年后再点入口」「A1 底稿没有登记对应科目提示」「复制引用粘到公式编辑器校验」「W3 大额预置的重要性提示与另存为我的模板」未逐项走。
     - 走查全程 console error **0**（除一处脚本自身未带 token 的 401，已修正后复跑为 0）。
     - 候选栈已停（前后端进程 terminated、`.env.local` 已删）；本轮走查未写业务数据（e2e 用 `SKIP_E2E_SEED=1`、页面走查只读 + 一次导出）。
     - 本条**保持 `[ ]*`**：剩余项依赖外部账号。

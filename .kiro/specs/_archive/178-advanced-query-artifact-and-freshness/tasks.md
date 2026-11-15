@@ -120,7 +120,7 @@
   - 变异：M8。
   - 验收：`routers/custom_query.py` 行数净减（N3，如下调白名单基线则与本任务同一提交）；用例与变异如上。
 
-- [ ] 5. 查询证据（R4.1~R4.7、R7.3；design §6.1~§6.5）
+- [x] 5. 查询证据（R4.1~R4.7、R7.3；design §6.1~§6.5）
   - 配置项四个（design §6.1）；`export_service.build_xlsx_file` 抽出，`stream_xlsx` 改为调用它且行为不变（既有导出测试不改即绿）。
   - `query_artifacts.py`：封存流程（`.partial` → 流式 SHA-256 → `os.replace` → 清单与清单摘要 → 独立短事务写运行与证据并提交，会话工厂可注入）、说明页四行、三个响应头、失败降级、下载重验（409 / 410）、清单输出。
   - 业务视图与构建器两条导出路径接入；导出审计增加证据编号、清单摘要、运行编号、版本摘要。
@@ -128,6 +128,55 @@
   - 真 PG：P10。
   - 变异：M10、M11。
   - 验收：`query_export.py`、`export_service.py` 均 ≤ 800 行；用例与变异如上。
+
+  **证据（2026-11-15，本轮完成接线并修掉 6 处真实缺陷）**
+  - 交付：`query_export.seal_and_respond` + `_capture_and_record_run` + `_stream_sealed_file` + `_evidence_headers`；
+    两条导出路径（`_business_export` / `export_builder_query`）都改为「先登记运行 → 封存证据 → 从证据文件流式返回」，
+    导出审计加 `run_id` / `artifact_id` / `manifest_sha256` / `vector_hash`；`export_service` 抽出
+    `_build_workbook` 作为 `stream_xlsx` 与 `build_xlsx_file` 的**唯一**建表内核（design §6.2）。
+  - 行数（`len(text.split("\n"))`，`check_file_size.py` rc 0）：`query_export.py` **638**、`export_service.py` **678**
+    （抽内核后从 697 降 19）、`query_artifacts.py` **439**、`query_runs.py` **307**，全部 ≤ 800。
+  - 测试：`test_aqf_task5_artifact_pg.py`（真 PG，**6 passed**：P10-a~d + 清单端点 + 审计字段）·
+    `test_aqf_task5_artifact_unit.py`（无库，**8 passed**：规范序列化往返 / 说明页四行与降级 / 路径自洽 / 降级不抛 / 根派生 / 建表内核合一）·
+    导出相关既有选集（`test_aql_export_gate` / `test_aql_export_pg` / `test_advanced_query_stream_export` /
+    `test_advanced_query_export_service` / `test_query_builder_endpoint` / `test_query_builder_streaming_export`）
+    **102 passed / 0 failed** ⇒ 抽内核与接线**没有改变既有导出行为**（既有用例一条未改）。
+  - 全目录回归：`tests/advanced_query_linkage/` **954 passed / 0 failed**（244 s）。
+  - 变异（`tmp_aqf/probes/mutate_task5.py`，改盘 → 跑 → 逐字节还原并核 sha256）：M10 下载不重验 ⇒ 409 用例红；
+    M11 封存失败抛错 ⇒ 降级用例红；M-audit 审计摘要恒空 ⇒ 审计用例红；M-kernel 让 `stream_xlsx` 自己建表 ⇒
+    内核合一守卫红；N1 阴性对照（只改注释）⇒ 全绿。**5/5 符合预期、5/5 还原 sha256 一致**。
+
+  **本轮修掉的 7 处真实缺陷（普通回归全绿看不出来，都是「接线正确但细节错」）**
+
+  | # | 缺陷 | 形态与证据 | 修法 |
+  |---|---|---|---|
+  | ① | `ensure_within_root` 传 `str` | 签名是 `(target: Path, root: Path)`，传字符串 ⇒ `AttributeError: 'str' object has no attribute 'resolve'`，被外层 `except` 降级 ⇒ **封存永远不成功**、`query_artifacts` 恒 0 行 | 传 `Path`；返回值赋回 `directory` |
+  | ② | `list(info_rows_base)` 对 `_InfoRows` 对象 | `info_rows_base` 是**可调用对象**（按实际写入行数生成说明页），不是行列表 ⇒ `TypeError: '_InfoRows' object is not iterable` | `info_rows_base(written) if callable(...)` 再展开 |
+  | ③ | `retention_until` 传 ISO 字符串给 PG | asyncpg 只认 `datetime` ⇒ `DataError: expected a datetime.date or datetime.datetime instance, got 'str'`（与任务 4 的 `captured_at` 同族） | 按方言分流：PG 传 `datetime`，非 PG 传 `isoformat()` |
+  | ④ | `_iter_file_bytes(path)` 漏 `byte_chunk` | 它是同步生成器且块大小是**必填位置参数** ⇒ `TypeError`，把「封存已成功」变成 500 | 显式传 `_STREAM_BYTE_CHUNK`，并把同步生成器包成异步迭代器 |
+  | ⑤ | 审计 `manifest_sha256` 恒 `None` | 读的是 `getattr(response, "_manifest_sha256", None)`，而属性名是 `manifest_sha256` ⇒ 静默取到 `None`，审计字段永远空 | 写入端与读取端统一为 `manifest_sha256`，并加用例断言它等于库里的摘要 |
+  | ⑥ | `build_xlsx_file` 跨盘 `os.replace` | `tempfile.mkstemp` 落在系统临时目录（C:），证据根在数据盘 ⇒ `OSError: [WinError 17] 系统无法将文件移到不同的磁盘驱动器` ⇒ 封存在 Windows 上**必然**降级 | 临时文件建在**目标目录内**（`_save_to_tempfile` 增可选 `directory` / `file_name`） |
+  | ⑦ | `storage_key` 写成**绝对路径** | `directory` 已 `resolve()` 而 `_artifact_root()` 没 resolve ⇒ `relative_to` 抛 `ValueError`，走 except 分支把 `D:\GT_plan\backend\storage\...\x.xlsx` 写进库（W3 走查实测） | 两边都 `resolve()` 后取 `relative_to(...).as_posix()`；except 兜底只回文件名 |
+
+  - 另修一处**测试夹具缺陷**（不是生产缺陷，但会掩盖上表全部问题）：`query_runs.user_id` / `query_artifacts.user_id`
+    都外键到 `users(id)`，而 `business` 夹具用的是**虚构**管理员 ⇒ 写入必 FK 违约、被降级吞掉，表现为
+    「导出 200 但响应里少两个响应头」。新增 `existing_user` / `business_real_user` 夹具（读共享库里真实的 admin，
+    只读引用），并把本文件切过去。`business_client` 同时补挂 `query_evidence.router` —— 只挂 `custom_query.router`
+    时下载端点返回 `{"detail":"Not Found"}` 的 404，看起来像「记录不存在」而实际是路由没注册。
+  - 🔴 过程教训：`fs_write` 写出的文件带 **UTF-8 BOM**，而同目录的 `test_aql_project_picks_pg.py` 会
+    `ast.parse(path.read_bytes().decode("utf-8"))` 扫全部用例文件 ⇒ `SyntaxError: invalid non-printable character U+FEFF`，
+    全量回归里表现为一条与本 spec 无关的失败。新建测试文件后**必须核对无 BOM**（`read_bytes()[:3] == b'\xef\xbb\xbf'`）。
+  - 🔴 **另修一处「测试往真实证据目录写文件」的副作用**（本轮引入的行为，不是既有缺陷）：AQF 任务 5 起
+    导出会封存证据，而 4 个既有测试文件没隔离 `settings.QUERY_ARTIFACT_ROOT` ⇒ 每跑一轮就往
+    `backend/storage/query_artifacts/` 落 9 个文件（SQLite 上没有 `query_artifacts` 表、库内 0 行，
+    所以**只看库看不出来**，只有磁盘一直累积；本轮实测累积过 92 个）。定位手段：在 `seal_artifact`
+    里临时插一段写调用栈的日志、跑一遍全目录、**逐字节还原并核对 sha256**（探针 `tmp_aqf/probes/trace_artifact_writer.py`），
+    一次就点出调用点是 `tests/authz_world.py:368 request` —— 即所有经 `authz_world` 建的应用里打导出端点的用例。
+    已修 4 处：`test_aql_endpoint_authz.py::_furnish`（**无条件**隔离）、`test_aql_export_gate.py::builder_app`、
+    `test_aql_export_pg.py::_gate_and_tempdir`、`test_query_builder_streaming_export.py::_audits`、
+    `test_query_builder_endpoint.py::_no_shared_audit`。
+    验收：`tests/advanced_query_linkage/` + 4 个相关文件 **999 passed / 0 failed**，跑完
+    `backend/storage/query_artifacts` **目录根本不存在**（不是「0 个文件」而是从未创建）。
 
 - [x] 6. 清理与保留（R8.3；design §5.4、§6.6）
   - `purge_expired_artifacts`、`prune_runs`、`.partial` 残留清除；接入 `workers/export_cleanup_worker`（启动跑一次 + 每小时，沿用主副本锁），日志记删除数。
@@ -142,6 +191,32 @@
   - 门禁：`check_router_registration` exit 0；端点鉴权基线两份守卫各维度计数不增；`test_route_shadow_guard.py` 绿。
   - 变异：M12、M13。
   - 验收：用例、门禁、变异如上。
+
+  **证据（2026-11-15，本轮补 P12 权限矩阵）**
+  - 🔴 **开工现状**：任务 7 原标 `[x]`，但 `tests/advanced_query_linkage/` 里**没有任何证据端点用例**
+    （`test_aqf_task*` 只覆盖 task1 迁移 / task2 版本 / task5 封存）⇒ 10 个端点、权限矩阵 P12、
+    503 降级、所有权 404、R7.2 重验访问**全部没有判据**。本轮补齐。
+  - 新增 `test_aqf_task7_evidence_endpoints_pg.py`（真 PG，**5 例**，共覆盖 10 个端点）：
+    | 用例 | 判据 |
+    |---|---|
+    | `test_other_users_objects_are_404_not_403` | 非本人的运行 / 证据在**六个**对象端点上全部 **404**（不是 403），且列表里也不出现；先用本人取出 200 做正向对照 |
+    | `test_object_whose_project_is_unreadable_is_403` | 本人对象但项目软删 ⇒ 五个端点全部 **403 `FORBIDDEN_PROJECT`**（R7.2 重验访问）；先断言项目活着时是 200 做反向对照 |
+    | `test_hide_and_clear_only_touch_my_own_rows` | `DELETE /runs/{id}` 后列表不含它、但**行还在**且 `hidden_at` 非空（隐藏 ≠ 删行）；`POST /runs/clear` 后列表空、**行仍在且 `hidden_at` 非空** |
+    | `test_all_ten_endpoints_are_503_when_migration_missing` | `query_evidence_available=False` 时 **10 个端点全部 503** `QUERY_EVIDENCE_UNAVAILABLE`（断言 `len(cases) == 10`，端点数量变化会红） |
+    | `test_runs_list_dedups_by_definition_and_filters_by_entry` | 同一份定义导出两次 → 历史里只有 **1 条**（按 `definition_hash` 去重）；`entry=builder` 过滤后不含 business 记录 |
+  - 变异（`tmp_aqf_mut_p12.py`，改盘 → 跑 → 逐字节还原核 sha256）：**M12** 去掉 `_get_run_or_404` 的
+    `user_id` 比对 ⇒ 所有权用例红；**M13** 去掉 `_get_artifact_or_404` 的 `user_id` 比对 ⇒ 同上；
+    **M-clear** 把 `UPDATE … SET hidden_at=now()` 改成 `DELETE` ⇒ 隐藏语义用例红；
+    **N1** 阴性对照（只改注释）⇒ 全绿。**4/4 符合预期、逐字节还原 sha256 一致**。
+  - 🔴 **M-clear 首轮是存活的**（rc=0）：我第一版只断言「列表为空」—— `DELETE` 之后列表当然也空。
+    补「行仍在 + `hidden_at` 非空」之后才打红。这正是「同一判据写两种强度能互相咬出假绿」的实例。
+  - 🔴 **两处造数据踩到的正确行为**：① `query_runs` / `query_artifacts` 的不可变触发器拒绝
+    `UPDATE project_id`（`CheckViolationError: identity fields are immutable`）⇒ R7.2 用例改成
+    「导出时就指定临时项目、之后软删 `projects`」，不碰证据表的身份字段；② `authz_world.build_app`
+    自建的应用**不挂** `ResponseWrapperMiddleware` ⇒ 响应没有 `{code,message,data}` 信封，
+    测试取值要写成 `body.get("data", body)`（这个差异本身已在任务 37 的 e2e 记录里登记过）。
+  - 全量回归：`tests/advanced_query_linkage/` **960 passed / 0 failed**（原 955 + 本轮 5），
+    跑完 `backend/storage/query_artifacts` **目录不存在**。
 
 - [x] 8. 前端公共模块（R3.4、R6.1~R6.3、R6.5、R6.6；design §8.1）
   - `queryRunFormat.ts`、`useQueryRunEvidence.ts`、`QueryRunBanner.vue`、`QueryEvidenceDrawer.vue`；`services/apiPaths/system.ts` 增九个路径。
@@ -175,9 +250,27 @@
     `E2E-D4发布测试项目_请勿动_2099`（名字明确「请勿动」）与 `【E2E】公式管理运行时门禁_2025`（**零成员行**、
     tb_balance / tb_ledger / trial_balance 全 0）。design §10.5 要求「写入只在【测试】项目」，这两个都不适合录入 AJE；
     自建测试项目会在共享库留残留。W2 的判据（行数 a → b、自动判定、重新查询）因此**未实测**。
-  - **W3 部分通过 + 抓到缺陷**：导出「试算平衡表」（该项目 2 行）成功 —— 文件 5,958 字节、SHA-256 已记录、
+  - **W3 部分通过 + 抓到缺陷**（2026-11-15 首轮）：导出「试算平衡表」（该项目 2 行）成功 —— 文件 5,958 字节、SHA-256 已记录、
     抽屉「导出证据」页签可见且列表能列出来源与行数、console error 0。但**库内 `query_artifacts` 为 0 行、
-    证据目录从未创建** —— 见下「缺陷 ⑤」。
+    证据目录从未创建** —— 见下「缺陷 ⑤」（已由任务 5 修复）。
+  - **W3 复走通过（2026-11-15 任务 5 完成后）**：候选栈 9981 + 3040（`tmp_aqf/probes/candidate_stack.py`），
+    探针 `tmp_aqf/probes/w3_export_evidence.py`，证据 `tmp_aqf/walkthrough/w3_evidence.json`。
+    项目 `d4e2e000-...-d401`（【测试】D4，年度 2099，试算表 2 行）。逐条结果：
+    | 判据 | 结果 |
+    |---|---|
+    | 导出响应头 | **`stored`** + `X-Query-Run-Id` + `X-Query-Artifact-Id`（文件 6,117 B） |
+    | 库内证据行 | 0 → **1**（导出前基线 0），`run_id` 与响应头一致 |
+    | 证据文件 | 存在，SHA-256 = 库记录 = 6,117 B |
+    | `GET /artifacts` 列表（抽屉读的端点） | **包含该编号** |
+    | `GET /artifacts/{id}/manifest` | `X-Manifest-SHA256` = 库 `manifest_sha256` |
+    | 下载重验 | **200**，6,117 B |
+    | 清理对账 | 两表回到 0 行、证据目录 0 文件（`tmp_aqf/probes/cleanup_artifacts.py`，92 个历史残留一并清掉） |
+    🔴 复走又抓到**第 7 处缺陷**：`storage_key` 存成了**绝对路径**（`D:\GT_plan\backend\storage\...\x.xlsx`）——
+    `directory` 已 `resolve()` 而 `_artifact_root()` 没有，`relative_to` 抛 `ValueError` 后走 except 分支写绝对路径。
+    既把服务器路径写进数据库，换证据根后旧记录也全失效。已修（两边都 `resolve()` + `as_posix()`）+ 守卫
+    `test_storage_key_is_relative_to_the_artifact_root`。
+    🔴 过程教训：平台信封是 `{code, message, data}`，探针取列表时要 `body["data"]["artifacts"]` ——
+    直接读 `body["artifacts"]` 会拿到空列表并误判成「抽屉会空」。
   - **W5 通过**：构建器是 `/custom-query` 内的 embedded 弹窗（**无独立路由**，`/advanced-query-builder` 是 404）。
     选表 → 执行 → `data-testid="aqb-result-scope"` **count=1**（锚点已按 design §8.2 挪到信息条范围段）、
     信息条 count=1、文案含「范围：当前项目（2099 年度）」+ 版本段 + 未记录提示；console error **0**。
@@ -212,12 +305,66 @@
     连续两轮「修复无效」都是这个原因）。
 
 
-  **任务状态修正（2026-11-15，由任务 10 走查得出）**
+  **任务状态修正（2026-11-15，由任务 10 走查得出；同日已由本文件任务 5 的证据回填）**
   - 任务 **5**（查询证据 R4.1~R4.7）原标 `[x]`，实测**整条证据封存链路未实现**（`seal_artifact` 零调用、
-    `query_export` 未接线、库内 0 行、证据目录未创建）⇒ 改回 `[ ]`，待后续批次实现。
+    `query_export` 未接线、库内 0 行、证据目录未创建）⇒ 当时改回 `[ ]`。
+    **2026-11-15 已完成**：`seal_and_respond` 接线、两条导出路径接入、`_build_workbook` 内核合一、
+    真 PG 6 例 + 无库 8 例 + 导出既有选集 102 例全绿、5 组变异全红（含 W3 复走抓到的第 7 处）⇒ 恢复 `[x]`，证据见任务 5。
   - 任务 **3 / 4 / 9** 的 `[x]` 保留，但各自的缺陷已在上面表格登记并修复（①~④），守卫与变异均补齐。
-  - 任务 **10** 因 W2 与 N1 未走、且 W3 暴露 ⑤，**保持 `[ ]*`**（依赖外部环境 + 任务 5）。
+  - 任务 **10** 的缺陷 ⑤ 已随任务 5 关闭；**W2 的服务端判据已落地**（见任务 10 的「W2 后端判据已落地」，
+    `test_aqf_task10_freshness_pg.py` 3 例 + 3 变异全红），仍未走的只剩浏览器显示层与 N1，**保持 `[ ]*`**。
+  - 🔴 缺陷 ⑤ 之外，任务 5 实施时又抓到 **7 处**「接线对了但细节错」的缺陷（`ensure_within_root` 传 str、
+    `_InfoRows` 不可迭代、`retention_until` 传 ISO 串、`_iter_file_bytes` 漏 `byte_chunk`、审计摘要属性名不符、
+    跨盘 `os.replace`），全部只在真 PG + 真文件系统上才暴露 ⇒ 逐条写进任务 5 的表格。
 
+  - **W4 通过 + N1 通过（2026-11-16，真实候选栈 9981，`_w4_n1.py`，证据 `_evidence/w4_n1.json`）**：
+    项目 `d4e2e000`（【测试】D4，年度 2099）。
+    | 判据 | 结果 |
+    |---|---|
+    | 同一份定义执行两次 | 两次拿到**同一个运行编号**（`same_run=true`） |
+    | 历史按定义去重 | `count=6`、`dedup_ok=true`（六个数据源各一条，无重复 `definition_hash`） |
+    | 回放一致 | 用历史里的 `definition` 再执行 ⇒ `same_total=true`、`same_first_row=true` |
+    | 清空历史后证据仍可下载 | `runs_after_clear=0`、`artifact_listed=true`、`download_status=200`（6,128 B） |
+    | N1 业务视图首页耗时 | 3 次 `0.038 / 0.038 / 0.038 s`，中位 **0.038 s**（目标 ≤ 3 s） |
+    清理：本次产生的 `query_runs` / `query_artifacts` 与证据文件按 id 精确删除，两表回到 0 行、0 文件
+    （`_cleanup.py` 对账 `query_artifacts=0 query_runs=0`）。
+    🔴 三个宿主（弹窗 / 页面版 / 构建器）读的是**同一组** `/runs` + `/artifacts` 端点，
+    前端映射由 vitest 覆盖（任务 8 / 9）⇒ 本项验的是「服务端给三个宿主的数据正确」，
+    浏览器只多验「显示出来」这一层（前端信息条 / 抽屉的渲染与状态由 `useQueryRunEvidence.spec.ts` 覆盖）。
+  - **W2 浏览器层：服务端判据已通过（回滚事务），真实栈录 AJE 被数据前提阻断（如实登记）**
+    - 服务端：`test_aqf_task10_freshness_pg.py` **3 passed**（数据没动 → `current`；插一行 → `stale` 带原因；
+      重采后回 `current`；空向量 → `unknown`；跨项目不串味），变异 `M-w2c` / `M-w2s` 全红。
+    - 真实栈阻断（2026-11-16 实测）：`POST /api/projects/{pid}/adjustments` 对
+      **`E2E-D4发布测试项目_请勿动_2099` 返回 400**，正文是「该项目的可用科目不包含：1001, 2241」——
+      该项目 `trial_balance` 只有 2 个科目，且**不在可用科目集**里。全库现算：
+      | 项目 | 年度 | 不同科目数 | 已有分录 | 数据集 |
+      |---|---|---|---|---|
+      | `重药控股安徽有限公司_2025` | 2025 | **196** | 10 | 6 |
+      | `E2E-D4发布测试项目_请勿动_2099` | 2099 | 2（不在可用科目集） | 0 | 0 |
+      | `【E2E】公式管理运行时门禁_2025` | 2025 | 0 | 0 | 0 |
+      ⇒ **只有真实业务项目有可用科目**，往里录 AJE 会污染业务数据；两个【测试】项目都缺可用科目集。
+      因此 W2 的「浏览器里录一笔 AJE」这一步**无法在共享库安全执行**。
+    - 替代证据的强度说明：W2 的判据链是「录 AJE → 重新采集 → 逐分量比较 → 显示 stale」，
+      其中**只有最后一步「显示」在前端**（`useQueryRunEvidence.checkFreshness` 的 60 秒节流与代际丢弃
+      由 `useQueryRunEvidence.spec.ts` 覆盖）。前四步已在回滚事务里用**同一条服务端代码路径**验过。
+  - **W2 后端判据已落地（2026-11-15，真 PG 回滚事务，3 passed）**：W2 的浏览器判据是「录入 AJE →
+    切回查询页自动判定 → 显示已过期与原因「调整分录行数 a → b」→ 重新查询 → 未变化」。其中**决定正确性的
+    部分在服务端**：采集摘要 → `recapture_vector` 重采 → `compare_vector` 逐分量比较（路由
+    `_freshness_for_vector` 就是这三步；前端只做显示 + 60 秒节流）。新增
+    `test_aqf_task10_freshness_pg.py`：
+    | 用例 | 判据 |
+    |---|---|
+    | `test_unchanged_is_current_then_one_more_row_is_stale` | 数据没动 → `current`；**插一行调整分录** → `stale` 且 `changes` 带原因；重新采集后 `vector_hash` 变化且回到 `current` |
+    | `test_empty_vector_is_unknown_not_current` | 空向量 → `unknown` + 中文原因（不能因为「没东西可比」就报 `current`） |
+    | `test_other_projects_changes_do_not_mark_this_one_stale` | 乙项目多一行不把甲项目判成 `stale`（时间戳作用域隔离） |
+    变异（`tmp_aqf/mut_w2.py`）：**M-w2c** 恒判 `current` ⇒ 打红；**M-w2s** 恒判 `stale` ⇒ 打红；
+    **N1** 阴性对照 ⇒ 全绿。**3/3 符合预期、逐字节还原 sha256 一致**。
+    🔴 为什么不用原判据：W2 要往**真实项目**录 AJE，而现库只有 `E2E-D4发布测试项目_请勿动_2099`
+    （名字明确「请勿动」）与 `【E2E】公式管理运行时门禁_2025`（零成员行、四表全 0）⇒ 写进去就是污染共享库。
+    回滚事务里造【测试】项目 + AJE，验的是**同一条服务端代码路径**，且不留残留。
+    🔴 一度写错接口：`compare_vector(before, after)` 是**纯函数**（两个向量比），不是「重采再比」——
+    正确用法是 `recapture_vector(db, components)` + `compare_vector(components, recaptured)`。
+    按名字推签名会让用例在 `await` 一个纯函数上崩掉（首轮 3 例全 ERROR 就是这么来的）。
 - [x] 11. 回归与收尾（N2、N4；design §10.4、§10.7）
   - 后端：`backend/tests/advanced_query_linkage` 全量真 PG + 任务 0 的选集；前端：任务 0 的 vitest 选集；与基线逐节点比对，新增失败为 0。
   - 变异表 M1~M15、F1~F4 全部在预期用例打红；阴性对照 N1 全绿。

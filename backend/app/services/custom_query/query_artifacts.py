@@ -54,12 +54,20 @@ def partial_path(directory: Path, artifact_id: uuid.UUID) -> Path:
 
 
 def storage_key(directory: Path, artifact_id: uuid.UUID) -> str:
-    """相对证据根目录的存储键（用于 query_artifacts.storage_key 列）。"""
-    root = _artifact_root()
+    """相对证据根目录的存储键（用于 ``query_artifacts.storage_key`` 列）。
+
+    🔴 两边都要 ``resolve()``：``directory`` 已经过 ``ensure_within_root`` 变成解析后的绝对路径，
+    而 ``_artifact_root()`` 还是原始字符串。不解析时 ``relative_to`` 在 Windows 上会因
+    大小写 / 短路径 / 尾部斜杠差异抛 ``ValueError``，走 except 分支把**绝对路径**写进库
+    （2026-11-15 W3 走查实测：库里是 `D:\\GT_plan\\backend\\storage\\...\\x.xlsx`）——
+    既把服务器路径暴露给数据库，换证据根后旧记录也全部失效。
+    """
+    root = _artifact_root().resolve()
+    target = (directory / f"{artifact_id}.xlsx").resolve()
     try:
-        return str(Path(directory / f"{artifact_id}.xlsx").relative_to(root))
-    except ValueError:
-        return str(directory / f"{artifact_id}.xlsx")
+        return target.relative_to(root).as_posix()
+    except ValueError:  # 真在根外（理论上 ensure_within_root 已挡住）
+        return target.name
 
 
 # ─── SHA-256 流式计算 ─────────────────────────────────────────────────────────
@@ -209,7 +217,10 @@ async def seal_artifact(
 
     try:
         directory = artifact_directory(artifact_id, now)
-        ensure_within_root(str(_artifact_root()), str(directory))
+        # 签名是 `ensure_within_root(target: Path, root: Path)`：传 str 会 AttributeError
+        # （`'str' object has no attribute 'resolve'`）⇒ 封存**一律**降级为 unavailable，
+        # 整条证据链路静默失效。2026-11-15 由 test_aqf_task5_artifact_pg 抓到。
+        directory = ensure_within_root(directory, _artifact_root())
         part = partial_path(directory, artifact_id)
         final = artifact_path(directory, artifact_id)
 
@@ -222,7 +233,11 @@ async def seal_artifact(
         )
 
         def make_info(written_rows: int) -> list[tuple[str, Any]]:
-            return list(info_rows_base) + list(extra_rows)
+            # `info_rows_base` 是 `_InfoRows` 可调用对象（按**实际写入行数**生成说明页），
+            # 不是行列表。直接 `list(info_rows_base)` 会 `TypeError: '_InfoRows' object
+            # is not iterable` ⇒ 封存必然降级（2026-11-15 test_aqf_task5_artifact_pg 抓到）。
+            base = info_rows_base(written_rows) if callable(info_rows_base) else info_rows_base
+            return list(base or ()) + list(extra_rows)
 
         # 写 .partial 文件
         built = await export_service.build_xlsx_file(
@@ -277,6 +292,35 @@ async def seal_artifact(
         # 写证据记录（独立短事务）
         from app.core.database import async_session as default_factory
         factory = session_factory or default_factory
+        dialect = db.get_bind().dialect.name
+        insert_params = {
+            "id": str(artifact_id),
+            "run_id": str(run_id) if run_id else None,
+            "user_id": user_id,
+            "entry": entry,
+            "project_id": str(project_id) if project_id else None,
+            "year": year,
+            "source_key": source_key[:200],
+            "definition_hash": definition_hash,
+            "version_vector": canonical_json(version_vector),
+            "vector_hash": vector_hash,
+            "scope": canonical_json(scope),
+            "file_name": file_name[:255],
+            "storage_key": storage_key(directory, artifact_id),
+            "media_type": ARTIFACT_MEDIA_TYPE,
+            "byte_size": byte_size,
+            # 时间一律传 datetime：asyncpg 只认 datetime（传 ISO 字符串是
+            # `DataError: expected a datetime.date or datetime.datetime instance, got 'str'`）；
+            # aiosqlite 反过来不认 datetime ⇒ 按方言分流。
+            "sha256": sha,
+            "row_count": built.row_count,
+            "columns": canonical_json(manifest["columns"]),
+            "manifest": canonical_json(manifest),
+            "manifest_sha256": msha,
+            "retention_until": retention_until,
+        }
+        if dialect != "postgresql":
+            insert_params["retention_until"] = retention_until.isoformat()
         try:
             async with factory() as short_db:
                 async with short_db.begin():
@@ -296,29 +340,7 @@ async def seal_artifact(
                             cast(:manifest AS jsonb), :manifest_sha256, :retention_until,
                             now(), now()
                         )
-                    """), {
-                        "id": str(artifact_id),
-                        "run_id": str(run_id) if run_id else None,
-                        "user_id": user_id,
-                        "entry": entry,
-                        "project_id": str(project_id) if project_id else None,
-                        "year": year,
-                        "source_key": source_key[:200],
-                        "definition_hash": definition_hash,
-                        "version_vector": canonical_json(version_vector),
-                        "vector_hash": vector_hash,
-                        "scope": canonical_json(scope),
-                        "file_name": file_name[:255],
-                        "storage_key": storage_key(directory, artifact_id),
-                        "media_type": ARTIFACT_MEDIA_TYPE,
-                        "byte_size": byte_size,
-                        "sha256": sha,
-                        "row_count": built.row_count,
-                        "columns": canonical_json(manifest["columns"]),
-                        "manifest": canonical_json(manifest),
-                        "manifest_sha256": msha,
-                        "retention_until": retention_until.isoformat(),
-                    })
+                    """), insert_params)
         except Exception as db_exc:
             logger.warning("AQF 证据记录写库失败: %s", db_exc)
             return SealResult(ok=False, reason=f"证据记录写入失败：{type(db_exc).__name__}")

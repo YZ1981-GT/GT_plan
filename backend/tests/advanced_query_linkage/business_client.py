@@ -79,8 +79,16 @@ class BusinessClient:
 
 
 @asynccontextmanager
-async def business_client(session: AsyncSession, monkeypatch: Any) -> AsyncIterator[BusinessClient]:
-    """真库业务视图客户端（夹具 ``business`` 用）：``session`` 是回滚事务会话。"""
+async def business_client(
+    session: AsyncSession, monkeypatch: Any, *, user: User | None = None,
+) -> AsyncIterator[BusinessClient]:
+    """真库业务视图客户端（夹具 ``business`` 用）：``session`` 是回滚事务会话。
+
+    ``user`` 缺省是一个**虚构**的系统管理员（不落库）—— 绝大多数取数用例不需要真实 users 行。
+    但凡被测路径要写 ``query_runs`` / ``query_artifacts``（两表 ``user_id`` 都外键到 ``users``）时，
+    虚构 id 会让 FK 违约、写入被降级吞掉（2026-11-15 实测：导出响应缺
+    ``X-Query-Run-Id`` / ``X-Query-Artifact-Id``）。这类用例必须经 ``existing_user`` 传库里真实账号。
+    """
     redis = fakeredis.aioredis.FakeRedis(server=fakeredis.FakeServer(), decode_responses=True)
     monkeypatch.setattr(core_redis, "redis_client", redis)
     monkeypatch.setattr(core_redis, "_redis_client", redis)
@@ -89,9 +97,13 @@ async def business_client(session: AsyncSession, monkeypatch: Any) -> AsyncItera
         return True
 
     monkeypatch.setattr(audit_helper, "_log_unthrottled", _no_audit)
-    api = build_app(custom_query.router)
-    admin = User(id=uuid.uuid4(), username="aql-b5-admin", email="aql-b5@test.invalid", hashed_password="x",
-                 role=UserRole.admin, is_active=True)
+    # 证据的下载 / 清单端点在 `query_evidence.router`，必须一起挂 —— 只挂 custom_query
+    # 会让用例拿到 `{"detail":"Not Found"}` 的 404，看起来像「记录不存在」而实际是路由没注册。
+    from app.routers import query_evidence
+
+    api = build_app(custom_query.router, query_evidence.router)
+    admin = user or User(id=uuid.uuid4(), username="aql-b5-admin", email="aql-b5@test.invalid",
+                         hashed_password="x", role=UserRole.admin, is_active=True)
 
     async def _db():
         yield session

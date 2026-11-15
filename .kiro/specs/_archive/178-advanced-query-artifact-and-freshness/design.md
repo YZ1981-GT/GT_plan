@@ -667,19 +667,44 @@ generated_at     generated_by {user_id, username}
 4. **登记在 SAVEPOINT 内但路由不提交** ⇒ 响应 `run.recorded=true` 而库里 0 行；构建器则**根本没登记**。
 5. 🔴 **导出证据链路整条未实现**：`query_artifacts.seal_artifact` 写完了但**全仓零调用**，
    `query_export.respond_xlsx` 仍走临时文件发完即删 ⇒ 库里 `query_artifacts` 0 行、证据目录从未创建。
-   **本轮不修**：这是 §6 整条 R4 需求（封存流程 / `build_xlsx_file` 拆分 / 两条导出路径接线 /
-   说明页四行 / 三个响应头 / 下载重验 / 清单端点 + P10 与 M10 / M11），不是接线补丁能糊过去的。
-   ⇒ `tasks.md` 任务 5 已从 `[x]` **如实改回 `[ ]`**。
+   当时判「不是接线补丁能糊过去的」，`tasks.md` 任务 5 从 `[x]` **如实改回 `[ ]`**。
+   **2026-11-15 已实现并回填 `[x]`**：接线后又在真 PG + 真文件系统上抓到 6 处「接线对了但细节错」
+   的缺陷，逐条见下节 2.6。
+
+### 2.6 任务 5 实施时抓到的 7 处真实缺陷（2026-11-15）
+
+全部只在「真 PG + 真文件系统」上暴露 —— 普通回归、类型检查、纯函数单测都看不出来，因为
+每一处都被 `seal_artifact` / `seal_and_respond` 的降级 `except` 吞成「导出照常、只是少两个响应头」。
+
+| # | 缺陷 | 错误形态 | 后果 |
+|---|---|---|---|
+| ① | `ensure_within_root(str, str)` | `AttributeError: 'str' object has no attribute 'resolve'` | **封存永远不成功**（签名要 `Path`） |
+| ② | `list(info_rows_base)` | `TypeError: '_InfoRows' object is not iterable` | 同上（它是可调用对象，不是行列表） |
+| ③ | `retention_until.isoformat()` 传 PG | asyncpg `DataError: expected a datetime...got 'str'` | 证据记录写不进库（与任务 4 的 `captured_at` 同族） |
+| ④ | `_iter_file_bytes(path)` 漏 `byte_chunk` | `TypeError: missing 1 required positional argument` | 封存成功后返回 500 |
+| ⑤ | 审计读 `getattr(response, "_manifest_sha256", None)` | 属性真名是 `manifest_sha256` | 审计里清单摘要**恒 None**（静默） |
+| ⑥ | `build_xlsx_file` 用系统临时目录 | `OSError: [WinError 17] 系统无法将文件移到不同的磁盘驱动器` | Windows 上封存**必然**降级 |
+| ⑦ | `storage_key` 写成绝对路径 | `relative_to` 抛 `ValueError` 后走 except 分支 | 库里存 `D:\GT_plan\backend\storage\...`；换证据根后旧记录全失效（W3 走查实测） |
+
+配套的测试夹具缺陷（会掩盖上面全部 6 条）：`query_runs.user_id` / `query_artifacts.user_id` 外键到 `users(id)`，
+而 `business` 夹具用**虚构**管理员 ⇒ 写入必 FK 违约、被降级吞掉。新增 `existing_user` / `business_real_user` 夹具；
+`business_client` 同时补挂 `query_evidence.router`（只挂 `custom_query.router` 时下载端点 404，
+形态是 `{"detail":"Not Found"}`，看起来像「记录不存在」）。
+
+另按 §6.2 把建表内核抽成 `ExportService._build_workbook`，`stream_xlsx` 与 `build_xlsx_file` 共用一份
+（`export_service.py` 697 → **678** 行）；并加 AST 守卫 `test_stream_and_build_share_one_workbook_kernel`
+防「两份实现只改一份」——本仓反复踩过的形态。
 
 ### 3. 回归基线（现算）
 
 | 项 | 结果 |
 |---|---|
-| 真 PG 全目录 `tests/advanced_query_linkage/` | **940 passed / 0 failed / 0 skipped** |
+| 真 PG 全目录 `tests/advanced_query_linkage/` | **954 passed / 0 failed / 0 skipped**（2026-11-15 任务 5 完成后重跑，244 s） |
+| 导出相关既有选集（8 文件） | **102 passed / 0 failed**（既有用例一条未改 ⇒ 抽内核没改行为） |
 | 非 PG 选集（29 文件） | **475 passed / 0 failed**（修复前 2 failed / 472 passed） |
 | 前端选集（35 文件） | **372 passed / 0 failed** |
 | 门禁 | `check_migration_versions` / `check_router_registration` / `check_file_size` / `test_spec_index_consistency` / `test_route_shadow_guard` 全 exit 0 |
-| 变异 | 接线 `V1/V2/V3` 红 + `N1` 绿；缺陷 `M-A/M-B/M-C` 红 + `N1` 绿，**逐字节还原 sha256 全部一致** |
+| 变异 | 接线 `V1/V2/V3` 红 + `N1` 绿；缺陷 `M-A/M-B/M-C` 红 + `N1` 绿；任务 5 的 `M10 / M11 / M-audit / M-kernel` 红 + `N1` 绿，**逐字节还原 sha256 全部一致** |
 
 ### 4. 预存失败（干净 HEAD `901cfd7a5` 上逐条同红，不属本 spec，未代改）
 
@@ -691,10 +716,14 @@ generated_at     generated_by {user_id, username}
 
 ### 5. 遗留
 
-- **任务 5**（查询证据 R4.1~R4.7）待实现：见上第 2.5 条清单。
+- **任务 5**（查询证据 R4.1~R4.7）**已实现**（2026-11-15），缺陷清单见上第 2.5 / 2.6 条。
 - **任务 10** 的 W2 未走：现库 12 个名称含「测试/E2E/UAT」的项目里只有 2 个有审计年度
   （`E2E-D4发布测试项目_请勿动_2099` 名字明确「请勿动」；`【E2E】公式管理运行时门禁_2025` 零成员行、四表全 0），
   录入 AJE 会污染共享库 ⇒ 需一个可写的【测试】项目或用户放行自建。
+- **任务 10 的 W3 已复走通过**（2026-11-15 任务 5 完成后）：导出 `stored` / 库行 +1 / 文件 SHA 一致 /
+  列表包含 / 清单摘要一致 / 下载 200 / 清理对账回到 0 行 0 文件。W3 首轮暴露的缺陷 ⑤ 已关闭，
+  复走又抓到第 ⑦ 处（`storage_key` 绝对路径）并修好。
+- **任务 10 仍未走**：W2（需一个可写的【测试】项目录入 AJE）与 N1 真实栈性能复跑。
 - **N1 性能**未在本任务复跑（本 spec 未改取数路径，只加版本采集；采集成本见 §0.3）。
 
 ## §11 Phase 2 预留（本 spec 不实施）

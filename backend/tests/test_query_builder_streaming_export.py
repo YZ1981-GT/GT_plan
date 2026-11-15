@@ -13,9 +13,12 @@
 from __future__ import annotations
 
 import io
+import shutil
+import tempfile
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
@@ -42,16 +45,27 @@ USER_ID = uuid.uuid4()
 def _audits():
     """审计写入换成只记录（advanced-query-linkage-closure 任务 26 起导出记审计 ``custom_query.export``）：真实写入经
     ``audit_logger`` 推进本机 Redis 队列，再由共享开发环境的审计 worker 写进共享库——测试不该在那里留下假用户的审计行。
-    模块级（不是函数级）：hypothesis 用例不接受函数级夹具。"""
+    模块级（不是函数级）：hypothesis 用例不接受函数级夹具。
+
+    同时把 ``QUERY_ARTIFACT_ROOT`` 指到模块私有的临时目录：AQF 任务 5 起导出会封存证据，
+    不隔离就会往真实的 ``backend/storage/query_artifacts`` 落文件（库行随回滚消失，磁盘文件会累积）。
+    """
     recorded: list[dict] = []
+    artifact_root = Path(tempfile.mkdtemp(prefix="aqf_stream_artifacts_"))
 
     async def _record(**kwargs):
         recorded.append(kwargs)
         return True
 
+    from app.core.config import settings
+
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(audit_helper, "_log_unthrottled", _record)
-        yield recorded
+        mp.setattr(settings, "QUERY_ARTIFACT_ROOT", str(artifact_root))
+        try:
+            yield recorded
+        finally:
+            shutil.rmtree(artifact_root, ignore_errors=True)
 
 
 class _FakeUser:

@@ -47,6 +47,7 @@ from app.services.custom_query.export_gate import ExportSlot, acquire_export_slo
 from app.services.custom_query.ownership_guard import ownership_guard
 from app.services.custom_query.pagination import collect_available_columns, resolve_sort, sort_rows
 from app.services.custom_query.query_orchestrator import ColumnMeta, FetchPage, query_orchestrator
+from app.services.custom_query.query_runs import normalize_definition
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +195,10 @@ async def respond_xlsx(
     slot: ExportSlot, rows: Any, columns: list[ColumnMeta], *, info_rows: _InfoRows, file_name: str,
     sheet_title: str | None = None, extra_sheets: Sequence[tuple[str, list[list[Any]]]] = (),
 ) -> GatedStreamingResponse:
-    """生成文件并预取首块（取数与写临时文件都在这一步完成）；失败先释放名额再抛，成功后名额随响应结束释放。"""
+    """生成文件并预取首块（取数与写临时文件都在这一步完成）；失败先释放名额再抛，成功后名额随响应结束释放。
+
+    ⚠️ 这是**不封存证据**的路径（``seal_and_respond`` 的降级分支与「导出当前页」类前端直出共用）。
+    """
     agen = export_module.export_service.stream_xlsx(
         rows, columns, info_rows=info_rows, sheet_title=sheet_title, extra_sheets=extra_sheets)
     try:
@@ -214,6 +218,215 @@ async def respond_xlsx(
     )
 
 
+def _evidence_headers(*, run_id: Any, artifact_id: Any, status: str) -> dict[str, str]:
+    """证据响应的三个头（design §6.3 第 5 步）。"""
+    headers = {"X-Query-Artifact-Status": status}
+    if run_id:
+        headers["X-Query-Run-Id"] = str(run_id)
+    if artifact_id:
+        headers["X-Query-Artifact-Id"] = str(artifact_id)
+    return headers
+
+
+async def _aiter_once(rows: Sequence[dict]) -> AsyncIterator[dict]:
+    """把已在内存里的行包成可重放的异步迭代器（封存失败降级时要再取一遍同一批行）。"""
+    for row in rows:
+        yield row
+
+
+#: 证据记录用的会话工厂（design §6.3「独立短事务」，缺省 ``core.database.async_session``）。
+#: 做成模块级注入点：真库用例把它指到回滚事务会话，测试写入不落共享库。
+_seal_session_factory: Any = None
+
+
+async def _capture_and_record_run(
+    *,
+    db: Any,
+    user: Any,
+    entry: str,
+    origin: str,
+    template_id: Any,
+    project_id: Any,
+    year: int | None,
+    source_key: str,
+    definition: dict,
+    scope: dict,
+    source: str,
+    acnr_targets: bool,
+    last_total: int | None,
+    builder_tables: Sequence[str] | None = None,
+) -> dict:
+    """采集版本向量并登记运行（design §5.3：导出先登记运行，说明页与证据都要运行编号）。
+
+    返回 ``{run_id, definition_hash, version_vector, vector_hash, vector_weak, captured_at}``。
+    采集或登记失败都**不阻断导出**（R1.6 降级方向）：版本摘要为空、run_id 为空，
+    随后封存会拿到 ``vector_hash=""``（封存仍可成功，只是清单里版本为空）。
+    """
+    from app.services.custom_query import query_runs as runs_module
+    from app.services.custom_query.version_capture import (
+        capture_business_vector,
+        capture_builder_vector,
+    )
+
+    captured_at = datetime.now(timezone.utc)
+    version_vector: dict = {}
+    vector_hash = ""
+    vector_weak = False
+    try:
+        if entry == "builder":
+            vector = await capture_builder_vector(
+                db, list(builder_tables or ()), scope=scope,
+            )
+        else:
+            vector = await capture_business_vector(
+                db, source, scope=scope, acnr_targets=acnr_targets,
+            )
+        version_vector = vector.as_dict()
+        vector_hash = vector.vector_hash
+        vector_weak = bool(vector.weak)
+    except Exception as exc:  # noqa: BLE001 — 采集失败不阻断导出
+        logger.debug("AQF 导出时版本采集失败（降级为无版本）: %s", exc)
+
+    def_hash = runs_module.definition_hash(definition)
+    run_id = None
+    try:
+        info = await runs_module.record_run(
+            db, user_id=user.id, entry=entry, origin=origin, template_id=template_id,
+            project_id=project_id, year=year, source_key=source_key,
+            definition=definition, scope=scope, version_vector=version_vector,
+            vector_hash=vector_hash, vector_weak=vector_weak,
+            captured_at=captured_at, last_total=last_total,
+        )
+        if info.get("recorded"):
+            run_id = info.get("id")
+            # 运行记录在自己这个 SAVEPOINT 里，独立提交（导出结束前就不再动它）
+            try:
+                await db.commit()
+            except Exception:  # noqa: BLE001
+                logger.warning("AQF 导出运行记录提交失败", exc_info=True)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("AQF 导出运行记录登记失败: %s", exc)
+
+    return {
+        "run_id": run_id,
+        "definition_hash": def_hash,
+        "version_vector": version_vector,
+        "vector_hash": vector_hash,
+        "vector_weak": vector_weak,
+        "captured_at": captured_at,
+    }
+
+
+async def _stream_sealed_file(
+    slot: ExportSlot, path: str, *, file_name: str, headers: dict[str, str],
+    manifest_sha256: str | None = None,
+) -> GatedStreamingResponse:
+    """从已封存的证据文件流式返回（**不删除**，design §6.3 第 5 步）。
+
+    `_iter_file_bytes` 是同步生成器且 `byte_chunk` 是必填位置参数（2026-11-15 实测漏传会
+    `TypeError`，把「封存已成功」变成 500）；这里显式给块大小并把它包成异步迭代器。
+    """
+    from app.services.custom_query.export_service import _STREAM_BYTE_CHUNK
+
+    sync_iter = export_module.export_service._iter_file_bytes(path, _STREAM_BYTE_CHUNK)
+
+    async def body() -> AsyncIterator[bytes]:
+        try:
+            for chunk in sync_iter:
+                yield chunk
+        finally:
+            # 证据文件是长期资产，不删；只关掉读取句柄
+            closer = getattr(sync_iter, "close", None)
+            if closer is not None:
+                closer()
+
+    response = GatedStreamingResponse(
+        b"", body(), slot, media_type=XLSX_MEDIA_TYPE,
+        headers={
+            "Content-Disposition": export_module.export_service.build_content_disposition(file_name),
+            **headers,
+        },
+    )
+    # 导出审计要记清单摘要（design §6.3 第 5 步之后的审计）。挂在响应对象上：
+    # 响应头已经用满（X-Manifest-SHA256 是清单端点的头），且它不属于给客户端的契约。
+    response.manifest_sha256 = manifest_sha256
+    return response
+
+
+async def seal_and_respond(
+    slot: ExportSlot,
+    make_rows: Callable[[], Any],
+    columns: list[ColumnMeta],
+    *,
+    info_rows: _InfoRows,
+    file_name: str,
+    db: Any,
+    user: Any,
+    entry: str,
+    origin: str = "direct",
+    template_id: Any = None,
+    project_id: Any = None,
+    year: int | None = None,
+    source_key: str,
+    source_label: str,
+    definition: dict,
+    definition_hash: str,
+    scope: dict,
+    version_vector: dict,
+    vector_hash: str,
+    vector_weak: bool = False,
+    captured_at: datetime | None = None,
+    run_id: Any = None,
+    sheet_title: str | None = None,
+    extra_sheets: Sequence[tuple[str, list[list[Any]]]] = (),
+) -> GatedStreamingResponse:
+    """封存证据并返回响应（AQF §6.3 / R4.1~R4.4；ADR-AQF-06 降级）。
+
+    成功：文件落在证据目录、独立短事务写入 ``query_artifacts``，响应从该文件流式返回且**不删**，
+          带 ``X-Query-Run-Id`` / ``X-Query-Artifact-Id`` / ``X-Query-Artifact-Status: stored``。
+    失败（任何一步）：**改走现有临时文件路径**（``respond_xlsx``），响应头 ``unavailable``，
+          不阻断导出 —— 这正是 ADR-AQF-06 的方向。
+
+    ``make_rows`` 是**工厂**而不是迭代器：封存会消费掉一遍行，降级时必须能重新取一遍
+    （``paged_fetch.stream_rows(plan)`` 每次调用都重建游标，可安全重放）。
+    """
+    from app.services.custom_query import query_artifacts as artifacts_module
+
+    sealed = await artifacts_module.seal_artifact(
+        db=db, user=user, entry=entry, origin=origin, template_id=template_id,
+        project_id=project_id, year=year, source_key=source_key, source_label=source_label,
+        definition=definition, definition_hash=definition_hash, scope=scope,
+        version_vector=version_vector, vector_hash=vector_hash, vector_weak=vector_weak,
+        captured_at=captured_at, run_id=run_id,
+        rows=make_rows(), columns=columns, info_rows_base=info_rows,
+        file_name=file_name, sheet_title=sheet_title, extra_sheets=extra_sheets,
+        session_factory=_seal_session_factory,
+    )
+    if sealed.ok:
+        logger.info(
+            "AQF 证据已封存 artifact=%s run=%s bytes=%s",
+            sealed.artifact_id, sealed.run_id, sealed.byte_size,
+        )
+        return await _stream_sealed_file(
+            slot, sealed.file_path, file_name=file_name,
+            headers=_evidence_headers(
+                run_id=sealed.run_id, artifact_id=sealed.artifact_id, status="stored",
+            ),
+            manifest_sha256=sealed.manifest_sha256,
+        )
+
+    logger.warning("AQF 证据封存降级为临时文件：%s", sealed.reason)
+    response = await respond_xlsx(
+        slot, make_rows(), columns, info_rows=info_rows, file_name=file_name,
+        sheet_title=sheet_title, extra_sheets=extra_sheets,
+    )
+    for key, value in _evidence_headers(
+        run_id=run_id, artifact_id=None, status="unavailable",
+    ).items():
+        response.headers[key] = value
+    return response
+
+
 async def _audited(response: GatedStreamingResponse, audit: Callable[[], Awaitable[Any]]) -> GatedStreamingResponse:
     """记导出审计（``record_export`` 内部吞异常，失败只记 WARNING）；被取消等异常时先释放响应（名额、临时文件）再抛。"""
     try:
@@ -222,8 +435,6 @@ async def _audited(response: GatedStreamingResponse, audit: Callable[[], Awaitab
         await response.release()
         raise
     return response
-
-
 def _grouping_unsupported() -> HTTPException:
     return HTTPException(status_code=400, detail={
         "error_code": "EXPORT_GROUPING_UNSUPPORTED",
@@ -263,13 +474,14 @@ async def _business_export(body: Any, *, user: Any, db: Any) -> GatedStreamingRe
         if plan is not None:
             total = await paged_fetch.count_plan(plan)
             _check_row_limit(total)
-            rows: Any = paged_fetch.stream_rows(plan)
+            make_rows: Callable[[], Any] = lambda: paged_fetch.stream_rows(plan)  # noqa: E731
             columns, warnings, label = plan.columns, plan.warnings, plan.spec.label
         else:
-            rows, columns, warnings = await _memory_rows(
+            cached_rows, columns, warnings = await _memory_rows(
                 req, await business_fetchers.business_fetcher(req, resolved, db, user=user), user=user, db=db)
-            total, label = len(rows), req.source
+            total, label = len(cached_rows), req.source
             _check_row_limit(total)
+            make_rows = lambda: _aiter_once(cached_rows)  # noqa: E731
         source_text = f"{label}（{req.source}）" if label != req.source else req.source
         project_text = await _project_label(db, req.project_id)
         conditions_text = describe_conditions(req.conditions, req.condition_logic, headers, req.filters)
@@ -278,7 +490,29 @@ async def _business_export(body: Any, *, user: Any, db: Any) -> GatedStreamingRe
             row_count=written, user=user, warnings=warnings,
         ))
         file_name = clean_file_name(getattr(body, "file_name", None), f"高级查询_{label}_{req.year}")
-        response = await respond_xlsx(slot, rows, _titled(columns, headers), info_rows=info, file_name=file_name)
+
+        # ── 版本向量采集 + 运行登记（design §5.3：导出先登记运行，说明页要用运行编号）──
+        run_info = await _capture_and_record_run(
+            db=db, user=user, entry="business", origin="direct", template_id=None,
+            project_id=req.project_id, year=req.year, source_key=req.source,
+            definition=normalize_definition(body, entry="export"),
+            scope={"project_id": str(req.project_id) if req.project_id else None, "year": req.year},
+            source=req.source, acnr_targets=bool(getattr(req, "targets", None)),
+            last_total=total,
+        )
+
+        response = await seal_and_respond(
+            slot, make_rows, _titled(columns, headers), info_rows=info, file_name=file_name,
+            db=db, user=user, entry="business", origin="direct", template_id=None,
+            project_id=req.project_id, year=req.year,
+            source_key=req.source, source_label=label,
+            definition=normalize_definition(body, entry="export"),
+            definition_hash=run_info["definition_hash"],
+            scope={"project_id": str(req.project_id) if req.project_id else None, "year": req.year},
+            version_vector=run_info["version_vector"], vector_hash=run_info["vector_hash"],
+            vector_weak=run_info["vector_weak"], captured_at=run_info["captured_at"],
+            run_id=run_info["run_id"],
+        )
     except BaseException:
         slot.release()
         raise
@@ -287,6 +521,9 @@ async def _business_export(body: Any, *, user: Any, db: Any) -> GatedStreamingRe
             "entry": "business", "source": req.source, "year": req.year,
             "row_count": info.written if info.written is not None else total,
             "columns": [c.key for c in columns], "conditions": len(req.conditions),
+            "run_id": run_info["run_id"], "artifact_id": response.headers.get("X-Query-Artifact-Id"),
+            "manifest_sha256": getattr(response, "manifest_sha256", None),
+            "vector_hash": run_info["vector_hash"],
         }))
 
 
@@ -353,8 +590,34 @@ async def export_builder_query(
                 row_count=written, user=user, warnings=[*warnings],
             ))
             file_name = clean_file_name(getattr(body, "file_name", None), f"高级构建器_{table_label}")
-            response = await respond_xlsx(slot, rows(), columns, info_rows=info, file_name=file_name,
-                                          sheet_title=table_label, extra_sheets=(extra_sheet,) if extra_sheet else ())
+
+            # ── 版本向量采集 + 运行登记（design §5.3）──
+            builder_scope = {
+                "projects": [str(p) for p in (getattr(scope, "project_ids", None) or ())],
+                "year": getattr(body, "year", None),
+            }
+            run_info = await _capture_and_record_run(
+                db=db, user=user, entry="builder", origin="direct", template_id=None,
+                project_id=getattr(scope, "requested_project_id", None), year=getattr(body, "year", None),
+                source_key=str(getattr(body, "table", "") or ""),
+                definition=normalize_definition(body, entry="builder"),
+                scope=builder_scope, source=str(getattr(body, "table", "") or ""),
+                acnr_targets=False, last_total=total,
+                builder_tables=[body.table] + [j.get("table") for j in body.joins if j.get("table")],
+            )
+
+            response = await seal_and_respond(
+                slot, rows, columns, info_rows=info, file_name=file_name,
+                db=db, user=user, entry="builder", origin="direct",
+                project_id=getattr(scope, "requested_project_id", None), year=getattr(body, "year", None),
+                source_key=str(getattr(body, "table", "") or ""), source_label=table_label,
+                definition=normalize_definition(body, entry="builder"),
+                definition_hash=run_info["definition_hash"], scope=builder_scope,
+                version_vector=run_info["version_vector"], vector_hash=run_info["vector_hash"],
+                vector_weak=run_info["vector_weak"], captured_at=run_info["captured_at"],
+                run_id=run_info["run_id"],
+                sheet_title=table_label, extra_sheets=(extra_sheet,) if extra_sheet else (),
+            )
         except SQLAlchemyError as exc:
             correlation_id = uuid.uuid4().hex
             try:
@@ -375,4 +638,6 @@ async def export_builder_query(
             "entry": "builder", "table": body.table, "year": body.year,
             "row_count": info.written if info.written is not None else total,
             "columns": names, "joins": joins, "all_projects": scope.is_all_projects,
+            "run_id": run_info["run_id"], "artifact_id": response.headers.get("X-Query-Artifact-Id"),
+            "vector_hash": run_info["vector_hash"],
         }))

@@ -1,5 +1,4 @@
 """advanced-query-linkage-closure 后端测试共用夹具（design §10；实施计划 §0.5、§0.13）。
-
 - ``pg_only``：本目录用到真库夹具（``gold``、``pg_rollback_session``）的用例必须带 ``pytest.mark.pg_only``——
   不带就当场报错，不连库（``gold.require_pg_only``）。口径类断言在 SQLite 上表达不了 PG 枚举、缺表与多数据集，
   跳过即没测：跑真库时核对 skipped 为 0。
@@ -17,6 +16,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -190,7 +190,43 @@ async def builder(pg_rollback_session: AsyncSession, monkeypatch: pytest.MonkeyP
 
 
 @pytest_asyncio.fixture
+async def existing_user(pg_rollback_session: AsyncSession, request: pytest.FixtureRequest) -> Any:
+    """从共享库取一个**真实**的系统管理员账号（只读引用，不改 users）。
+
+    为什么需要它：`query_runs.user_id` / `query_artifacts.user_id` 都外键到 `users(id)`，
+    而 `business_client` 缺省用的虚构管理员不落库 ⇒ 任何要写这两表的路径都会 FK 违约，
+    被 `except` 降级成「记录失败」，响应里看不出差别的只有少两个响应头。
+    """
+    require_pg_only(request.node)
+    from app.models.base import UserRole
+    from app.models.core import User
+
+    row = (
+        await pg_rollback_session.execute(
+            sa.text(
+                "SELECT id, username, role::text FROM users "
+                "WHERE is_deleted = false AND is_active = true AND role::text = 'admin' "
+                "ORDER BY created_at LIMIT 1"
+            )
+        )
+    ).first()
+    if row is None:
+        pytest.fail("共享库没有可用的 admin 账号；写入型证据用例无法验证真实接线")
+    return User(id=row[0], username=row[1], email=f"{row[1]}@test.invalid",
+                hashed_password="x", role=UserRole(row[2]), is_active=True)
+
+
+@pytest_asyncio.fixture
 async def business(pg_rollback_session: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[BusinessClient]:
     """真库业务视图客户端：生产注册的 custom_query router + 回滚事务会话（见 ``business_client``）。"""
     async with business_client(pg_rollback_session, monkeypatch) as client:
+        yield client
+
+
+@pytest_asyncio.fixture
+async def business_real_user(
+    pg_rollback_session: AsyncSession, monkeypatch: pytest.MonkeyPatch, existing_user: Any,
+) -> AsyncIterator[BusinessClient]:
+    """同 ``business``，但用库里真实账号 —— 写 ``query_runs`` / ``query_artifacts`` 的用例必须用它。"""
+    async with business_client(pg_rollback_session, monkeypatch, user=existing_user) as client:
         yield client
