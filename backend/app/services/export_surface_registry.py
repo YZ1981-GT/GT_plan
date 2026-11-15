@@ -116,19 +116,22 @@ EXPORT_SURFACE_REGISTRY: dict[str, ExportSurfaceEntry] = {
     ),
     # ── data_exchange: 数据交换，输出规范原值 + 非正式说明 ──
     "consol_trial_local_export": ExportSurfaceEntry(
-        path="/api/projects/{project_id}/consolidation/trial-balance/local-export",
+        # 🔴 真实路由是 `/api/consolidation/trial/local-export` + query 参数
+        # （consolidation 域全部用 query 风格，见 `consol_trial.py`）。
+        # 注册表是**描述性清单**，应匹配真实路由；不给它单独造一套 path-param 风格。
+        path="/api/consolidation/trial/local-export",
         method="GET",
         classification="data_exchange",
         description="合并试算表本地数据导出（元口径原值 + 非正式说明）",
     ),
     "consol_diff_local_export": ExportSurfaceEntry(
-        path="/api/projects/{project_id}/consolidation/diff/local-export",
+        path="/api/consolidation/trial/diff/local-export",
         method="GET",
         classification="data_exchange",
         description="合并差额表本地导出",
     ),
     "consol_note_local_export": ExportSurfaceEntry(
-        path="/api/projects/{project_id}/consolidation/notes/local-export",
+        path="/api/consolidation/notes/local-export",
         method="GET",
         classification="data_exchange",
         description="合并附注本地导出",

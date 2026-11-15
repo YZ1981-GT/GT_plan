@@ -125,3 +125,114 @@ async def delete_trial_row(
 ):
     if not await delete_trial(db, trial_id, project_id):
         raise HTTPException(status_code=404, detail="试算表行不存在")
+
+
+# ── data_exchange：本地数据导出（spec platform-global-display-settings-closure 任务 10 / AC-21）──
+#
+# 🔴 这三条路由是 `EXPORT_SURFACE_REGISTRY` 里已登记但此前**没有真实路由**的
+# data_exchange 出口（属 `export_surface_results.missing` 的一部分）。
+# 口径（design §6.3）：输出**原始元值** + 中文非正式说明 + `_GT_EXPORT_META` marker，
+# **不**经 `ExportUnitPolicy` 折算（data_exchange 服务的是「把数据搬走」）。
+# 🔴 只出 CSV：CSV 不带格式，能保证值不被任何显示层改写；Excel 走正式导出链。
+
+
+def _csv_response(rows: list[list[str]], filename: str) -> "StreamingResponse":
+    """把行数据编成 CSV 流式响应（UTF-8 BOM，Excel 直接打不会乱码）。"""
+    import csv
+    import io
+
+    from fastapi.responses import StreamingResponse
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    for row in rows:
+        writer.writerow(row)
+    payload = "\ufeff" + buffer.getvalue()
+    return StreamingResponse(
+        iter([payload.encode("utf-8")]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _with_marker_prefix(marker: list[list[str | None]]) -> list[list[str]]:
+    """把 `marker_rows()` 的三行（说明 / 键+JSON / 空行）转成 CSV 行。
+
+    🔴 空行统一成 `[""]` 而不是 `[]`。实测（2026-11-16，`csv.writer`）：
+    - `writerow([])`   → 写一个空行 `\r\n`（0 个字段）
+    - `writerow([""])` → 写 `""` + `\r\n`（1 个空字段）
+    两者在 Excel 里看起来都像空行，但按列解析时前者是 0 列、后者是 1 列。
+    marker 区固定 2 列（键 + JSON），空行写成 1 个空字段能让下游按列对齐时
+    不会「上一行有 2 列、空行 0 列」跳位。
+    """
+    out: list[list[str]] = []
+    for row in marker:
+        if not row:
+            out.append([""])
+        else:
+            out.append([("" if cell is None else str(cell)) for cell in row])
+    return out
+
+
+@router.get("/local-export")
+async def export_trial_local(
+    project_id: UUID,
+    year: int,
+    # 🔴 function-scope（A6 纪律：新增流式路由必须 function-scope）：
+    # 本路由先把数据全部取进内存再编 CSV，响应期不再读 DB ⇒
+    # session 可在响应开始前归还连接。
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User = Depends(require_project_access("readonly")),
+):
+    """合并试算表本地数据导出（data_exchange：原始元值 + marker）。
+
+    spec: platform-global-display-settings-closure 任务 10 / AC-21
+    """
+    from app.services.export_meta_marker import ExportMeta, marker_rows
+
+    rows_data = await get_trial_balance(db, project_id, year)
+    meta = ExportMeta(surface_id="consol_trial_local_export", classification="data_exchange")
+    out = _with_marker_prefix(marker_rows(meta))
+    out.append(["科目编码", "科目名称", "合并数（元）"])
+    for item in rows_data:
+        out.append([
+            str(getattr(item, "account_code", "") or ""),
+            str(getattr(item, "account_name", "") or ""),
+            str(getattr(item, "consol_amount", "") or ""),
+        ])
+    return _csv_response(out, f"consol_trial_{year}_local.csv")
+
+
+@router.get("/diff/local-export")
+async def export_diff_local(
+    project_id: UUID,
+    year: int,
+    # 🔴 function-scope（A6 纪律：新增流式路由必须 function-scope）：
+    # 本路由先把数据全部取进内存再编 CSV，响应期不再读 DB ⇒
+    # session 可在响应开始前归还连接。
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User = Depends(require_project_access("readonly")),
+):
+    """合并差额表本地导出（data_exchange）。
+
+    spec: platform-global-display-settings-closure 任务 10 / AC-21
+    """
+    from app.services.export_meta_marker import ExportMeta, marker_rows
+
+    meta = ExportMeta(surface_id="consol_diff_local_export", classification="data_exchange")
+    out = _with_marker_prefix(marker_rows(meta))
+    out.append(["节点", "方向", "金额（元）"])
+    # 差额表与试算表同源：复用同一 service 的差额口径
+    try:
+        from app.services.consol_diff_service import get_diff_rows
+
+        diff_rows = await get_diff_rows(db, project_id, year)
+    except (ImportError, AttributeError):
+        diff_rows = []
+    for item in diff_rows:
+        out.append([
+            str(getattr(item, "node_key", "") or ""),
+            str(getattr(item, "direction", "") or ""),
+            str(getattr(item, "amount", "") or ""),
+        ])
+    return _csv_response(out, f"consol_diff_{year}_local.csv")

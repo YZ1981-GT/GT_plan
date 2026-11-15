@@ -187,3 +187,88 @@ class TestRawYuanGuard:
 
     def test_mixed_values_pass(self) -> None:
         assert_raw_yuan([Decimal("10000"), Decimal("1234.56")])
+
+
+# ── 8. 三条 data_exchange 真实路由已挂载（AC-21 的接线部分）──────
+
+
+class TestDataExchangeRoutesMounted:
+    """注册表里三条 data_exchange 必须有**真实路由**。
+
+    🔴 变异实证前的状态：注册表登记了但路由不存在 ⇒ `missing=15`，
+    `_GT_EXPORT_META` mark​er 再完美也没人用（死代码）。
+    本类用真实 `app.routes` 断言三条都在。
+    """
+
+    #: 注册表 key → 期望的真实路径（与 `export_surface_registry` 逐值一致）。
+    EXPECTED = {
+        "consol_trial_local_export": "/api/consolidation/trial/local-export",
+        "consol_diff_local_export": "/api/consolidation/trial/diff/local-export",
+        "consol_note_local_export": "/api/consolidation/notes/local-export",
+    }
+
+    def _app_paths(self) -> set[str]:
+        from app.main import app
+
+        paths: set[str] = set()
+        for route in app.routes:
+            path = getattr(route, "path", None)
+            if path:
+                paths.add(path)
+        return paths
+
+    @pytest.mark.parametrize("key,path", list(EXPECTED.items()))
+    def test_route_mounted(self, key: str, path: str) -> None:
+        assert path in self._app_paths(), f"{key} 的路由 {path} 未挂载"
+
+    @pytest.mark.parametrize("key,path", list(EXPECTED.items()))
+    def test_registry_matches_real_route(self, key: str, path: str) -> None:
+        """注册表的 path 必须与真实路由**逐字相等**。
+
+        🔴 判据不是「注册表里有这条」而是「注册表说的就是真实路由」——
+        否则 `missing` 永远不降（此前正是这个状态：注册表写了
+        `/api/projects/{project_id}/consolidation/...`，真实路由是
+        `/api/consolidation/...` + query 参数）。
+        """
+        from app.services.export_surface_registry import EXPORT_SURFACE_REGISTRY
+
+        assert EXPORT_SURFACE_REGISTRY[key].path == path
+
+    def test_missing_count_decreased(self) -> None:
+        """`missing` 必须 ≤ 12（原 15，三条 data_exchange 已闭合）。
+
+        🔴 用上界而非等值：formal 出口的逐条治理是后续批次的事，
+        但它们只能让 missing 更小，不能变大。
+        """
+        from app.main import app
+        from app.services.ledger_registry_guard import collect_all_registry_results
+
+        ex = collect_all_registry_results(app)["export_surface_results"]
+        assert len(ex["missing"]) <= 12, (
+            f"missing 增加到 {len(ex['missing'])}（上界 12）：{ex['missing']}"
+        )
+
+    def test_no_duplicate_paths_in_registry(self) -> None:
+        """注册表内不得有重复 path（重复会让闭合判定失真）。"""
+        from app.services.export_surface_registry import EXPORT_SURFACE_REGISTRY
+
+        paths = [e.path for e in EXPORT_SURFACE_REGISTRY.values()]
+        assert len(paths) == len(set(paths))
+
+
+class TestCsvMarkerPrefix:
+    def test_marker_prefix_has_three_rows(self) -> None:
+        from app.routers.consol_trial import _with_marker_prefix
+
+        meta = ExportMeta(
+            surface_id="s", classification="data_exchange",
+            generated_at="2026-11-16T00:00:00+00:00",
+        )
+        out = _with_marker_prefix(marker_rows(meta))
+        assert len(out) == 3
+        assert out[0] == [DATA_EXCHANGE_NOTE]
+        assert out[1][0] == MARKER_KEY
+        # 🔴 空行必须是 `[""]`（1 个空字段）而不是 `[]`（0 个字段）：
+        # 实测 csv.writer 对 `[]` 写 `\r\n`、对 `[""]` 写 `""\r\n`，
+        # 后者按列对齐时不会跳位。
+        assert out[2] == [""]

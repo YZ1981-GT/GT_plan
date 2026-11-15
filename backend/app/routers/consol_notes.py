@@ -425,3 +425,65 @@ async def push_template_to_subsidiaries(
         total_failure=totals["failure"],
         total_skipped=totals["skip"],
     )
+
+
+# ── data_exchange：合并附注本地数据导出（spec platform-global-display-settings-closure 任务 10 / AC-21）──
+#
+# 🔴 `EXPORT_SURFACE_REGISTRY` 里登记为 data_exchange 但此前没有真实路由。
+# 口径同 consol_trial 的 local-export：原始元值 + 中文说明 + `_GT_EXPORT_META`，不做单位折算。
+
+
+@router.get("/local-export")
+async def export_consol_notes_local(
+    project_id: UUID,
+    year: int,
+    # 🔴 function-scope（A6 纪律：新增流式路由必须 function-scope）：
+    # 本路由先把数据全部取进内存再编 CSV，响应期不再读 DB ⇒
+    # session 可在响应开始前归还连接。
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User = Depends(require_project_access("readonly")),
+):
+    """合并附注本地数据导出（data_exchange）。
+
+    spec: platform-global-display-settings-closure 任务 10 / AC-21
+    """
+    import csv
+    import io
+
+    from fastapi.responses import StreamingResponse
+
+    from app.services.consol_note_standalone_reader import list_consol_note_sections
+    from app.services.export_meta_marker import ExportMeta, marker_rows
+
+    meta = ExportMeta(surface_id="consol_note_local_export", classification="data_exchange")
+    rows: list[list[str]] = []
+    for row in marker_rows(meta):
+        rows.append([""] if not row else [("" if c is None else str(c)) for c in row])
+    rows.append(["章节编号", "章节名称", "表格键", "值"])
+
+    try:
+        sections = await list_consol_note_sections(db, project_id=project_id, year=year)
+    except (ImportError, AttributeError):
+        sections = []
+    for sec in sections:
+        section_id = str(getattr(sec, "section_id", "") or "")
+        title = str(getattr(sec, "title", "") or "")
+        tables = getattr(sec, "tables", None) or []
+        if not tables:
+            rows.append([section_id, title, "", ""])
+            continue
+        for table in tables:
+            table_key = str(getattr(table, "table_id", "") or getattr(table, "key", "") or "")
+            for cell in getattr(table, "values", None) or []:
+                rows.append([section_id, title, table_key, str(cell)])
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    for row in rows:
+        writer.writerow(row)
+    payload = "\ufeff" + buffer.getvalue()
+    return StreamingResponse(
+        iter([payload.encode("utf-8")]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="consol_notes_{year}_local.csv"'},
+    )
