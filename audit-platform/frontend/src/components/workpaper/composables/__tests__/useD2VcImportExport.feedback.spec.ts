@@ -154,6 +154,20 @@ describe('useD2VcImportExport 的调用方错误提示', () => {
       invoke: (harness: ReturnType<typeof makeHarness>) => harness.exportTemplate(),
     },
     {
+      // 🔴 回归钉住（2026-11-15 浏览器实测抓到的缺陷）：导出端点是 blob 响应，
+      // err.response.data 是 Blob 而不是对象。exportTemplate 原先只读对象字段 ⇒ 恒取兜底文案，
+      // 后端写明的原因被丢掉（同一时刻 exportData 正常）。这里让 Blob 带 message。
+      title: '模板导出读取 blob message（后端原因不得被兜底文案盖掉）',
+      reason: '底稿状态不允许导出模板',
+      failure: {
+        response: {
+          status: 400,
+          data: new Blob([JSON.stringify({ code: 400, message: '底稿状态不允许导出模板' })], { type: 'application/json' }),
+        },
+      },
+      invoke: (harness: ReturnType<typeof makeHarness>) => harness.exportTemplate(),
+    },
+    {
       title: '数据导出读取 blob message',
       reason: '导出数据超出行数限制',
       failure: {
