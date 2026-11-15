@@ -868,9 +868,17 @@ async def get_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """汇总统计"""
+    """汇总统计（按用户循环范围过滤，与列表端点同口径）"""
     svc = AdjustmentService(db)
-    result = await svc.get_summary(project_id, year)
+    scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
+    allowed_codes: set[str] | None = None
+    if scope_cycles is not None:
+        try:
+            allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("调整汇总按循环过滤：取循环科目失败 project=%s: %s", project_id, exc)
+            allowed_codes = set()
+    result = await svc.get_summary(project_id, year, allowed_codes=allowed_codes)
     return result.model_dump()
 
 

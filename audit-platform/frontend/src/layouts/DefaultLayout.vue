@@ -326,7 +326,10 @@ const FULLWIDTH_PATHS = [
 // '/workpapers/'：底稿短链（定位后替换到编辑器）不是项目子路径，不加则落进浏览模式、路由内容不渲染（acnr T16）
 // '/display-settings'：全宽独立设置页（spec platform-global-display-settings-closure 任务 5），
 //   不加这条会落进三栏浏览模式、右侧被项目详情占掉 ⇒ 普通用户看不到自己的显示偏好面板
-const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/display-settings', '/dashboard/', '/eqcr/', '/workpapers/']
+// '/partner/'：合伙人签发页（`/partner/sign-decision/:projectId/:year`）不是项目子路径，
+//   不加则 `isBrowseMode` 判 true ⇒ 页面被项目列表/详情顶掉，签发清单根本看不到
+//   （2026-11-15 adjustment-practice-linkage-integrity-closure D9/F5 浏览器实测）
+const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/display-settings', '/dashboard/', '/eqcr/', '/workpapers/', '/partner/']
 
 function isFullWidthPath(p: string): boolean {
   if (FULLWIDTH_PATHS.includes(p)) return true

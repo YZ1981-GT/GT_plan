@@ -69,6 +69,9 @@ def _locked_hint(status: ReviewStatus) -> str:
     }.get(status, f"「{status.value}」")
 
 
+# 汇总 where 条件抽到伴生模块（本文件已达行数门上界，新增逻辑不抬 whitelist 基线）
+from app.services.adjustment_summary_filters import summary_filters as _summary_filters  # noqa: E402
+
 class AdjustmentService:
     """审计调整分录管理"""
 
@@ -467,8 +470,16 @@ class AdjustmentService:
         self,
         project_id: UUID,
         year: int,
+        *,
+        allowed_codes: set[str] | None = None,
     ) -> AdjustmentSummary:
-        """汇总统计"""
+        """汇总统计。
+
+        ``allowed_codes``：受限成员（审计员按团队分配循环）的可见科目集合。
+        ``None`` = 不限（admin / partner / 主管）。与列表端点
+        ``get_user_scope_cycles`` + ``get_codes_by_cycles`` 同一口径 ——
+        否则计数卡与列表条数不一致（2026-11-15 实测：审计员列表 1 组、计数卡 2 笔）。
+        """
         adj = Adjustment.__table__
 
         # 按类型汇总
@@ -479,11 +490,7 @@ class AdjustmentService:
                 sa.func.coalesce(sa.func.sum(adj.c.debit_amount), 0).label("total_debit"),
                 sa.func.coalesce(sa.func.sum(adj.c.credit_amount), 0).label("total_credit"),
             )
-            .where(
-                adj.c.project_id == project_id,
-                adj.c.year == year,
-                adj.c.is_deleted == sa.false(),
-            )
+            .where(*_summary_filters(adj, project_id, year, allowed_codes))
             .group_by(adj.c.adjustment_type)
         )
         result = await self.db.execute(type_q)
@@ -497,11 +504,7 @@ class AdjustmentService:
                 adj.c.review_status,
                 sa.func.count(sa.distinct(adj.c.entry_group_id)).label("cnt"),
             )
-            .where(
-                adj.c.project_id == project_id,
-                adj.c.year == year,
-                adj.c.is_deleted == sa.false(),
-            )
+            .where(*_summary_filters(adj, project_id, year, allowed_codes))
             .group_by(adj.c.review_status)
         )
         status_result = await self.db.execute(status_q)

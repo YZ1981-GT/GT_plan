@@ -43,11 +43,14 @@ const dictStore = useDictStore()
 
 const tagType = computed(() => {
   if (!props.value) return 'info'
-  if (dictStore.loaded) {
-    return dictStore.type(props.dictKey, props.value)
-  }
-  // fallback: 前端硬编码映射
-  return getStatusColor(props.dictKey, props.value) || 'info'
+  // 🔴 2026-11-15：`dictStore.type()` 对未登记 type 的字典项返回空字符串，
+  // 直接传给 el-tag 会触发 Element Plus prop 校验警告
+  // （`Invalid prop: validation failed for prop "type". got value ""`，实测一屏 22 条）。
+  // 空值一律兜底成 'info'，与 `!props.value` 分支同口径。
+  const resolved = dictStore.loaded
+    ? dictStore.type(props.dictKey, props.value)
+    : getStatusColor(props.dictKey, props.value)
+  return resolved || 'info'
 })
 
 const tagLabel = computed(() => {

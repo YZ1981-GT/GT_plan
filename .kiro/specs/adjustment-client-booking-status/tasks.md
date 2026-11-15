@@ -51,3 +51,8 @@
     D1~D8 吸收（见本文件页头的 2026-11-04 归档复查）；**本任务的验收由该 spec 的 `D9`（D 批真 PG、
     账套回滚、错报 / 声明书 / 签发门与浏览器验收）与 `F4`（客户入账回滚验收）承载**，不在本 spec 另跑一遍。
     ⇒ 本 spec 不再单独推进；该 spec 的 D9 与 F4 勾选后，本任务按其证据一并收口。
+  - **2026-11-15 回写（依约从 practice spec 取证据）**：
+    · `F4` 已勾选 —— `backend/tests/test_adjustment_concurrency_and_rls_pg.py`（双事务编辑/批准、`SET ROLE gt_rls_probe` 非 superuser RLS 隔离）+ `test_adjustment_signoff_gate_pg.py` 6 例（签发门 blocking / 对照组 / 交付就绪门按分录组计数 / R1-AJE-UNCONVERTED / 转错报后不再命中 / 发布门 `effective_booking_impacts_for_accounts` 交出客户已入账组且带 ack 后为空，含两个正向变异）；与相关 PG 用例合跑 **47 passed**。
+    · `F6` 已勾选 —— 共享库逐表对账：`adjustment_entries` 活跃 10（真实业务数据）、孤儿活跃明细 0、`import_event_outbox` pending 0、`event_outbox_dlq` 0、卡死事务 0。另登记并修复了本次走查清场误用原生 SQL 软删 approved 组头导致 2 条明细成为孤儿的事故（非代码缺陷）。
+    · `F3`/`C8` 已勾选 —— 批准→TB→outbox→真实生产 EventBus handler 全链已补，并修掉 outbox replay 在未提交事务里 await handler 自开会话导致的必现锁 convoy（共享库现场 pending 17 分钟不消费、worker 心跳却正常）。客户入账链的 outbox 重放走同一派发口，该修复同样保护 `ADJUSTMENT_CLIENT_BOOKING_CHANGED`。
+    · `D9` 仍为 `[ ]*` ⇒ **本任务保持 `[ ]*`**：PG/HTTP 侧证据齐备，但浏览器侧声明书页面本身未走查；另 F5 的五角色全矩阵也未闭合。

@@ -16,6 +16,7 @@
         :class="`gt-tb-font-${displayPrefs.fontSize}`"
         :row-class-name="rowClass"
         empty-text="暂无分录"
+        :scrollbar-tabindex="0"
         @selection-change="(sel: any[]) => emit('selection-change', sel)"
       >
         <el-table-column type="selection" width="36" />

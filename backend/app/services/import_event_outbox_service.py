@@ -70,6 +70,25 @@ class ImportEventOutboxService:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def _release_locks_before_deliver(db: AsyncSession) -> None:
+        """派发前先提交，把本会话持有的行锁全部释放。
+
+        🔴 2026-11-15 修复的必现自锁死锁（真 PG 实测 17 分钟不解除、清理后 55 秒复现）：
+        重放路径在**同一事务**里先 ``with_for_update`` 锁 outbox 行、再
+        ``claim_consumption`` 往 ``import_event_consumptions`` 插幂等行（该表
+        ``project_id`` 有 FK 到 ``projects`` ⇒ 顺带拿到 ``projects`` 的行级 KEY SHARE
+        锁），随后同步 ``await`` handler；而 handler 一律用**独立会话**
+        （``async_session_factory``）读同一个 project 行 ⇒ 子会话等父事务的 txid、
+        父事务等子会话返回，形成环形等待。心跳仍由独立 ticker 写，所以健康页看起来
+        是活的，只有 ``pg_stat_activity`` 能看出 ``idle in transaction`` + 等待链。
+
+        提交而不是回滚：认领行（幂等闸门）与 ``attempt_count`` 必须留下痕迹，
+        否则重放会无限重复派发副作用。``async_session`` 是
+        ``expire_on_commit=False``，提交后读 ``item`` 属性仍然安全。
+        """
+        await db.commit()
+
+    @staticmethod
     async def _deliver(db: AsyncSession, item: ImportEventOutbox) -> bool:
         """把一条 outbox 行的副作用派发出去（in-process handler 链 + SSE）。
 
@@ -92,6 +111,12 @@ class ImportEventOutboxService:
             DurableEventOutboxService,
             TYPED_EVENT_PAYLOAD_KEY,
         )
+
+        # 🔴 唯一派发口上的死锁闸：本会话此前可能已持有 outbox 行锁，以及
+        # import_event_consumptions.project_id 外键带来的 projects 行锁；handler 一律用
+        # 独立会话读同一 project，不先提交就会环形等待（详见
+        # `_release_locks_before_deliver`）。放在派发口而不是各调用方，新路径绕不过。
+        await ImportEventOutboxService._release_locks_before_deliver(db)
 
         stored_payload = dict(item.payload or {})
         typed = stored_payload.get(TYPED_EVENT_PAYLOAD_KEY)
@@ -241,6 +266,12 @@ class ImportEventOutboxService:
             report["exhausted_total_count"] = exhausted_total
             report["skipped_exhausted_count"] = exhausted_total
             report["exhausted_skipped_in_this_run"] = exhausted_in_window
+        # 派发口 `_deliver` 内部已统一提交释放行锁，这里每条派发后再提交一次。
+        # 历史：`with_for_update` 与 claim_consumption 都会在本会话留下
+        # 行锁（import_event_consumptions.project_id 的 FK 还会锁 projects 行）。
+        # handler 用独立会话读同一 project ⇒ 必须先提交释放锁再派发，否则必现自锁死锁
+        # （真 PG 实测：worker 心跳正常但 pending 永不消费，pg_stat_activity 里
+        #  `idle in transaction` 持 txid 卡住两个 handler 会话，清理后 55 秒复现）。
         for item in items:
             try:
                 item.status = OutboxStatus.pending
@@ -253,6 +284,8 @@ class ImportEventOutboxService:
                 item.status = OutboxStatus.published
                 item.published_at = datetime.now(timezone.utc)
                 item.last_error = None
+                await db.flush()
+                await db.commit()
                 report["published_count"] += 1
             except Exception as exc:
                 item.status = OutboxStatus.failed
@@ -269,6 +302,7 @@ class ImportEventOutboxService:
                     report["moved_to_dlq_count"] = (
                         report.get("moved_to_dlq_count", 0) + 1
                     )
+                await db.commit()
         await db.flush()
         return report
 

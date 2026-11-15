@@ -206,7 +206,13 @@ async def test_readiness_and_review_workflow_report_group_counts(
     # 待确认 = draft + pending_review + rejected 三组；遗留 passed_reason 不再让
     # 未完成内部复核的分录从出具就绪口径里消失（R6.1）。
     assert status.count == 4
-    assert status.detail == {"unconfirmed_count": 3}
+    # detail 里除 unconfirmed_count 外还有 content_digest / line_count / source_kind
+    # （就绪快照单源：签发门与交付门共用同一份内容摘要，见 deliverable_readiness_sources）。
+    # 这里只钉住与"按组计数"相关的键，避免把摘要实现细节写成判据。
+    assert status.detail["unconfirmed_count"] == 3
+    assert status.detail["source_kind"] == "adjustments"
+    assert len(str(status.detail["content_digest"])) == 64
+    assert status.detail["line_count"] >= 3
     assert blockers[0].evidence == {
         "component": "adjustments",
         "unconfirmed_count": 3,
@@ -262,10 +268,12 @@ async def test_role_ai_summaries_count_groups(monkeypatch, db_session, grouped_a
     async def _no_stale(*_args, **_kwargs):
         return []
 
-    async def _weekly_text(_data):
+    async def _weekly_text(_data, *, role=None):
+        # 实现会以关键字传 role（用于按角色定制润色提示），桩必须接受它；
+        # 但并非所有调用方都会传（generate_project_summary 就不传），故只验能收下。
         return "周报"
 
-    async def _summary_text(_data):
+    async def _summary_text(_data, *, role=None):
         return "摘要"
 
     monkeypatch.setattr(role_ai_features, "get_stale_workpapers", _no_stale)

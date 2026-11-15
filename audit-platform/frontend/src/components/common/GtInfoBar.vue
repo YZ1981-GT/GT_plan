@@ -25,6 +25,7 @@
           size="small"
           class="gt-info-bar__select gt-info-bar__select--unit"
           filterable
+          aria-label="选择单位"
           @change="$emit('unit-change', $event)"
         >
           <el-option
@@ -46,6 +47,7 @@
           :model-value="yearValue"
           size="small"
           class="gt-info-bar__select gt-info-bar__select--year"
+          aria-label="选择年度"
           @change="$emit('year-change', $event)"
         >
           <el-option
