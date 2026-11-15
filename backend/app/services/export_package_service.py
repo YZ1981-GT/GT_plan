@@ -132,7 +132,12 @@ class ExportPackageService:
                 lines.append("注意: 此导出包含未通过一致性检查的数据，请谨慎使用。")
                 warnings_text = "\n".join(lines)
 
-        # Generate Excel report
+        # ── 生成 Excel 报表（formal 来源）──────────────────────────────────
+        #
+        # 🔴 AC-20 要求「组合包任一来源/policy 失败时不生成 zip，包内无空文件和
+        # placeholder」。改造前这里是 `except → BytesIO(b"")` 后**照样打包**：
+        # 用户拿到一个 zip，里面那个 xlsx 是 0 字节、打开报「文件已损坏」，
+        # 而调用方只看到 200 ⇒ 静默产出废件。
         from app.services.report_excel_exporter import ReportExcelExporter
 
         excel_exporter = ReportExcelExporter(self.db)
@@ -143,10 +148,17 @@ class ExportPackageService:
                 mode="audited",
             )
         except Exception as e:
-            logger.warning("Excel export failed, using empty placeholder: %s", e)
-            excel_output = BytesIO(b"")
+            # fail closed：整包失败，不产出「少了报表」的静默半成品
+            raise ExportPackageBuildError(
+                f"财务报表生成失败，组合包未生成（不产出空文件）: {e}"
+            ) from e
+        excel_bytes = excel_output.getvalue()
+        if not excel_bytes:
+            raise ExportPackageBuildError(
+                "财务报表生成返回 0 字节，组合包未生成（不产出空文件）"
+            )
 
-        # Generate Word notes
+        # ── 生成 Word 附注（formal 来源）─────────────────────────────────
         from app.services.note_word_exporter import NoteWordExporter
 
         word_exporter = NoteWordExporter(self.db)
@@ -160,8 +172,31 @@ class ExportPackageService:
                 report_scope=normalize_report_scope(project.report_scope),
             )
         except Exception as e:
-            logger.warning("Word export failed, using empty placeholder: %s", e)
-            word_output = BytesIO(b"")
+            raise ExportPackageBuildError(
+                f"附注 Word 生成失败，组合包未生成（不产出空文件）: {e}"
+            ) from e
+        word_bytes = word_output.getvalue()
+        if not word_bytes:
+            raise ExportPackageBuildError(
+                "附注 Word 生成返回 0 字节，组合包未生成（不产出空文件）"
+            )
+
+        # ── 单位策略快照（formal 来源必须带 policy digest）───────────────
+        #
+        # AC-22 要求 manifest 逐项含 policy digest。取快照失败 ⇒ 整包失败：
+        # 「这份包里金额按元还是万元」必须可审计，不能缺。
+        from app.services.export_policy_snapshot import resolve_policy_snapshot_for_project
+
+        try:
+            policy_snapshot = await resolve_policy_snapshot_for_project(
+                self.db, project_id=project_id, year=year
+            )
+        except Exception as e:
+            raise ExportPackageBuildError(
+                f"单位策略快照构造失败，组合包未生成（缺 policy 无法审计）: {e}"
+            ) from e
+        policy_payload = json.loads(policy_snapshot)
+        policy_digest = policy_payload.get("_digest")
 
         # Build filenames per 致同 naming convention (Requirements: 32.1-32.4)
         excel_filename = sanitize_filename(f"{company_short}_{year}年度财务报表.xlsx")
@@ -173,7 +208,6 @@ class ExportPackageService:
 
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
             # Excel report
-            excel_bytes = excel_output.getvalue()
             zf.writestr(excel_filename, excel_bytes)
             manifest_files.append({
                 "filename": excel_filename,
@@ -181,10 +215,11 @@ class ExportPackageService:
                 "format": "xlsx",
                 "size_bytes": len(excel_bytes),
                 "sha256": hashlib.sha256(excel_bytes).hexdigest(),
+                "classification": "formal",
+                "policy_digest": policy_digest,
             })
 
             # Word notes
-            word_bytes = word_output.getvalue()
             zf.writestr(word_filename, word_bytes)
             manifest_files.append({
                 "filename": word_filename,
@@ -192,33 +227,30 @@ class ExportPackageService:
                 "format": "docx",
                 "size_bytes": len(word_bytes),
                 "sha256": hashlib.sha256(word_bytes).hexdigest(),
+                "classification": "formal",
+                "policy_digest": policy_digest,
             })
 
-            # Optional: audit report placeholder
+            # ── 可选：审计报告 / 审定表 ──────────────────────────────────
+            #
+            # 🔴 改造前这两项写的是**真占位符字节**
+            # （`b"Audit report placeholder"` / `b"Workpapers placeholder"`）：
+            # 用户拿到的 zip 里那两个文件打不开，而 manifest 里还带着 sha256 与
+            # size ⇒ 看起来像「有据可查的正式件」。
+            # AC-20 明确「包内无空文件和 placeholder」⇒ 现在**要么产出真件、要么整包失败**。
+            # 真件来源尚未接入组合包（审计报告走 `word-exports/audit-report/generate`，
+            # 审定表走底稿导出），故当前显式拒绝而不是造假件。
             if include_audit_report:
-                audit_filename = sanitize_filename(f"{company_short}_{year}年度审计报告.docx")
-                audit_content = b"Audit report placeholder"
-                zf.writestr(audit_filename, audit_content)
-                manifest_files.append({
-                    "filename": audit_filename,
-                    "type": "audit_report",
-                    "format": "docx",
-                    "size_bytes": len(audit_content),
-                    "sha256": hashlib.sha256(audit_content).hexdigest(),
-                })
+                raise ExportPackageBuildError(
+                    "审计报告真件来源尚未接入组合包（拒绝产出 placeholder）。"
+                    "请先用 word-exports/audit-report/generate 单独生成。"
+                )
 
-            # Optional: workpapers placeholder
             if include_workpapers:
-                wp_filename = sanitize_filename(f"{company_short}_{year}年度审定表.xlsx")
-                wp_content = b"Workpapers placeholder"
-                zf.writestr(wp_filename, wp_content)
-                manifest_files.append({
-                    "filename": wp_filename,
-                    "type": "workpapers",
-                    "format": "xlsx",
-                    "size_bytes": len(wp_content),
-                    "sha256": hashlib.sha256(wp_content).hexdigest(),
-                })
+                raise ExportPackageBuildError(
+                    "审定表真件来源尚未接入组合包（拒绝产出 placeholder）。"
+                    "请先用底稿导出单独生成。"
+                )
 
             # Warnings file (if force_export with failures)
             if warnings_text:
@@ -232,13 +264,22 @@ class ExportPackageService:
 
             # manifest.json
             manifest = {
-                "version": "1.0",
+                # 1.1：新增 `unit_policy`（AC-22 要求 manifest 能证明「按哪个单位出」）
+                # 与每条文件的 `classification` / `policy_digest`
+                "version": "1.1",
                 "project_id": str(project_id),
                 "project_name": project.name,
                 "company_name": project.client_name or project.name,
                 "year": year,
                 "export_time": datetime.now(timezone.utc).isoformat(),
                 "template_type": project.template_type or "soe",
+                # AC-22：manifest 必须能证明「这份包按哪个单位出」
+                "unit_policy": {
+                    "unit": policy_payload.get("unit"),
+                    "divisor": policy_payload.get("divisor"),
+                    "digest": policy_digest,
+                    "fallback": bool(policy_payload.get("_fallback", False)),
+                },
                 "consistency_check": {
                     "overall": consistency_result.overall,
                     "force_export": force_export,
@@ -262,3 +303,13 @@ class ConsistencyCheckError(Exception):
     def __init__(self, message: str, checks: list[dict] | None = None):
         super().__init__(message)
         self.checks = checks or []
+
+
+class ExportPackageBuildError(Exception):
+    """组合包构建失败（fail closed）。
+
+    🔴 与 `ConsistencyCheckError` 的区别：那个是「数据不一致，可 force_export 放行」，
+    这个是「来源拿不到 / 是空字节 / 是 placeholder / 缺 policy」——
+    **不产出半成品**。改造前这些情形会静默产出空文件或 placeholder 字节，
+    调用方只看到 200，用户拿到废件。
+    """
