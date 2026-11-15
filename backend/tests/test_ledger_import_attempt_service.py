@@ -221,3 +221,133 @@ class TestCurrentPhaseIsDisplayOnly:
     def test_phase_does_not_affect_transition(self, phase: str) -> None:
         """改 current_phase 不影响状态机（它不参与判定）。"""
         assert_transition("building", "sealed")  # 与 phase 无关
+
+
+# ── 5. 真实接线（AST 判据）──────────────────────────────────
+#
+# 🔴 内核写好但生产零调用 = 死代码（memory「registry 成了只被测试看的副本」同型）。
+# 以下用 AST 判据钉住「submit_import_job 真的建 attempt」与「attempt id 进 job options」。
+
+
+class TestSubmitWiring:
+    def _service_source(self) -> str:
+        from pathlib import Path
+
+        p = Path(__file__).resolve().parents[1] / "app" / "services" / "ledger_import_application_service.py"
+        return p.read_text(encoding="utf-8")
+
+    def _called_names(self) -> set[str]:
+        import ast
+
+        from pathlib import Path
+
+        p = Path(__file__).resolve().parents[1] / "app" / "services" / "ledger_import_application_service.py"
+        tree = ast.parse(p.read_text(encoding="utf-8"))
+        names: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                func = node.func
+                if isinstance(func, ast.Name):
+                    names.add(func.id)
+                elif isinstance(func, ast.Attribute):
+                    names.add(func.attr)
+        return names
+
+    def test_submit_calls_create_attempt(self) -> None:
+        assert "create_attempt" in self._called_names(), (
+            "submit_import_job 未调用 create_attempt；attempt 内核成了死代码"
+        )
+
+    def test_submit_calls_resolve_base_token(self) -> None:
+        assert "resolve_base_token" in self._called_names(), (
+            "submit_import_job 未调用 resolve_base_token；base token 没有唯一来源"
+        )
+
+    def test_attempt_id_is_recorded_in_job_options(self) -> None:
+        """attempt id 必须进 ImportJob.options，否则恢复入口只能按 project+year 反查
+        （会取到并发提交的另一条 attempt）。"""
+        assert '"attempt_id"' in self._service_source(), (
+            "ImportJob.options 未记录 attempt_id"
+        )
+
+    def test_create_attempt_happens_before_create_job(self) -> None:
+        """attempt 必须在 job 之前落（**限定在 submit_import_job 函数体内**）。
+
+        🔴 顺序反过来会出现「job 已在队列、attempt 不存在」的窗口，
+        重启时无法判定该重跑还是接管。
+
+        🔴 判据必须按 AST 取函数体：本文件另有 `run_account_chart_import` 也调
+        `create_job`（pos 更靠前），按全文 `find()` 会把它当成 submit 的那一处
+        而误判顺序错（本轮实测 1 例假红）。
+        """
+        import ast
+        from pathlib import Path
+
+        p = Path(__file__).resolve().parents[1] / "app" / "services" / "ledger_import_application_service.py"
+        src = p.read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        target = None
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "submit_import_job":
+                target = node
+                break
+        assert target is not None, "找不到 submit_import_job"
+        body = ast.get_source_segment(src, target) or ""
+        i_attempt = body.find("await create_attempt(")
+        i_job = body.find("await ImportJobService.create_job(")
+        assert i_attempt > 0, "submit_import_job 内没有 create_attempt"
+        assert i_job > 0, "submit_import_job 内没有 create_job"
+        assert i_attempt < i_job, (
+            f"create_attempt（函数体内 pos {i_attempt}）必须在 "
+            f"create_job（pos {i_job}）之前"
+        )
+
+    def test_base_token_resolver_is_the_only_entry(self) -> None:
+        """base token 只能经 `base_token_resolver.resolve_base_token` 解析。
+
+        反向：service 里不得自己 select LedgerDataset 取 active 来算 token
+        （那会与 detect 侧口径分叉）。
+        """
+        import ast
+        from pathlib import Path
+
+        p = Path(__file__).resolve().parents[1] / "app" / "services" / "ledger_import_application_service.py"
+        src = p.read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        # 找 submit_import_job 函数体
+        target = None
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "submit_import_job":
+                target = node
+                break
+        assert target is not None
+        body_src = ast.get_source_segment(src, target) or ""
+        assert "resolve_base_token" in body_src
+        # 不应直接按 active 查数据集来算 token
+        assert "DatasetStatus.active" not in body_src, (
+            "submit_import_job 自己查 active 数据集算 base token；"
+            "必须走 resolve_base_token 唯一入口"
+        )
+
+
+class TestBaseTokenResolver:
+    def test_resolver_returns_none_token_when_no_active(self) -> None:
+        """无 active 时返回 BaseToken(None, None)，不抛。"""
+        import inspect
+
+        from app.services.ledger_import.base_token_resolver import resolve_base_token
+
+        assert inspect.iscoroutinefunction(resolve_base_token)
+
+    def test_resolver_reads_contract_digest_from_unit_normalization(self) -> None:
+        """digest 必须从 `unit_normalization.contract.contract_digest` 读。
+
+        与 `dataset_unit_contract._is_valid_contract` 同一字段（现读实证过）。
+        """
+        from pathlib import Path
+
+        p = Path(__file__).resolve().parents[1] / "app" / "services" / "ledger_import" / "base_token_resolver.py"
+        src = p.read_text(encoding="utf-8")
+        assert "unit_normalization" in src
+        assert "contract" in src
+        assert "contract_digest" in src

@@ -47,7 +47,7 @@
 - [x] A3 前端底稿批量下载切异步任务、展示真实进度/失败/下载，不再同步等待整包。
 - [x] A4 bulk import 先落 spool，只传路径；增加全局/用户/项目并发与内存预算。
 - [x] A5 LibreOffice 唯一 profile、communicate、排队上限/acquire timeout、Retry-After 与指标。
-- [ ] A6 流式下载提前释放 DB，会话与文件句柄在取消时及时关闭。
+- [~] A6 流式下载提前释放 DB，会话与文件句柄在取消时及时关闭。
   - 已完成：附件、底稿 ZIP、bulk SSE/下载、chain/ledger SSE、doc AI 外层 session、
     `wp_chat`（请求内 prepare_chat + 项目权限，流期纯 LLM）、`working_paper`/`wp_download`
     的单件 `FileResponse` 与打包下载、`wp_template_download`、`wp_xlsx_export`、
@@ -64,6 +64,18 @@
   - 勘误（2026-11-06 整体复核，AST 现扫，现算值禁写死）：返回 StreamingResponse / FileResponse 的路由共 213 个，
     已 function-scope 21、不取 DB 51，**仍为请求级 `Depends(get_db)` 的候选 141 个**——上条「少量历史路由」
     低估了规模，余量是跨 100+ 路由的系统性迁移，每条都要先判响应期是否仍读 DB。
+  - **2026-11-16 更新（棘轮守卫已建，`[ ]`→`[~]`）**：新建 `backend/scripts/check/check_streaming_db_scope.py`
+    + 冻结基线 `backend/data/streaming_db_scope_baseline.json`。**现算口径更新**：AST 扫 `backend/app/`
+    得 **112 个候选**（比上条 141 少 29，因为期间已有 47 个路由迁到 function-scope 或不取 DB）；
+    `--check` 现跑 **exit 0**。守卫保证三件事：①候选数**只减不增**（新增流式路由必须一开始就
+    function-scope，否则点名报出）；②基线缺失即失败（不能静默退化成「无候选」）；③基线**不得虚高**
+    （`_MAX_BASELINE_INFLATION=5`，防「改大基线蒙过关」）；`--write` 在候选增加时**拒绝写盘**。
+    **为什么冻结而不是硬修**：112 条跨 100+ 文件，每条都要先判「响应生成器是否仍读 DB」
+    （读 DB 的不能简单改 scope，否则响应期拿不到数据），属独立 spec 工作量；
+    按 memory ㉗③「规模超单轮能力时冻结棘轮而非硬修」。
+    **验证**：`test_streaming_db_scope_ratchet.py` 11 例（基线非空/字段完整/扫描器真命中/
+    `--check` 通过/基线缺失失败/候选增加失败/基线虚高失败/`--write` 拒绝上调/tasks.md 有登记）。
+    **仍未做**：逐条迁移（本批只冻结与守护）、真实大文件并发下的连接池对账。
 - [x] A7 同输入验证文件 SHA/ZIP 清单/导入摘要不变，并测并发时 health/event-loop lag。
 
 ## 批 B 耐久任务
