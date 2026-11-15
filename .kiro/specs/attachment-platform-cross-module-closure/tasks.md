@@ -78,3 +78,9 @@
   - 删除后 PG 核对：目标附件 0 行、对应 `attachment_versions` 0 行、`legacy_attachment_alias` 0 行；四个物理文件均不存在。Task28 两个项目仍未软删，项目可见附件 0、近期知识文档可见行 0，项目状态/年度未变。
   - 原有回收站两条附件 `k10-browser-smoke.png`、`r4-voucher.pdf` 删除前后仍保持软删除且未被操作。
   - 重载首页后浏览器 console 无 error/warn；最终附件平台/AI/路由挂载聚焦套件 **126 passed / 6 skipped**（跳过项均为既有 PG-only 项），Task 29 最终验收完成。
+
+- **2026-11-15 Task 30 runner 修复与 dry-run（未 apply）**：
+  - `EvidenceBackfillRunner` 新增既有 `AttachmentVersion` 链预检：连续 version、同 project/year、previous 链、current 指针、available 状态和 legacy version 必须逐项一致；既有链只规划补 `legacy_attachment_alias`，不重复创建版本；多条 legacy 链无法安全映射或既有链不一致则 apply 前置阻断。
+  - 新增显式 `dry_run=True`：不创建 checkpoint/version/alias，不更新附件根，只输出 planned/alias-only/blocked/skipped 统计；新增 `assess_existing_version_chain` 守卫用例。
+  - 共享 PG dry-run 结果（事务前后计数一致，未写入）：安徽项目扫描 247、聚合 247、`alias_only_roots=247`、`aliases_planned=247`、`versions_planned=0`、阻断 0；和平项目扫描 118、因年度无法证明全部 `skipped_no_audit_year=118`；`attachment_versions=269`、`legacy_attachment_alias=2`、`evidence_migration_checkpoints=0` 前后不变。
+  - 后端 backfill/治理回归 **33 passed**；本批只提交 runner 兼容修复和 dry-run 能力，**未执行真实 apply**，等待用户对安徽 247 条 alias-only 计划再次确认。
