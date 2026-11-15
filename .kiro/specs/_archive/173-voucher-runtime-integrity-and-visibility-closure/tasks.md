@@ -105,7 +105,7 @@
 
 ## 批次 6：收尾
 
-- [ ] 16. 浏览器实测
+- [x] 16. 浏览器实测
   - 单笔挂凭传别的项目底稿 → 422（开发工具 Network）
   - `/voucher-links/query` 结果不含不可见底稿
   - D2 Excel 导入同号不同日的凭证 → 两行
@@ -128,3 +128,60 @@
 - 任务 14 标 `[x]` 时，2 个 PBT 用例用的是 fast-check 4 已删除的 `fc.char` / `fc.stringOf`，从未真正执行（文件级报错被当成全绿）；
   已改写为小值域 + 逐行模型（`mergeVoucherRows.spec.ts`），并在变异 `merge_rows_date` 下确认打红。
 - 本 spec 剩余收尾（任务 11 / 15 / 16 / 17）并入 `voucher-workflow-linkage-lineage-closure`，随它一起提交推送。
+## 补充验收（2026-11-15：任务 16 第三项，原记录不改）
+
+任务 16 第三项「D2 Excel 导入同号不同日的凭证 → 两行」在 2026-11-04 判为无法验收，原因是三个 `vc-*` 端点后端不存在
+（`mergeVoucherRows` 无可达调用路径）。端点已由 spec `d2-voucher-check-import-export-endpoints` 实现并归档
+（`_archive/170-d2-voucher-check-import-export-endpoints/`，v1.0.204），本节补上该项验收。
+
+**环境**：隔离临时库 `gt_tmp_vrc`（`pg_dump` 共享库、排除 tb_aux_ledger / tb_ledger / tb_aux_balance /
+tb_aux_balance_summary / logs / task_history 六张大表的数据；143 MB，迁移已到 V271）+ 后端 9982
+（`run_uvicorn`、`GT_BACKEND_NO_RELOAD=1`、`GT_BOOTSTRAP_DONE=1`）+ 前端 3032（Vite 代理在配置文件里写死 9982）。
+底稿 `a544a961…` 的 11 个文件复制到 `tmp_voucher_runtime_closure/storage` 并把临时库 `file_path` 改指过去，
+共享 `backend/wp_storage` 未参与。浏览器走 `http://127.0.0.1:3032`。
+
+**夹具设计**（`probes/make_same_no_diff_date_fixture.py`）——按「同号同日 / 同号不同日 / 文件内重复 / 全新凭证」
+四类交叉，让两种去重口径给出不同的行数：
+
+| 行 | 凭证编号 | 日期 | 语义 | 期望 |
+| --- | --- | --- | --- | --- |
+| 界面已有 | VC-EXIST-001 | 2025-03-15 | 合并靶子（check1 = 原核对-金额一致） | 保留、不被导入覆盖 |
+| A | VC-EXIST-001 | 2025-03-15 | 同号同日 | 不新增 |
+| B | VC-EXIST-001 | 2025-09-09 | **同号不同日** | **必须新增（核心判别行）** |
+| C | VC-EXIST-001 | 2025-09-09 | 文件内重复 | 不新增 |
+| D | VC-SAME-DAY | 2025-11-11 | 全新凭证 | 新增 |
+| E | VC-SAME-DAY | 2025-11-11 | 文件内重复 | 不新增 |
+
+期后区另放 1 行（VC-POST-DIFF）验证两区不串。判别力：联合键口径 = 3 行，单字段口径 = 2 行（B 被并掉）。
+
+**正向结果（现行实现，`voucherNo|voucherDate` 联合键）** —— 8 项判据全绿、`page error 0`：
+
+- 本期区 **3 行**：`VC-EXIST-001|2025-03-15`（check1 仍为「原核对-金额一致」，未被导入行覆盖）·
+  `VC-EXIST-001|2025-09-09`（借方 2,222.00、check1「导入侧核对-B」）· `VC-SAME-DAY|2025-11-11`（借方 4,444.00）
+- 期后区 1 行 `VC-POST-DIFF`，两区不串
+- `POST …/d2/vc-import-data` **200**；随后 4 次 `PUT …/checklist-responses` 全 **200** 且 `require_if_match=true`（严格 CAS，
+  `if_match` 逐次取上次回执版本）；整页 reload 后两区 3+1 行逐格与保存前一致
+- 证据：`tmp_voucher_runtime_closure/browser/walkthrough-same-no-diff-date-2026-11-15T10-13-08-730Z.json` + `t0`~`t4` 截图
+
+**变异证明（判据不是恒绿）** —— 把 `mergeVoucherRows` 的两处联合键退回单字段 `voucherNo`
+（`probes/mutate_merge_key.py`；工作树是 CRLF，靶点按 LF 归一后注入、按原行尾写回）：
+
+- 本期区只有 **2 行**，`VC-EXIST-001|2025-09-09` 被并掉
+- `currentRowCount` / `currentVoucherNos` / `currentDates` / `currentCheck1` / `distinctFromLegacy` **五项打红**；
+  `postRowCount` / `postNotCrossed` / `pageErrorsZero` 仍绿 —— 红的是目标判据，不是整页崩
+- 证据：`browser/walkthrough-same-no-diff-date-mutant-single-field.json`
+- 还原后 sha256 与改前逐字节一致（`ebbcffb9b38f528908e91bb7ec211f2007dc38a865e9a708558723fdb476e0b3`）、
+  `git diff HEAD` 为空；再跑一次正向重新 **3 行绿**（`browser/walkthrough-same-no-diff-date-restored-confirm.json`）
+
+**清理对账**（临时库内写入仅在 `checklist_responses` 的 `D2-vc-current-rows` / `D2-vc-post-rows` 两行）：
+
+- 停进程：后端 9982 为 `run_uvicorn` 父子（PID 95652→58944）、前端 3032 为 `node vite.js --port 3032`（PID 50996），
+  逐个 `Stop-Process -Force` 后 `Get-NetTCPConnection -LocalPort 9982,3032 -State Listen` 为空、三个 PID 全 gone
+- `DROP DATABASE IF EXISTS gt_tmp_vrc` 前先核 `pg_stat_activity` 该库连接数 **0**；DROP 后 `pg_database` 里 `gt_tmp%` **为空**
+- 共享库未被本次走查写入：`audit_platform` 里该底稿仍只有走查前就有的 `D2-adj-tb-amount`
+  （updated 2026-11-15 02:50:53，与走查前逐值一致），`working_paper` 该行仍 `content_revision=0 / file_version=1 /
+  updated 2026-10-29 09:33:47 / unknown / draft / not_submitted`；库大小仍 32 GB
+- 共享 `backend/wp_storage` 未改（3459 个文件，最新写入停在 2026-11-09 14:47:54）
+- 本 spec 未新建 git worktree（`git worktree list` 里两条 `tmp_aqf/*` 属其他会话，未动）
+
+**结论**：任务 16 三项全部通过（前两项 2026-11-04 已通过，第三项本节补齐），本 spec 17/17 完成。
