@@ -35,15 +35,61 @@ async def validation_exception_handler(
 
     🔴 ``exc.errors()`` 必须经 ``jsonable_encoder``（FastAPI 自带处理器同样如此）：自定义 ``field_validator`` 抛
     ``ValueError`` 时错误里带 ``ctx.error``（异常对象），直接序列化会 TypeError ⇒ 本该 422 的请求变成 500。
+
+    🔴 **PDF 创建路由的结构化脱敏**（spec platform-global-display-settings-closure 任务 10 / AC-22）：
+    Pydantic v2 的错误条目里 `input` / `context` 会带**原始请求值**（密码、项目 id 等）。
+    PDF create 带 `password` 字段，一旦校验失败就会把明文密码回显进 422 响应、应用日志与审计日志。
+    这里对 PDF create 路径**结构化删除**这两个键（只留 `loc`/`msg`/`type`），
+    不做序列化后字符串替换（后者脆且会漏掉嵌套结构）。
     """
+    detail = jsonable_encoder(exc.errors())
+    if _is_pdf_create_path(request.url.path):
+        detail = _redact_validation_detail(detail)
     return JSONResponse(
         status_code=422,
         content={
             "code": 422,
             "message": "请求参数校验失败",
-            "detail": jsonable_encoder(exc.errors()),
+            "detail": detail,
         },
     )
+
+
+#: PDF 创建路由的路径片段（结构匹配，不做前缀猜测）。
+_PDF_CREATE_PATH_MARKERS = ("/pdf-export", "/pdf/export")
+
+
+def _is_pdf_create_path(path: str) -> bool:
+    """判断是否是 PDF 创建路由。
+
+    🔴 用**路径片段**而非完整路径匹配：PDF 创建路由在不同 router 里的前缀可能变
+    （`/api/projects/{id}/pdf-export`、`/api/export/pdf/export` 等），
+    按前缀硬编码会漏掉。判据是「路径末段含 pdf 且含 export/create」这类形态。
+    """
+    lowered = path.lower().rstrip("/")
+    if any(marker in lowered for marker in _PDF_CREATE_PATH_MARKERS):
+        return True
+    # 兜底：末段同时含 pdf 与 export
+    tail = lowered.rsplit("/", 2)[-2:]
+    joined = "/".join(tail)
+    return "pdf" in joined and ("export" in joined or "create" in joined)
+
+
+def _redact_validation_detail(detail):
+    """结构化删除 `input` / `context`（保留 `loc` / `msg` / `type`）。
+
+    🔴 为什么不整段丢弃：`loc` 与 `msg` 是调用方定位问题的唯一依据；
+    `type` 用于前端做本地化。只删会带原始值的两个键。
+    """
+    if isinstance(detail, list):
+        return [_redact_validation_detail(item) for item in detail]
+    if isinstance(detail, dict):
+        return {
+            key: value
+            for key, value in detail.items()
+            if key not in ("input", "context")
+        }
+    return detail
 
 
 async def evidence_governance_error_handler(request: Request, exc):
