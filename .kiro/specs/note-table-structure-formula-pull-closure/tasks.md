@@ -73,4 +73,14 @@
 - [x] 39. R18：映射确认两入口共用错误处理；确认失败不 apply，409 重新预览
 - [x] 41. R19/R20：在最新公式中枢架构上恢复附注审核要点/未生成原因和加载错误三态；统一推送后表内公式 follow-up、刷新 opt-out、推送拥有格保护与来源信封
 - [x] 42. R15/R16/R17/D2真零/自动映射去重：后端 202 passed、门禁 --check 通过、候选树 27 文件复核完成
-- [ ] 43. R21：Playwright 实测单体刷新、公式管理和合并入口；复核干净检出，更新 INDEX，单提交按版本规则推送
+- [x] 43. R21：Playwright 实测单体刷新、公式管理和合并入口；复核干净检出，更新 INDEX，单提交按版本规则推送
+  - 2026-11-15 收尾：Playwright 实测通过 —— 单体附注编辑器 199 章节渲染 + 底稿同步来源横幅 + 刷新按钮；公式管理弹窗附注 804 行带
+    「审核要点（不执行）」标记；合并附注入口（Tab 106 章节、明细映射弹窗可自动确认 3/12、忽略行带原因、乙公司缺章节警告）；console error 0
+  - 干净检出复核（`tmp_note_closeout/verify_wt` @ HEAD `ebeb61eea`，index 26856 = HEAD 树、0 脏文件）：后端 193 passed（本轮 10 个
+    测试文件）；前端 60 文件 575 passed / 1 failed，唯一失败 `consolAutotreeLinkageWiring.spec.ts:35` 属 HEAD 预存（守卫写死无 `await`，
+    而 `views/ConsolidationIndex.vue:1737` 已是 `await reloadCurrentNodeContent()`），与本 spec 无关
+  - 顺手修复 1 个 HEAD 预存红 `test_note_table_header_catalog.py::test_committed_catalog_is_up_to_date`（干净树 1 failed / 20 passed）：
+    标题行库 `backend/data/note_table_header_library.json` 三处「期初余额」与模板权威源 `note_template_soe.json` 的
+    `headers=['项目','期末余额','年初余额']` 不一致（语义键 `prior|` 相同、属同义写法，且同文件相邻 `八、32#0` 原本就是「年初余额」）⇒
+    重跑 `scripts/seed/build_note_table_header_library.py` 收敛。改动仅 3 行 3 处文字、纯 LF。修后五项生成类门禁全绿
+    （标题行库 / total_terms golden / 写入归属矩阵 146 章 608 条 / Word 树 / 表格白名单）、header catalog 21 passed、相关 425 passed 1 skipped
