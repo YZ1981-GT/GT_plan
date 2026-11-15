@@ -295,7 +295,6 @@
         <div class="gt-aqb-section">
           <div class="gt-aqb-section-title">
             查询结果 <span v-if="result" class="gt-aqb-result-count">共 {{ result.total }} 行</span>
-            <span v-if="resultScopeText" class="gt-aqb-scope-tag" data-testid="aqb-result-scope">{{ resultScopeText }}</span>
             <el-button size="small" style="margin-left:8px" @click="evidenceDrawerVisible = true">🕘 历史与证据</el-button>
             <el-checkbox
               v-if="result && result.rows.length"
@@ -304,6 +303,19 @@
               class="gt-aqb-tech-toggle"
             >显示技术字段<template v-if="hiddenTechnicalCount > 0">（已隐藏 {{ hiddenTechnicalCount }} 列）</template></el-checkbox>
           </div>
+          <!-- 信息条（AQF §8.2：承接 resultScopeText，范围段的 data-testid 仍是 aqb-result-scope） -->
+          <QueryRunBanner
+            :run-info="evidence.runInfo.value"
+            :version="evidence.version.value"
+            :freshness="evidence.freshness.value"
+            :checking="evidence.checking.value"
+            :scope-text="resultScopeTextForBanner"
+            scope-test-id="aqb-result-scope"
+            :unavailable="Boolean(evidence.checkError.value)"
+            @check="evidence.checkFreshness()"
+            @requery="runQuery()"
+            @open-drawer="evidenceDrawerVisible = true"
+          />
           <!-- 查询失败：持久显示中文原因与追踪号（R11.1；不落到「查询返回 0 行」） -->
           <el-alert
             v-if="queryError"
@@ -441,6 +453,7 @@ import {
 import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
 import { useQueryRunEvidence } from '@/components/query/useQueryRunEvidence'
 import QueryEvidenceDrawer from '@/components/query/QueryEvidenceDrawer.vue'
+import QueryRunBanner from '@/components/query/QueryRunBanner.vue'
 import AcnrTargetResults, { type AcnrResultsBlock } from '@/components/custom-query/AcnrTargetResults.vue'
 import {
   BUILDER_NO_PROJECT_HINT, buildBuilderPayload, isKnownYear, readBlobErrorBody,
@@ -592,6 +605,14 @@ const resultScopeText = computed(() => {
   if (s.requested_project_id) return `范围：当前项目${lastQuery.year ? `（${lastQuery.year} 年度）` : ''}`
   return s.all_projects ? '范围：全部项目' : `范围：${s.project_count} 个项目`
 })
+
+/**
+ * 传给信息条的范围文本（AQF §8.2）。
+ * 🔴 `resultScopeText` 自带「范围：」前缀，而 `QueryRunBanner` 自己也会渲染「范围：」标签
+ * ⇒ 直接传会显示「范围：范围：当前项目…」（实测踩到）。这里剥掉前缀，
+ * 由信息条的标签统一加；`aqb-result-scope` 锚点的可见文案因此仍是「范围：当前项目…」，与原判据一致。
+ */
+const resultScopeTextForBanner = computed(() => resultScopeText.value.replace(/^范围：/, ''))
 
 const loadingPreview = ref(false)
 const loadingExecute = ref(false)
