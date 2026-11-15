@@ -909,27 +909,21 @@ async def wp_sheet_preview(
     return await render_sheet_preview(proj_uuid, row[0], wp_code, parsed_data, sheet_name)
 
 
-@router.post("/execute")
-async def execute_query(
+async def _execute_with_http_layer(
     body: QueryRequest,
     response: Response,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    _origin: str = "direct",
-    _template_id: uuid.UUID | None = None,
+    db: AsyncSession,
+    current_user: User,
+    *,
+    origin: str = "direct",
+    template_id: uuid.UUID | None = None,
 ):
-    """执行自定义查询 —— 经 ExecuteCompatibilityAdapter 的唯一执行路径。
+    """execute 的 HTTP 层实现（响应头、错误映射、拒绝审计）—— 直接查询与模板执行共用同一份。
 
-    改造前此处是 14 条内联 ``if/elif`` 直接分发取数器，`ExecuteCompatibilityAdapter`
-    与 `QueryOrchestrator` 因此被完整绕过（router 引用数 0）。现在：
-
-    - 归属校验、寻址、缓存、分组、透视、分页统一由编排器 step1~step8 负责；
-    - router 只保留 HTTP 层职责：降级响应头、缓存命中头、审计、错误映射；
-    - 异常分类明确 —— ``HTTPException`` 原样上抛保留状态码；其余回滚并转 500 带
-      correlation_id。改造前的 ``except Exception`` 把超时/中断/列不存在全吞成
-      ``200 {"rows": [], "error": ...}``，失败在前端表现为「查不到数据」。
-
-    _Requirements: 3.1, 3.2, 3.7, 5.1, 5.2, 5.3_
+    ``origin`` / ``template_id`` 只作**内部**参数：它们是运行记录（AQF R1.1）的来源标记，
+    不能出现在路由签名里 —— 一旦声明为路由参数，FastAPI 会把它们当 query 参数，
+    客户端就能用 ``?_origin=template`` 自报来源、或用非法值触发 ``ck_query_runs_origin``
+    约束失败（运行记录静默降级）。因此路由 ``execute_query`` 只暴露原签名，模板路径走本函数。
     """
     # ─── GIN index degradation: add header when index is building ────────
     from app.services.gin_index_monitor import is_index_building
@@ -944,7 +938,7 @@ async def execute_query(
 
     try:
         result = await execute_business_query(
-            body, user=current_user, db=db, origin=_origin, template_id=_template_id
+            body, user=current_user, db=db, origin=origin, template_id=template_id
         )
     except HTTPException as http_exc:
         detail = http_exc.detail if isinstance(http_exc.detail, dict) else {}
@@ -980,6 +974,32 @@ async def execute_query(
         response.headers["X-Cache"] = "HIT"
 
     return result
+
+
+@router.post("/execute")
+async def execute_query(
+    body: QueryRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """执行自定义查询 —— 经 ExecuteCompatibilityAdapter 的唯一执行路径。
+
+    改造前此处是 14 条内联 ``if/elif`` 直接分发取数器，`ExecuteCompatibilityAdapter`
+    与 `QueryOrchestrator` 因此被完整绕过（router 引用数 0）。现在：
+
+    - 归属校验、寻址、缓存、分组、透视、分页统一由编排器 step1~step8 负责；
+    - router 只保留 HTTP 层职责：降级响应头、缓存命中头、审计、错误映射；
+    - 异常分类明确 —— ``HTTPException`` 原样上抛保留状态码；其余回滚并转 500 带
+      correlation_id。改造前的 ``except Exception`` 把超时/中断/列不存在全吞成
+      ``200 {"rows": [], "error": ...}``，失败在前端表现为「查不到数据」。
+
+    签名与改造前一致（AQF design §5.3「路由函数名与签名不变」）：运行记录的来源标记
+    走内部函数 ``_execute_with_http_layer``，不作路由参数（否则客户端可自报 ``_origin``）。
+
+    _Requirements: 3.1, 3.2, 3.7, 5.1, 5.2, 5.3_
+    """
+    return await _execute_with_http_layer(body, response, db, current_user)
 
 
 class QueryExportRequest(QueryRequest):
@@ -1449,8 +1469,8 @@ async def execute_template(
         raise template_config_rejected(exc) from None
     except ValueError as exc:  # 条件里还有未取值的参数占位
         raise HTTPException(status_code=400, detail={"error_code": "TEMPLATE_INVALID", "message": str(exc)}) from None
-    return await execute_query(query_body, response, db, current_user,
-                               _origin="template", _template_id=tpl.id)
+    return await _execute_with_http_layer(query_body, response, db, current_user,
+                                          origin="template", template_id=tpl.id)
 
 
 # ─── Cell Writeback Endpoint (Req 2, Req 13) ────────────────────────────────

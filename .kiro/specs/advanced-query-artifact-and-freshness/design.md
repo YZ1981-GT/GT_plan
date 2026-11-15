@@ -54,6 +54,10 @@
 
 ### 0.5 行数（`len(text.split("\n"))`，与行数门同口径）
 
+**更新（2026-11-15 重算，`tmp_aqf/probes/recompute_design0.py`）**：下表「现行数」是**设计时**的值，保留原文作对照；
+实施后的现算值见本节末的「实施后现算」小表。两处预算被突破（`query_orchestrator.py` +34 对预算 +30、
+`export_service.py` +89 对预算 +40），都仍在 800 行硬上限内，处置见 §10.8 收口节。
+
 | 文件 | 现行数 | 上限 | 本 spec 预算 |
 |---|---|---|---|
 | backend/app/routers/custom_query.py | 1990 | 白名单 1911 × 1.05 = 2006 | 执行主体移出，净减 |
@@ -65,9 +69,73 @@
 | audit-platform/frontend/src/components/template-library/CustomQueryTab.vue | 1012 | 1500 | +50 以内 |
 | audit-platform/frontend/src/views/AdvancedQueryBuilder.vue | 1149 | 1500 | +50 以内 |
 
+
+**实施后现算（2026-11-15，`len(text.split("\n"))`，`check_file_size.py` 对本表全部文件 exit 0）**
+
+| 文件 | 设计时 | 现算 | 变化 | 上限 / 预算 | 结论 |
+|---|---|---|---|---|---|
+| `backend/app/routers/custom_query.py` | 1990 | **1982** | -8 | 白名单 1911 × 1.05 = 2006（预算 净减） | 在限内 |
+| `backend/app/services/custom_query/query_orchestrator.py` | 743 | **777** | +34 | 800（预算 +30 以内） | 🔴 超预算（+34 > +30，仍在 800 内） |
+| `backend/app/routers/query_builder.py` | 494 | **515** | +21 | 800（预算 +40 以内） | 在限内 |
+| `backend/app/services/custom_query/query_export.py` | 379 | **379** | +0 | 800（预算 +60 以内） | 在限内 |
+| `backend/app/services/custom_query/export_service.py` | 608 | **697** | +89 | 800（预算 +40 以内） | 🔴 超预算（+89 > +40，仍在 800 内） |
+| `audit-platform/frontend/src/components/query/CustomQueryDialog.vue` | 1431 | **1411** | -20 | 1500（预算 净增 ≤ 0） | 在限内 |
+| `audit-platform/frontend/src/components/template-library/CustomQueryTab.vue` | 1012 | **1025** | +13 | 1500（预算 +50 以内） | 在限内 |
+| `audit-platform/frontend/src/views/AdvancedQueryBuilder.vue` | 1149 | **1161** | +12 | 1500（预算 +50 以内） | 在限内 |
+
+本 spec 新增文件（上限 800 / 前端 1500）：
+
+| 文件 | 现算 | 上限 |
+|---|---|---|
+| `backend/app/services/custom_query/query_runs.py` | **284** | 800 |
+| `backend/app/services/custom_query/query_artifacts.py` | **425** | 800 |
+| `backend/app/services/custom_query/query_evidence.py` | **58** | 800 |
+| `backend/app/services/custom_query/version_registry.py` | **162** | 800 |
+| `backend/app/services/custom_query/version_capture.py` | **365** | 800 |
+| `backend/app/services/custom_query/version_compare.py` | **163** | 800 |
+| `backend/app/routers/query_evidence.py` | **389** | 800 |
+| `backend/app/services/custom_query/business_execute.py` | **113** | 800 |
+| `backend/app/models/query_evidence_models.py` | **181** | 800 |
+| `audit-platform/frontend/src/components/query/queryRunFormat.ts` | **72** | 1500 |
+| `audit-platform/frontend/src/components/query/useQueryRunEvidence.ts` | **300** | 1500 |
+| `audit-platform/frontend/src/components/query/QueryRunBanner.vue` | **163** | 1500 |
+| `audit-platform/frontend/src/components/query/QueryEvidenceDrawer.vue` | **153** | 1500 |
+
+⇒ 三处偏离：`query_orchestrator.py`（+34 对预算 +30）、`export_service.py`（+89 对预算 +40）、`custom_query.py`（未净减：1990 → 1982）。前两者仍在 800 行硬上限内，第三处仍低于白名单门限 2006；处置登记在 §10.8 收口节（不抬白名单、不改判据）。
+
 ### 0.6 迁移号
 
-**更新（2026-11-07）**：磁盘最高 V267（255 个 V 文件、202 个 R 文件，`check_migration_versions` exit 0）；共享库 `schema_version` 最高 V267（任务 1 证据：V267 已由迁移器应用）；远端分支 `spec/disclosure-note-doc-upload-and-batch-fill` HEAD 最高 V267（2026-11-06 任务 1 推送）。三处一致，本 spec 新迁移取 V267。旧记（2026-11-04 扫描时）为 V251，已由任务 1 现取 V267。
+**更新（2026-11-15 重算，任务 0 第 5 条）**：三处现算 —— 磁盘 **259** 个 `V*.sql`、最高 **V271**、重复版本号 **0 组**、
+配对 `R*.sql` 206 个；共享库 `schema_version` **261 行、最高 V271**；远端分支
+`spec/disclosure-note-doc-upload-and-batch-fill` **259** 个、最高 **V271**。三处一致。
+
+- 本 spec 的 **V267 已落共享库**（`schema_version` 有 `V267__query_runs_and_artifacts.sql`，
+  `to_regclass('query_runs')` / `to_regclass('query_artifacts')` 均非空，两表各 0 行）
+  ⇒ 任务 10 的「迁移落库」前置**已满足**，不再需要用户放行（requirements D3 的放行对象已不存在）。
+- V268~V271 是**他域**产物（`consol_workpaper_instance` / `ledger_browse_indexes` /
+  `consol_note_stale_semantics` / `ledger_import_attempts`），本 spec 零新增迁移。
+- 旧记（2026-11-04）V251、（2026-11-07）V267 都已过期，按本节为准。
+
+### 0.7 端点鉴权基线三维计数（2026-11-15 现算，调用守卫自己的扫描函数）
+
+口径：调 `tests/test_project_endpoint_authorization_baseline.py` 的
+`_scan_unauthorized` / `_scan_identity_only` / `_scan_prefixed` / `_total_project_endpoints`
+与 `tests/test_project_endpoint_authz_body_carried.py` 的 `_scan`，**不自写扫描器**
+（自写一份会得出另一个数，正是「同一判据写两份」的坑）。
+
+| 维度 | 现算 | 基线常量 | 结论 |
+|---|---|---|---|
+| 路径含 `{project_id}` 的端点总数 | **446** | — | 分母非空 |
+| 同上，真实无鉴权 | **6** | 冻结、禁回填 | 未增加 |
+| 同上，「仅登录不校项目」 | **143** | `_IDENTITY_ONLY_BASELINE = 146` | 已减 3（可下调） |
+| router 级前缀含 `{project_id}` | **735**（project 540 / identity 192 / none 3） | `_PREFIXED_IDENTITY_ONLY_BASELINE = 197` | identity 192 < 197 |
+| 同上，无鉴权档 | **3** | `_PREFIXED_KNOWN_GAPS` 为空 | 3 个全在 `_PREFIXED_SELF_AUTH`（签名 / 回调自鉴权） |
+| 请求体携带项目标识 | **232**（project 150 / identity 78 / none 4） | `_BODY_KNOWN_GAPS` 5 条 | 🔴 见下 |
+
+🔴 **body_carried 维的 `_BODY_KNOWN_GAPS` 有 2 条已失效**（`metabase.py::build_drilldown_url`、
+`metabase.py::get_embed_url` 现已不是 none 档）⇒ `test_body_known_gaps_only_shrink` 在**干净 HEAD 上就红**
+（本 spec 未碰 metabase）。按棘轮契约本该删除这 2 条，但那是**他域端点**（metabase 嵌入），
+删除登记等于代他域确认「已补鉴权」，本 spec 不代改，只登记（见 §10.8 收口节的预存失败清单）。
 
 ## §1 总体流程
 
