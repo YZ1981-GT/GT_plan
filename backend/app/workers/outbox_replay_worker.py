@@ -20,7 +20,22 @@ from app.workers.worker_helpers import write_heartbeat
 logger = logging.getLogger("import_outbox")
 
 
-async def run(stop_event: asyncio.Event) -> None:
+async def _heartbeat_loop(
+    stop_event: asyncio.Event,
+    *,
+    worker_name: str,
+    interval_seconds: float = 20.0,
+) -> None:
+    """独立维持心跳，避免 replay 退避期间 TTL 过期。"""
+    while not stop_event.is_set():
+        await write_heartbeat(worker_name)
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
+        except asyncio.TimeoutError:
+            pass
+
+
+async def _run_loop(stop_event: asyncio.Event) -> None:
     """Outbox 重放主循环。"""
     import_enabled = bool(settings.LEDGER_IMPORT_OUTBOX_REPLAY_ENABLED)
     if not import_enabled:
@@ -137,3 +152,23 @@ async def run(stop_event: asyncio.Event) -> None:
                 break
             except asyncio.TimeoutError:
                 pass
+
+
+async def run(stop_event: asyncio.Event) -> None:
+    """带独立心跳的 outbox worker 入口。
+
+    replay 可能因数据库/handler 故障进入指数退避，也可能在配置解析或模块初始化期
+    抛错。心跳不能绑定在 replay 每轮，否则 worker 仍活着但退避超过 60 秒时会被健康页
+    误报为死亡；入口 finally 也保证关闭时 ticker 不泄漏。
+    """
+    heartbeat_task = asyncio.create_task(
+        _heartbeat_loop(stop_event, worker_name="outbox_replay_worker")
+    )
+    try:
+        await _run_loop(stop_event)
+    finally:
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass

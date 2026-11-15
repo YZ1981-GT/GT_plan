@@ -36,12 +36,10 @@ from app.models.audit_platform_models import (
     UnadjustedMisstatement,
 )
 from app.models.audit_platform_schemas import (
-    AccountOption,
     AdjustmentCollaborationAssignRequest,
     AdjustmentCollaborationContributeRequest,
     AdjustmentCollaborationRejectRequest,
     AdjustmentCreate,
-    AdjustmentSummary,
     AdjustmentSyncRequest,
     AdjustmentUpdate,
     ReviewStatusChange,
@@ -810,6 +808,7 @@ async def convert_adjustment_to_misstatement(
             entry_group_id=entry_group_id,
             year=year,
             created_by=current_user.id,
+            force=force,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1436,7 +1435,7 @@ async def export_adjustment_template(
             dv_name.errorTitle = "科目名称必须在项目科目库"
             dv_name.prompt = "从下拉选择二级科目名称, D/F/G/H 列将自动联动填充"
             dv_name.promptTitle = "提示"
-            dv_name.add(f"E2:E200")
+            dv_name.add("E2:E200")
             ws_target.add_data_validation(dv_name)
 
             # B 列: AJE/RJE 类型下拉

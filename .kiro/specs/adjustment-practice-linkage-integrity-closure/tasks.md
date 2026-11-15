@@ -20,7 +20,8 @@
   - 证据：`3cd7352a6` 新建 `adjustmentRouteTarget.ts` + 测试
 - [x] A7. 读请求错误态、请求 epoch、草稿隔离与丢弃、视口宽度、键盘焦点
   - 证据：`3cd7352a6` 修改 `Adjustments.vue` 等前端文件
-- [ ] A8. A 批测试、逐处变异、Playwright 运行验证
+- [ ]* A8. A 批测试、逐处变异、Playwright 运行验证
+  - 2026-11-15：现有 CF 退役、深链、资源错误/代际、动作和前端相关用例已重跑；新增 `Adjustments.a8e8.spec.ts` 锁定代际、错误重试、服务端分页、深链和反向变异。Playwright 已在【测试】项目验证调整大厅加载、相关接口 200、390px 无横向溢出、无 console error；CF 四类深链、错误重试、草稿恢复和完整浏览器变异链仍未闭合。
 
 ## B. 分录组完整性与复核任务
 
@@ -40,7 +41,8 @@
   - 证据：`3cd7352a6` 新建 `adjustment_review_task_service.py`
 - [x] B8. 职责分离、覆盖理由、高风险 required_level 与权限单一来源
   - 证据：`3cd7352a6` 修改 `adjustment_review_service.py`
-- [ ] B9. B 批 PG/HTTP/并发/权限测试与变异
+- [ ]* B9. B 批 PG/HTTP/并发/权限测试与变异
+  - 2026-11-15：新增 `test_adjustment_b9_integrity_pg.py`，真实 PG 已验证 stale revision 拒绝、负金额约束拒绝和三张调整工作流表 FORCE RLS；既有 SQLite/HTTP 权限、复核任务、整组删除恢复和 TB 故障回滚用例已重跑。双事务编辑/批准、自定义编号/导入覆盖并发和非 superuser RLS 强制隔离仍需专门环境，未勾选完成。
 
 ## C. 原子批准、底稿发布门与 durable outbox
 
@@ -58,7 +60,8 @@
   - 证据：`3cd7352a6` 修改 `report_stale_service.py`、`test_note_stale_event_chain.py`
 - [x] C7. 计算状态、重试入口、通知与签发/交付门接线
   - 证据：`3cd7352a6` 修改相关通知与门禁逻辑
-- [ ] C8. C 批真 PG 全链、故障注入、重复投递、Redis 降级和 Playwright
+- [ ]* C8. C 批真 PG 全链、故障注入、重复投递、Redis 降级和 Playwright
+  - 2026-11-15：新增 outbox 失败→重试→重复句柄幂等、Redis ping 失败内存降级测试；真实 PG outbox 故障/重放/幂等和通知 SAVEPOINT 用例通过。修复 outbox worker 无监督退出与退避期间心跳过期：启动 registry 对 outbox worker 增加有限退避 supervisor，worker 增加独立 20 秒心跳 ticker；新增 `test_outbox_replay_worker_supervision.py` 3 passed。开发服实测 `event-cascade/health` 已恢复 `healthy`（lag=0、DLQ=0、Redis=true、worker alive），调整大厅不再显示“部分功能暂时不可用”。批准→TB→outbox→真实 EventBus handler 全链、handler 中途失败/DLQ、Redis 真栈和 Playwright 尚未完成。
 
 ## D. 客户已入账与未更正错报单源
 
@@ -82,8 +85,9 @@
   - 证据：`3cd7352a6` 修改 `misstatement_service.py`、`misstatement_summary_service.py`、新建 `MisstatementSummaryView.vue`
 - [x] D8. treatment 历史与"纳入/已入账/不予更正/撤销"界面
   - 证据：`3cd7352a6` 新建 `adjustment_treatment_service.py`、`AdjustmentTreatmentDialog.vue`
-- [ ] D9. D 批真 PG、账套回滚、错报/声明书/签发门和浏览器验收
+- [ ]* D9. D 批真 PG、账套回滚、错报/声明书/签发门和浏览器验收
   - 同时承载 `adjustment-client-booking-status` Task 9 的 pg_only 全流程与【测试】项目浏览器全流程（见本节页头）
+  - 2026-11-15 已补 `test_adjustment_client_booking_pg.py` 与 `test_adjustment_booking_suggestions_pg.py`，并补真实 router HTTP 标记/撤销追加历史；默认未设置 `DATABASE_URL` 时收集为 2 skipped，显式指向本地 PostgreSQL 后 2 passed。通过临时测试复核人和【测试】项目完成了浏览器：AJE 粘贴录入→提交复核→另一账号批准→精确建议→客户已入账→账套回滚→撤销，数据库核对 `book/revoke` 与 `include/client_booked/withdraw` 历史，活动调整行清理为 0。浏览器期间 `/event-cascade/health` 暴露 outbox replay worker 未运行，且声明书/签发门仍只有 PG/HTTP 证据，故仍保留 `[ ]*`。
 
 ## E. 重要性、证据与专业工作台
 
@@ -101,16 +105,24 @@
   - 证据：`3cd7352a6` 修改 `adjustment_export_service.py`、`test_eqcr_snapshot.py`
 - [x] E7. 五角色工作台：我的待办、重大调整、例外、自审覆盖、下游失败
   - 证据：`3cd7352a6` 修改 `Adjustments.vue` 界面改造
-- [ ] E8. 响应式、无障碍、窄屏和大批量性能验证
+- [ ]* E8. 响应式、无障碍、窄屏和大批量性能验证
+  - 2026-11-15：调整大厅可点击来源/协作标签已改原生 button + aria-label + focus-visible；契约测试、区域类型检查和 stylelint 通过。浏览器 390px overflow=0，注入总量 10,000/page_size=50 时渲染 50 行约 1.53 秒；真实 10,000 组数据、axe/屏幕阅读器、完整键盘焦点回收和 p50/p95 基准仍未闭合。
 
 ## F. 终验与治理
 
-- [ ] F1. 修复 adjustment-hall spec 归档缺失与 INDEX 链接，登记本 spec
-- [ ] F2. 当前 HEAD 与候选树后端/前端失败集合逐节点对比，只候选红为 0
-- [ ] F3. 真 PG + 真 HTTP + 真 EventBus 全链验收，不 mock 相邻层
-- [ ] F4. 并发、故障恢复、RLS、签发/交付门、客户入账回滚验收
-  - 「客户入账回滚」一并作为 `adjustment-client-booking-status` Task 9 的回滚验收证据（见 D 批页头）
-- [ ] F5. 五角色 Playwright、刷新回读、通知深链、来源底稿、窄屏与键盘验收
-- [ ] F6. 共享库 migration 与测试数据写入经用户放行后执行；逐表清理对账
-- [ ] F7. 磁盘变异汇总、临时产物清理、诊断与文档更新
-- [ ] F8. fetch 同步、单一提交、版本号与主要变动推送
+- [x] F1. 修复 adjustment-hall spec 归档缺失与 INDEX 链接，登记本 spec
+  - ✅ 2026-11-15 复核结项：`adjustment-hall-entry-review-closure` 目录已在 `_archive/112-adjustment-hall-entry-review-closure/`，INDEX 速递区有 10/10 ✅ 行且链接指向归档路径（非活跃路径）；`backend/tests/test_spec_index_consistency.py` **23 passed**（该守卫覆盖：链接必须点得开 / 活跃表不得有已归档 spec / 表格段列数一致 / 无 mojibake / 速递条目不得落在正文区）。本 spec 自身（`adjustment-client-booking-status`、本 spec）在 INDEX 活跃表中登记。⇒ F1 的「归档缺失与链接」事实不成立（旧记录过期），已结项。
+- [x] F2. 当前 HEAD 与候选树后端/前端失败集合逐节点对比，只候选红为 0
+  - ✅ 2026-11-15：候选 `7ff1a4ab8d97b081fae8a66775cf9012f16da612` / tree `bde619b5`，基线 HEAD `8eb79c894`。同一后端选集 HEAD **60 passed/2 failed**、候选 **62 passed/0 failed**；前端既有 4 文件 HEAD/候选均 **37 passed**，候选新增 A8/E8 契约 **4 passed**。两条 HEAD 失败由本批错报 force 幂等与声明书同刻排序修复，结果写入 `tmp_adjustment_f_remaining/f2_results.md`；候选 worktree 已锁定验证后释放，refs 未移动。
+- [ ]* F3. 真 PG + 真 HTTP + 真 EventBus 全链验收，不 mock 相邻层
+  - 2026-11-15：真实 PG/HTTP 的 B9、客户入账、outbox 和错报/声明书/签发门分段用例已通过；修复并验证 outbox supervisor/独立心跳后开发服 `event-cascade/health` 为 healthy，pending outbox 已清空。批准→TB→outbox→生产 EventBus handler 的同一全链仍缺，现有分段测试仍有局部替身，不能勾选完成。
+- [ ]* F4. 并发、故障恢复、RLS、签发/交付门、客户入账回滚验收
+  - 2026-11-15：已覆盖 PG stale CAS、约束、FORCE RLS 元数据、outbox 故障/重放和客户入账回滚；回滚 active dataset 的 PostgreSQL 唯一 active 约束顺序缺陷已修复并回归通过。event-cascade health 当前 healthy、DLQ=0。双事务并发、非 superuser RLS 强制隔离、统一签发/交付故障门和全链恢复仍待专用环境。
+- [ ]* F5. 五角色 Playwright、刷新回读、通知深链、来源底稿、窄屏与键盘验收
+  - 2026-11-15：已完成调整大厅窄屏、接口、键盘聚焦、来源/协作原生按钮和合成分页性能走查，并用临时编制/复核账号完成 AJE 提交、通知、批准、客户入账、回滚、撤销和刷新路径。仍缺合伙人/QC/EQCR 五角色全矩阵、通知深链与来源底稿连续走查，且 event-cascade health 暴露 outbox replay worker 未运行。
+- [ ]* F6. 共享库 migration 与测试数据写入经用户放行后执行；逐表清理对账
+  - 2026-11-15：只读查询确认共享库已应用 V212/V235，V235 的 MigrationRunner 规范化 checksum 与数据库记录一致；测试项目活动调整行已为 0，临时复核账号已停用、人员已删除、项目委派已撤销。本轮未执行共享库 migration、持久化 seed、物理清理或回滚，等待用户明确目标库与清理授权。
+- [x] F7. 磁盘变异汇总、临时产物清理、诊断与文档更新
+  - ✅ 2026-11-15：本批临时产物清理 —— 删 `tmp_note_table_fix/`（一次性探针）与两处变异备份（`mutbak_nwps.py` / `mutbak_m1detail.ts`，均已逐字节还原后删除）；保留 `tmp_mcycle_audit/probe_m_contract_vs_frontend.py` 与 `probe_m_field_names.py` 两个**可复现探针**（M 循环形态冲突的证据来源，见 `oo-writeback-template-parity-closure` 9.2）。变异汇总见各批记录（显示设置 3/3、M 棘轮 2/2、附注章节锁 3/3）。
+- [ ]* F8. fetch 同步、单一提交、版本号与主要变动推送
+  - 2026-11-15：已 fetch --prune，HEAD 与 origin 同为 `8eb79c894`、ahead/behind=0；`push_version.py --dry-run` 被当前 91 条工作树/未跟踪改动按安全门拒绝，未执行 fetch/rebase、提交、版本标签或推送。

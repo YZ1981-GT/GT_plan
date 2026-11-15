@@ -43,8 +43,9 @@
   - Files: `routers/wp_html_save.py`、`services/event_handlers/_impl.py`、新接口所在路由、底稿编辑器外壳组件、`utils/http.ts`
   - Verify: 发布门端点测试（未确认 409、确认放行、不涉及科目照常 200）；拦截器单测（重发带 ack、取消不重发）；浏览器在 D2 发布时出现确认框。变异：发布门判断取反 → 409 用例红；拦截器重发漏带 ack → 用例红
 
-- [ ] 9. 验收与收尾（需求 6）
+- [ ]* 9. 验收与收尾（需求 6）
   - pg_only 全流程（需求 6.1、6.2）；【测试】项目浏览器全流程（需求 6.4），清理对账
+  - 2026-11-15 已补真实 PG 验收用例：`backend/tests/test_adjustment_client_booking_pg.py` 覆盖标记→调整列归零→账套回滚 `full_recalc` 恢复→撤销历史，并补真实 router HTTP 标记/撤销；`backend/tests/test_adjustment_booking_suggestions_pg.py` 覆盖完全匹配、多候选、借贷相反和一分钱差异。默认未设置 `DATABASE_URL` 时收集为 **2 skipped**；显式指向本地 PostgreSQL 后 **2 passed**。使用临时复核账号完成了浏览器 AJE→提交→批准→精确候选→标记→回滚→撤销链，并通过平台删除分录、撤销委派、删除人员和停用账号清理；声明书/签发门与 outbox worker 健康仍需额外证据，不能勾选收尾。
   - 变异记录汇总；干净 worktree 跑要提交的树，失败集合与 HEAD 对比；INDEX.md 登记
   - **2026-11-06 承接登记**：Task 1~8 的代码已由 `adjustment-practice-linkage-integrity-closure` 的
     D1~D8 吸收（见本文件页头的 2026-11-04 归档复查）；**本任务的验收由该 spec 的 `D9`（D 批真 PG、

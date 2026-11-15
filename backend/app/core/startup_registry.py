@@ -28,6 +28,7 @@ from typing import Any, Awaitable, Callable, Literal, Sequence
 from app.core import startup_candidate_gate as _candidate_gate
 from app.core import startup_deferred as _deferred
 from app.core import startup_migrations as _migrations
+from app.workers.worker_helpers import write_heartbeat
 
 Criticality = Literal["critical", "best_effort"]
 TaskStatus = Literal["ok", "skipped", "failed", "deferred"]
@@ -702,6 +703,62 @@ def _task_print_ready(ctx: StartupContext) -> None:
 # Workers — each has a stable name in the registry / report
 # ---------------------------------------------------------------------------
 
+async def _supervise_worker(
+    run_fn: Callable[[asyncio.Event], Awaitable[None]],
+    stop_event: asyncio.Event,
+    worker_name: str,
+    *,
+    restart_delay_seconds: float = 5.0,
+) -> None:
+    """监督必须持续运行的耐久 worker，异常退出时有限退避后重启。
+
+    正常 stop_event / CancelledError 是关闭信号，不重启；普通 return 或异常才视为
+    意外退出。当前只由 outbox replay 使用，避免把“配置关闭即正常 return”的条件 worker
+    误判成故障。
+    """
+    consecutive_failures = 0
+    while not stop_event.is_set():
+        try:
+            await run_fn(stop_event)
+            if stop_event.is_set():
+                return
+            consecutive_failures += 1
+            logger.error(
+                "[worker-supervisor] %s 意外结束（return），将在 %.1fs 后重启",
+                worker_name,
+                restart_delay_seconds,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001 - supervisor 必须保护应用生命周期
+            consecutive_failures += 1
+            logger.exception(
+                "[worker-supervisor] %s 意外崩溃（第 %d 次），将在 %.1fs 后重启",
+                worker_name,
+                consecutive_failures,
+                restart_delay_seconds,
+            )
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=restart_delay_seconds)
+        except asyncio.TimeoutError:
+            pass
+
+
+async def _heartbeat_loop(
+    stop_event: asyncio.Event,
+    *,
+    worker_name: str,
+    interval_seconds: float = 20.0,
+) -> None:
+    """独立维持心跳，避免业务退避/长事务期间 TTL 过期。"""
+    while not stop_event.is_set():
+        await write_heartbeat(worker_name)
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
+        except asyncio.TimeoutError:
+            pass
+
+
 def _make_worker_starter(
     worker_import: str,
     attr: str = "run",
@@ -711,7 +768,12 @@ def _make_worker_starter(
 
         mod = importlib.import_module(worker_import)
         run_fn = getattr(mod, attr)
-        task = asyncio.create_task(run_fn(ctx.stop_event))
+        if worker_import == "app.workers.outbox_replay_worker":
+            task = asyncio.create_task(
+                _supervise_worker(run_fn, ctx.stop_event, "outbox_replay_worker")
+            )
+        else:
+            task = asyncio.create_task(run_fn(ctx.stop_event))
         ctx.worker_tasks.append(task)
 
     return _start
