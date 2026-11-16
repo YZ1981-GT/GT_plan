@@ -421,6 +421,7 @@
     **本任务仍保持 `[~]`**：普通底稿 content representation/version/artifact 证据
     已如实登记在可伪证台账（三条 `NO_PRODUCTION_WRITER` / `PARTIAL_WIRING`），未清零。
     （AC-19~AC-22、AC-23 的 C 部分、AC-24）
+  - **2026-11-18 代码收口（`[~]` 保持）：普通底稿 evidence consumer 已接线，writer 缺口如实保留**：新增 `workpaper_sync/export_evidence.py` 的 current content version → current representation → published artifact 解析与 formal/data_exchange 合同校验；`POST /api/workpapers/{wp_id}/export-xlsx` 在已有 `current_content_version_id` 时先验 evidence，formal 缺 policy pair / representation artifact 不一致返回 409，并在响应头暴露 content version / surface / policy digest；`archive_inventory._workpaper_entries` 对已有 content version 绑定 `content_version_id` / `representation_id` / `artifact_id` / `artifact_sha256` / classification / policy digest，证据无效转 `MISSING`，不回退旧 file_path 充当当前版本证明。新增 `test_workpaper_export_evidence.py` 4 例，相关底稿导出/归档回归 **57 passed**。SQLite/旧隔离 schema 夹具继续兼容；真实 PostgreSQL 生产 schema 缺 evidence 时 fail closed。**仍未完成**：`Repository.create_content_version` 的正式 production writer 尚未接入 V265 四列（证据台账保持 `PARTIAL_WIRING`），历史 current version 的批量回填不做。
 
 - [x] 6C. 附注 Word 普通/clone 路径消费 kind/scale（R6、R9；依赖任务 10 的 `ExportUnitRegion`，与其附注路径子项同批）
   - `NoteWordExporter._render_table` 与 `note_template_table_look.render_cloned_table` 接收同一 `ExportUnitRegion + column_kinds + column_ratio_scales`，kind/scale 取自 6A 的 catalog 与稳定 column_id，只有 amount 执行 policy divisor；`note_template_block_fill.rebuild_block` 按 `<section_id>/<table_id>` 取 region 后交给两条内核。

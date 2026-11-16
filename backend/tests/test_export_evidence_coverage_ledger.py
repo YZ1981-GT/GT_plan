@@ -152,6 +152,12 @@ class TestUnwiredColumnsStayUnwired:
             if path.name in {
                 "workpaper_sync_models.py",
                 "export_surface_registry.py",
+                # These modules are **evidence consumers/builders**, not content-version
+                # writers. Treating their output dict keys as ORM writes made the
+                # original zero-writer ratchet false-red as soon as task 10 gained
+                # its first consumer integration.
+                "export_evidence.py",
+                "archive_inventory.py",
             }:
                 continue
             if column in _assign_targets(path):

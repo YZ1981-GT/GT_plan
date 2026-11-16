@@ -104,17 +104,48 @@ def _paperless_doc_id(att) -> int | None:
 async def _workpaper_entries(db: AsyncSession, project_id: UUID, names: _ArcNames) -> list[InventoryEntry]:
     from app.models.workpaper_models import WorkingPaper, WpIndex
     from app.services.wp_export.wp_file_resolver import VERDICT_LABELS, resolve_wp_file
+    from app.services.workpaper_sync.export_evidence import (
+        WorkpaperExportEvidenceError,
+        resolve_current_content_export_evidence,
+    )
 
     rows = (await db.execute(
-        sa.select(WorkingPaper.id, WorkingPaper.file_path, WpIndex.wp_code, WpIndex.wp_name)
+        sa.select(
+            WorkingPaper.id,
+            WorkingPaper.file_path,
+            WorkingPaper.current_content_version_id,
+            WpIndex.wp_code,
+            WpIndex.wp_name,
+        )
         .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
         .where(WorkingPaper.project_id == project_id, WorkingPaper.is_deleted == sa.false())
         .order_by(WpIndex.wp_code, WorkingPaper.id)
     )).all()
     templates = _template_root()
     out: list[InventoryEntry] = []
-    for wp_id, file_path, wp_code, wp_name in rows:
-        # 名称首尾空白先去掉（模板名带前导空格，如「 管理层声明书程序表」⇒ 包内名出现双空格）
+    for wp_id, file_path, current_content_version_id, wp_code, wp_name in rows:
+        # 版本链存在时，归档必须绑定 current content evidence；不回退旧 file_path
+        # 作为「当前版本」的证明。历史没有 content version 的底稿仍走兼容路径，
+        # 但该条会在后续 evidence ledger / archive policy 守卫中如实被标记。
+        content_evidence = None
+        if current_content_version_id is not None:
+            try:
+                content_evidence = await resolve_current_content_export_evidence(
+                    db, project_id=project_id, wp_id=wp_id
+                )
+            except WorkpaperExportEvidenceError as exc:
+                out.append(
+                    InventoryEntry(
+                        category="workpaper_file",
+                        source_id=str(wp_id),
+                        label=f"{wp_code} {(wp_name or '').strip()}".strip(),
+                        wp_code=wp_code or "",
+                        arcname="",
+                        status=MISSING,
+                        reason=f"当前底稿内容版本证据无效：{exc}",
+                    )
+                )
+                continue
         label = f"{wp_code} {(wp_name or '').strip()}".strip()
         base = dict(category="workpaper_file", source_id=str(wp_id), label=label, wp_code=wp_code or "")
         res = resolve_wp_file(file_path, wp_code=None, allow_template_fallback=False)
@@ -123,7 +154,33 @@ async def _workpaper_entries(db: AsyncSession, project_id: UUID, names: _ArcName
                 out.append(InventoryEntry(**base, arcname="", status=SKIPPED, reason="未生成底稿文件（指向模板库），仅收数据快照"))
                 continue
             arcname = names.take("10-底稿", safe_name(label), res.path.suffix.lower())
-            out.append(InventoryEntry(**base, arcname=arcname, status=OK, local_path=res.path))
+            evidence = None
+            if content_evidence is not None:
+                evidence = {
+                    "content_version_id": str(content_evidence.content_version_id),
+                    "representation_id": (
+                        str(content_evidence.representation_id)
+                        if content_evidence.representation_id else None
+                    ),
+                    "artifact_id": (
+                        str(content_evidence.artifact_id)
+                        if content_evidence.artifact_id else None
+                    ),
+                    "artifact_sha256": content_evidence.artifact_sha256,
+                    "classification": content_evidence.export_surface_class,
+                    "policy_digest": content_evidence.unit_policy_digest,
+                    "policy_snapshot": content_evidence.unit_policy_snapshot,
+                    "source_storage_unit": content_evidence.source_storage_unit,
+                }
+            out.append(
+                InventoryEntry(
+                    **base,
+                    arcname=arcname,
+                    status=OK,
+                    local_path=res.path,
+                    evidence=evidence or {},
+                )
+            )
         elif res.verdict == "empty":
             out.append(InventoryEntry(**base, arcname="", status=SKIPPED, reason="未生成底稿文件，仅收数据快照"))
         else:
