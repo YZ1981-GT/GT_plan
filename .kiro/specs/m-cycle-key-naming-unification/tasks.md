@@ -2,8 +2,9 @@
 
 > **状态：实施中（2026-11-16）**。Phase 0 现算完成（推翻 design §2 的三条前提）、
 > 路径已拍板（A' = 逐行 JSON 单一来源）、任务 4 已实施并通过守卫 + 变异。
-> 剩余：任务 5.2（M1 的 12 条 R2 结构差异，需业务裁决）+ 5.3（M2 28 条）+ 任务 6 收尾。
-> 棘轮已从 65 条降到 40 条（M1 偿还 25 条）。
+> 剩余：任务 6 收尾（干净 worktree / INDEX 登记 / 归档）。
+> 棘轮从 65 条降到 **18 条**（M1 偿还 25 + M2 偿还 22），余 18 条全是 R2 结构差异 ——
+> 用户 2026-11-16 裁决「拿不准就空着，让用户手动用公式管理实现表间链接」，不在本 spec 实施。
 > 来源：`oo-writeback-template-parity-closure` 任务 9.2 的键名层（该 spec 已归档，
 > 投影层已修完）。
 
@@ -95,7 +96,7 @@
     把我的 8 个文件临时换成 HEAD 版后 `useF5Integration.spec.ts` 同样 1 failed
     （8 文件逐字节还原确认）
 
-- [~] 5. 棘轮逐条偿还（原 65 条 → 现 40 条；M1 已完成、M2 未动）
+- [x] 5. 棘轮逐条偿还（原 65 条 → 现 18 条；M1 偿还 25 + M2 偿还 22；余 18 条 R2 按用户裁决空着）
   - [x] 5.1 **M1 已偿还 25 条**（18+19 → 7+5），且发现真缺口不是「键名不一致」
     **直读模板「明细表M1-2」（openpyxl，R12 组头 + R13 列头 + merges）确认真实结构**：
     `A1:U` 共 **21 列**，与 provider `DETAIL_SHEET.fields` 21 条**逐列一致**：
@@ -142,26 +143,62 @@
     `test_m_detail_single_storage_source.py` **11 passed**（任务 4）；
     `m9-detail-import-refresh.spec.ts` **2 passed**（M9 未动）。
 
-  - [ ] 5.2 **M1 余 12 条是 R2 结构差异，需业务裁决**（不能用键名对齐解决）
-    provider 侧 7 条：`priorOpening`（D 期初数）/ `increaseAmount`（E 本期增加）/
+  - [x] 5.2 **R2 结构差异：用户 2026-11-16 裁决「拿不准就空着，让用户手动用公式管理实现表间链接」**
+    **裁决口径**：本 spec **不猜语义映射**。模板列与前端键「疑似同义但不确定」的一律
+    **保持空着（不接、不猜、不写默认值）**，由用户在**公式管理**里手动建立表间链接。
+    理由：猜错的代价是「前端写 A、后端读 B」的静默数据错位（本 spec 记录过的真实反例：
+    曾按中文表头反推 `endAging` / `beginAje` / `isVerified` 六个键，与 provider 真名全不一致）；
+    而空着是**可见的未完成**，用户填公式时能自己发现。
+
+    **具体处置**：这些键**留在棘轮基线里**（不豁免、不接），并在基线注释里写明
+    「R2：待用户用公式管理手动链接」。棘轮会一直盯着它们，不会静默消失也不会假性变短。
+
+    M1 余 7 条（provider 侧）：`priorOpening`（D 期初数）/ `increaseAmount`（E 本期增加）/
     `decreaseAmount`（F 本期减少）/ `closingBalance`（G 期末数公式）/
     `auditedOpening`（N）/ `auditedIncrease`（O）/ `auditedDecrease`（P）/
-    `auditedClosing`（Q，↔ 前端 `endAudited`）。
-    前端侧 5 条：`beginBalance` / `declaredAmount` / `paidAmount` / `endBalance` /
-    `endAudited`。
-    **语义对照（需业务裁决）**：
-    | 模板 | 前端 | 是否同一含义？ |
-    |---|---|---|
-    | D 期初数（未审） | `beginBalance` 期初应付余额 | 很可能是 |
-    | E 本期增加（未审） | `declaredAmount` 本期宣告股利 | **不一定**（宣告≠全部增加） |
-    | F 本期减少（未审） | `paidAmount` 本期支付 | **不一定**（支付≠全部减少） |
-    | G 期末数（=D+E−F 公式） | `endBalance` 期末应付余额 | 若是 D+E−F 则等价 |
-    | Q 期末数（审定，公式） | `endAudited` 期末应付（审定数） | 很可能是 |
-    | N/O/P 审定期初/增/减 | 前端**无对应** | 前端缺 3 个审定列 |
+    `auditedClosing`（Q）。
+    M1 余 5 条（前端侧）：`beginBalance` / `declaredAmount` / `paidAmount` /
+    `endBalance` / `endAudited`。
 
-    ⇒ 这一层要么改前端行模型（宣告/支付 → 期初/增/减），要么在契约侧加字段映射。
-    两者都要动已发布 representation 或 10 个宿主的读写语义 ⇒ **需用户裁决后再做**。
+    M2 余 4 条（provider 侧）：`auditedOpening` / `auditedIncrease` / `auditedDecrease` /
+    `auditedClosing`。
+    M2 余 2 条（前端侧）：`beginAmount` / `endAmount`。
 
-  - [ ] 5.3 M2 未动（19+9 = 28 条）：照 M1 的方法做（直读模板定列 → 补字段 → 豁免声明 → 变异）
+    ⇒ **本 spec 的可机械完成部分到此清零**。余下 18 条全部是「用户用公式管理手动链接」的
+    范围，不在本 spec 内实施。
+
+  - [x] 5.3 **M2 已偿还 22 条**（19+9 → 4+2），方法同 M1
+    **直读模板「明细表（非上市公司）M2-2」（A1:X 24 列，R10/R11/R12 三级表头）**：
+    与 provider `CONFIG.sheets`（24 字段）**逐列一致**。
+    前端 `M2DetailUnlistedRow` 原 16 键，只接了 5 列（A 投资方名称 / E 本期增加 /
+    G 本期减少 / D 比例% / X 备注）⇒ **15 列没接**。
+
+    偿还：
+    ①`M2DetailUnlistedRow` 补 15 个字段（键名用 provider `json_key` 真名）：
+    `investMethod` / `investAmount` / `increaseMethod` / `closingAmount` / `closingRatio` /
+    `priorAdjAje` / `priorAdjRje` / `currentAjeIncrease` / `currentAjeDecrease` /
+    `currentRjeIncrease` / `currentRjeDecrease` / `auditedOpeningRatio` /
+    `auditedClosingRatio` / `verified` / `verificationRef`
+    ⇒ **provider-only 19 → 4**（余 4 条全是 R2，见 5.2）；
+    ②7 个「模板无此列」的 UI 派生键登记豁免 + `_M2_UI_ONLY_CLAIM` 声明：
+    `investType` / `idType` / `idNumber` / `increaseReason` / `decreaseReason` /
+    `subscribedAmount` / `investDate` ⇒ **frontend-only 9 → 2**（余 2 条 R2）。
+
+    🔴 **`investType` 的特别说明**：前端这个键叫「出资方式」，而模板 B/F 列是
+    `investMethod` / `increaseMethod` —— **名字像但不是同一列**。这是「按中文表头反推英文键」
+    陷阱的又一实例；处理方式是**两边都保留**：`investMethod` 接模板 B 列（新增），
+    `investType` 留作前端自建标签（豁免），二者语义不同不合并。
+
+    **新增 3 条 M2 可伪证断言**（与 M1 同构）：豁免键必须真的不在 provider 声明里 /
+    声明与 `_UI_ONLY_KEYS` 双向一致 / 前端每个键必须有归属。
+
+    **变异 3/3 全 RED**：夹带 `investMethod`（模板 B 列）⇒ provider-only 禁增 + 总量棘轮红；
+    `_M2_UI_ONLY_CLAIM` 漏 `subscribedAmount` ⇒ 双向一致红；
+    把 `beginAmount`（R2 基线键）塞进豁免 ⇒ 基线自证 + 方向 2 双红。逐字节还原后 14 passed。
+
+    **上市版 M2-2 不在本 spec 范围**：模板有「明细表（上市公司）M2-2」（A1:AJ 36 列），
+    但 **provider 完全没声明**它（`CONFIG.sheets` 只有 `m201-unlisted-managed`），
+    前端 `M2DetailListedRow` 18 键也没有对应的 provider 契约。
+    ⇒ 这是「provider 缺整张表」，不是键名不一致，需另立 spec。
 
 - [ ] 6. 收尾：干净 worktree 跑守卫、推送、登记 INDEX

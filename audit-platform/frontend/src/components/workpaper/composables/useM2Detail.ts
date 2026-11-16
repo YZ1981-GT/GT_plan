@@ -107,6 +107,43 @@ export interface M2DetailUnlistedRow {
   investDate: string
   /** 备注 */
   remark: string
+
+  // ═══ 以下 13 个键按模板补齐（spec m-cycle-key-naming-unification 任务 5.3）═══
+  // 模板「明细表（非上市公司）M2-2」A~X 共 24 列，此前前端只接了 5 列
+  // （A 投资方名称 / E 本期增加 / G 本期减少 / D 比例% / X 备注）。
+  // 🔴 键名用 provider 的 `json_key` 真名，唯一权威是
+  //    `phase5_m2_paid_in_capital.CONFIG.sheets`。
+
+  /** B 列「出资方式」（未审数/期初数）—— 与前端 investType「出资方式」不是同一列 */
+  investMethod?: string
+  /** C 列「出资金额」（未审数/期初数）—— R2：与 beginAmount 的关系待裁决 */
+  investAmount?: number
+  /** F 列「出资方式」（本期增加组） */
+  increaseMethod?: string
+  /** H 列「出资金额」（未审数/期末数）—— R2：与 endAmount 的关系待裁决 */
+  closingAmount?: number
+  /** I 列「比例%」（未审数/期末数） */
+  closingRatio?: number
+  /** J 列「账项调整」（期初调整） */
+  priorAdjAje?: number
+  /** K 列「重分类调整」（期初调整） */
+  priorAdjRje?: number
+  /** L 列「本期增加」（账项调整） */
+  currentAjeIncrease?: number
+  /** M 列「本期减少」（账项调整） */
+  currentAjeDecrease?: number
+  /** N 列「本期增加」（重分类调整） */
+  currentRjeIncrease?: number
+  /** O 列「本期减少」（重分类调整） */
+  currentRjeDecrease?: number
+  /** Q 列「比例%」（审定数/期初数） */
+  auditedOpeningRatio?: number
+  /** U 列「比例%」（审定数/期末数） */
+  auditedClosingRatio?: number
+  /** V 列「是否经过验资」 */
+  verified?: string
+  /** W 列「验资报告索引号」 */
+  verificationRef?: string
 }
 
 /** 明细版本分支 */

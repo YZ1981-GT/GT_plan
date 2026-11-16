@@ -73,6 +73,16 @@ _UI_ONLY_KEYS = {
     # 交叉核对 / 公式派生
     "crossRefDiff",        # 「与M1-1交叉验证差额」—— 模板无（纯前端计算）
     "periodChange",        # 「本期变动=宣告-支付」—— 模板无（纯前端计算）
+
+    # ── M2 实收资本（非上市）：模板 24 列（A~X）里没有的 7 个前端派生键 ──────
+    "investType",          # 「出资方式」—— 🔴 模板 B/F 列是 investMethod / increaseMethod，
+                           #    与这个前端键**不是同一列**；它属前端自建的「出资类型」标签
+    "idType",              # 「证件类型」—— 模板无此列
+    "idNumber",            # 「证件号码」—— 模板无此列
+    "increaseReason",      # 「增资原因」—— 模板无此列
+    "decreaseReason",      # 「减资原因」—— 模板无此列
+    "subscribedAmount",    # 「认缴出资额」—— 模板无此列
+    "investDate",          # 「出资日期」—— 模板无此列
 }
 
 #: 🔴 棘轮基线：`(label, interface) -> {provider 有但前端没有的键}`。
@@ -90,12 +100,14 @@ _BASELINE_PROVIDER_ONLY: dict[tuple[str, str], set[str]] = {
         "auditedOpening", "closingBalance", "decreaseAmount", "increaseAmount",
     },
     ("M2", "M2DetailUnlistedRow"): {
-        "auditedClosing", "auditedClosingRatio", "auditedDecrease",
-        "auditedIncrease", "auditedOpening", "auditedOpeningRatio",
-        "closingAmount", "closingRatio", "currentAjeDecrease",
-        "currentAjeIncrease", "currentRjeDecrease", "currentRjeIncrease",
-        "increaseMethod", "investAmount", "investMethod", "priorAdjAje",
-        "priorAdjRje", "verificationRef", "verified",
+        # M2 非上市：2026-11-16 按模板「明细表（非上市公司）M2-2」A~X 24 列补齐
+        # 15 个字段后，从 19 条降到 4 条（删：auditedClosingRatio / auditedOpeningRatio /
+        # closingAmount / closingRatio / currentAjeDecrease / currentAjeIncrease /
+        # currentRjeDecrease / currentRjeIncrease / increaseMethod / investAmount /
+        # investMethod / priorAdjAje / priorAdjRje / verificationRef / verified）。
+        # 余 4 条全是 R2 结构差异：模板「出资金额(未审期初/期末)」与
+        # 「审定期初/期末」vs 前端 beginAmount / endAmount 的另一套语义，需业务裁决。
+        "auditedClosing", "auditedDecrease", "auditedIncrease", "auditedOpening",
     },
 }
 
@@ -108,8 +120,10 @@ _BASELINE_FRONTEND_ONLY: dict[tuple[str, str], set[str]] = {
         "beginBalance", "declaredAmount", "endAudited", "endBalance", "paidAmount",
     },
     ("M2", "M2DetailUnlistedRow"): {
-        "beginAmount", "decreaseReason", "endAmount", "idNumber", "idType",
-        "increaseReason", "investDate", "investType", "subscribedAmount",
+        # M2 非上市：2026-11-16 把 7 个「模板无此列」的纯 UI 派生键登记进 `_UI_ONLY_KEYS`
+        # 后，从 9 条降到 2 条 —— 余下这 2 条是 R2 结构差异
+        # （模板 C「出资金额」/ H「出资金额」↔ 前端 beginAmount / endAmount），需业务裁决。
+        "beginAmount", "endAmount",
     },
 }
 
@@ -294,4 +308,59 @@ def test_m1_ui_only_claim_covers_every_frontend_only_key() -> None:
         f"M1 有 {len(unaccounted)} 个前端键既不在 provider 声明、也不在 UI 豁免、"
         f"也不在棘轮基线里: {unaccounted}。\n"
         "每个键必须有明确归属：接 provider 真名 / 登记为模板无列的 UI 派生 / 进基线等裁决。"
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# M2（实收资本 · 非上市）的 `_UI_ONLY_KEYS` 可伪证断言
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 判据同 M1：该键在权威模板「明细表（非上市公司）M2-2」A~X 24 列里没有对应列。
+# 现算口径 = provider `CONFIG.sheets` 的 json_key 集合（24 条）。
+
+#: M2 非上市模板声明为「模板无对应列」的纯 UI 派生键。
+_M2_UI_ONLY_CLAIM = {
+    "investType", "idType", "idNumber",
+    "increaseReason", "decreaseReason", "subscribedAmount", "investDate",
+}
+
+
+def test_m2_ui_only_claims_have_no_provider_column() -> None:
+    """M2 那 7 个豁免键必须真的不在 provider 声明里（模板无对应列）。"""
+    provider = _provider_keys("phase5_m2_paid_in_capital")
+    overlap = sorted(_M2_UI_ONLY_CLAIM & provider)
+    assert not overlap, (
+        f"这些键被登记为「模板无对应列」但 provider 其实声明了: {overlap}。\n"
+        "说明模板确实有这一列 ⇒ 豁免是错的，必须挪回正常键名对账。"
+        "🔴 特别注意 `investType`：模板 B/F 列是 `investMethod` / `increaseMethod`，"
+        "不是它 —— 若 provider 某天真加了 `investType`，说明模板补了列。"
+    )
+
+
+def test_m2_ui_only_claim_matches_registered_ui_only_both_ways() -> None:
+    """M2 豁免声明与 `_UI_ONLY_KEYS` 必须**双向**一致（同 M1 的教训）。"""
+    missing = sorted(_M2_UI_ONLY_CLAIM - _UI_ONLY_KEYS)
+    assert not missing, (
+        f"这些键在 _M2_UI_ONLY_CLAIM 里但没进 _UI_ONLY_KEYS: {missing}"
+    )
+    m2_fe = _interface_keys(_FE / "useM2Detail.ts", "M2DetailUnlistedRow")
+    provider = _provider_keys("phase5_m2_paid_in_capital")
+    m2_ui_exempt = (m2_fe - provider) & _UI_ONLY_KEYS - _GENERIC_UI_ONLY_KEYS
+    unclaimed = sorted(m2_ui_exempt - _M2_UI_ONLY_CLAIM)
+    assert not unclaimed, (
+        f"这些键被 _UI_ONLY_KEYS 豁免但不在 _M2_UI_ONLY_CLAIM 声明里: {unclaimed}。\n"
+        "没进声明的豁免就是「夹带私货」，会让棘轮假性变短。"
+    )
+
+
+def test_m2_ui_only_claim_covers_every_frontend_only_key() -> None:
+    """M2 前端每个键必须有归属（接真名 / UI 豁免 / 进基线）。"""
+    fe = _interface_keys(_FE / "useM2Detail.ts", "M2DetailUnlistedRow")
+    provider = _provider_keys("phase5_m2_paid_in_capital")
+    unaccounted = sorted(
+        fe - provider - _UI_ONLY_KEYS - _BASELINE_FRONTEND_ONLY[("M2", "M2DetailUnlistedRow")]
+    )
+    assert not unaccounted, (
+        f"M2 有 {len(unaccounted)} 个前端键既不在 provider 声明、也不在 UI 豁免、"
+        f"也不在棘轮基线里: {unaccounted}"
     )
