@@ -185,6 +185,19 @@
             <!-- 业务页入口上下文（W6，ADR-AQL-20）：本次从哪个业务对象进来、解析出的科目、切换 / 返回 / 清除 -->
             <QueryEntryBanner :entry="queryEntry.entry.value" :meta="resultMeta" :can-go-back="queryEntry.canGoBack.value"
               :depth="queryEntry.depth.value" @switch="onEntrySwitch" @back="onEntryBack" @clear="onEntryClear" />
+            <!-- 信息条（AQF §8.2：结果区顶部显示范围 / 数据版本 / 采集时间 / 时效）。
+                 🔴 必须放在 QueryErrorAlert(v-if) / el-table(v-else-if) 这条链**之前** ——
+                 插在两者之间会打断 v-else-if 链，Vue 编译报「v-else/v-else-if has no adjacent v-if」。 -->
+            <QueryRunBanner
+              :run-info="evidence.runInfo.value"
+              :version="evidence.version.value"
+              :freshness="evidence.freshness.value"
+              :checking="evidence.checking.value"
+              :unavailable="Boolean(evidence.checkError.value)"
+              @check="evidence.checkFreshness()"
+              @requery="executeQuery()"
+              @open-drawer="evidenceDrawerVisible = true"
+            />
             <!-- 查询失败：持久显示中文原因与追踪号，不落到「暂无数据」（R11.1） -->
             <QueryErrorAlert v-if="queryError" :error="queryError" />
             <!-- 结果表格 -->
@@ -479,6 +492,7 @@ function onSortChange({ prop, order }: { prop?: string | null; order?: string | 
 // AQF §8：服务端历史与证据（替代本地 localStorage 历史）
 import { useQueryRunEvidence } from './useQueryRunEvidence'
 import QueryEvidenceDrawer from './QueryEvidenceDrawer.vue'
+import QueryRunBanner from './QueryRunBanner.vue'
 const evidence = useQueryRunEvidence('business')
 const evidenceDrawerVisible = ref(false)
 // 首次加载删除旧的本地历史键（R5.5）

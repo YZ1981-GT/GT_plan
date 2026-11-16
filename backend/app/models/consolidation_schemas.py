@@ -219,6 +219,13 @@ class EliminationEntryResponse(EliminationEntryBase):
         return value if isinstance(value, list) else []
 
 
+class EliminationReviewResponse(EliminationEntryResponse):
+    """抵销分录复核回执；审批落库与下游重算投递状态分开表达。"""
+
+    recalc_trigger: Literal["event_published", "event_failed", "not_applicable"] = "not_applicable"
+    recalc_notice: str | None = None
+
+
 class EliminationReviewAction(BaseModel):
     """抵消分录复核操作：submit 提交审批（草稿/已驳回 → 待审批）、approve 审批、reject 驳回、
     revoke 撤销审批（已审批 → 草稿；合并项目或其上层合并项目锁定时拒绝，spec consol-elimination-single-source-push 需求 8.2）。"""

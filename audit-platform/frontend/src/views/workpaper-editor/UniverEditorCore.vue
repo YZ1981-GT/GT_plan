@@ -23,6 +23,7 @@ import { useCrossModuleRefs } from '@/composables/useCrossModuleRefs'
 import { useUserOverrides } from '@/composables/useUserOverrides'
 import { useStaleImpact } from '@/composables/useStaleImpact'
 import { type SheetNavFacadeAPI } from '@/composables/useSheetNavFacade'
+import { useWorkpaperDraftAccessor } from '@/composables/workpaper/workpaperDraftOverlay'
 import { resolveSheetNameByDeepLink } from '@/utils/normalizeSheetName'
 import { eventBus } from '@/utils/eventBus'
 import type { WorkpaperDetail } from '@/services/workpaperApi'
@@ -33,6 +34,7 @@ import SheetTopTabs from '@/components/workpaper/SheetTopTabs.vue'
 import GtLoadingOverlay from '@/components/common/GtLoadingOverlay.vue'
 import CycleTriggerPanel from './CycleTriggerPanel.vue'
 import EditorStatusBar, { type SmartTipData } from './EditorStatusBar.vue'
+import { serializeUniverDraft } from './univerDraftContent'
 
 // ─── Props & Emits ──────────────────────────────────────────────────────────
 
@@ -165,6 +167,32 @@ watch(editRevision, () => {
   markSaveEdited()
   autoSave.markDirty()
 }, { flush: 'sync' })
+
+// ─── AI 面板：未保存草稿访问器（spec chat-host-draft-overlay Task 4）─────────
+//
+// 两个值都交给 `useWorkpaperDraftAccessor` 统一登记：
+// * `isDirty` —— 就是上面的 `dirty`（`useEditorUniver` 按 DIRTY_COMMAND_PATTERNS 逐条置真，
+//   保存成功由 `useEditorSave` 置假），不另建一套标记；
+// * 基线版本 —— `props.wpDetail.updated_at`。`useWorkpaperDraftAccessor` 只取**首次非空**的
+//   那一个并永久冻结：保存会刷新 `wpDetail`（`refreshDetail()`），跟着变就等于关掉过期检测。
+//
+// `collectContent` 在**没有未保存修改时返回 null**（任务正文），所以面板拿到的永远是
+// 「改了但没保存」的那份正文。
+useWorkpaperDraftAccessor({
+  wpId: () => props.wpId,
+  currentBusinessVersion: () => props.wpDetail?.updated_at ?? null,
+  isDirty: () => dirty.value === true,
+  collectContent: () => {
+    const workbook = univerAPI.value?.getActiveWorkbook?.()
+    if (!workbook) return null
+    try {
+      return serializeUniverDraft(workbook.getSnapshot?.())
+    } catch {
+      // 取不到快照 ⇒ 不提供草稿（而不是提供一份可能过时的）。面板据此退回「未纳入」文案。
+      return null
+    }
+  },
+})
 
 // ─── saved 事件 → Shell 刷新 wpDetail ───────────────────────────────────────
 

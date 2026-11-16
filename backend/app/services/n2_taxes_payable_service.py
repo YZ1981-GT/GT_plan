@@ -242,8 +242,26 @@ def validate_liability_direction(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-async def get_tb_data(project_id: str, db: Any) -> dict[str, Any]:
-    """从 tb_balance 取科目2221应交税费余额数据（负债类/贷方）
+async def _resolve_tb_year(project_id: str, db: Any, year: int | None) -> int:
+    """解析 TB 读取年度；无法确定年度时显式失败，不能静默查成空。"""
+    if year is not None:
+        return int(year)
+
+    from app.services.project_audit_year import fetch_project_audit_year
+
+    resolved = await fetch_project_audit_year(db, project_id)
+    if resolved is None:
+        raise ValueError(f"项目未设置审计年度，无法读取 TB：{project_id}")
+    return resolved
+
+
+async def get_tb_data(
+    project_id: str, db: Any, year: int | None = None
+) -> dict[str, Any]:
+    """从 tb_balance 取科目2221应交税费余额数据（负债类/贷方）。
+
+    ``begin_balance`` / ``end_balance`` 是兼容 payload 键；数据库真实列为
+    ``opening_balance`` / ``closing_balance``，并通过 label 保留外部契约。
 
     Requirements: 12.2
     """
@@ -264,17 +282,19 @@ async def get_tb_data(project_id: str, db: Any) -> dict[str, Any]:
     }
 
     try:
-        active_filter = get_active_filter(project_id)
+        resolved_year = await _resolve_tb_year(project_id, db, year)
+        active_filter = await get_active_filter(
+            db, TbBalance.__table__, project_id, resolved_year, strict=True
+        )
         stmt = (
             sa.select(
-                TbBalance.begin_balance,
+                TbBalance.opening_balance.label("begin_balance"),
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
-                TbBalance.end_balance,
+                TbBalance.closing_balance.label("end_balance"),
             )
             .where(
-                TbBalance.project_id == str(project_id),
-                TbBalance.standard_account_code == _N2_ACCOUNT_CODE,
+                TbBalance.account_code == _N2_ACCOUNT_CODE,
                 active_filter,
             )
             .limit(1)
@@ -287,7 +307,8 @@ async def get_tb_data(project_id: str, db: Any) -> dict[str, Any]:
             result["end_balance"] = _parse_num(row.end_balance)
             result["found"] = True
     except Exception as e:  # noqa: BLE001
-        logger.warning("N2 service: TB 取数失败 project_id=%s: %s", project_id, e)
+        logger.exception("N2 service: TB 取数失败 project_id=%s: %s", project_id, e)
+        raise
 
     return result
 
@@ -373,7 +394,8 @@ async def get_cross_wp_summary(project_id: str, db: Any) -> dict[str, Any]:
                 tax_accruals[tax_type] = amount
 
     except Exception as e:  # noqa: BLE001
-        logger.warning("N2 service: 跨底稿合计查询失败: %s", e)
+        logger.exception("N2 service: 跨底稿合计查询失败: %s", e)
+        raise
 
     total = sum(tax_accruals.values())
     return {

@@ -79,9 +79,9 @@ async def trigger_push(
     except (OperationBoundaryError, OperationConflict, ValueError) as exc:
         await db.rollback()
         raise _operation_error(exc) from exc
-    from app.workers.consol_operation_worker import wake
+    from app.core.worker_wakeup import wake_worker
 
-    wake()
+    wake_worker("consol_operation_worker")
     operation = requested.operation
     newly_queued = requested.disposition == "created"
     return {

@@ -187,38 +187,6 @@
     ],
     "reason": "R2 待裁：K2-3 前端分录行是「借方科目 / 贷方科目」分列（一行两科目，K2-5 / K2-6 推送也按此格式），模板是一行一个科目（科目名称 + 借方 / 贷方调整金额），且有 类别 / 报表项目 / 索引列；改成单科目行要迁移已存分录并改推送格式，先不改契约（K3 ~ K7 已按模板补列，批 B2c）"
   },
-  "l4.bonds_payable|L4-3-rows": {
-    "fields": [
-      "ajeDecreaseAmount",
-      "ajeDecreaseQty",
-      "ajeIncreaseAmount",
-      "ajeIncreaseQty",
-      "auditedDecreaseAmount",
-      "auditedDecreaseQty",
-      "auditedEndQty",
-      "auditedIncreaseAmount",
-      "auditedIncreaseQty",
-      "auditedPriorAmount",
-      "auditedPriorQty",
-      "priorAjeAmount",
-      "priorAjeQty",
-      "priorRjeAmount",
-      "priorRjeQty",
-      "rjeDecreaseAmount",
-      "rjeDecreaseQty",
-      "rjeIncreaseAmount",
-      "rjeIncreaseQty",
-      "unauditedDecreaseAmount",
-      "unauditedDecreaseQty",
-      "unauditedEndAmount",
-      "unauditedEndQty",
-      "unauditedIncreaseAmount",
-      "unauditedIncreaseQty",
-      "unauditedPriorAmount",
-      "unauditedPriorQty"
-    ],
-    "reason": "任务 9.2（批 D）：L4-3 金融负债工具明细表契约字段名整体与前端不同（数量 / 金额 × 未审 / 调整 / 审定）"
-  },
   "m1.dividends_payable|placeholder": {
     "fields": [
       "aging",

@@ -38,7 +38,7 @@
   --el-color-danger: var(--gt-color-coral);
   --el-color-info: var(--gt-color-teal);
   --el-border-radius-base: var(--gt-radius-sm);
-  --el-font-size-base: var(--gt-font-size-base);
+  --el-font-size-base: var(--gt-display-font-size, var(--gt-font-size-base));
   --el-font-family: var(--gt-font-family);
   --el-border-color: var(--gt-color-border);
   --el-border-color-light: var(--gt-color-border-light);
@@ -52,7 +52,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
-  font-size: var(--gt-font-size-base);
+  font-size: var(--gt-display-font-size, var(--gt-font-size-base));
   line-height: var(--gt-line-height-base);
   scroll-behavior: smooth;
 }
@@ -81,7 +81,7 @@ body {
 
 .el-table th.el-table__cell {
   font-weight: 600;
-  font-size: var(--gt-font-size-sm);
+  font-size: var(--gt-display-font-size, var(--gt-font-size-sm));
   letter-spacing: 0.3px;
   text-transform: none;
   border-bottom: 2px solid #e8e4f0 !important;
@@ -90,7 +90,7 @@ body {
 }
 
 .el-table td.el-table__cell {
-  font-size: var(--gt-font-size-sm);
+  font-size: var(--gt-display-font-size, var(--gt-font-size-sm));
   transition: background-color var(--gt-transition-fast);
 }
 

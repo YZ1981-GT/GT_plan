@@ -6,7 +6,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, nextTick } from 'vue'
 
 const mockGet = vi.fn()
 vi.mock('@/services/apiProxy', () => ({
@@ -15,7 +15,7 @@ vi.mock('@/services/apiProxy', () => ({
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 // vi.mock 工厂会被提升到文件顶部：桩组件的构造放进 vi.hoisted
-const { passthrough } = vi.hoisted(() => ({
+const { passthrough, previewDrawer } = vi.hoisted(() => ({
   passthrough: async (name: string) => {
     const vue = await import('vue')
     return {
@@ -27,9 +27,26 @@ const { passthrough } = vi.hoisted(() => ({
       }),
     }
   },
+  previewDrawer: async () => {
+    const vue = await import('vue')
+    return {
+      default: vue.defineComponent({
+        name: 'AttachmentPreviewDrawerStub',
+        props: { modelValue: Boolean, attachment: Object },
+        emits: ['update:modelValue'],
+        setup(props, { emit }) {
+          return () => props.modelValue
+            ? vue.h('div', { class: 'AttachmentPreviewDrawer-stub', 'data-attachment': props.attachment?.name }, [
+                vue.h('button', { type: 'button', 'data-testid': 'preview-close', onClick: () => emit('update:modelValue', false) }, '关闭预览'),
+              ])
+            : null
+        },
+      }),
+    }
+  },
 }))
 vi.mock('@/components/workpaper/AttachmentDropZone.vue', () => passthrough('AttachmentDropZone'))
-vi.mock('@/components/common/AttachmentPreviewDrawer.vue', () => passthrough('AttachmentPreviewDrawer'))
+vi.mock('@/components/common/AttachmentPreviewDrawer.vue', () => previewDrawer())
 vi.mock('@/components/attachment/OcrConfirmDialog.vue', () => passthrough('OcrConfirmDialog'))
 
 import AttachmentTabPanel from '../AttachmentTabPanel.vue'
@@ -100,19 +117,58 @@ describe('AttachmentTabPanel', () => {
     expect(mockGet).toHaveBeenCalledTimes(2)
   })
 
-  it('关联底稿清单取失败时提示，下次悬停重试', async () => {
-    mockGet
-      .mockResolvedValueOnce(VIEW)
-      .mockRejectedValueOnce(new Error('500'))
-      .mockResolvedValueOnce([{ wp_id: 'w1', wp_code: 'D4-2', wp_name: '合同检查' }])
+  it('主列表失败不伪装成空态，重试后可恢复并带取消边界', async () => {
+    const pending = new Promise<never>(() => {})
+    mockGet.mockImplementationOnce(() => pending)
     const wrapper = mount(AttachmentTabPanel, { props: { projectId: 'p1', wpId: 'w1' }, global: { stubs } })
     await flushPromises()
-    const popover = wrapper.find('.popover-stub')
-    await popover.trigger('mouseenter')
+    const signal = mockGet.mock.calls[0][1].signal as AbortSignal
+    expect(signal).toBeInstanceOf(AbortSignal)
+    wrapper.unmount()
+    expect(signal.aborted).toBe(true)
+
+    mockGet.mockReset()
+    mockGet.mockRejectedValueOnce(Object.assign(new Error('500'), { response: { status: 500 } }))
+    const retryWrapper = mount(AttachmentTabPanel, { props: { projectId: 'p1', wpId: 'w1' }, global: { stubs } })
     await flushPromises()
-    expect(popover.text()).toContain('关联底稿加载失败')
-    await popover.trigger('mouseenter')
+    expect(retryWrapper.find('[data-testid="attachment-tab-load-error"]').exists()).toBe(true)
+    expect(retryWrapper.text()).toContain('关联附件加载失败')
+    expect(retryWrapper.text()).not.toContain('暂无关联附件')
+    mockGet.mockResolvedValueOnce(VIEW)
+    await retryWrapper.find('[data-testid="attachment-tab-retry"]').trigger('click')
     await flushPromises()
-    expect(popover.text()).toContain('D4-2')
+    expect(retryWrapper.text()).toContain('合同.pdf')
+  })
+
+  it('附件名称按钮支持 Enter/Space，关闭预览后焦点回到触发按钮', async () => {
+    mockGet.mockResolvedValueOnce(VIEW)
+    const wrapper = mount(AttachmentTabPanel, {
+      props: { projectId: 'p1', wpId: 'w1' },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    const name = wrapper.find('button.gt-attach-tab__name')
+    expect(name.attributes('type')).toBe('button')
+    expect(name.attributes('aria-label')).toBe('预览附件 合同.pdf')
+    expect(name.attributes('title')).toBe('预览 合同.pdf')
+    expect(wrapper.find('.gt-attach-tab__item').attributes('role')).toBeUndefined()
+    ;(name.element as HTMLElement).focus()
+
+    await name.trigger('keydown', { key: 'ArrowDown' })
+    expect(wrapper.find('[data-testid="preview-close"]').exists()).toBe(false)
+
+    await name.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.find('[data-attachment="a1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="preview-close"]').exists()).toBe(true)
+    const close = wrapper.find('[data-testid="preview-close"]')
+    ;(close.element as HTMLElement).focus()
+    await close.trigger('click')
+    await nextTick()
+    expect(document.activeElement).toBe(name.element)
+
+    await name.trigger('keydown', { key: ' ' })
+    expect(wrapper.find('[data-testid="preview-close"]').exists()).toBe(true)
+    wrapper.unmount()
   })
 })

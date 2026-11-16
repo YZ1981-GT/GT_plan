@@ -32,6 +32,8 @@ _Requirements: 1.6, 9.5, 11.1, 11.2_
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import logging
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import asdict, dataclass, field, replace
@@ -59,6 +61,9 @@ from app.services.custom_query.pagination import (
     validate_pagination,
 )
 from app.services.custom_query.query_cache import QueryCache, query_cache
+
+if TYPE_CHECKING:
+    from app.services.custom_query.version_capture import VersionVector
 
 logger = logging.getLogger(__name__)
 
@@ -443,7 +448,10 @@ class QueryOrchestrator:
                 scope={"project_id": req.project_id, "year": req.year},
                 acnr_targets=acnr_targets,
             )
-            req.version_hash = version_vector.hash
+            # 🔴 字段名是 `vector_hash`（VersionVector 的定义，见 version_capture.py）；
+            # 曾写成 `version_vector.hash` ⇒ AttributeError 被下面的 except 静默吞掉，
+            # 表现为 result.version 有值但 req.version_hash 恒 None、运行记录永远「未采集到版本向量」。
+            req.version_hash = version_vector.vector_hash
         except Exception as _ve:
             logger.debug("AQF 版本采集失败，降级为无版本查询: %s", _ve)
 

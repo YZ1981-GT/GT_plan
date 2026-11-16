@@ -4,9 +4,24 @@
 确保 D~N 循环全部底稿主入口组件已接入版本链（useWorkpaperVersionToolbar +
 GtWpVersionTrail），防止新增底稿遗漏集成。
 
-检测两个必备标记：
-  1. useWorkpaperVersionToolbar — composable 导入或调用
-  2. GtWpVersionTrail — template 中挂载版本轨迹组件
+检测**任一**合规接入形态（三种，实测三种都存在过）：
+
+  A. **共享 runtime 注入（当前主流，88/88 全用这个）**
+     组件 `inject(WorkpaperRuntimeContextKey)` 后取 `runtime?.version.*`。
+     版本能力由 `useWorkpaperScaffold()` 一处 `useWorkpaperVersionToolbar({...})`
+     创建、`provide(WorkpaperRuntimeContextKey, runtime)` 下发
+     （见 useWorkpaperScaffold.ts L88 `version: ReturnType<typeof ...>` /
+     L186 真实调用 / L262 provide）。这是更优的架构：一处创建、多处复用，
+     不会给 N 个组件各建一份 composable 实例。
+
+  B. 直接调用 `useWorkpaperVersionToolbar(...)`
+
+  C. template 中挂载 `<GtWpVersionTrail />`
+
+\U0001f534 2026-11-14 判据修正：原实现只认 B / C 两种**字面量标记**，把 A 这一
+主流形态判成「未接入」—— 于是 88 个 D~N 主入口全部报违规、`--strict` 从引入起
+就恒红（governance-checks.yml 的注释还写着「当前全树已接入，直接 strict 阻断新增
+违规」，与实际严重不符）。现改为三种形态任一即合规，并保留「完全无标记」的真判据。
 
 用法：
   python backend/scripts/check/check_wp_version_trail.py            # 报告模式（退出码 0）
@@ -41,6 +56,10 @@ _RE_MAIN_ENTRY = re.compile(r"^Gt[D-N]\d+.*\.vue$")
 # ─── 必备标记 ─────────────────────────────────────────────────────────────────
 MARKER_COMPOSABLE = "useWorkpaperVersionToolbar"
 MARKER_COMPONENT = "GtWpVersionTrail"
+#: 共享 runtime 注入形态（当前主流）：组件 inject 上下文后取 `version.*`。
+#: 两段都要出现才算 —— 只 inject 上下文但没取 version 能力的不算接入。
+MARKER_RUNTIME_CONTEXT = "WorkpaperRuntimeContextKey"
+MARKER_RUNTIME_VERSION = "version"
 
 
 def load_whitelist(path: Path) -> set[str]:
@@ -78,6 +97,21 @@ def scan_file(path: Path) -> tuple[bool, bool]:
     has_composable = MARKER_COMPOSABLE in content
     has_component = MARKER_COMPONENT in content
     return (has_composable, has_component)
+
+
+def has_runtime_inject(path: Path) -> bool:
+    """共享 runtime 注入形态：`inject(WorkpaperRuntimeContextKey)` 且取过 `version.*`。
+
+    \U0001f534 两段都必须现读命中：只 import Key 但没取 version 能力（例如只用了
+    review / reload）不算接入 —— 那是本判据最容易退化成恒真的地方。
+    """
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError):
+        return False
+    if MARKER_RUNTIME_CONTEXT not in content:
+        return False
+    return bool(re.search(r"runtime\??\.version\b|\.version\.versionTrailRef\b", content))
 
 
 def find_main_entries(wp_dir: Path) -> list[Path]:
@@ -124,8 +158,10 @@ def main() -> int:
             continue
 
         has_composable, has_component = scan_file(entry)
+        # 形态 A：共享 runtime 注入（当前主流，88/88 用这个）
+        runtime_ok = has_runtime_inject(entry)
 
-        if has_composable and has_component:
+        if (has_composable and has_component) or (runtime_ok and has_component) or runtime_ok:
             compliant += 1
             continue
 
@@ -152,12 +188,16 @@ def main() -> int:
             print(f"  {rel}  [缺少 {missing_desc}]")
         print()
         print(
-            "修复：参照 GtD2AccountsReceivable.vue 执行 5 步标准接入\n"
-            "  1. import useWorkpaperVersionToolbar + defineAsyncComponent GtWpVersionTrail\n"
-            "  2. call composable(wpId, projectId)\n"
-            "  3. 保存成功后 scheduleAutoSnapshot()\n"
-            "  4. template 末尾 mount <GtWpVersionTrail />\n"
-            "  5. provide versionTrailRef + openVersionHistory"
+            "修复（推荐形态 A：共享 runtime 注入）：\n"
+            "  1. import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'\n"
+            "  2. const runtime = inject(WorkpaperRuntimeContextKey, null)\n"
+            "  3. const versionTrailRef = runtime?.version.versionTrailRef ?? ref(null)\n"
+            "     const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)\n"
+            "     const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)\n"
+            "  4. 保存成功后调 scheduleAutoSnapshot()\n"
+            "  5. template 挂 <GtWpVersionTrail :workpaper-id :project-id />\n"
+            "  6. provide('<cycle>VersionTrailRef', versionTrailRef) 给子对话框用\n"
+            "版本能力由 useWorkpaperScaffold() 一处创建并 provide，不要在组件里重复 new。"
         )
 
         if args.strict:

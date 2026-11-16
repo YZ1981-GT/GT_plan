@@ -51,13 +51,24 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
+
+interface ConfirmationAICheck {
+  id: string
+  check_type: string
+  risk_level: string
+  check_result: Record<string, unknown>
+  human_confirmed: boolean
+  confirmed_by?: string
+}
 
 // 桩实现 — 函证 AI 审核后端端点尚未就绪
 const confirmationAIApi = {
-  runChecks: (_listId: string | null, _types: string[]) => Promise.resolve({ data: [] as any[] }),
-  confirm: (_checkId: string, _payload: { confirmed: boolean }) => Promise.resolve({ data: {} }),
+  runChecks: (_listId: string | null, _types: string[]): Promise<{ data: ConfirmationAICheck[] }> =>
+    Promise.resolve({ data: [] as ConfirmationAICheck[] }),
+  confirm: (_checkId: string, _payload: { confirmed: boolean }): Promise<{ data: unknown }> =>
+    Promise.resolve({ data: {} }),
 }
 
 const props = defineProps({
@@ -67,7 +78,7 @@ const props = defineProps({
 
 const checkType = ref('')
 const running = ref(false)
-const results = ref([])
+const results = ref<ConfirmationAICheck[]>([])
 
 async function runChecks() {
   running.value = true
@@ -82,24 +93,37 @@ async function runChecks() {
   }
 }
 
-async function confirmCheck(r) {
+async function confirmCheck(r: ConfirmationAICheck) {
   await confirmationAIApi.confirm(r.id, { confirmed: true })
   r.human_confirmed = true
   r.confirmed_by = 'current_user'
 }
 
-async function rejectCheck(r) {
+async function rejectCheck(r: ConfirmationAICheck) {
   await confirmationAIApi.confirm(r.id, { confirmed: false })
   r.human_confirmed = true
   r.confirmed_by = 'current_user'
   r.risk_level = 'high'
 }
 
-function checkTypeLabel(t) {
-  return { address_verify: '地址验证', reply_ocr: '回函OCR', amount_compare: '金额比对', seal_check: '印章检查' }[t] || t
+function checkTypeLabel(t: string): string {
+  const labels: Record<string, string> = {
+    address_verify: '地址验证',
+    reply_ocr: '回函OCR',
+    amount_compare: '金额比对',
+    seal_check: '印章检查'
+  }
+  return labels[t] || t
 }
-function riskLabel(r) {
-  return { high: '🔴 高风险', medium: '🟡 中风险', low: '🟢 低风险', pass: '✅ 通过' }[r] || r
+
+function riskLabel(r: string): string {
+  const labels: Record<string, string> = {
+    high: '🔴 高风险',
+    medium: '🟡 中风险',
+    low: '🟢 低风险',
+    pass: '✅ 通过'
+  }
+  return labels[r] || r
 }
 </script>
 

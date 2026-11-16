@@ -84,3 +84,17 @@
 - [x] 23. 浏览器实测（127.0.0.1:3030）：报表页 /api 全 200、附注列编号、切年度写 `?year=&tab=` 并按新年度取数、console error 0；项目树标签无 warn；版本链抽屉 5 条快照、「历史版本」页签走 `/version-archives`（全库 `wp_version_archive` 0 行，空数组为真实状态）；工时预算对比；公式管理四宿主首次打开才加载；D2 能力快照 1 次请求
 - [ ]* 23a. A16 推荐标记、A18-2 导出的界面走查：只在页面内调接口验证（A16 推荐 A16-1、A18-2 检查 4 项未填、导出 17,965 字节 docx）；打开真实项目底稿会占编辑锁，未做界面层。**不单独验收**，结论引用任务 28（requirements R13.1）
 - [x] 24. 更新本 spec 证据、INDEX（第 6 行）、memory（1 行，共 300 行）；删仓库外探针目录与基线 worktree；待裁决项见 design §8
+> **2026-11-14 勘误（上一条 2026-11-11 勘误已过期，append-only，原勾选与原文均不改）**：用户「整体分析下未归档完成的 spec，逐一修复完成」时对该条逐句现算复核，**「任务 26 / 27 的产物不在当前分支」这一判断已不成立**。
+> - 三个守卫**全部在库且已被跟踪**，同一提交 `d7d7515f5`（`chore(root): 同步隔离树改动并清理临时产物`）入库：`src/__tests__/apiPathPrefixGuard.spec.ts`、`src/components/workpaper/__tests__/k10OcrContract.spec.ts`、`src/components/workpaper/composables/__tests__/iCycleDualModeHealth.spec.ts`；`GtRegulatoryLetter.requests.spec.ts` 亦在库。
+> - 统一探针 `fetchOnlyOfficeHealthy` 有**生产定义**：`src/components/workpaper/sync/onlyOfficeHealth.ts`，被 20+ 个 `useXxDualMode` 引用（`useI1DualMode` / `useI3DualMode` / `useK10DualMode` / `useN1DualMode` / `useD4SyncMode` / `useHSyncMode` / `useARenderModeSwitch` 等）。
+> - 「HEAD 现扫仍不带 /api 的 7 组 / 13 处」**现算为 0 处**。复核口径按 memory 铁律 ㉖（注释会骗过文本扫描器）：先把 `/* */` `//` `<!-- -->` 换成等量空格再扫。首版探针（不剔注释）命中 2 处，逐处现读**全在注释里**——`useFirstLoad.ts:8` 是 JSDoc 用法示例 `useFirstLoad(() => api.get('/items'))`，`useE1Adjudication.ts:538` 是说明「原写 `/projects/{pid}/trial-balance/writeback` 已消除该反模式」的历史注释。
+> - 任务 28 记录的五个阻断点**逐项现算均已修复**（同一剔除注释的探针）：
+>   | 阻断点 | 当时记录 | 2026-11-14 现算 |
+>   |---|---|---|
+>   | I1 / I3~I6 在线编辑切换 | 请求 `/workpapers/onlyoffice/health`（无 /api，拿到首页 HTML ⇒ 恒判不健康） | 走 `fetchOnlyOfficeHealthy()` 统一探针，**代码内无任何字面量路径**（`/api` 前缀在 `onlyOfficeHealth.ts` 里一处收口） |
+>   | H3 划转 / 抵押勾稽 | 请求 `/custom-query/wp-id-by-code`（无 /api） | 两处均已是 `/api/custom-query/wp-id-by-code`（各 1 处，非 /api 形态 0） |
+>   | K10 其他收益 / 应收补助识别 | `POST /d4/contract-ocr`（404） | 两处均已是 `/api/workpapers/${wpId}/d4/contract-ocr`（各 1 处，非 /api 形态 0），并按底稿挂载 |
+>   | A18-2 检查 / 导出入口 | 修在 `GtRegulatoryLetter` 而实际组件是 `GtA182RegulatoryCommunication` | 实际组件 `GtA182RegulatoryCommunication.vue` 已含 `export-word` 请求（`/api` 形态 1、非 /api 0），即「修在用户看到的组件上」这一项已补 |
+>   | A16 推荐标记 | `GtA16Bundle` 只显示存在 `A16-1`~`A16-7` 子底稿的页签 ⇒ 页签全空 | 未在本轮复核范围（属界面层，需【测试】项目里有 A16 子底稿才能验；`api-prefix-fix-recovery` 任务 5 已补「子底稿缺失时的空态」） |
+> - ⇒ **任务 26 / 27 的交付状态已具备分支级证据**（在库 + 可执行守卫 + 剔除注释后 0 处缺失前缀），原「不计入完成度」的处置不再成立。任务 28 的**代码侧**五条阻断全部消除；剩下的只是**界面走查**本身（需在【测试】项目里按平台路径生成 A16 子底稿后逐项点开），因此仍保持 `[ ]*`，但阻断原因由「产物不在分支」更正为「仅缺界面层实测与 A16 子底稿数据」。
+> - 复核方法留痕：探针 `tmp_spec_audit/probe_api_prefix_ast.py`（全仓剔注释扫描）、`tmp_spec_audit/probe_residual_task28.py`（不剔注释，用于对照假阳）、`tmp_spec_audit/probe_residual_task28_strict.py`（剔注释，出上表数据）。

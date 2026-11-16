@@ -75,6 +75,13 @@ def _parse_num(v: Any) -> float:
         return 0.0
 
 
+def _require_year(ctx: RenderContext) -> int:
+    """渲染取数必须有项目审计年度，缺失时显式失败而不是查 year=0。"""
+    if ctx.year is None:
+        raise ValueError("N3 取数缺少有效审计年度")
+    return int(ctx.year)
+
+
 # ─── TB 取数（负债类！期末余额）──────────────────────────────────────────────
 
 
@@ -115,7 +122,7 @@ async def _fetch_tb_data(
     }
     try:
         active_filter = await get_active_filter(
-            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year or 0
+            ctx.db, TbBalance.__table__, ctx.project_id, _require_year(ctx)
         )
         all_rows = (
             await ctx.db.execute(
@@ -148,7 +155,8 @@ async def _fetch_tb_data(
         for k in ("begin_balance", "debit_amount", "credit_amount", "end_balance"):
             result[k] = round(result[k], 2)
     except Exception as e:  # noqa: BLE001
-        logger.warning("N3 render: TB 取数失败: %s", e)
+        logger.exception("N3 render: TB 取数失败: %s", e)
+        raise RuntimeError("N3 试算表取数失败") from e
     return result
 
 
@@ -167,7 +175,7 @@ async def _build_adjudication_prefill(
     ]
     try:
         active_filter = await get_active_filter(
-            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year or 0
+            ctx.db, TbBalance.__table__, ctx.project_id, _require_year(ctx)
         )
         rows = (
             await ctx.db.execute(
@@ -182,9 +190,9 @@ async def _build_adjudication_prefill(
                 )
             )
         ).fetchall()
-    except Exception as e:  # noqa: BLE001 — 预填失败按空处理，不阻塞渲染
-        logger.warning("N3 render: 审定表预填 tb_balance 查询失败: %s", e)
-        return {}
+    except Exception as e:  # noqa: BLE001
+        logger.exception("N3 render: 审定表预填 tb_balance 查询失败: %s", e)
+        raise RuntimeError("N3 审定表预填取数失败") from e
 
     roots = {str(c).strip() for c in codes if "~" not in str(c)}
     subs = leaf_rows([r for r in rows if (r.account_code or "").strip() not in roots])

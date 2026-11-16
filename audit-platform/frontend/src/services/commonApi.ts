@@ -1700,10 +1700,9 @@ export async function checkUnconfirmedAI(projectId: string, wpId: string): Promi
 }
 
 // ── LLM 底稿对话 ──
-
-export function wpChatSSE(wpId: string, message: string, context?: Record<string, any>) {
-  return http.post(P_wpai.chat(wpId), { message, context }, { responseType: 'stream' })
-}
+// 🔴 `wpChatSSE` 已于 2026-11-15 删除（spec llm-linkage-audit-practice-closure 任务 15）：
+// 它指向旧链路 `/{wp_id}/ai/chat`，唯一消费方 `AiAssistantSidebar.vue` 已零挂载并被删除。
+// 现役底稿对话统一走 `PlatformAiChatPanel` + `usePlatformAiChat`（单一 ContextPlan）。
 
 export async function generateLedgerAnalysis(projectId: string, body: { account_codes?: string[]; year?: number }): Promise<any> {
   const { data } = await http.post(P_wpai.generateLedgerAnalysis(projectId), body)

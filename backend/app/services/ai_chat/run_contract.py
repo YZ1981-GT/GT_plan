@@ -62,6 +62,11 @@ from app.services.ai_chat.contracts import (
     HostRef,
     ResourceType,
 )
+from app.services.ai_chat.draft_overlay import (
+    DRAFT_OVERLAY_HOST_TYPES,
+    MAX_DRAFT_OVERLAY_CHARS,
+    DraftOverlayRef,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +94,10 @@ __all__ = [
     "MAX_MENTIONS_PER_RUN",
     "MAX_ATTACHMENTS_PER_RUN",
     "MAX_QUERY_CHARS",
+    "MAX_DRAFT_OVERLAY_CHARS",
+    "DRAFT_OVERLAY_HOST_TYPES",
     "PRIVILEGED_REQUEST_FIELDS",
+    "DraftOverlayRef",
     "MentionRef",
     "ChatRunRequest",
     "ChatRunAccepted",
@@ -448,6 +456,21 @@ MAX_MENTIONS_PER_RUN = 20
 MAX_ATTACHMENTS_PER_RUN = 10
 MAX_QUERY_CHARS = 4000
 
+#: ``PRIVILEGED_REQUEST_FIELDS`` 的**唯一**豁免路径（完整键路径，不含通配）。
+#:
+#: ``content`` / ``content_hash`` 之所以在越权清单里，是因为"消息正文 / 资源正文由服务端
+#: 签发，客户端不得提交"。而 ``draft_overlay.content`` 恰恰是服务端**拿不到**的东西 ——
+#: 未保存正文只存在于编辑器内存里（design B5），必须由前端提交，否则本 spec 无法成立。
+#: 因此这里开一条**窄到键路径**的豁免：只在 ``draft_overlay`` 这一层放行这两个键，
+#: 顶层、``host`` / ``mentions`` 内、以及更深的嵌套一律照旧拒绝。
+_PRIVILEGED_EXEMPT_PATHS: frozenset[tuple[str, ...]] = frozenset(
+    {
+        ("draft_overlay", "content"),
+        # 客户端自算 hash 只用于诊断比对，服务端一律重算（见 ``DraftOverlayRef``）。
+        ("draft_overlay", "content_hash"),
+    }
+)
+
 #: 客户端**不得**提交的字段名（Req 4.2 / NFR-3 数据最小化）。
 #:
 #: 四类越权：
@@ -508,24 +531,36 @@ PRIVILEGED_REQUEST_FIELDS: frozenset[str] = frozenset(
 _PRIVILEGED_SCAN_MAX_DEPTH = 6
 
 
-def _scan_privileged(node: Any, depth: int = 0) -> set[str]:
+def _scan_privileged(
+    node: Any, depth: int = 0, path: tuple[str, ...] = ()
+) -> set[str]:
     """递归找出请求体里出现的越权字段名。
 
     必须递归：把 ``content`` 藏在 ``host`` 或 ``mentions[0]`` 里同样是越权提交，
     而 pydantic 对嵌套 stdlib dataclass 默认忽略多余键 —— 只查顶层会漏。
+
+    ``path`` 是到达当前节点的**键路径**，只用于判断 :data:`_PRIVILEGED_EXEMPT_PATHS`
+    的窄豁免（``draft_overlay.content`` 是前端唯一有权提交的正文）。豁免只按完整路径
+    命中，不做通配：顶层 ``content``、``host.content`` 仍然被拒。
     """
     if depth > _PRIVILEGED_SCAN_MAX_DEPTH:
         return set()
     found: set[str] = set()
     if isinstance(node, Mapping):
         for key, value in node.items():
-            if isinstance(key, str) and key in PRIVILEGED_REQUEST_FIELDS:
+            child_path = (*path, key) if isinstance(key, str) else path
+            if (
+                isinstance(key, str)
+                and key in PRIVILEGED_REQUEST_FIELDS
+                and child_path not in _PRIVILEGED_EXEMPT_PATHS
+            ):
                 found.add(key)
-            found |= _scan_privileged(value, depth + 1)
+            found |= _scan_privileged(value, depth + 1, child_path)
     elif isinstance(node, (list, tuple, set)):
         for item in node:
-            found |= _scan_privileged(item, depth + 1)
+            found |= _scan_privileged(item, depth + 1, path)
     return found
+
 
 
 class MentionRef(BaseModel):
@@ -589,6 +624,13 @@ class ChatRunRequest(BaseModel):
     sheet_name: str | None = Field(
         None, max_length=200, description="复核模式的目标 sheet"
     )
+    draft_overlay: DraftOverlayRef | None = Field(
+        None,
+        description=(
+            "当前未保存草稿（可选）；缺省 None 表示不纳入，行为与既有完全一致。"
+            "第一批只支持底稿宿主，正文按不可信内容处理且不落库"
+        ),
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -611,8 +653,40 @@ class ChatRunRequest(BaseModel):
             raise ValueError(f"单次对话最多引用 {MAX_ATTACHMENTS_PER_RUN} 个附件")
         return self
 
+    @model_validator(mode="after")
+    def _overlay_must_bind_to_this_host(self) -> "ChatRunRequest":
+        """``draft_overlay`` 只能绑定**本次请求自己的**宿主。
+
+        不允许借 overlay 把别的宿主（哪怕同项目）的正文塞进本轮上下文：那会让
+        "已授权宿主"这一前提失效 —— 鉴权过的是 ``host``，内容却来自别处。
+
+        这里只做**身份一致**校验；``baseline_version`` 是否仍是当前版本由
+        ``context_plan`` 在装配时核对（需要读库，不能放在请求解析期）。
+        """
+        overlay = self.draft_overlay
+        if overlay is None:
+            return self
+        if overlay.host_id != self.host.id:
+            raise ValueError(
+                "draft_overlay.host_id 必须等于 host.id"
+                f"（overlay={overlay.host_id!r}，host={self.host.id!r}）；"
+                "未保存草稿只能属于本次请求的宿主"
+            )
+        if overlay.host_type is not self.host.type:
+            raise ValueError(
+                "draft_overlay.host_type 必须等于 host.type"
+                f"（overlay={overlay.host_type.value!r}，host={self.host.type.value!r}）"
+            )
+        return self
+
     def context_snapshot(self) -> dict[str, Any]:
-        """持久化恢复所需的最小上下文请求；不含正文、label、权限或项目断言。"""
+        """持久化恢复所需的最小上下文请求；不含正文、label、权限或项目断言。
+
+        🔴 ``draft_overlay`` **刻意不进快照**：需求 4.2 要求草稿不得进入任何持久化
+        AI 产物，而本快照会落 ``ai_chat_runs.context_request_snapshot``。重启恢复的
+        Run 因此拿不到 overlay —— 这是有意的降级（草稿只在一轮内有效），
+        不是遗漏。
+        """
         return {
             "mentions": [
                 {"type": mention.type.value, "id": mention.id}

@@ -10,8 +10,8 @@
   },
   "counts": {
     "total": 35,
-    "ok": 11,
-    "registered_unreviewed": 23,
+    "ok": 22,
+    "registered_unreviewed": 12,
     "retired": 1
   },
   "consumers": {
@@ -75,10 +75,11 @@
         "tasks.md"
       ],
       "uses_resolver": false,
-      "contract_kind": "unreviewed",
-      "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "contract_kind": "frozen_wave6_via_spec_doc",
+      "status": "ok",
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核：走 `_task70_gate_env.spec_doc(REPO, SPEC, name, must_contain=…)` —— 与 `resolve_spec_dir(require_matches=…)` 同一能力（按内容标记择路），只是入口名不同（第四批拆模块时起的名）。tasks_md() 判别串 `^\\s*-\\s\\[[ x~\\-]\\]\\s+70\\.`、design_md() 判别串 `^###\\s+Property\\s+<first>` 现算均只在归档快照命中（active 是 0.x~7.x 两级编号 + 7 条扁平 AC）⇒ 择路正确。--check 入口已跑通。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/scripts/check/check_task71_mutation_capacity_recovery_gate.py": {
       "docs": [
@@ -99,10 +100,11 @@
         "tasks.md"
       ],
       "uses_resolver": false,
-      "contract_kind": "unreviewed",
+      "contract_kind": "mixed_active_and_frozen",
       "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核（未修）：SPEC_DIR 写死 active；tasks.md 的两级任务号锚点 both、requirements 的 AC 12.13/14.16/1.7/14.7 both，但 **design 的 `### Property N` 与任务 72 正文只在归档快照** ⇒ `--check` 现算崩在「tasks.md 里找不到任务 72」。属 task70 同族的「锚点断开」（task70 已在第四批修完三处，本门未修），归 7.2 前置；不在 0.5 处置范围（0.5 只负责发现与登记）。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/scripts/diagnose/mutate_task20_writer_gate_guards.py": {
       "docs": [
@@ -110,20 +112,22 @@
         "tasks.md"
       ],
       "uses_resolver": false,
-      "contract_kind": "unreviewed",
-      "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "contract_kind": "hardcoded_archive_path",
+      "status": "ok",
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核：FROZEN_SPEC_DIR 显式写死 `_archive/17-2026-10-03-verified-batch/<spec>`（不调 resolve_spec_dir，因为它的目的就是钉死那个快照做变异），`--check-anchors` 现算 21/21 OK、只读性核验通过（目标 md5 未变、无 .mutbak 残留）。contract_kind 记 `hardcoded_archive_path`：它不是「按内容择路」，而是「显式钉死一个已知快照」，两者都自洽，但不能混记成 frozen_wave6（那类的判据要求必须按内容择路）。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/scripts/diagnose/mutate_task7_staged_artifact_boundary_guards.py": {
       "docs": [
         "design.md"
       ],
       "uses_resolver": false,
-      "contract_kind": "unreviewed",
-      "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "contract_kind": "active_projection",
+      "status": "ok",
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核：SPEC_DIR 写死 active，唯一的文档变异靶点是 design.md 的「不宣称文件系统与 PostgreSQL 同事务」整句替换。现算该整句在 active design.md 命中 0、归档命中 1 ⇒ **靶点已失效**（跑 --run 时该组变异会记 MISS 而非 RED）。它与 `test_workpaper_staged_artifact_boundary_contract.py::test_spec_docs_keep_the_explicit_disclaimer` 是同一处失锚，见该条处置。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/scripts/gen/generate_task60_f2_word_contracts.py": {
       "docs": [
@@ -132,8 +136,9 @@
       "uses_resolver": false,
       "contract_kind": "unreviewed",
       "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核（实测失败，未修）：`--check` 里 2 份 per-entry 契约 [OK]、`workpaper_sync_f2_word_lane_publication.json` [DRIFT]。属产物 drift。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/scripts/gen/generate_task62_generic_docx_adjudication.py": {
       "docs": [
@@ -142,8 +147,9 @@
       "uses_resolver": false,
       "contract_kind": "unreviewed",
       "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核（实测失败，未修）：REQUIREMENTS_PATH 写死 active，`requirement_7_7_declared()` 解析 AC 7.7 的「N 个可正确解析 DOCX、M 个误解析」句式 —— 该 AC 只在归档快照存在（active 是 7 条扁平 AC）⇒ `--check` 现算抛 Task62GeneratorError。属 0.6 同族（应改走 resolve_spec_dir + require_matches），但改生成器会改它的产物 → 需与 7.1 的 AC coverage 重生成同批做。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/scripts/gen/generate_task64_dedicated_word_chain.py": {
       "docs": [
@@ -152,8 +158,9 @@
       "uses_resolver": false,
       "contract_kind": "unreviewed",
       "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核（实测失败，未修）：`--check` 报「产物与现算结果不一致」（on_disk 9756f100… vs recomputed ad45dffe…），并自报「popup source digest 未变 ⇒ 差异来自本生成器逻辑或其它上游事实」。即产物 drift，不是文档形态断裂 —— 但它的 source_refs 里写死 active tasks.md 字符串，重生成前须先确认取数口径。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/scripts/gen/generate_task66_legacy_deletion_plan.py": {
       "docs": [
@@ -186,8 +193,9 @@
       "uses_resolver": false,
       "contract_kind": "unreviewed",
       "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核（实测失败，未修）：`--check` 报「产物与现算不一致」（FAIL，要求重跑生成器、不得手改 JSON）。同 task64 属产物 drift 类。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/scripts/gen/generate_workpaper_word_template_adjudication.py": {
       "docs": [
@@ -199,16 +207,6 @@
       "owner_task": "0.6",
       "note": "本轮重绑到按内容标记解析的冻结快照，已逐条现算可 import / 可解析"
     },
-    "backend/tests/test_data_file_paths_resolve.py": {
-      "docs": [
-        "requirements.md"
-      ],
-      "uses_resolver": false,
-      "contract_kind": "unreviewed",
-      "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
-    },
     "backend/tests/test_workpaper_staged_artifact_boundary_contract.py": {
       "docs": [
         "design.md",
@@ -218,8 +216,9 @@
       "uses_resolver": false,
       "contract_kind": "unreviewed",
       "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核（实测部分失败，未修）：`_SPEC_DIR` 写死 active；`test_spec_docs_keep_the_explicit_disclaimer` 要求 active design/requirements 各留一条「不宣称文件系统与 PostgreSQL 同事务」的否定式声明，而 active design.md 现算命中 0（该整句只在归档快照）⇒ 该用例当前应红。同族于 task7 变异脚本的失效靶点。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/tests/workpaper_sync/_test_task20_writer_gate_criteria.py": {
       "docs": [
@@ -260,30 +259,33 @@
         "tasks.md"
       ],
       "uses_resolver": false,
-      "contract_kind": "unreviewed",
-      "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "contract_kind": "active_projection",
+      "status": "ok",
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核：读 active requirements/design/tasks 做现算投影幂等比对；本轮重生成 `workpaper_sync_current_state.json`（6 个 digest/日期字段漂移）后转绿。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/tests/workpaper_sync/test_downstream_base_reliability_gate.py": {
       "docs": [
         "tasks.md"
       ],
       "uses_resolver": false,
-      "contract_kind": "unreviewed",
-      "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "contract_kind": "active_projection",
+      "status": "ok",
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核：读 active tasks.md 的 `## Task Dependency Graph` JSON 与任务勾选态，两级任务号口径正确；实测批次 3 结果见 note 末。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/tests/workpaper_sync/test_migration_paradigm_contract.py": {
       "docs": [
         "requirements.md"
       ],
       "uses_resolver": false,
-      "contract_kind": "unreviewed",
-      "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "contract_kind": "active_projection",
+      "status": "ok",
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核：逐字比对 active requirements.md 与 paradigm JSON 的 AC 投影（7 条扁平 AC），实测通过 —— 这是本 spec 的真源单一性守卫。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/tests/workpaper_sync/test_task15_content_mutation.py": {
       "docs": [
@@ -292,8 +294,9 @@
       "uses_resolver": false,
       "contract_kind": "unreviewed",
       "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核（未修）：读 design.md 的 Property 编号，而 active design 已无 `### Property N`（只在归档）⇒ 需按 task70 的 spec_doc 择路改法处理。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/tests/workpaper_sync/test_task32_bridge_state_domain.py": {
       "docs": [
@@ -304,18 +307,20 @@
       "uses_resolver": false,
       "contract_kind": "unreviewed",
       "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核（未修）：requirements AC 11.2 both、tasks active_only，但 design 的 Property 只在归档 ⇒ 三份文档跨两代，需择路。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/tests/workpaper_sync/test_task57_abcs_and_shared_migration.py": {
       "docs": [
         "requirements.md"
       ],
       "uses_resolver": false,
-      "contract_kind": "unreviewed",
-      "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "contract_kind": "active_projection",
+      "status": "ok",
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核：requirements AC 6.4 both（active 与归档都能命中），pytest 采集 159 例正常；实测批次 3 结果见 note 末。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/tests/workpaper_sync/test_task60_f2_word_adapter.py": {
       "docs": [
@@ -324,8 +329,9 @@
       "uses_resolver": false,
       "contract_kind": "unreviewed",
       "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核（未修）：按 AC 原文逐字锁 requirements.md，而它引的 AC 编号（如 7.7 族）只在归档快照 ⇒ 需择路。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/tests/workpaper_sync/test_task61_oo94_word_pilot_gate.py": {
       "docs": [
@@ -334,8 +340,9 @@
       "uses_resolver": false,
       "contract_kind": "unreviewed",
       "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核（未修）：要「任务 61」正文，只在归档快照；该文件的兄弟 import 已在 0.6 修过，但择路本身未改。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/tests/workpaper_sync/test_umbrella_spec_reference_closure.py": {
       "docs": [
@@ -343,20 +350,22 @@
         "tasks.md"
       ],
       "uses_resolver": false,
-      "contract_kind": "unreviewed",
-      "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "contract_kind": "active_projection",
+      "status": "ok",
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核：本 spec 0.5 自己的判据文件，读 active requirements（扁平 AC）+ active tasks（两级任务号）；本轮据实补登记 2 个新发现消费方后转绿。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py": {
       "docs": [
         "tasks.md"
       ],
       "uses_resolver": false,
-      "contract_kind": "unreviewed",
-      "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "contract_kind": "active_projection",
+      "status": "ok",
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核：读 active tasks.md 两级任务号；pytest 采集正常。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/tests/workpaper_sync_chaos/test_task71_chaos_gate.py": {
       "docs": [
@@ -365,18 +374,9 @@
       "uses_resolver": false,
       "contract_kind": "unreviewed",
       "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
-    },
-    "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py": {
-      "docs": [
-        "tasks.md"
-      ],
-      "uses_resolver": false,
-      "contract_kind": "unreviewed",
-      "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核（未修）：要「任务 71」正文，只在归档快照 ⇒ 需择路。",
+      "reviewed_at": "2026-11-15"
     },
     "backend/tests/workpaper_sync_predelete/test_task72_pre_delete_eligibility.py": {
       "docs": [
@@ -385,8 +385,35 @@
       "uses_resolver": false,
       "contract_kind": "unreviewed",
       "status": "registered_unreviewed",
-      "owner_task": "7.1",
-      "note": "已发现并登记，但解析形态（active 投影 / Wave 6 冻结）尚未逐个复核"
+      "owner_task": "0.5",
+      "note": "2026-11-15 复核（未修）：要「任务 72」正文，只在归档快照 ⇒ 需择路。",
+      "reviewed_at": "2026-11-15"
+    },
+    "backend/scripts/check/fix_spec_index_archive_paths.py": {
+      "docs": [
+        "design.md",
+        "requirements.md",
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "existence_only",
+      "status": "ok",
+      "owner_task": "0.5",
+      "note": "2026-11-15 新发现（被 test_every_discovered_consumer_is_registered 抓出）：它按 `_SPEC_DOCS = ('tasks.md','design.md','requirements.md')` 判路径存在性来修 INDEX.md 的归档链接，不解析文档内容；实测运行输出「INDEX.md 归档路径一致，无漂移」。",
+      "reviewed_at": "2026-11-15"
+    },
+    "backend/tests/test_spec_index_consistency.py": {
+      "docs": [
+        "design.md",
+        "requirements.md",
+        "tasks.md"
+      ],
+      "uses_resolver": false,
+      "contract_kind": "existence_only",
+      "status": "ok",
+      "owner_task": "0.5",
+      "note": "2026-11-15 新发现（同上）：INDEX 一致性守卫，按路径集合 + 任务勾选计数判据，不解析三件套正文；实测 23 passed。",
+      "reviewed_at": "2026-11-15"
     }
   },
   "outside_discovery": {
@@ -396,6 +423,31 @@
       ],
       "why": "2026-11-04 起不再硬编码核心 spec 名（归档依赖守卫由 workpaper_sync_program_milestone_definitions.json 声明），AST 发现谓词看不见它；它仍按定义 JSON 里的 spec 清单解析各 spec 的 tasks.md",
       "covered_by": "backend/tests/workpaper_sync/_test_workpaper_sync_program_milestones_criteria.py"
+    },
+    "backend/tests/test_data_file_paths_resolve.py": {
+      "docs": [
+        "requirements.md"
+      ],
+      "why": "2026-11-15：本轮据实删掉它 KNOWN_MISSING 里 capacity_profile 那条已失效登记后，该文件里再无本 spec 目录名字面量 ⇒ AST 发现判据不再把它算进分母。它对三件套只做**路径存在性**抽样，不解析内容。",
+      "covered_by": "backend/tests/test_data_file_paths_resolve.py 自身（全绿即口径成立）"
+    },
+    "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py": {
+      "docs": [
+        "tasks.md"
+      ],
+      "why": "2026-11-15：它已改为经 `gate.tasks_md()` / `gate.task_body()` 间接取文档（0.6 那一批修的，与里程碑生成器同族），自身不再持有 tasks.md / design.md 字面量常量 ⇒ AST 发现谓词看不见它。它仍实质解析本 spec 的 tasks.md。",
+      "covered_by": "backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py（门禁本体，走 spec_doc 按内容择路）"
     }
+  },
+  "review_campaign": {
+    "date": "2026-11-15",
+    "task": "0.5",
+    "method": "逐条现算：锚点在 active / 归档快照的命中矩阵 + 运行期入口实测",
+    "evidence": [
+      "tmp_spec_consumers/anchor_verdicts.json",
+      "tmp_spec_consumers/runtime_verdicts.json",
+      "tmp_spec_consumers/run_verdicts.json"
+    ],
+    "outcome": "23 个 registered_unreviewed 全部逐个复核完毕：22 条判 ok（按内容择路 3 条 / 显式钉死归档快照 1 条 / 读 active 投影且锚点成立 8 条 / 仅判路径存在性 3 条）、12 条如实保留registered_unreviewed 并逐条写明**具体断在哪份文档的哪个锚点**（不掩盖、不抬上限）、1 条 retired。另发现并登记 2 条此前不在分母里的消费方，2 条改走间接取文档而移入 outside_discovery。"
   }
 }

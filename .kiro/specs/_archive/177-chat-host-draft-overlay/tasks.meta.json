@@ -1,0 +1,111 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. 请求契约与字段校验": [
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794736740418
+      },
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794736750983
+      },
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794739903394
+      }
+    ],
+    "2. 版本核对与 manifest 条目（ADR 对应 design §3 / §4）": [
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794736740457
+      },
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794739915870
+      },
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794742965351
+      }
+    ],
+    "3. 不可信内容包装与不落库": [
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794736740485
+      },
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794742974915
+      },
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794746544091
+      }
+    ],
+    "4. 宿主暴露未保存态与基线版本": [
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794736740512
+      },
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794746551412
+      },
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794750646154
+      }
+    ],
+    "5. 面板开关与文案": [
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794736740541
+      },
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794750651193
+      },
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794751852008
+      }
+    ],
+    "6. 浏览器端到端": [
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794736740573
+      }
+    ],
+    "7. 回归与守卫": [
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794736740597
+      }
+    ],
+    "8. 收口": [
+      {
+        "executionId": "e0f90c19-6c9a-40c0-a914-acc3a8fd98b1",
+        "chatSessionId": "sess_48621829-cc84-4e19-8329-74b24e7d529d",
+        "timestamp": 1794736740630
+      }
+    ]
+  }
+}

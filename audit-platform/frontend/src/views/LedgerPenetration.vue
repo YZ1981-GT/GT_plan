@@ -459,8 +459,9 @@
         :data="tabLedgerDisplay"
         :width="tableWidth"
         :height="tableHeight || 600"
-        :estimated-row-height="50"
-        :header-height="40"
+        :estimated-row-height="densityMetrics.estimatedRowHeight"
+        :header-height="densityMetrics.headerHeight"
+        :key="densityMetrics.remountKey"
         :row-class="ledgerVirtualRowClass"
         :row-event-handlers="tabVirtualRowEventHandlers"
         fixed
@@ -587,8 +588,9 @@
         :data="tabAuxLedgerDisplay"
         :width="tableWidth"
         :height="tableHeight || 600"
-        :estimated-row-height="50"
-        :header-height="40"
+        :estimated-row-height="densityMetrics.estimatedRowHeight"
+        :header-height="densityMetrics.headerHeight"
+        :key="densityMetrics.remountKey"
         :row-class="ledgerVirtualRowClass"
         :row-event-handlers="tabVirtualRowEventHandlers"
         fixed
@@ -718,8 +720,9 @@
         :data="ledgerVirtualDisplay"
         :width="tableWidth"
         :height="tableHeight || 600"
-        :estimated-row-height="50"
-        :header-height="40"
+        :estimated-row-height="densityMetrics.estimatedRowHeight"
+        :header-height="densityMetrics.headerHeight"
+        :key="densityMetrics.remountKey"
         :row-class="ledgerVirtualRowClass"
         :row-event-handlers="virtualRowEventHandlers"
         fixed
@@ -1521,7 +1524,9 @@ const { label: datasetUnitLabel } = useDatasetUnitPresentation(
 )
 // 显示单位切换 — 直接操作 displayPrefs store（全局持久化）
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useTableDensityMetrics } from '@/composables/useTableDensityMetrics'
 const displayPrefs = useDisplayPrefsStore()
+const densityMetrics = useTableDensityMetrics()
 const displayUnit = computed({
   get: () => displayPrefs.amountUnit as 'yuan' | 'wan' | 'qian',
   set: (v: string) => displayPrefs.setUnit(v as any),

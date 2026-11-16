@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -371,7 +372,9 @@ async def execute_query(
             db, _all_tables,
             scope={"projects": [str(p) for p in (scope.project_ids or [])], "year": getattr(body, "year", None)},
         )
-        _builder_version_hash = _bv.hash
+        # 🔴 字段名是 `vector_hash`（VersionVector 定义）；写 `_bv.hash` 会 AttributeError
+        # 被下面的 except 静默吞掉 ⇒ 缓存键与运行记录永远拿不到版本摘要（与 execute 同一处缺陷）。
+        _builder_version_hash = _bv.vector_hash
         _builder_version = _bv.as_dict()
     except Exception as _bve:
         logger.debug("AQF 构建器版本采集失败: %s", _bve)
@@ -464,8 +467,39 @@ async def execute_query(
     # version 在 set_cached_result 之后追加，不污染缓存（ADR-AQF-03）
     if _builder_version:
         final["version"] = _builder_version
+    # ── 运行记录（AQF §5.3：读写缓存之后、成功审计之前登记并提交）──────────
+    # 🔴 `_version_hash` 是内部键：登记用它，**不进响应**（与业务视图一致，N2）。
+    # 原先这里把 `_version_hash` 直接塞进 `final` 就返回了，既没登记运行记录、
+    # 也把内部键泄漏给了前端（任务 10 走查实测）。
+    final.pop("_version_hash", None)
     if _builder_version_hash:
-        final["_version_hash"] = _builder_version_hash
+        try:
+            from app.services.custom_query.query_runs import normalize_definition, record_run
+
+            run_info = await record_run(
+                db,
+                user_id=current_user.id,
+                entry="builder",
+                origin="direct",
+                project_id=None,
+                year=getattr(body, "year", None),
+                source_key=str(getattr(body, "table", "") or ""),
+                definition=normalize_definition(body, entry="builder"),
+                scope={"projects": [str(p) for p in (scope.project_ids or [])],
+                       "year": getattr(body, "year", None)},
+                version_vector=_builder_version,
+                vector_hash=_builder_version_hash,
+                vector_weak=bool(_builder_version.get("weak")),
+                captured_at=datetime.now(timezone.utc),
+                last_total=int(total),
+            )
+            await db.commit()
+        except Exception:  # 登记失败不阻断查询（R1.6）
+            logger.warning("AQF 构建器运行记录登记失败", exc_info=True)
+            run_info = {"recorded": False, "reason": "运行记录登记失败"}
+        final["run"] = run_info
+    else:
+        final["run"] = {"recorded": False, "reason": "未采集到版本向量"}
     await _audit_query_success(
         body, user=current_user, scope=scope, total=int(total), cache_hit=False, db=db
     )

@@ -32,7 +32,10 @@ describe('单棵树：中栏是唯一的企业树（R7.1）', () => {
   it('当前节点只经 setCurrentNode 切换：中栏选择 / 组织图 / 结构卡片 / 上下文条都走它', () => {
     const set = body(index, 'function setCurrentNode(node: ConsolTreeNode')
     expect(set).toContain('currentConsolEntity.value = currentConsolEntityForNode(node)')
-    expect(set).toContain('if (opts.reload !== false && (changed || opts.force)) reloadCurrentNodeContent()')
+    // 60f2fed793 起 setCurrentNode 包进 workspaceGuard.runTransition（切节点前处理未保存修改），
+    // 回调为 async ⇒ 必须 await 重读，否则切换会在重读完成前就结束（runTransition 提前返回）。
+    expect(set).toContain('if (opts.reload !== false && (changed || opts.force)) await reloadCurrentNodeContent()')
+    expect(set).toContain('workspaceGuard.runTransition(')
     expect(body(index, 'function onTreeNodeClick(data: ConsolTreeNode)')).toContain('setCurrentNode(data)')
     expect(body(index, 'function onConsolTreeSelect(data: ConsolTreeSelectPayload)')).toContain('setCurrentNode(node')
     expect(index).toContain('@go-root="groupTree[0] && setCurrentNode(groupTree[0])"')

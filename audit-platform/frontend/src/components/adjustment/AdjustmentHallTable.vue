@@ -16,6 +16,7 @@
         :class="`gt-tb-font-${displayPrefs.fontSize}`"
         :row-class-name="rowClass"
         empty-text="暂无分录"
+        :scrollbar-tabindex="0"
         @selection-change="(sel: any[]) => emit('selection-change', sel)"
       >
         <el-table-column type="selection" width="36" />
@@ -92,8 +93,10 @@
           <template #default="{ row }">
             <template v-if="row.origin === 'workpaper'">
               <el-tag v-if="row.source_missing" type="warning" size="small" effect="plain" title="来源底稿已删除，可在这里删除这笔草稿">底稿已删除</el-tag>
-              <el-tag v-else type="success" size="small" class="gt-adj-link" :title="`打开来源底稿 ${row.source_wp_code || ''}`"
-                @click="emit('action', 'source', row)">底稿 {{ row.source_wp_code || '' }}</el-tag>
+              <button v-else type="button" class="gt-adj-inline-action gt-adj-inline-action--success"
+                :title="`打开来源底稿 ${row.source_wp_code || ''}`"
+                :aria-label="`打开来源底稿 ${row.source_wp_code || ''}`"
+                @click="emit('action', 'source', row)">底稿 {{ row.source_wp_code || '' }}</button>
             </template>
             <el-tag v-else type="info" size="small" effect="plain">手工</el-tag>
           </template>
@@ -127,8 +130,9 @@
           <template #default="{ row }">
             <div class="gt-adj-status-cell">
               <GtStatusTag dict-key="adjustment_status" :value="row.review_status" />
-              <el-tag v-if="row.has_active_collaboration" type="primary" size="small" effect="plain" class="gt-adj-link"
-                title="存在进行中的协作补充，点击查看" @click="emit('action', 'collab', row)">🤝协作中</el-tag>
+              <button v-if="row.has_active_collaboration" type="button" class="gt-adj-inline-action gt-adj-inline-action--primary"
+                title="存在进行中的协作补充，点击查看" aria-label="查看进行中的协作补充"
+                @click="emit('action', 'collab', row)">🤝协作中</button>
               <el-tag v-if="row.converted_to_misstatement_id" type="warning" size="small" effect="plain">已转错报</el-tag>
               <StaleIndicator v-if="row.converted_to_misstatement_id && staleMisstatementIds.has(row.converted_to_misstatement_id)"
                 :stale="true" tooltip="错报阈值已变更，建议重新评估" size="small" />
@@ -295,6 +299,15 @@ defineExpose({ reveal, clearSelection, toggleFullscreen, isFullscreen })
 .gt-adj-hall-table :deep(.gt-adj-row-focus > td.el-table__cell) { animation: gt-adj-focus-flash 2.4s ease-out 2; background: var(--gt-color-primary-bg); }
 @keyframes gt-adj-focus-flash { 0%, 60% { background: var(--gt-color-wheat-light); } 100% { background: var(--gt-color-primary-bg); } }
 .gt-adj-link { cursor: pointer; }
+.gt-adj-inline-action {
+  display: inline-flex; align-items: center; min-height: 22px; padding: 2px 7px;
+  border: 1px solid transparent; border-radius: 4px; background: transparent;
+  font: inherit; font-size: var(--gt-font-size-xs); line-height: 1.4; cursor: pointer;
+}
+.gt-adj-inline-action--success { color: var(--el-color-success); border-color: var(--el-color-success-light-5); }
+.gt-adj-inline-action--primary { color: var(--el-color-primary); border-color: var(--el-color-primary-light-5); }
+.gt-adj-inline-action:hover { background: var(--gt-color-primary-bg); }
+.gt-adj-inline-action:focus-visible { outline: 2px solid var(--gt-color-primary); outline-offset: 2px; }
 /* 表格字号跟随个人设置，标签不许折行（折行会把「审计调整」压成两行、看着像被截断） */
 .gt-adj-type-tag { white-space: nowrap; }
 .gt-adj-status-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }

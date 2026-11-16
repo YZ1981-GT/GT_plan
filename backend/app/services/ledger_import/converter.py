@@ -18,6 +18,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -26,6 +28,9 @@ from typing import Optional
 from .aux_dimension import parse_aux_dimension
 from .direction_resolver import resolve_account_direction
 from .sign_convention_types import CURRENT_SIGN_CONVENTION
+
+if TYPE_CHECKING:
+    from app.services.ledger_import.conversion_result import BalanceConversionResult, LedgerConversionResult
 
 # 显式方向列 token（借/贷/D/C），与 direction_derivation 口径一致
 _DEBIT_DIR_TOKENS = frozenset(["借", "借方", "D", "d", "debit", "Debit", "DEBIT"])

@@ -57,15 +57,16 @@ const items = computed(() => props.links.map(link => ({
     <!-- 已挂查询失败优先：这张凭证挂没挂到底稿不知道，不能显示成「尚未挂到底稿」 -->
     <template v-if="linkStatus === 'error'">
       <span class="gt-voucher-links__error" role="alert" data-testid="voucher-links-unknown">挂接状态未知（查询失败）</span>
-      <button type="button" class="gt-voucher-links__retry" @click="emit('retry-links')">重试</button>
+      <button type="button" class="gt-voucher-links__retry" aria-label="重试凭证挂接状态查询" title="重试凭证挂接状态查询" @click="emit('retry-links')">重试</button>
     </template>
     <template v-else-if="evidenceStatus === 'error' || evidenceStatus === 'forbidden'">
       <span class="gt-voucher-links__error" role="alert">
         {{ evidenceStatus === 'forbidden' ? '无权查看凭证证据' : '凭证证据加载失败' }}
       </span>
-      <button type="button" class="gt-voucher-links__retry" @click="emit('retry')">重试</button>
+      <button type="button" class="gt-voucher-links__retry" aria-label="重试凭证证据查询" title="重试凭证证据查询" @click="emit('retry')">重试</button>
     </template>
-    <span v-else-if="linkStatus === 'loading' && !items.length" class="gt-voucher-links__empty">查询中…</span>
+    <span v-else-if="linkStatus === 'loading' && !items.length" class="gt-voucher-links__empty">挂接状态查询中…</span>
+    <span v-else-if="evidenceStatus === 'loading' && !items.length" class="gt-voucher-links__empty">凭证证据查询中…</span>
     <template v-else-if="items.length">
       <span v-for="it in items" :key="it.key" class="gt-voucher-links__item">
         <button
@@ -94,6 +95,7 @@ const items = computed(() => props.links.map(link => ({
           :ocr-status="attachment.ocr_status"
         />
       </span>
+      <span v-if="evidenceStatus === 'loading'" class="gt-voucher-links__empty">凭证证据查询中…</span>
     </template>
     <span v-else class="gt-voucher-links__empty">尚未挂到底稿</span>
   </span>
@@ -129,5 +131,17 @@ const items = computed(() => props.links.map(link => ({
 }
 .gt-voucher-links__empty {
   color: var(--gt-color-text-placeholder);
+}
+
+@media (max-width: 768px) {
+  .gt-voucher-links { max-width: 100%; }
+  .gt-voucher-links__item { min-width: 0; max-width: 100%; }
+  .gt-voucher-links__open { min-height: 24px; }
+}
+
+@media (max-width: 390px) {
+  .gt-voucher-links { align-items: flex-start; gap: 6px; }
+  .gt-voucher-links__label { flex-basis: 100%; }
+  .gt-voucher-links__item { flex-wrap: wrap; }
 }
 </style>

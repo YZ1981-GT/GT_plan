@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 
 import pytest
@@ -144,3 +145,98 @@ def test_custom_adapter_registration_is_isinstance_checkable():
     assert got is adapter
     assert isinstance(got, EventBusStateAdapter)
     assert not isinstance(got, InMemoryEventBusStateAdapter)
+
+
+# ── E2 真实接线（2026-11-15）──────────────────────────────
+#
+# 🔴 骨架落地但生产零调用 = 死代码（memory「registry 成了只被测试看的副本」同型）。
+# 以下用例钉住「EventBus 真的用了 adapter 的 SSE quota 面」。
+
+
+@pytest.mark.asyncio
+async def test_create_sse_queue_without_quota_keeps_legacy_behavior():
+    """默认 `max_per_project=0` ⇒ 不申请配额，行为与改造前 100% 等价。"""
+    from app.services.event_bus import EventBus
+
+    bus = EventBus()
+    q1 = await bus.create_sse_queue()
+    q2 = await bus.create_sse_queue()
+    assert len(bus._sse_queues) == 2
+    assert q1 is not q2
+    # 未传 project_id ⇒ 映射里是 None（不申请配额，但记录队列以便统一清理）
+    assert set(bus._sse_queue_projects.values()) == {None}
+
+
+@pytest.mark.asyncio
+async def test_create_sse_queue_acquires_and_releases_quota():
+    """传 project_id + cap ⇒ 走 adapter 配额；remove 时释放。"""
+    from app.services.event_bus import EventBus
+    from app.services.event_bus_state_adapter import (
+        InMemoryEventBusStateAdapter,
+        install_event_bus_state_adapter,
+        reset_event_bus_state_adapter,
+    )
+
+    adapter = InMemoryEventBusStateAdapter()
+    install_event_bus_state_adapter(adapter)
+    try:
+        bus = EventBus()
+        project = uuid.uuid4()
+        q = await bus.create_sse_queue(project_id=project, max_per_project=1)
+        assert q is not None
+        # 第二个应被拒
+        with pytest.raises(Exception, match="已达上限"):
+            await bus.create_sse_queue(project_id=project, max_per_project=1)
+        # 释放后可再建
+        bus.remove_sse_queue(q)
+        await asyncio.sleep(0)  # 让 ensure_future 的 release 跑完
+        q2 = await bus.create_sse_queue(project_id=project, max_per_project=1)
+        assert q2 is not None
+    finally:
+        reset_event_bus_state_adapter()
+
+
+@pytest.mark.asyncio
+async def test_quota_isolated_per_project():
+    """不同 project 的配额互不影响。"""
+    from app.services.event_bus import EventBus
+    from app.services.event_bus_state_adapter import (
+        InMemoryEventBusStateAdapter,
+        install_event_bus_state_adapter,
+        reset_event_bus_state_adapter,
+    )
+
+    install_event_bus_state_adapter(InMemoryEventBusStateAdapter())
+    try:
+        bus = EventBus()
+        p1, p2 = uuid.uuid4(), uuid.uuid4()
+        await bus.create_sse_queue(project_id=p1, max_per_project=1)
+        # p1 满了，p2 仍可建
+        await bus.create_sse_queue(project_id=p2, max_per_project=1)
+        assert len(bus._sse_queues) == 2
+    finally:
+        reset_event_bus_state_adapter()
+
+
+def test_create_sse_queue_is_async():
+    """E2：必须是 async（quota 走 adapter 的 await）。
+
+    🔴 这条钉住「改回同步」的回归：同步方法无法 await adapter，
+    改回去会让配额静默失效。
+    """
+    import inspect
+
+    from app.services.event_bus import EventBus
+
+    assert inspect.iscoroutinefunction(EventBus.create_sse_queue)
+
+
+def test_router_calls_create_sse_queue_with_await():
+    """生产调用方必须 await（否则拿到 coroutine 而不是队列）。"""
+    from pathlib import Path
+
+    router = Path(__file__).resolve().parents[1] / "app" / "routers" / "events.py"
+    source = router.read_text(encoding="utf-8")
+    assert "await event_bus.create_sse_queue()" in source, (
+        "routers/events.py 未 await create_sse_queue"
+    )

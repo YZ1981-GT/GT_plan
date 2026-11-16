@@ -295,14 +295,21 @@ class SystemMessageAssembler:
         knowledge_hits: list[Any] | None = None,
         mention_texts: list[tuple[str, str]] | None = None,
         attachment_texts: list[tuple[str, str]] | None = None,
+        draft_overlay_texts: list[tuple[str, str]] | None = None,
     ) -> str:
         """组装完整 system message 内容。
 
         组装顺序（恰好一条 system）：
         1. NATIVE_SYSTEM_POLICY
         2. review prompt（如有）
-        3. 数据定界块（项目信息 + 文档内容 + 关联知识 + mentions + attachments）
+        3. 数据定界块（项目信息 + 文档内容 + 未保存草稿 + 关联知识 + mentions + attachments）
+
+        ``draft_overlay_texts`` 是「当前未保存草稿」（``[(label, content)]``）。
+        🔴 它们与其余块**同处一个定界块内**：草稿来自用户编辑器，属不可信内容，
+        "数据而非指令"的通知必须对它们同样成立（需求 4.1）。调用方已按版本核对裁决过
+        （``denied`` 的草稿不会传进来）。
         """
+        from app.services.ai_chat.dsh_masking import delimit_untrusted_content
         from app.services.ai_chat.native_engine import (
             CONTEXT_BLOCK_CLOSE,
             CONTEXT_BLOCK_OPEN,
@@ -323,6 +330,21 @@ class SystemMessageAssembler:
             data_blocks.append(f"【项目信息】\n{project_summary}")
         if doc_excerpt:
             data_blocks.append(f"【当前文档内容】\n{doc_excerpt}")
+
+        # 未保存草稿：紧跟当前文档内容（同属"用户正在编辑的这份底稿"）
+        if draft_overlay_texts:
+            # 🔴 每份草稿都必须经**权威定界器**（``dsh_masking.delimit_untrusted_content``，
+            #    与 ``routers/note_ai.py`` 的附注 overlay 同一个函数）逐块包装：它会带上
+            #    ``[数据来源: draft_overlay（label）]`` 头与 ``[/draft_overlay]`` 尾，
+            #    并中和正文自带的定界标记。手写 ``【未保存草稿：…】`` 只是展示标签，
+            #    不构成来源定界 —— 需求 4.1 要求的是"经 delimit_untrusted_content 类包装"。
+            overlay_rendered = "\n\n".join(
+                delimit_untrusted_content(
+                    text, source_type="draft_overlay", source_label=label
+                )
+                for label, text in draft_overlay_texts
+            )
+            data_blocks.append(f"【当前未保存草稿】\n{overlay_rendered}")
 
         # mentions
         if mention_texts:

@@ -20,7 +20,7 @@
  * @module composables/useKnowledge
  * @see R3.7
  */
-import { ref, shallowRef } from 'vue'
+import { getCurrentScope, onScopeDispose, ref, shallowRef } from 'vue'
 import { api } from '@/services/apiProxy'
 import { knowledgeLibrary as P_kl } from '@/services/apiPaths'
 
@@ -48,6 +48,8 @@ export interface PickDocumentsOptions {
   /** 最大可选数量，默认 5（与后端 knowledge_doc_ids 上限一致） */
   maxSelect?: number
 }
+
+export type KnowledgeSearchStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'forbidden' | 'error'
 
 // ── 内部状态：KnowledgePickerDialog 的 resolve/reject ──
 
@@ -92,6 +94,20 @@ export function _rejectPickerSelection() {
 export function useKnowledge() {
   const searching = ref(false)
   const searchResults = ref<KnowledgeDoc[]>([])
+  const searchStatus = ref<KnowledgeSearchStatus>('idle')
+  const searchError = ref('')
+  let searchSeq = 0
+  let searchAbort: AbortController | null = null
+
+  function statusOf(error: any): number {
+    return Number(error?.response?.status || error?.status || 0)
+  }
+
+  function cancelSearch(): void {
+    searchSeq += 1
+    searchAbort?.abort()
+    searchAbort = null
+  }
 
   /**
    * 搜索知识库（后端按当前用户可读过滤）
@@ -99,27 +115,50 @@ export function useKnowledge() {
    * @param context 上下文词（底稿编码 / 科目名），只参与排序加分，不参与召回
    */
   async function search(query: string, context?: string): Promise<KnowledgeDoc[]> {
-    if (!query.trim()) return []
-    searching.value = true
-    try {
-      const params: Record<string, string> = { q: query.trim() }
-      if (context) params.context = context
-      const data = await api.get<any>(P_kl.search, { params })
-      const results: KnowledgeDoc[] = Array.isArray(data) ? data : []
-      searchResults.value = results
-      return results
-    } catch {
-      searchResults.value = []
+    const trimmed = query.trim()
+    if (!trimmed) {
+      searchStatus.value = 'idle'
+      searchError.value = ''
       return []
+    }
+    const mine = ++searchSeq
+    searchAbort?.abort()
+    const controller = new AbortController()
+    searchAbort = controller
+    searching.value = true
+    searchStatus.value = 'loading'
+    searchError.value = ''
+    try {
+      const params: Record<string, string> = { q: trimmed }
+      if (context) params.context = context
+      const data = await api.get<any>(P_kl.search, {
+        params,
+        _silent: true,
+        _dedupe: false,
+        signal: controller.signal,
+      } as any)
+      if (mine !== searchSeq || controller.signal.aborted) return []
+      if (!Array.isArray(data)) throw new Error('知识库搜索响应格式不正确')
+      const results: KnowledgeDoc[] = data
+      searchResults.value = results
+      searchStatus.value = results.length ? 'ready' : 'empty'
+      return results
+    } catch (error: any) {
+      if (mine !== searchSeq || controller.signal.aborted) throw error
+      searchResults.value = []
+      const status = statusOf(error)
+      searchStatus.value = status === 403 ? 'forbidden' : 'error'
+      searchError.value = status === 403 ? '无权搜索知识库' : '搜索失败，请检查网络后重试'
+      throw error
     } finally {
-      searching.value = false
+      if (mine === searchSeq) {
+        searching.value = false
+        if (searchAbort === controller) searchAbort = null
+      }
     }
   }
 
-  /**
-   * 读取文档正文；非文本类（无抽取正文）或不可读时返回空串
-   * @param docId 文档 ID
-   */
+  if (getCurrentScope()) onScopeDispose(cancelSearch)
   async function getDocContent(docId: string): Promise<string> {
     try {
       const data = await api.get<any>(P_kl.documentPreview(docId), { _silent: true } as any)
@@ -145,6 +184,8 @@ export function useKnowledge() {
   return {
     searching,
     searchResults,
+    searchStatus,
+    searchError,
     search,
     getDocContent,
     pickDocuments,

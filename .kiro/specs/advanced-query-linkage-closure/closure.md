@@ -725,3 +725,44 @@ asset_blob / 附件血缘 / 平台耐久任务 / 合并运行 / 抵销工作表 
 #### 三个写端点在候选栈
 
 候选后端 9981 直连与经 3040 代理各核一次：三个都是 410 `ADVANCED_QUERY_WRITEBACK_RETIRED`，阳性对照 401。
+
+### 16.10 任务 37 补充实测（2026-11-15）
+
+候选栈沿用 §16.9 的做法（后端 9981 `--lifespan off` + `GT_BOOTSTRAP_DONE=1` + Redis db 9；前端 3040，
+`.env.local` 定死后端地址）。本轮只补**不需要专门账号**的项。
+
+#### e2e 回归
+
+两个 spec 在**修复后的候选树上重跑 11 / 11 passed**（`workers=1`、`SKIP_E2E_SEED=1` 只读核对）。
+🔴 踩到的坑：`playwright.config.ts` 的 `webServer` 是 `reuseExistingServer: !process.env.CI`
+⇒ 设 `CI=1` 会让它想自己起 3030（已被候选前端占用）并直接报 `already used`；**跑候选栈 e2e 时不要设 CI**。
+
+#### 新补走的 §10.5 项
+
+| 项 | 判据 | 结果 |
+|---|---|---|
+| 序时账翻页 | 和平药房_2025 序时账「共 1,066,675 条」→ 第 2 页内容不同 | 通过（1,066,675 = SQL 生效数据集行数，与 §三 N1 表一致） |
+| 借方降序 | 点「借方发生额」表头 → 首屏按借方金额降序 | 通过 |
+| 切项目后再开弹窗 | 切到「重药控股安徽_2025」→ 弹窗可选中、执行按钮随数据源重置 | 通过 |
+| 错误态中文与错误码 | 未登记源 → 400 `UNKNOWN_SOURCE` + 中文原因；非法 project_id / 不存在项目 → 403 `FORBIDDEN_PROJECT` + 中文原因 | 通过（信封均为 `{code, message:{error_code, message}}`，无英文、无 500） |
+| 页面版结果表右键 | 100 行结果上对首行右键 | **无右键菜单** —— 与 e2e spec「按前置条件不满足记录」一致，不是缺陷 |
+| 模板库「📊 高级查询」按钮 | 静态核实 `TemplateLibraryButton` 挂在 3 个宿主（`WpTemplateDetail` / `ReportConfigTab` / `NoteTemplateTab`），点击 `eventBus.emit('open-custom-query', {tab, source, project_id})`；`ThreeColumnLayout` 订阅并打开弹窗 | **链路完整**；但该按钮在**各模板详情页签内**、不在 `/template-library` 首页 —— 我第一版探针在首页找所以 count=0，是探针找错位置（先怀疑产品、后被静态核实否掉） |
+
+全程 console error **0**（除一处脚本自身未带 token 的 401，修正后复跑为 0）。本轮走查**未写业务数据**。
+
+#### 仍未走（如实登记，不假绿）
+
+- 需专门测试账号的 **4 项**：审计员作者在回收站看到「恢复」「删除」、模板三档对审计员可见、
+  经理清 `sessionStorage` 后刷新回收站、PM 身份构建器默认当前项目 / 只见可访问项目
+  —— 要在共享库建测试账号，本轮不建。
+- 未逐项走：附注右键与底稿工具栏两个宿主、附注编辑器页内切年后再点入口、A1 底稿「没有登记对应科目」提示、
+  复制引用粘到公式编辑器校验、W3 大额预置的重要性提示与「另存为我的模板」。
+
+⇒ 任务 37 **保持 `[ ]*`**（剩余项依赖外部账号）。
+
+#### 顺带修的 AQF 侧发现
+
+本轮同时在 `advanced-query-artifact-and-freshness` 的任务 10 走查里抓到并修复了 4 处**落在本 spec 交付物上**的缺陷
+（路由签名把 `_origin` 泄漏为 query 参数、`version_vector.hash` 字段名拼错、`query_runs` 的 PG 插入传 ISO 字符串、
+登记后路由不提交且构建器未登记），详见该 spec 的 `tasks.md` 任务 10 表格与 design §10.8。
+

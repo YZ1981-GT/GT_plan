@@ -1,8 +1,8 @@
 {
   "generated_from": "backend/data/workpaper_writer_inventory.json",
-  "inventory_digest": "ab57506e1d688614e2ea2286895732c1055c89a385f379d4cfb675a2f01e8bad",
-  "inventory_source_digest": "a9081392702692b8d6df4d0b64dbed87c78482890dd51713ca61a5331eb4b0ea",
-  "matrix_digest": "4e99d918cd0a5aea85771be7bb6df88619b78bff382879fc0604652db1b32eba",
+  "inventory_digest": "d41118332be5e966333c4ec61b366108e03bf74dbea42620f4a93ae5c5e002e4",
+  "inventory_source_digest": "ff6beab37c9e90a4a36b7aceb8254e5f286e5cda390b7e8f73c7e96a9a718d08",
+  "matrix_digest": "465d6d47cf7febd4c89258c33a93b16c1211efccf9be03f646c66bc1db833764",
   "policy_modules": [
     "app.routers.excel_html",
     "app.routers.wp_onlyoffice_router",
@@ -28,32 +28,6 @@
     "app.services.wp_template_finder::find_template_file_any"
   ],
   "rows": [
-    {
-      "adjudication_owner_task": null,
-      "blocking_task": "19,20,66,67",
-      "domain": "export_storage_resolver",
-      "evidence": {
-        "function_found": true,
-        "function_self_written_markers": [],
-        "function_unified_entry_calls": [],
-        "module_self_written_markers": [],
-        "module_unified_entry_calls": []
-      },
-      "group": "out_of_task12_scope",
-      "intended_status": "deferred",
-      "is_resolver_fork": true,
-      "kind": "resolver",
-      "module": "app.routers.completion_phase",
-      "note": null,
-      "qualname": "export_workpaper_word",
-      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
-      "resolver_identities": [
-        "find_template_file_any"
-      ],
-      "source_path": "backend/app/routers/completion_phase.py",
-      "status": "deferred",
-      "writer_id": "app.routers.completion_phase::export_workpaper_word"
-    },
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
@@ -2849,7 +2823,7 @@
       "legacy_excel_html": 13,
       "legacy_file_path": 5,
       "oo_room": 7,
-      "out_of_task12_scope": 33,
+      "out_of_task12_scope": 32,
       "storage_version": 2,
       "template_finder": 7,
       "template_provisioning": 5,
@@ -2857,14 +2831,14 @@
       "wopi": 6
     },
     "by_status": {
-      "deferred": 83,
+      "deferred": 82,
       "migrated": 14
     },
-    "deferred": 83,
+    "deferred": 82,
     "migrated": 14,
     "regressed": 0,
-    "resolver_fork_count": 78,
-    "row_count": 97
+    "resolver_fork_count": 77,
+    "row_count": 96
   },
   "task": "Wave 1 Task 12",
   "unified_entry_calls": [

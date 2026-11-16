@@ -189,8 +189,26 @@ def _parse_num(v: Any) -> float:
         return 0.0
 
 
-async def get_tb_data(project_id: str, db: Any) -> dict[str, Any]:
-    """从 tb_balance 取科目2901递延所得税负债余额数据（负债类/贷方）
+async def _resolve_tb_year(project_id: str, db: Any, year: int | None) -> int:
+    """解析 TB 读取年度；无法确定年度时显式失败，不能静默查成空。"""
+    if year is not None:
+        return int(year)
+
+    from app.services.project_audit_year import fetch_project_audit_year
+
+    resolved = await fetch_project_audit_year(db, project_id)
+    if resolved is None:
+        raise ValueError(f"项目未设置审计年度，无法读取 TB：{project_id}")
+    return resolved
+
+
+async def get_tb_data(
+    project_id: str, db: Any, year: int | None = None
+) -> dict[str, Any]:
+    """从 tb_balance 取科目2901递延所得税负债余额数据（负债类/贷方）。
+
+    ``begin_balance`` / ``end_balance`` 是兼容 payload 键；数据库真实列为
+    ``opening_balance`` / ``closing_balance``，并通过 label 保留外部契约。
 
     Requirements: 6.6
     """
@@ -211,17 +229,19 @@ async def get_tb_data(project_id: str, db: Any) -> dict[str, Any]:
     }
 
     try:
-        active_filter = get_active_filter(project_id)
+        resolved_year = await _resolve_tb_year(project_id, db, year)
+        active_filter = await get_active_filter(
+            db, TbBalance.__table__, project_id, resolved_year, strict=True
+        )
         stmt = (
             sa.select(
-                TbBalance.begin_balance,
+                TbBalance.opening_balance.label("begin_balance"),
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
-                TbBalance.end_balance,
+                TbBalance.closing_balance.label("end_balance"),
             )
             .where(
-                TbBalance.project_id == str(project_id),
-                TbBalance.standard_account_code == _N3_ACCOUNT_CODE,
+                TbBalance.account_code == _N3_ACCOUNT_CODE,
                 active_filter,
             )
             .limit(1)
@@ -234,7 +254,8 @@ async def get_tb_data(project_id: str, db: Any) -> dict[str, Any]:
             result["end_balance"] = _parse_num(row.end_balance)
             result["found"] = True
     except Exception as e:  # noqa: BLE001
-        logger.warning("N3 service: TB 取数失败 project_id=%s: %s", project_id, e)
+        logger.exception("N3 service: TB 取数失败 project_id=%s: %s", project_id, e)
+        raise
 
     return result
 
@@ -276,13 +297,13 @@ async def writeback_tb(project_id: str, audited_amount: float, db: Any) -> dict[
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-async def get_cross_wp_total(project_id: str, db: Any) -> dict[str, Any]:
-    """跨底稿合计：N1资产部分 + N3负债部分
+async def get_cross_wp_total(
+    project_id: str, db: Any, year: int | None = None
+) -> dict[str, Any]:
+    """跨底稿合计：N1资产部分 + N3负债部分。
 
-    从 checklist_responses 中聚合 N3 审定数据，并从 tb_balance 获取 N1 资产数据，
-    供 N5 递延所得税费用核对行（N5-8）消费。
-
-    递延所得税费用 = 本期递延税负债增加（N3本期变动） - 本期递延税资产增加（N1本期变动）
+    余额字段使用 TbBalance 的真实 ORM 列，并以 label 保留旧 payload 键。
+    查询或年度解析失败会重新抛出，不能返回全零结果掩盖取数故障。
 
     Requirements: 6.6
     """
@@ -303,18 +324,20 @@ async def get_cross_wp_total(project_id: str, db: Any) -> dict[str, Any]:
     }
 
     try:
-        active_filter = get_active_filter(project_id)
+        resolved_year = await _resolve_tb_year(project_id, db, year)
+        active_filter = await get_active_filter(
+            db, TbBalance.__table__, project_id, resolved_year, strict=True
+        )
 
         # N3 递延所得税负债（科目2901）
         n3_row = (
             await db.execute(
                 sa.select(
-                    TbBalance.begin_balance,
-                    TbBalance.end_balance,
+                    TbBalance.opening_balance.label("begin_balance"),
+                    TbBalance.closing_balance.label("end_balance"),
                 )
                 .where(
-                    TbBalance.project_id == str(project_id),
-                    TbBalance.standard_account_code == _N3_ACCOUNT_CODE,
+                    TbBalance.account_code == _N3_ACCOUNT_CODE,
                     active_filter,
                 )
                 .limit(1)
@@ -329,16 +352,14 @@ async def get_cross_wp_total(project_id: str, db: Any) -> dict[str, Any]:
             n3_data["period_change"] = n3_end - n3_begin
 
         # N1 递延所得税资产（科目1811）
-        _N1_ACCOUNT_CODE = "1811"
         n1_row = (
             await db.execute(
                 sa.select(
-                    TbBalance.begin_balance,
-                    TbBalance.end_balance,
+                    TbBalance.opening_balance.label("begin_balance"),
+                    TbBalance.closing_balance.label("end_balance"),
                 )
                 .where(
-                    TbBalance.project_id == str(project_id),
-                    TbBalance.standard_account_code == _N1_ACCOUNT_CODE,
+                    TbBalance.account_code == "1811",
                     active_filter,
                 )
                 .limit(1)
@@ -353,7 +374,8 @@ async def get_cross_wp_total(project_id: str, db: Any) -> dict[str, Any]:
             n1_data["period_change"] = n1_end - n1_begin
 
     except Exception as e:  # noqa: BLE001
-        logger.warning("N3 service: 跨底稿合计查询失败: %s", e)
+        logger.exception("N3 service: 跨底稿合计查询失败 project_id=%s: %s", project_id, e)
+        raise
 
     # 递延所得税费用 = 本期递延税负债增加 - 本期递延税资产增加
     deferred_tax_expense = n3_data["period_change"] - n1_data["period_change"]

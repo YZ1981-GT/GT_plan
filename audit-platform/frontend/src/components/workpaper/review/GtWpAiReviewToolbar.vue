@@ -33,7 +33,7 @@
 
     <el-dialog
       v-model="reviewDialogVisible"
-      :title="`${wpCodePrefix} ${label} AI 复核`"
+      :title="reviewDialogTitle"
       width="900px"
       :destroy-on-close="false"
       append-to-body
@@ -82,8 +82,14 @@ const emit = defineEmits<{
 }>()
 
 const { currentRole } = usePermissionMatrix()
+/**
+ * 复核动作的可用角色：与后端 `review.workpaper` 任务的 `allowed_roles` 逐值一致
+ * （ADR-LLM-008：页面不硬编码与后端不一致的角色数组）。
+ * 后端声明见 `backend/app/services/ai_task_registry.py`：admin/partner/manager/qc/eqcr。
+ * 🔴 曾漏 eqcr ⇒ EQCR 看不到复核按钮，而后端实际允许其独立复核。
+ */
 const canStartAiReview = computed(() =>
-  ['manager', 'partner', 'qc', 'admin'].includes(currentRole.value),
+  ['admin', 'partner', 'manager', 'qc', 'eqcr'].includes(currentRole.value),
 )
 
 // Task 9 AI taxonomy：a11y 名称由 taxonomy 单一真源派生，与 data-ai-action 一致
@@ -91,6 +97,16 @@ const pageReviewA11yName = computed(() => descriptorFor('ai_review_page').a11yNa
 const batchReviewA11yName = computed(() => descriptorFor('ai_review_batch').a11yName)
 
 const resolvedYear = computed<number | null>(() => props.year ?? null)
+
+/**
+ * 弹窗标题：`label` 是可选 prop（未传时不能把 undefined 渲染进标题）。
+ * 有 label 时 `编码 科目名 AI 复核`，否则 `编码 AI 复核`。
+ */
+const reviewDialogTitle = computed(() => {
+  const label = (props.label ?? '').trim()
+  const prefix = (props.wpCodePrefix ?? '').trim()
+  return [prefix, label, 'AI 复核'].filter((part) => part).join(' ')
+})
 
 const reviewDialogVisible = ref(false)
 const reviewing = ref(false)

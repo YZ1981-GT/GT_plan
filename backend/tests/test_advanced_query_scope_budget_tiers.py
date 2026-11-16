@@ -644,6 +644,12 @@ class TestBuilderWiring:
         改造前 router 自己做一层 `query_cache.get_cached_result`，与编排器内部的
         `CanonicalRedisQueryCache` 并行 —— 两套键规则、两套 TTL，命中与否的语义
         取决于先命中哪一层。收敛后缓存只归编排器，router 只据 `cache_hit` 落 header。
+
+        AQF（advanced-query-artifact-and-freshness）把执行主体搬到
+        `business_execute.execute_business_query` 后，HTTP 层落在内部函数
+        `_execute_with_http_layer`（路由 `execute_query` 只剩一行委托）⇒ 判据按该函数
+        取源；若直接取 `execute_query`，解析到的是空壳，断言会变成空转（本用例原本就靠
+        「反向自检」抓到过这一点）。
         """
         import ast
         import inspect
@@ -651,19 +657,55 @@ class TestBuilderWiring:
 
         import app.routers.custom_query as rm
 
-        src = textwrap.dedent(inspect.getsource(rm.execute_query))
-        tree = ast.parse(src)
+        for fn_name in ("_execute_with_http_layer", "execute_query"):
+            src = textwrap.dedent(inspect.getsource(getattr(rm, fn_name)))
+            tree = ast.parse(src)
+            called = {
+                getattr(n.func, "id", None) or getattr(n.func, "attr", None)
+                for n in ast.walk(tree)
+                if isinstance(n, ast.Call)
+            }
+            for banned in ("get_cached_result", "set_cached_result", "compute_cache_key"):
+                assert banned not in called, (
+                    f"{fn_name} 内仍直接调用 {banned}()，形成第二条缓存路径"
+                )
+
+        # 反向自检：解析器要能认出真实存在的调用，否则上面的断言是空转
+        src = textwrap.dedent(inspect.getsource(rm._execute_with_http_layer))
         called = {
             getattr(n.func, "id", None) or getattr(n.func, "attr", None)
-            for n in ast.walk(tree)
+            for n in ast.walk(ast.parse(src))
             if isinstance(n, ast.Call)
         }
-        for banned in ("get_cached_result", "set_cached_result", "compute_cache_key"):
-            assert banned not in called, (
-                f"execute_query 内仍直接调用 {banned}()，形成第二条缓存路径"
-            )
-        # 反向自检：解析器要能认出真实存在的调用，否则上面的断言是空转
-        assert "execute" in called, "AST 解析未认出 adapter.execute 调用，判据不可靠"
+        assert "execute_business_query" in called, "AST 解析未认出执行主体调用，判据不可靠"
+
+    def test_execute_route_signature_has_no_origin_query_param(self):
+        """运行记录的来源标记不得成为路由参数（AQF R1.1 / design §5.3「签名不变」）。
+
+        AQF 第一版把 `_origin` / `_template_id` 声明在路由签名上 ⇒ FastAPI 把它们当
+        **query 参数**，客户端可以 `?_origin=template` 自报来源（污染运行记录），
+        或用非法值让 `ck_query_runs_origin` 约束失败（运行记录静默降级）。
+        判据取运行期依赖树（不是读源码推断），并带正向对照证明解析器有效。
+        """
+        from app.main import app
+
+        routes = {
+            r.path: r for r in app.routes if getattr(r, "path", "").endswith("/custom-query/execute")
+        }
+        assert routes, "未找到 /api/custom-query/execute 路由"
+        dep = routes["/api/custom-query/execute"].dependant
+        names = {getattr(p, "name", p) for p in dep.query_params}
+        assert names == set(), f"execute 路由出现了 query 参数：{sorted(names)}"
+        assert {getattr(p, "name", p) for p in dep.body_params} == {"body"}
+        # 正向对照：同模块别的路由确实带 query 参数，证明上面的解析不是空转
+        other = {
+            r.path: r
+            for r in app.routes
+            if getattr(r, "path", "").endswith("/custom-query/indicators")
+        }
+        assert other, "未找到 /api/custom-query/indicators 路由"
+        other_names = {getattr(p, "name", p) for p in other["/api/custom-query/indicators"].dependant.query_params}
+        assert "project_id" in other_names, "依赖树解析未认出 indicators 的 query 参数，判据不可靠"
 
     def test_wiring_symbols_present_in_owning_modules(self):
         """接线的最低结构判据：各符号在其**归属模块**中可调用。

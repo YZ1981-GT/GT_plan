@@ -78,7 +78,20 @@ def test_soe_has_offset_detail_table() -> None:
 
 @pytest.mark.parametrize("variant", _VARIANTS)
 def test_section_marked_aligned(variant: str) -> None:
-    assert _section(variant).get("_aligned_by") == fx.ALIGNED_BY
+    """`_aligned_by` 是**标签集合**（旧值字符串 / 新值列表），只要求含本 spec 标签。
+
+    同一章节常被多个 spec 先后对齐过；要求「恰好等于自己那个标签」会让谁后写谁赢，
+    其余 spec 的 `--check` 永久红（差异只在标记字段、内容一致）。
+    语义与 `fix_note_n_cycle_full_structure._aligned_by_has` 同一口径。
+    """
+    mark = _section(variant).get("_aligned_by")
+    if isinstance(mark, str):
+        marks = [mark]
+    elif isinstance(mark, (list, tuple, set)):
+        marks = [str(m) for m in mark]
+    else:
+        marks = []
+    assert fx.ALIGNED_BY in marks, f"{variant} 的 _aligned_by 未含 {fx.ALIGNED_BY}：{mark!r}"
 
 
 # ─────────────────────── 2. 表 1 两级表头 + 子列序 ───────────────────────

@@ -21,6 +21,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.ai_models import (
+    SourceType,
     AIContentType,
     AIConfirmationStatus,
     AIModelType,

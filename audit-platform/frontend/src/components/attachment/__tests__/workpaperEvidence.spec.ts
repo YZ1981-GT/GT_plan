@@ -27,6 +27,7 @@ import {
   voucherKeyLabel,
 } from '../workpaperEvidence'
 import { resetWpEvidenceLinksForTest } from '@/composables/useWpEvidenceLinks'
+import { ATTACHMENT_UPLOAD_BUSY_MESSAGE } from '@/composables/attachmentUploadGate'
 
 function repoRoot(): string {
   let dir = dirname(fileURLToPath(import.meta.url))
@@ -35,6 +36,13 @@ function repoRoot(): string {
     dir = resolve(dir, '..')
   }
   throw new Error('找不到仓库根目录')
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
+  return { promise, resolve, reject }
 }
 
 /** 取 python ``NAME: frozenset[str] = frozenset({...})`` 字面量里的字符串成员（按括号配对截取）。 */
@@ -126,6 +134,25 @@ describe('uploadWorkpaperEvidence', () => {
     expect(config).toMatchObject({ _silent: true })
     expect(res.attachment.id).toBe('a1')
     expect(res.evidenceLink).toBeNull()
+  })
+
+  it('同一底稿并发上传只保留一个请求，完成后释放互斥门', async () => {
+    const pending = deferred<any>()
+    mockPost.mockReturnValueOnce(pending.promise)
+    const file = new File(['%PDF'], '对账单.pdf', { type: 'application/pdf' })
+    const first = uploadWorkpaperEvidence({ projectId: 'p1', wpId: 'w1', file })
+    await Promise.resolve()
+
+    await expect(uploadWorkpaperEvidence({ projectId: 'p1', wpId: 'w1', file }))
+      .rejects.toThrow(ATTACHMENT_UPLOAD_BUSY_MESSAGE)
+    expect(mockPost).toHaveBeenCalledTimes(1)
+
+    pending.resolve({ data: { attachment: { id: 'a1' }, evidence_link: null } })
+    await expect(first).resolves.toMatchObject({ attachment: { id: 'a1' } })
+    mockPost.mockResolvedValueOnce({ data: { attachment: { id: 'a2' }, evidence_link: null } })
+    await expect(uploadWorkpaperEvidence({ projectId: 'p1', wpId: 'w1', file }))
+      .resolves.toMatchObject({ attachment: { id: 'a2' } })
+    expect(mockPost).toHaveBeenCalledTimes(2)
   })
 
   it('行级上传带表页与单元格；兼容未解包的信封', async () => {

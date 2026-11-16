@@ -45,7 +45,8 @@ KNOWN_BAD_SHEET_NAMES: dict[tuple[str, str], str] = {
     # 已于 d-cycle-four-table-extraction-and-disclosure-completion Task 18 按源模板正名
     # （→「函证结果汇总表D0-1」/「跟函函证过程控制D0-3」/「核实被函证单位信息D0-2」），
     # 按「白名单只许变短」规则移出。
-    ("E0", "审定表E0-1"): "归属 e0-confirmation-completion 遗留；memory 已记，源 xlsx 无该 tab",
+    # ("E0", "审定表E0-1") 已于 e0-confirmation-completion 修好（改用源 xlsx 真实 tab 名
+    # 「函证结果汇总表E0-1」），按「白名单只许变短」规则移出。
     ("F0", "审定表F0-1"): "归属 f0-confirmation-linkage-and-structural-enhancement；源 xlsx 无该 tab",
     # ("L0", "审定表L0-1") 已于 l0-confirmation-source-alignment Task 4 修好
     # （→「函证结果汇总表L0-1」），按「白名单只许变短」规则移出。

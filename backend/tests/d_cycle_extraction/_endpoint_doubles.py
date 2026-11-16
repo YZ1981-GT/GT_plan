@@ -31,8 +31,93 @@ from app.models.core import Project
 from app.models.workpaper_models import WpFormula
 
 
+class _NullSavepoint:
+    """``AsyncSession.begin_nested()`` 的替身：enter/exit 均无操作。"""
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class FakeExecuteResult:
+    """``AsyncSession.execute`` 结果替身（共享）。
+
+    审计链（``audit_chain.head.read_head`` / ``append_audit_log``）、年度解析、
+    成员级别查询各自用不同的取值入口（``.all()`` / ``.scalars()`` / ``.scalar_one_or_none()``
+    / ``.mappings()``）—— 少一个就会以 AttributeError 的形式，把「替身不全」伪装成
+    「生产回归」。本替身把常用的都覆盖，未知查询一律返回空集合（= 空结果，而非崩溃）。
+
+    用法：``FakeExecuteResult(scalar=..., rows=[...])``。
+    """
+
+    def __init__(self, *, scalar=None, rows=None):
+        self._scalar = scalar
+        self._rows = list(rows or [])
+
+    # 单值入口
+    def scalar_one_or_none(self):
+        return self._scalar
+
+    def scalar(self):
+        return self._scalar
+
+    # 行集合入口
+    def all(self):
+        return list(self._rows)
+
+    def first(self):
+        return self._rows[0] if self._rows else None
+
+    def scalars(self):
+        return SimpleNamespace(
+            all=lambda: list(self._rows),
+            first=lambda: (self._rows[0] if self._rows else None),
+            unique=lambda: SimpleNamespace(all=lambda: list(self._rows)),
+        )
+
+    def mappings(self):
+        return SimpleNamespace(
+            all=lambda: list(self._rows),
+            first=lambda: (self._rows[0] if self._rows else None),
+        )
+
+
+class FakeSessionWriteMixin:
+    """替身会话的 **ORM 写侧** 方法（与 ``AuthGateSessionMixin`` 的读侧配对）。
+
+    自 spec ``audit-log-chain-integrity`` 批 B，公式保存是 mandatory 审计调用点：
+    ``write_wp_formula_audit`` → ``append_audit_log`` → ``append_entry`` 会
+    ``db.add(AuditLogEntry(...))`` 并要求 SAVEPOINT 隔离。这是**审计留痕**，
+    不是业务表写回 —— 与 Property 13「锚点保存不写 checklist_responses / parsed_data」
+    不冲突。替身把写入登记到 ``added``，不真正落库。
+
+    使用方法：``class _FakeSession(FakeSessionWriteMixin, AuthGateSessionMixin)``，
+    并在 ``__init__`` 里调用 ``self._init_write_side()``。
+    """
+
+    def _init_write_side(self):
+        self.added: list[object] = []
+
+    def add(self, obj):
+        self.added.append(obj)
+
+    def add_all(self, objs):
+        self.added.extend(objs)
+
+    async def flush(self, *a, **_kw):
+        return None
+
+    async def refresh(self, obj, *a, **_kw):
+        return None
+
+    async def delete(self, obj):
+        return None
+
+
 class AuthGateSessionMixin:
-    """替身会话混入：补 ``get`` / ``get_bind``，并记录门禁触达。
+    """替身会话混入：补 ``get`` / ``get_bind`` / ``begin_nested``，并记录门禁触达。
 
     ``project_status``：归档守卫读到的项目状态（默认进行中；设为 ``archived`` 可验证 423）。
     """
@@ -52,13 +137,28 @@ class AuthGateSessionMixin:
         if model is Project:
             # 另给审计年度五级解析读的字段（spec formula-hub-integrity-closure 需求 11.1：底稿公式审计按项目年度补齐）；
             # 全为 None = 项目没有审计年度，载荷不带 year
+            # is_deleted：``formula_settings.outbox._fetch_project_year`` 会判项目是否已删
+            # （spec formula-global-settings-sync：公式变更 outbox 事件需要年度）
             return SimpleNamespace(id=ident, status=self.project_status, audit_year=None, audit_period_end=None,
-                                   audit_period_start=None, wizard_state=None, name=None)
+                                   audit_period_start=None, wizard_state=None, name=None,
+                                   is_deleted=False)
         return None
 
     def get_bind(self, *_a, **_kw):
         self.auth_gate_calls.append(("get_bind",))
         return SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+
+    def begin_nested(self):
+        """SAVEPOINT 替身（async context manager，不做任何事）。
+
+        生产侧自 spec ``audit-log-chain-integrity`` 批 B 起，公式审计
+        ``write_wp_formula_audit`` 是 mandatory 调用点：审计失败即业务失败，
+        故写审计时 ``async with db.begin_nested():`` 包一层 SAVEPOINT 隔离。
+        替身必须跟上，否则 AttributeError 会把「被测行为是否正确」变成
+        「替身是否够新」——这类红会掩盖真实回归。
+        """
+        self.auth_gate_calls.append(("begin_nested",))
+        return _NullSavepoint()
 
 
 def admin_user():

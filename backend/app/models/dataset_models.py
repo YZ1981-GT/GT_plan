@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
-from sqlalchemy import ForeignKey, Index, String, Text, func, text
+from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -52,6 +52,17 @@ class JobStatus(str, enum.Enum):
     canceled = "canceled"
     timed_out = "timed_out"
     interrupted = "interrupted"
+
+
+class LedgerImportAttemptStatus(str, enum.Enum):
+    """账套导入 attempt 的最小持久化状态。"""
+
+    building = "building"
+    sealed = "sealed"
+    activating = "activating"
+    activated = "activated"
+    cleanup_pending = "cleanup_pending"
+    cleanup_done = "cleanup_done"
 
 
 class ArtifactStatus(str, enum.Enum):
@@ -243,6 +254,89 @@ class ImportJob(Base):
     __table_args__ = (
         Index("idx_import_jobs_project_year", "project_id", "year"),
         Index("idx_import_jobs_status", "status"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# LedgerImportAttempt — staged 导入持久化边界
+# ---------------------------------------------------------------------------
+
+
+class LedgerImportAttempt(Base):
+    """一次账套导入 attempt 的最小不可变合同与状态记录。
+
+    当前批次只建立持久化基础，具体 staged 写入、seal 和 activation 由后续
+    阶段接入；单位确认合同不使用空默认值，避免恢复流程把缺合同当成合法旧作业。
+    """
+
+    __tablename__ = "ledger_import_attempts"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ledger_datasets.id", ondelete="SET NULL"), nullable=True
+    )
+    base_dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ledger_datasets.id", ondelete="SET NULL"), nullable=True
+    )
+    base_unit_contract_digest: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    upload_token: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[LedgerImportAttemptStatus] = mapped_column(
+        sa.Enum(
+            LedgerImportAttemptStatus,
+            native_enum=False,
+            length=32,
+            create_constraint=False,
+        ),
+        server_default=text("'building'"),
+        nullable=False,
+    )
+    current_phase: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
+    payload_style: Mapped[str] = mapped_column(String(32), nullable=False)
+    unit_confirmation: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    unit_contract_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    bundle_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    failure_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('building', 'sealed', 'activating', 'activated', "
+            "'cleanup_pending', 'cleanup_done')",
+            name="ck_ledger_import_attempt_status",
+        ),
+        CheckConstraint(
+            "payload_style IN ('account_chart', 'ledger')",
+            name="ck_ledger_import_attempt_payload_style",
+        ),
+        CheckConstraint(
+            "base_unit_contract_digest IS NULL OR length(base_unit_contract_digest) = 64",
+            name="ck_ledger_import_attempt_base_digest_length",
+        ),
+        CheckConstraint(
+            "unit_contract_digest IS NULL OR length(unit_contract_digest) = 64",
+            name="ck_ledger_import_attempt_contract_digest_length",
+        ),
+        CheckConstraint(
+            "bundle_digest IS NULL OR length(bundle_digest) = 64",
+            name="ck_ledger_import_attempt_bundle_digest_length",
+        ),
+        Index("idx_ledger_import_attempts_project_year", "project_id", "year"),
+        Index("idx_ledger_import_attempts_status", "status"),
+        Index("idx_ledger_import_attempts_upload_token", "upload_token"),
     )
 
 

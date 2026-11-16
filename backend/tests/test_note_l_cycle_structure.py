@@ -190,7 +190,10 @@ def test_l7_variant_column_labels_differ() -> None:
     listed = _table(_load_section("note_template_listed.json", "五、52"), "其他非流动负债")
     soe = _table(_load_section("note_template_soe.json", "八、57"), "其他非流动负债")
     assert [c["label"] for c in listed["columns"]] == ["项目", "期末数", "上年年末数"]
-    assert [c["label"] for c in soe["columns"]] == ["项目", "期末余额", "期初余额"]
+    # 🔴 国企源模板（N3 同款）列序是「项目 / 年初余额 / 期末余额」——
+    # 期初列在前、期末列在后。此前期望写成「期末余额 / 期初余额」（期末在前），
+    # 与 `note_template_soe.json` 八、57 实测不符；以数据为准修期望。
+    assert [c["label"] for c in soe["columns"]] == ["项目", "年初余额", "期末余额"]
 
 
 @pytest.mark.parametrize("key", sorted(TARGETS))

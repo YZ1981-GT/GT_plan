@@ -13,9 +13,11 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ai_models import AttachmentOcrStatus
+from app.models.workpaper_models import WorkingPaper
 from app.services.ai_chat.attachment_service import AttachmentService
 from app.services.ai_chat.audit_relation_context import (
     AuditRelationItem,
@@ -25,6 +27,12 @@ from app.services.ai_chat.context_budget import (
     ContextBudgetPolicy,
     ContextManifestEntry,
 )
+from app.services.ai_chat.contracts import HostType
+from app.services.ai_chat.draft_overlay import (
+    WORKPAPER_BUSINESS_VERSION_SOURCE,
+    DraftOverlayDecision,
+    decide_draft_overlay,
+)
 from app.services.ai_chat.mention_service import MentionContentItem, load_mention_context
 from app.services.ai_chat.note_service import knowledge_jump_route
 from app.services.ai_chat.run_resource_service import (
@@ -33,6 +41,14 @@ from app.services.ai_chat.run_resource_service import (
 )
 from app.services.ai_chat.review_mode import SystemMessageAssembler, resolve_review_mode
 from app.services.doc_ai_context_builder import ChatContext, ContextBuilder, SearchHit
+
+#: ``draft_overlay`` 的 manifest ``source_type``（design §4；按宿主类型拼接，
+#: 将来支持附注宿主时自然得到 ``draft_overlay:note``）。
+DRAFT_OVERLAY_SOURCE_PREFIX = "draft_overlay"
+
+#: 底稿宿主「当前业务版本」的权威列（re-export）：装配点与前端 ``openedBaselineVersion()``
+#: 必须读**同一个**量，因此把真源常量从这里再暴露一次，避免调用方各自拼字符串。
+BUSINESS_VERSION_SOURCE = WORKPAPER_BUSINESS_VERSION_SOURCE
 
 
 @dataclass(frozen=True)
@@ -116,8 +132,23 @@ async def build_context_plan(
     )
     allocation = policy.allocate()
 
+    # draft overlay（design §1 B3：本函数是唯一装配入口）。版本核对读的是**库里的当前
+    # 业务版本**，与 budget 无关，因此在裁剪前先判定；一旦 ``denied``，正文根本不进
+    # system message（需求 6.3：不得静默使用旧草稿）。
+    overlay_decision = await _decide_draft_overlay(db, request=request)
+
     summary_budget = min(int(policy.total_budget * 0.10), allocation.doc_excerpt)
-    doc_budget = max(0, allocation.doc_excerpt - summary_budget)
+    # overlay 与宿主正文共享 ``doc_excerpt`` 槽位，且最多占其中的一半：草稿是补充而非
+    # 替代，已保存正文必须仍有一半预算。缺省路径下 ``overlay_used == 0`` ⇒ ``doc_budget``
+    # 与加 overlay 前逐值相同。
+    overlay_cap = max(0, allocation.doc_excerpt - summary_budget) // 2
+    overlay_texts, overlay_used = _budget_draft_overlay(
+        policy,
+        request=request,
+        decision=overlay_decision,
+        budget=overlay_cap,
+    )
+    doc_budget = max(0, allocation.doc_excerpt - summary_budget - overlay_used)
     summary, summary_used = policy.truncate_to_budget(base.project_summary, summary_budget)
     host_sources = list(getattr(base, "host_sources", []) or [])
     if host_sources:
@@ -243,6 +274,7 @@ async def build_context_plan(
         knowledge_hits=context.knowledge_hits,
         mention_texts=mention_texts,
         attachment_texts=attachment_texts,
+        draft_overlay_texts=overlay_texts,
     )
     manifest = policy.manifest.as_dict()
     manifest.update(
@@ -253,7 +285,138 @@ async def build_context_plan(
             "review_mode": review_for_prompt is not None,
         }
     )
+    if overlay_decision is not None:
+        # design §4 顶层标记：前端与守卫快速判断"本轮是否真的纳入了未保存草稿"。
+        # 🔴 **只在提交了 overlay 时出现**（不提交时连键都不存在）：需求 6.1 要求默认关闭时
+        # 行为与现状完全一致，而"多出一个恒 False 的键"同样是一次对外契约变更 ——
+        # 前端据此判断"这个后端版本到底认不认 overlay"，缺键即可整体走旧路径。
+        manifest["draft_overlay_included"] = overlay_decision.included
     return ContextPlan(context, system_message, manifest, citations)
+
+
+async def _decide_draft_overlay(
+    db: AsyncSession, *, request: Any
+) -> DraftOverlayDecision | None:
+    """读宿主当前业务版本并裁决 overlay（design §3 步骤 6~7）。
+
+    返回 ``None`` = 本轮没有 overlay（缺省路径，manifest 与既有完全一致）。
+
+    🔴 读版本失败**不抛**：design §3 要求任何一步失败都不阻断整轮对话。这里把
+    "读不出来"表达成 ``current_version=""``，由 :func:`decide_draft_overlay` 判
+    ``denied`` 并给出中文原因 —— 与"版本确实过期"共用同一条降级路径，
+    也就没有"读库失败 ⇒ 整轮 Run 变成 context_build_failed"这种把用户彻底挡在门外的形态。
+    """
+    overlay = getattr(request, "draft_overlay", None)
+    if overlay is None:
+        return None
+    if overlay.host_type is not HostType.workpaper:  # pragma: no cover — 契约层已拦
+        # 契约层（``DRAFT_OVERLAY_HOST_TYPES``）已拒绝其余宿主；这里是第二道
+        # fail-closed：真走到此处说明契约漂移了，宁可不纳入也不猜版本来源。
+        current: object = ""
+    else:
+        current = await _read_workpaper_business_version(db, overlay.host_id)
+    return decide_draft_overlay(
+        overlay,
+        current_version=current,
+        host_label=str(getattr(request.host, "display_label", "") or ""),
+    )
+
+
+async def _read_workpaper_business_version(db: AsyncSession, wp_id: str) -> object:
+    """读底稿宿主当前业务版本（``working_paper.updated_at``，见
+    :data:`~app.services.ai_chat.draft_overlay.WORKPAPER_BUSINESS_VERSION_SOURCE`）。
+
+    **不在这里做授权判定**：宿主鉴权已在 ``HostContextResolver.enforce`` 完成
+    （design §3 步骤 1「先于 overlay」），本函数只按已授权的 ``host.id`` 取一列。
+
+    读失败（非法 UUID / 行不存在 / 库异常）一律返回 ``None`` —— 由判定层降级成
+    ``denied`` 而不是抛出去打断 Run。
+    """
+    from uuid import UUID as _UUID
+
+    try:
+        wp_uuid = _UUID(str(wp_id))
+    except (ValueError, TypeError, AttributeError):
+        return None
+    try:
+        return (
+            await db.execute(
+                sa.select(WorkingPaper.updated_at).where(
+                    WorkingPaper.id == wp_uuid,
+                    WorkingPaper.is_deleted == sa.false(),
+                )
+            )
+        ).scalar_one_or_none()
+    except Exception:  # noqa: BLE001 — 版本核对失败只降级，不阻断整轮对话
+        return None
+
+
+def _budget_draft_overlay(
+    policy: ContextBudgetPolicy,
+    *,
+    request: Any,
+    decision: DraftOverlayDecision | None,
+    budget: int,
+) -> tuple[list[tuple[str, str]], int]:
+    """把已裁决的 overlay 记进 manifest 并裁到预算内。
+
+    返回 ``(rendered_texts, used_bytes_of_budget)``；``rendered_texts`` 交给
+    ``SystemMessageAssembler`` 定界包装。``denied`` 时返回空列表 —— 正文**绝不进入**
+    system message（需求 6.3），但 manifest 仍记 ``denied`` + 中文原因（需求 6.2 的前端提示）。
+
+    🔴 ``overlay.content`` 只在这里被读一次，且只进内存里的 system message：
+    不写日志、不写 metrics、不进 ``context_snapshot``（需求 4.2/4.3）。
+    """
+    if decision is None:
+        return [], 0
+
+    overlay = getattr(request, "draft_overlay", None)
+    source_type = f"{DRAFT_OVERLAY_SOURCE_PREFIX}:{request.host.resource_type.value}"
+    if not decision.included or overlay is None:
+        policy.manifest.add(
+            ContextManifestEntry(
+                source_type=source_type,
+                source_id=str(request.host.resource_id),
+                label=decision.label,
+                status="denied",
+                reason=decision.reason,
+                content_hash=decision.content_hash,
+                baseline_version=decision.baseline_version,
+            )
+        )
+        return [], 0
+
+    rendered, used = policy.truncate_to_budget(overlay.content, max(0, budget))
+    if not rendered:
+        # 预算给不到一个字符（极端小预算）：按 unavailable 留痕，不假装纳入。
+        policy.manifest.add(
+            ContextManifestEntry(
+                source_type=source_type,
+                source_id=str(request.host.resource_id),
+                label=decision.label,
+                status="unavailable",
+                reason="budget_exceeded",
+                budget_tokens=budget,
+                content_hash=decision.content_hash,
+                baseline_version=decision.baseline_version,
+            )
+        )
+        return [], 0
+
+    policy.manifest.add(
+        ContextManifestEntry(
+            source_type=source_type,
+            source_id=str(request.host.resource_id),
+            label=decision.label,
+            status="included" if rendered == overlay.content else "trimmed",
+            budget_tokens=budget,
+            used_tokens=used,
+            reason="" if rendered == overlay.content else "budget_exceeded",
+            content_hash=decision.content_hash,
+            baseline_version=decision.baseline_version,
+        )
+    )
+    return [(decision.label, rendered)], used
 
 
 def _add_text_entry(

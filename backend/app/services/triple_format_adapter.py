@@ -294,7 +294,7 @@ class FinancialReportAdapter:
                 FinancialReport.year == year,
                 FinancialReport.report_type == report_type,
                 FinancialReport.is_deleted == sa.false(),
-            ).order_by(FinancialReport.row_order)
+            ).order_by(FinancialReport.row_code)
         )
         rows = result.scalars().all()
 
@@ -314,9 +314,9 @@ class FinancialReportAdapter:
 
             cells[f"{r+1}:0"] = {"value": row.row_name, "style": style}
             cells[f"{r+1}:1"] = {"value": row.row_code}
-            cells[f"{r+1}:2"] = {"value": float(row.amount) if row.amount else None,
+            cells[f"{r+1}:2"] = {"value": float(row.current_period_amount) if row.current_period_amount else None,
                                   "formula": row.formula_used}
-            cells[f"{r+1}:3"] = {"value": float(row.prior_amount) if row.prior_amount else None}
+            cells[f"{r+1}:3"] = {"value": float(row.prior_period_amount) if row.prior_period_amount else None}
 
         return {
             "sheets": [{
@@ -356,10 +356,10 @@ class AdjustmentSummaryAdapter:
             .where(
                 Adjustment.project_id == project_id,
                 Adjustment.year == year,
-                Adjustment.entry_type == entry_type,
+                Adjustment.adjustment_type == entry_type,
                 Adjustment.is_deleted == sa.false(),
             )
-            .order_by(Adjustment.entry_number, AdjustmentEntry.id)
+            .order_by(Adjustment.adjustment_no, AdjustmentEntry.id)
         )
         rows_data = result.all()
 
@@ -369,7 +369,7 @@ class AdjustmentSummaryAdapter:
             cells[f"0:{c}"] = {"value": h, "style": {"bold": True, "textAlign": "center"}}
 
         for r, (adj, entry) in enumerate(rows_data):
-            cells[f"{r+1}:0"] = {"value": adj.entry_number}
+            cells[f"{r+1}:0"] = {"value": adj.adjustment_no}
             cells[f"{r+1}:1"] = {"value": adj.description or ""}
             cells[f"{r+1}:2"] = {"value": entry.account_code}
             cells[f"{r+1}:3"] = {"value": entry.account_name or ""}

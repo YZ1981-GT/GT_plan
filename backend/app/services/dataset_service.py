@@ -410,6 +410,10 @@ class DatasetService:
 
             # 当前 → rolled_back
             current.status = DatasetStatus.rolled_back
+            # partial unique index 只允许一个 active：先 flush 释放旧 active，
+            # 再把 previous 提升为 active，避免 PostgreSQL 在同一次 flush 里先更新 previous
+            # 而触发 uq_ledger_datasets_one_active（SQLite 不会暴露这个竞态顺序）。
+            await db.flush()
             # B' 架构：不再 UPDATE 物理行 is_deleted，可见性完全由 dataset.status 控制
 
             # 上一版本 → active

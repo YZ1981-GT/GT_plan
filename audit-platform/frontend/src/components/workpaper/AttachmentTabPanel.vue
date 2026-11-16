@@ -24,18 +24,32 @@
         <span>拖拽文件到此处上传，或点击行预览</span>
       </div>
 
-      <div v-if="loading" v-loading="true" class="gt-attach-tab__loading" />
-      <div v-else-if="!list.length" class="gt-attach-tab__empty">暂无关联附件</div>
-      <ul v-else class="gt-attach-tab__list">
+      <div v-if="loading" v-loading="true" class="gt-attach-tab__loading" role="status" aria-label="正在加载关联附件">
+        正在加载关联附件…
+      </div>
+      <div v-else-if="listStatus === 'error' || listStatus === 'forbidden'" class="gt-attach-tab__empty gt-attach-tab__error" role="alert" data-testid="attachment-tab-load-error">
+        <div>{{ listStatus === 'forbidden' ? '无权查看本底稿附件' : '关联附件加载失败' }}</div>
+        <div class="gt-attach-tab__error-detail">{{ listError || '请检查网络后重试' }}</div>
+        <button type="button" class="gt-attach-tab__retry" data-testid="attachment-tab-retry" @click="loadList">重试</button>
+      </div>
+      <div v-else-if="listStatus === 'empty'" class="gt-attach-tab__empty">暂无关联附件</div>
+      <ul v-else-if="listStatus === 'ready'" class="gt-attach-tab__list">
         <li
           v-for="att in list"
           :key="att.id"
           class="gt-attach-tab__item"
-          @click="onPreview(att)"
+          @click="onPreview(att, $event)"
         >
-          <span class="gt-attach-tab__icon">{{ iconFor(att.file_name) }}</span>
+          <span class="gt-attach-tab__icon" aria-hidden="true">{{ iconFor(att.file_name) }}</span>
           <div class="gt-attach-tab__body">
-            <div class="gt-attach-tab__name" :title="att.file_name">{{ att.file_name }}</div>
+            <button
+              type="button"
+              class="gt-attach-tab__name"
+              :title="`预览 ${att.file_name}`"
+              :aria-label="`预览附件 ${att.file_name}`"
+              @click.stop="onPreview(att, $event)"
+              @keydown="onItemKeydown($event, att)"
+            >{{ att.file_name }}</button>
             <div class="gt-attach-tab__meta">
               {{ humanSize(att.file_size) }} · {{ shortTime(att.created_at) }}
               <span v-if="isRowOnly(att)" class="gt-attach-tab__row-tag" data-testid="row-evidence-tag">行级证据</span>
@@ -52,7 +66,10 @@
                 </template>
                 <div class="gt-attach-tab__link-list">
                   <div v-if="linkedWps[att.id] === undefined" class="gt-attach-tab__link-hint">加载中…</div>
-                  <div v-else-if="linkedWps[att.id] === null" class="gt-attach-tab__link-hint">关联底稿加载失败</div>
+                  <div v-else-if="linkedWps[att.id] === null" class="gt-attach-tab__link-hint" role="alert">
+                    关联底稿加载失败
+                    <button type="button" class="gt-attach-tab__link-retry" aria-label="重试关联底稿列表" title="重试关联底稿列表" @click.stop="loadLinkedWps(att.id)">重试</button>
+                  </div>
                   <div
                     v-for="wp in linkedWps[att.id] || []"
                     :key="wp.wp_id"
@@ -75,8 +92,9 @@
               size="small"
               class="gt-attach-tab__eye"
               :aria-label="`预览 ${att.file_name}`"
+              :title="`预览 ${att.file_name}`"
               data-testid="attachment-eye"
-              @click.stop="onPreview(att)"
+              @click.stop="onPreview(att, $event)"
             ><el-icon><View /></el-icon></el-button>
           </el-tooltip>
         </li>
@@ -96,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch, onUnmounted } from 'vue'
+import { reactive, ref, watch, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { Paperclip, View } from '@element-plus/icons-vue'
 import AttachmentDropZone from '@/components/workpaper/AttachmentDropZone.vue'
@@ -137,9 +155,40 @@ const props = defineProps<{
 
 const router = useRouter()
 const list = ref<AttachmentRow[]>([])
+type AttachmentListStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'forbidden' | 'error'
+const listStatus = ref<AttachmentListStatus>('idle')
+const listError = ref('')
 const loading = ref(false)
+let listSeq = 0
+let listAbort: AbortController | null = null
 const drawerOpen = ref(false)
 const selected = ref<AttachmentForPreview | null>(null)
+let previewOpener: HTMLElement | null = null
+
+function rememberPreviewOpener(source: Event | EventTarget | null | undefined) {
+  const eventLike = source && typeof source === 'object'
+    && ('currentTarget' in source || 'target' in source)
+  const candidate = eventLike
+    ? ((source as Event).currentTarget || (source as Event).target)
+    : source
+  const element = candidate instanceof Element
+    ? ((candidate.closest('button') as HTMLElement | null) || (candidate instanceof HTMLElement ? candidate : null))
+    : null
+  previewOpener = element
+}
+
+function restorePreviewFocus() {
+  const opener = previewOpener
+  previewOpener = null
+  if (!opener?.isConnected) return
+  void nextTick(() => {
+    if (opener.isConnected) opener.focus()
+  })
+}
+
+watch(drawerOpen, (open) => {
+  if (!open) restorePreviewFocus()
+})
 
 const OFFICE_EXTS = LEGACY_CAPABILITIES.attachmentTab.office
 
@@ -182,31 +231,67 @@ function isRowOnly(att: AttachmentRow): boolean {
 }
 
 async function loadList() {
+  const mine = ++listSeq
+  listAbort?.abort()
   if (!props.projectId || !props.wpId) {
     list.value = []
+    listError.value = ''
+    listStatus.value = 'empty'
+    listAbort = null
     return
   }
+  const controller = new AbortController()
+  listAbort = controller
   loading.value = true
+  listStatus.value = 'loading'
+  listError.value = ''
   try {
-    const data: any = await httpApi.get(P_att.wpView(props.wpId))
-    list.value = Array.isArray(data) ? data : data?.items || []
-  } catch {
-    list.value = []
+    const data: any = await httpApi.get(P_att.wpView(props.wpId), {
+      _silent: true,
+      _dedupe: false,
+      signal: controller.signal,
+    } as any)
+    if (mine !== listSeq) return
+    const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : null
+    if (!items) throw new Error('关联附件响应格式不正确')
+    list.value = items
+    listStatus.value = items.length ? 'ready' : 'empty'
+  } catch (error: any) {
+    if (mine !== listSeq || controller.signal.aborted) return
+    const status = Number(error?.response?.status || error?.status || 0)
+    listStatus.value = status === 403 ? 'forbidden' : 'error'
+    listError.value = status === 403 ? '你没有查看本底稿附件的权限' : '请检查网络或稍后重试'
   } finally {
-    loading.value = false
+    if (mine === listSeq) {
+      loading.value = false
+      if (listAbort === controller) listAbort = null
+    }
   }
 }
 
 /** 附件 id → 关联底稿清单；undefined = 未取，null = 取失败（悬停时取一次，之后复用）。 */
 const linkedWps = reactive<Record<string, LinkedWp[] | null | undefined>>({})
+const linkedWpLoading = reactive<Record<string, boolean>>({})
+const linkedWpControllers = new Map<string, AbortController>()
 
 async function loadLinkedWps(attachmentId: string) {
-  if (linkedWps[attachmentId]) return
+  if (linkedWps[attachmentId] || linkedWpLoading[attachmentId]) return
+  const controller = new AbortController()
+  linkedWpControllers.set(attachmentId, controller)
+  linkedWpLoading[attachmentId] = true
   try {
-    const linked: any = await httpApi.get(P_pr.attachmentWorkpapers(attachmentId), { _silent: true } as any)
+    const linked: any = await httpApi.get(P_pr.attachmentWorkpapers(attachmentId), {
+      _silent: true,
+      _dedupe: false,
+      signal: controller.signal,
+    } as any)
+    if (controller.signal.aborted) return
     linkedWps[attachmentId] = Array.isArray(linked) ? linked : linked?.items || []
   } catch {
-    linkedWps[attachmentId] = null
+    if (!controller.signal.aborted) linkedWps[attachmentId] = null
+  } finally {
+    if (linkedWpControllers.get(attachmentId) === controller) linkedWpControllers.delete(attachmentId)
+    linkedWpLoading[attachmentId] = false
   }
 }
 
@@ -216,7 +301,8 @@ function jumpToWp(wpId: string) {
   }
 }
 
-function onPreview(att: AttachmentRow) {
+function onPreview(att: AttachmentRow, opener?: Event | EventTarget | null) {
+  rememberPreviewOpener(opener)
   // 判型统一构造：file_type 是分类词（image / word），原样当类型提示时图片判不出、
   // 识别状态 completed 显示成英文（spec attachment-inline-preview ADR-AIP-02）
   selected.value = toAttachmentPreview({
@@ -227,6 +313,12 @@ function onPreview(att: AttachmentRow) {
     ocr_text: att.ocr_text,
   })
   drawerOpen.value = true
+}
+
+function onItemKeydown(event: KeyboardEvent, att: AttachmentRow) {
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  event.preventDefault()
+  onPreview(att, event)
 }
 
 function onLinkCreated() {
@@ -297,7 +389,15 @@ function _stopOcrPolling() {
   if (_ocrPollTimer) { clearInterval(_ocrPollTimer); _ocrPollTimer = null }
 }
 
-onUnmounted(() => _stopOcrPolling())
+onUnmounted(() => {
+  listSeq += 1
+  listAbort?.abort()
+  listAbort = null
+  for (const controller of linkedWpControllers.values()) controller.abort()
+  linkedWpControllers.clear()
+  previewOpener = null
+  _stopOcrPolling()
+})
 
 // loadList 完成后启动轮询
 watch(list, () => _startOcrPolling(), { deep: false })
@@ -331,10 +431,18 @@ watch(list, () => _startOcrPolling(), { deep: false })
 .gt-attach-tab__icon { font-size: 18px; flex-shrink: 0; }
 .gt-attach-tab__body { flex: 1; min-width: 0; }
 .gt-attach-tab__name {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
   font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer;
 }
+.gt-attach-tab__name:hover { color: var(--gt-color-primary); text-decoration: underline; }
 .gt-attach-tab__meta {
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-text-tertiary);
@@ -379,4 +487,37 @@ watch(list, () => _startOcrPolling(), { deep: false })
 .gt-attach-tab__link-item:hover { background: var(--gt-color-primary-bg, #f4f0fa); }
 .gt-attach-tab__link-code { font-weight: 600; font-size: 12px; color: var(--gt-purple, #4b2d77); }
 .gt-attach-tab__link-name { font-size: 11px; color: var(--gt-color-text-tertiary); }
+.gt-attach-tab__error-detail { margin-top: 4px; font-size: 12px; }
+.gt-attach-tab__retry,
+.gt-attach-tab__link-retry {
+  border: 0;
+  background: transparent;
+  color: var(--el-color-primary, #409eff);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.gt-attach-tab__retry { margin-top: 8px; padding: 4px 8px; }
+.gt-attach-tab__item:focus-visible,
+.gt-attach-tab__name:focus-visible,
+.gt-attach-tab__retry:focus-visible,
+.gt-attach-tab__link-retry:focus-visible,
+.gt-attach-tab__eye:focus-visible {
+  outline: 2px solid var(--el-color-primary, #409eff);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .gt-attach-tab__item { align-items: flex-start; flex-wrap: wrap; }
+  .gt-attach-tab__body { min-width: calc(100% - 48px); }
+  .gt-attach-tab__meta { flex-wrap: wrap; }
+  .gt-attach-tab__eye { margin-left: auto; }
+}
+
+@media (max-width: 390px) {
+  .gt-attach-tab__hint { padding-inline: 8px; }
+  .gt-attach-tab__item { padding-inline: 8px; }
+  .gt-attach-tab__body { min-width: calc(100% - 36px); }
+  .gt-attach-tab__meta { gap: 4px; }
+  .gt-attach-tab__eye { width: 100%; justify-content: flex-end; }
+}
 </style>

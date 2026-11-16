@@ -38,6 +38,10 @@ from app.services.four_table.parent_check import build_parent_check
 
 from ._context import RenderContext
 
+# 🔴 `_is_leaf` 是跨策略共享的判据，唯一实现在 `_h2_construction_in_progress`；
+#    本文件原先直接引用却从未 import ⇒ 走到该分支必 NameError。复用同一份，不复制第二实现。
+from app.routers.wp_render_strategies._h2_construction_in_progress import _is_leaf
+
 logger = logging.getLogger(__name__)
 
 # 保留旧常量供别名兼容

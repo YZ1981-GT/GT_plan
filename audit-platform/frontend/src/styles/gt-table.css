@@ -65,25 +65,25 @@
 .gt-tb-font-xs .el-table__body,
 .gt-tb-font-xs th .cell,
 .gt-tb-font-xs td .cell {
-  font-size: 11px !important;
+  font-size: var(--gt-display-font-size, 11px) !important;
 }
 
 .gt-tb-font-sm .el-table__body,
 .gt-tb-font-sm th .cell,
 .gt-tb-font-sm td .cell {
-  font-size: 12px !important;
+  font-size: var(--gt-display-font-size, 12px) !important;
 }
 
 .gt-tb-font-md .el-table__body,
 .gt-tb-font-md th .cell,
 .gt-tb-font-md td .cell {
-  font-size: 13px !important;
+  font-size: var(--gt-display-font-size, 13px) !important;
 }
 
 .gt-tb-font-lg .el-table__body,
 .gt-tb-font-lg th .cell,
 .gt-tb-font-lg td .cell {
-  font-size: 14px !important;
+  font-size: var(--gt-display-font-size, 14px) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════

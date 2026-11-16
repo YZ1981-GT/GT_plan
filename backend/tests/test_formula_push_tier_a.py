@@ -386,7 +386,7 @@ class TestApply:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def _make_note_rule(wp_code: str, *, table: str = "测试表", fields: tuple[str, ...] = ("end_amount", "prior_amount")) -> "PushRule":
+def _make_note_rule(wp_code: str, *, table: str = "测试表", fields: tuple[str, ...] = ("end_amount", "prior_amount")) -> "PushRule":  # noqa: F821 — PushRule 在函数体内 import（前向引用）
     """构建用于 note_rows 测试的假附注规则。"""
     from app.services.formula_push.rules import PushRule, PushSource, PushTarget
     return PushRule(

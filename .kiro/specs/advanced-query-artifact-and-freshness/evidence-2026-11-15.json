@@ -1,0 +1,580 @@
+{
+  "design0_recompute.json": {
+    "line_counts": {
+      "backend/app/routers/custom_query.py": 1982,
+      "backend/app/services/custom_query/query_orchestrator.py": 777,
+      "backend/app/routers/query_builder.py": 515,
+      "backend/app/services/custom_query/query_export.py": 379,
+      "backend/app/services/custom_query/export_service.py": 697,
+      "audit-platform/frontend/src/components/query/CustomQueryDialog.vue": 1411,
+      "audit-platform/frontend/src/components/template-library/CustomQueryTab.vue": 1025,
+      "audit-platform/frontend/src/views/AdvancedQueryBuilder.vue": 1161,
+      "backend/app/services/custom_query/query_runs.py": 284,
+      "backend/app/services/custom_query/query_artifacts.py": 425,
+      "backend/app/services/custom_query/query_evidence.py": 58,
+      "backend/app/services/custom_query/version_registry.py": 162,
+      "backend/app/services/custom_query/version_capture.py": 365,
+      "backend/app/services/custom_query/version_compare.py": 163,
+      "backend/app/routers/query_evidence.py": 389,
+      "backend/app/services/custom_query/business_execute.py": 113,
+      "backend/app/models/query_evidence_models.py": 181,
+      "audit-platform/frontend/src/components/query/queryRunFormat.ts": 72,
+      "audit-platform/frontend/src/components/query/useQueryRunEvidence.ts": 300,
+      "audit-platform/frontend/src/components/query/QueryRunBanner.vue": 163,
+      "audit-platform/frontend/src/components/query/QueryEvidenceDrawer.vue": 153
+    },
+    "migrations": {
+      "disk_count": 259,
+      "disk_max": 271,
+      "disk_dups": [],
+      "r_count": 206,
+      "remote_count": 259,
+      "remote_max": 271
+    },
+    "pg": {
+      "rows": 261,
+      "max": 271,
+      "objects": {
+        "query_runs": "query_runs",
+        "query_artifacts": "query_artifacts"
+      },
+      "run_rows": 0,
+      "artifact_rows": 0
+    },
+    "routes": {
+      "count": 36,
+      "routes": [
+        {
+          "path": "/api/custom-query/indicators",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "get_indicators",
+          "query_params": [
+            "project_id",
+            "depth",
+            "branch",
+            "year"
+          ]
+        },
+        {
+          "path": "/api/custom-query/wp-id-by-code",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "wp_id_by_code",
+          "query_params": [
+            "project_id",
+            "wp_code"
+          ]
+        },
+        {
+          "path": "/api/custom-query/wp-sheet-preview",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "wp_sheet_preview",
+          "query_params": [
+            "project_id",
+            "wp_code",
+            "sheet_name"
+          ]
+        },
+        {
+          "path": "/api/custom-query/execute",
+          "methods": [
+            "POST"
+          ],
+          "endpoint": "execute_query",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/export",
+          "methods": [
+            "POST"
+          ],
+          "endpoint": "export_query",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/templates",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "list_templates",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/template-share-targets",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "template_share_targets",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/template-presets",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "list_template_presets",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/template-presets/{preset_id}/resolve",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "resolve_template_preset",
+          "query_params": [
+            "project_id",
+            "year"
+          ]
+        },
+        {
+          "path": "/api/custom-query/templates",
+          "methods": [
+            "POST"
+          ],
+          "endpoint": "create_template",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/templates/{template_id}/resolve",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "resolve_user_template",
+          "query_params": [
+            "project_id",
+            "year"
+          ]
+        },
+        {
+          "path": "/api/custom-query/templates/{template_id}",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "get_template",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/templates/{template_id}",
+          "methods": [
+            "PUT"
+          ],
+          "endpoint": "update_template",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/templates/{template_id}",
+          "methods": [
+            "DELETE"
+          ],
+          "endpoint": "delete_template",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/templates/{template_id}/execute",
+          "methods": [
+            "POST"
+          ],
+          "endpoint": "execute_template",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/cell-writeback",
+          "methods": [
+            "POST"
+          ],
+          "endpoint": "cell_writeback_gone",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/index-health",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "get_index_health",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/cross-sheet-trace",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "cross_sheet_trace",
+          "query_params": [
+            "wp_code",
+            "sheet_name",
+            "cell_ref",
+            "project_id",
+            "max_depth"
+          ]
+        },
+        {
+          "path": "/api/custom-query/address-resolve",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "address_resolve",
+          "query_params": [
+            "uri"
+          ]
+        },
+        {
+          "path": "/api/custom-query/runs",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "list_runs",
+          "query_params": [
+            "entry",
+            "project_id",
+            "limit",
+            "before"
+          ]
+        },
+        {
+          "path": "/api/custom-query/runs/{run_id}",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "get_run",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/runs/{run_id}/freshness",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "get_run_freshness",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/runs/{run_id}",
+          "methods": [
+            "DELETE"
+          ],
+          "endpoint": "hide_run",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/runs/clear",
+          "methods": [
+            "POST"
+          ],
+          "endpoint": "clear_runs",
+          "query_params": [
+            "entry"
+          ]
+        },
+        {
+          "path": "/api/custom-query/artifacts",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "list_artifacts",
+          "query_params": [
+            "entry",
+            "project_id",
+            "limit",
+            "before"
+          ]
+        },
+        {
+          "path": "/api/custom-query/artifacts/{artifact_id}",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "get_artifact",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/artifacts/{artifact_id}/download",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "download_artifact",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/artifacts/{artifact_id}/manifest",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "get_artifact_manifest",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/artifacts/{artifact_id}/freshness",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "get_artifact_freshness",
+          "query_params": []
+        },
+        {
+          "path": "/api/query/schema",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "get_schema",
+          "query_params": []
+        },
+        {
+          "path": "/api/query/access",
+          "methods": [
+            "GET"
+          ],
+          "endpoint": "get_access",
+          "query_params": []
+        },
+        {
+          "path": "/api/query/preview",
+          "methods": [
+            "POST"
+          ],
+          "endpoint": "preview_query",
+          "query_params": []
+        },
+        {
+          "path": "/api/query/execute",
+          "methods": [
+            "POST"
+          ],
+          "endpoint": "execute_query",
+          "query_params": []
+        },
+        {
+          "path": "/api/query/export-excel",
+          "methods": [
+            "POST"
+          ],
+          "endpoint": "export_excel",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/writeback-preview",
+          "methods": [
+            "POST"
+          ],
+          "endpoint": "writeback_preview_gone",
+          "query_params": []
+        },
+        {
+          "path": "/api/custom-query/writeback-confirm",
+          "methods": [
+            "POST"
+          ],
+          "endpoint": "writeback_confirm_gone",
+          "query_params": []
+        }
+      ]
+    }
+  },
+  "authz_baseline.json": {
+    "path_param_dimension": {
+      "total_project_endpoints": 446,
+      "unauthorized": 6,
+      "identity_only": 143,
+      "identity_only_baseline": 146
+    },
+    "prefixed_dimension": {
+      "total": 735,
+      "by_tier": {
+        "identity": 192,
+        "project": 540,
+        "none": 3
+      },
+      "identity_only_baseline": 197,
+      "known_gaps": [],
+      "self_auth": [
+        "deliverable.py::onlyoffice_callback",
+        "deliverable.py::signed_download_version"
+      ]
+    },
+    "body_carried_dimension": {
+      "total": 232,
+      "by_tier": {
+        "identity": 78,
+        "project": 150,
+        "none": 4
+      },
+      "known_gaps": [
+        "b60_chapters.py::get_chapter_definitions",
+        "feature_flags.py::check_flag",
+        "feature_flags.py::list_flags",
+        "metabase.py::build_drilldown_url",
+        "metabase.py::get_embed_url"
+      ]
+    }
+  },
+  "patch_points_verify.json": {
+    "design_points": [
+      {
+        "module": "app.services.custom_query.query_orchestrator",
+        "attr": "read_acnr_target_values",
+        "where": "tests/test_advanced_query_hardening_wave012.py:713",
+        "resolved": true,
+        "detail": "app.services.custom_query.query_orchestrator + read_acnr_target_values"
+      },
+      {
+        "module": "app.services.custom_query.query_export",
+        "attr": "acquire_export_slot",
+        "where": "tests/advanced_query_linkage/test_aql_export_pg.py:169",
+        "resolved": true,
+        "detail": "app.services.custom_query.query_export + acquire_export_slot"
+      },
+      {
+        "module": "app.services.custom_query.execute_compatibility.ExecuteCompatibilityAdapter",
+        "attr": "execute",
+        "where": "tests/test_advanced_query_ddl_cross_lock.py:285",
+        "resolved": true,
+        "detail": "app.services.custom_query.execute_compatibility + ExecuteCompatibilityAdapter.execute"
+      },
+      {
+        "module": "app.services.custom_query.execute_compatibility.ExecuteCompatibilityAdapter",
+        "attr": "execute",
+        "where": "tests/test_advanced_query_hardening_properties_scope.py:177/193",
+        "resolved": true,
+        "detail": "app.services.custom_query.execute_compatibility + ExecuteCompatibilityAdapter.execute"
+      },
+      {
+        "module": "app.services.custom_query.ownership_guard",
+        "attr": "set_rls_context",
+        "where": "tests/advanced_query_linkage/test_aqs_safety_closure.py:70",
+        "resolved": true,
+        "detail": "app.services.custom_query.ownership_guard + set_rls_context"
+      }
+    ],
+    "scanned_extra": [
+      {
+        "file": "backend/tests/advanced_query_linkage/test_aql_address_resolve.py",
+        "line": 175,
+        "owner": "custom_query",
+        "member": "'_load_step_sheet_mapping'",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/advanced_query_linkage/test_aql_export_gate.py",
+        "line": 364,
+        "owner": "paged_fetch",
+        "member": "'stream_statement'",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/advanced_query_linkage/test_aql_export_pg.py",
+        "line": 144,
+        "owner": "paged_fetch",
+        "member": "'stream_statement'",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/advanced_query_linkage/test_aql_export_pg.py",
+        "line": 169,
+        "owner": "'app.services.custom_query.query_export.acquire_export_slot'",
+        "member": "_spy",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/advanced_query_linkage/test_aqs_safety_closure.py",
+        "line": 277,
+        "owner": "'app.services.custom_query.query_orchestrator.CycleScopeCache.cycles'",
+        "member": "cycles",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/advanced_query_linkage/test_aqs_safety_closure.py",
+        "line": 371,
+        "owner": "'app.services.custom_query.ownership_guard.audit_logger.log_action'",
+        "member": "AsyncMock(return_value={})",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/advanced_query_linkage/test_aqs_safety_closure.py",
+        "line": 70,
+        "owner": "'app.services.custom_query.ownership_guard.set_rls_context'",
+        "member": "rls",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/advanced_query_linkage/test_aqs_safety_closure.py",
+        "line": 71,
+        "owner": "'app.services.custom_query.ownership_guard.audit_logger.log_action'",
+        "member": "AsyncMock(return_value={})",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/perf/test_workpaper_html_renderer_perf.py",
+        "line": 403,
+        "owner": "wp_xlsx_export_service",
+        "member": "'_sync_export_workpaper_xlsx'",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/test_advanced_query_ddl_cross_lock.py",
+        "line": 286,
+        "owner": "'app.services.custom_query.audit_helper.record_query_rejected'",
+        "member": "_record",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/test_advanced_query_ddl_cross_lock.py",
+        "line": 316,
+        "owner": "'app.services.custom_query.audit_helper.record_query_rejected'",
+        "member": "_record",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/test_advanced_query_hardening_wave012.py",
+        "line": 536,
+        "owner": "ownership_guard",
+        "member": "'assert_target_accessible'",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/test_advanced_query_hardening_wave012.py",
+        "line": 820,
+        "owner": "paged_fetch",
+        "member": "'page'",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/test_advanced_query_hardening_wave012.py",
+        "line": 614,
+        "owner": "ownership_guard",
+        "member": "'assert_target_accessible'",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/test_advanced_query_hardening_wave012.py",
+        "line": 713,
+        "owner": "'app.services.custom_query.query_orchestrator.read_acnr_target_values'",
+        "member": "AsyncMock()",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/test_advanced_query_hardening_wave012.py",
+        "line": 915,
+        "owner": "ownership_guard",
+        "member": "'assert_target_accessible'",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/test_advanced_query_indicators_lazy.py",
+        "line": 220,
+        "owner": "ownership_guard",
+        "member": "'assert_target_accessible'",
+        "op": "setattr"
+      },
+      {
+        "file": "backend/tests/test_custom_query_template_scope_hardening.py",
+        "line": 182,
+        "owner": "ownership_guard",
+        "member": "'assert_target_accessible'",
+        "op": "setitem"
+      }
+    ]
+  }
+}

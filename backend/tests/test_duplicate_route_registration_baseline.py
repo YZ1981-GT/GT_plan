@@ -24,14 +24,14 @@ import pytest
 
 #: 2026-09-30 冻结的「已知重复」（method, path）。🔴 只许删除条目，不许新增：
 #: 修掉一组后必须同步删掉它（``test_baseline_has_no_stale_entries`` 会逼你删）。
+#: 2026-11-14 删除 ``GET /api/projects/{project_id}/a16/recommended-version``：
+#: completion_phase 的死实现已删（wp_editor_router 先注册 ⇒ 它从未可达，且返回旧形状
+#: {main, supplement}，前端只认 {recommended_code, …}），并按 export-word 先例钉住
+#: 「现在由谁服务」（``test_a16_recommended_version_is_served_by_wp_editor_only``）。
 _KNOWN_DUPLICATES: frozenset[tuple[str, str]] = frozenset({
     ("GET", "/api/aging/presets"),
-    ("GET", "/api/b60/chapter-definitions"),
-    ("GET", "/api/projects/{project_id}/a16/recommended-version"),
     ("GET", "/api/projects/{project_id}/aging/config"),
     ("GET", "/api/projects/{project_id}/issue-hints"),
-    ("GET", "/api/projects/{project_id}/working-papers/{wp_id}/export-word"),
-    ("GET", "/api/projects/{project_id}/working-papers/{wp_id}/export-word/check-incomplete"),
     ("GET", "/api/projects/{project_id}/workpaper-summaries/{key}"),
     ("POST", "/api/projects/{project_id}/ledger-import/jobs/{job_id}/retry"),
     ("PUT", "/api/projects/{project_id}/aging/config"),
@@ -94,6 +94,58 @@ def test_baseline_has_no_stale_entries(app_routes):
     dups = duplicated_routes(app_routes)
     stale = sorted(k for k in _KNOWN_DUPLICATES if k not in dups)
     assert not stale, f"以下已不再重复注册，请从 _KNOWN_DUPLICATES 删除：{stale}"
+
+
+def test_a16_recommended_version_is_served_by_wp_editor_only(app_routes):
+    """A16 推荐版本只由 ``wp_editor_router`` 注册一次，且生效实现就是它。
+
+    2026-11-14：``completion_phase`` 的死实现已删（它比 ``wp_editor_router`` 后注册 ⇒
+    从未可达，且返回旧形状 ``{main, supplement}``，前端 ``WorkpaperWordEditor`` 只认
+    ``{recommended_code, recommended_label, all_versions, always_required}``）。
+    只删基线登记而不钉住「现在由谁服务」，下次谁再往 ``completion_phase`` 加回一条
+    同路径端点，又会静默遮蔽而所有判据照绿（export-word 同型先例）。
+    """
+    path = "/api/projects/{project_id}/a16/recommended-version"
+    hits = [
+        r for r in app_routes
+        if getattr(r, "path", None) == path and "GET" in (getattr(r, "methods", None) or ())
+    ]
+    names = [f"{r.endpoint.__module__}.{r.endpoint.__qualname__}" for r in hits]
+    assert names == ["app.routers.wp_editor_router.get_a16_recommended_version"], names
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "expected"),
+    [
+        (
+            "GET",
+            "/api/projects/{project_id}/working-papers/{wp_id}/export-word",
+            "app.routers.wp_export_word.get_export_word",
+        ),
+        (
+            "GET",
+            "/api/projects/{project_id}/working-papers/{wp_id}/export-word/check-incomplete",
+            "app.routers.wp_export_word.get_check_incomplete",
+        ),
+    ],
+)
+def test_export_word_is_registered_exactly_once_by_the_dispatch_router(
+    app_routes, method, path, expected
+):
+    """export-word 两条路径各只注册一次，且生效实现是 ``wp_export_word``。
+
+    spec ``api-prefix-fix-recovery`` 任务 4：``completion_phase`` 那两份重复实现已删。它们比
+    ``wp_export_word`` 先注册 ⇒ 一直遮蔽后者，而自己又坏的（``WorkingPaper`` 无 ``wp_code`` 列
+    ⇒ 导出恒 500；check 返回 ``{incomplete, count}`` 与前端契约不符）⇒ 导出 Word 三个月不可用。
+    只删基线登记而不钉住「现在由谁服务」，下次谁再往 ``completion_phase`` 加一条同路径端点，
+    又会静默遮蔽而所有判据照绿。
+    """
+    hits = [
+        r for r in app_routes
+        if getattr(r, "path", None) == path and method in (getattr(r, "methods", None) or ())
+    ]
+    names = [f"{r.endpoint.__module__}.{r.endpoint.__qualname__}" for r in hits]
+    assert names == [expected], names
 
 
 def test_detector_catches_an_injected_duplicate():

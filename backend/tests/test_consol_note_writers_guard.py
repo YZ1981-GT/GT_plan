@@ -32,7 +32,7 @@ _CONTENT_SHAPES = frozenset(
         "raw_sql_data",
     }
 )
-_PERSISTENCE_SHAPES = _CONTENT_SHAPES | {"stale_assignment", "orm_update_stale"}
+_PERSISTENCE_SHAPES = _CONTENT_SHAPES | {"stale_assignment", "orm_update_stale", "stale_state_call"}
 _RAW_DATA_UPDATE = re.compile(
     r"\bUPDATE\s+consol_note_data\b.*\bSET\s+data\s*=",
     re.IGNORECASE | re.DOTALL,
@@ -265,6 +265,8 @@ def _analyze_definition(definition: _Definition, *, include_nested: bool = False
             calls.add(tail)
         if tail == "ConsolNoteData":
             kinds.add("orm_constructor")
+        if tail in {"mark_stale", "stale_values"}:
+            kinds.add("stale_state_call")
         if tail == "update_source_projection":
             kinds.add("source_projection")
         if tail == "values" and isinstance(node.func, ast.Attribute):
@@ -334,6 +336,8 @@ def _direct_persistence(definition: _Definition, shapes: _Shapes) -> bool:
     consol_note_data SQL、来源投影，或带保护函数的附注写入函数才满足身份证据。
     """
 
+    if "stale_state_call" in shapes.kinds and "ConsolNoteData" in shapes.names:
+        return True
     if shapes.kinds & {"orm_constructor", "orm_update_data", "source_projection", "raw_sql_data"}:
         return True
     if "orm_data_assignment" in shapes.kinds:
@@ -423,7 +427,7 @@ def test_registry_entrypoints_roles_and_protection_basis_match_production_ast():
             assert not shapes.kinds & {"stale_assignment", "orm_update_stale"}
             assert not spec.protection_basis
         elif spec.role == "stale":
-            assert shapes.kinds & {"stale_assignment", "orm_update_stale"}
+            assert shapes.kinds & {"stale_assignment", "orm_update_stale", "stale_state_call"}
             assert not shapes.kinds & _CONTENT_SHAPES
             assert not spec.protection_basis
 
@@ -445,7 +449,8 @@ def _assert_persistence_registry_is_complete(definitions: dict[str, _Definition]
     )
 
     observed_kinds = set().union(*(observed[entry].kinds for entry in observed_persistence))
-    assert {"orm_constructor", "orm_data_assignment", "raw_sql_data", "stale_assignment"} <= observed_kinds
+    assert {"orm_constructor", "orm_data_assignment", "raw_sql_data"} <= observed_kinds
+    assert {"stale_assignment", "stale_state_call"} & observed_kinds
 
 
 def _assert_automatic_writer_protection_references(definitions: dict[str, _Definition]) -> None:

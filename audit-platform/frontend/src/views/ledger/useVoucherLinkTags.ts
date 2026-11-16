@@ -14,7 +14,7 @@
  * - 凭证层（`linksOfKey`）另并入各可见底稿已取得的凭证证据（spec attachment-voucher-evidence-binding 需求 7，
  *   证据走凭证证据索引按需查）；明细层 📎（`flagOfRow` / `linksOfRow`）照旧只看登记。
  */
-import { shallowRef, watch, type Ref } from 'vue'
+import { getCurrentScope, onScopeDispose, shallowRef, watch, type Ref } from 'vue'
 import {
   queryVoucherLinks, VOUCHER_LINKS_MAX_KEYS, type VoucherLink,
 } from '@/components/workpaper/composables/useAttachedVouchers'
@@ -53,6 +53,9 @@ export const LINK_SOURCE_LABEL: Readonly<Record<VoucherTag['source'], string>> =
   evidence: '凭证证据',
 }
 
+export const VOUCHER_LINKS_CACHE_TTL_MS = 60_000
+export const VOUCHER_LINKS_MAX_CACHED_KEYS = 2_000
+
 /** 「J1 应付职工薪酬 · 抽凭 ×2 · 预审」；底稿已删 / 不在本项目、没指定底稿、旧登记各有说明；证据条目列文件名 */
 export function voucherLinkText(link: VoucherTag): string {
   const wp = link.wp_code
@@ -88,18 +91,40 @@ export function useVoucherLinkTags(projectId: Ref<string>, year: Ref<number | nu
   let seq = 0
   /** 每个键最近一次为它发起的请求序号：晚到的旧响应不覆盖 */
   const latest = new Map<string, number>()
+  const cachedAt = new Map<string, number>()
+  const controllers = new Map<number, AbortController>()
 
   function clear(): void {
+    for (const controller of controllers.values()) controller.abort()
+    controllers.clear()
     links.value = new Map()
     failed.value = new Set()
     pending.value = new Set()
     latest.clear()
+    cachedAt.clear()
     seq += 1
   }
   watch([projectId, year], clear)
 
   function syncPending(): void {
     pending.value = new Set(latest.keys())
+  }
+
+  function isFresh(key: string): boolean {
+    const at = cachedAt.get(key)
+    return at !== undefined && Date.now() - at < VOUCHER_LINKS_CACHE_TTL_MS
+  }
+
+  function trimCache(next: Map<string, VoucherLink[]>): void {
+    if (next.size <= VOUCHER_LINKS_MAX_CACHED_KEYS) return
+    const victims = [...cachedAt.entries()]
+      .filter(([key]) => !latest.has(key) && !pending.value.has(key))
+      .sort((a, b) => a[1] - b[1])
+    for (const [key] of victims.slice(0, next.size - VOUCHER_LINKS_MAX_CACHED_KEYS)) {
+      next.delete(key)
+      cachedAt.delete(key)
+      failed.value.delete(key)
+    }
   }
 
   async function fetchKeys(keys: string[]): Promise<void> {
@@ -109,13 +134,18 @@ export function useVoucherLinkTags(projectId: Ref<string>, year: Ref<number | nu
     for (let i = 0; i < keys.length; i += VOUCHER_LINKS_MAX_KEYS) {
       const chunk = keys.slice(i, i + VOUCHER_LINKS_MAX_KEYS)
       const mine = ++seq
+      const controller = new AbortController()
+      controllers.set(mine, controller)
       for (const k of chunk) latest.set(k, mine)
       syncPending()
       let found: Record<string, VoucherLink[]>
       try {
-        found = await queryVoucherLinks(pid, yr, chunk)
+        found = await queryVoucherLinks(pid, yr, chunk, controller.signal)
       } catch {
-        if (pid !== projectId.value || yr !== year.value) return
+        if (controller.signal.aborted || pid !== projectId.value || yr !== year.value) {
+          controllers.delete(mine)
+          return
+        }
         const nextFailed = new Set(failed.value)
         for (const k of chunk) {
           if (latest.get(k) !== mine) continue
@@ -124,20 +154,27 @@ export function useVoucherLinkTags(projectId: Ref<string>, year: Ref<number | nu
         }
         failed.value = nextFailed
         syncPending()
+        controllers.delete(mine)
         continue
       }
-      if (pid !== projectId.value || yr !== year.value) return
+      if (controller.signal.aborted || pid !== projectId.value || yr !== year.value) {
+        controllers.delete(mine)
+        return
+      }
       const next = new Map(links.value)
       const nextFailed = new Set(failed.value)
       for (const k of chunk) {
         if (latest.get(k) !== mine) continue
         next.set(k, found[k] ?? [])
+        cachedAt.set(k, Date.now())
         nextFailed.delete(k)
         latest.delete(k)
       }
+      trimCache(next)
       links.value = next
       failed.value = nextFailed
       syncPending()
+      controllers.delete(mine)
     }
   }
 
@@ -146,7 +183,15 @@ export function useVoucherLinkTags(projectId: Ref<string>, year: Ref<number | nu
     const keys = new Set<string>()
     for (const row of rows) {
       const k = rowVoucherKey(row, year.value)
-      if (k && !links.value.has(k) && !latest.has(k)) keys.add(k)
+      if (!k || latest.has(k)) continue
+      if (links.value.has(k) && isFresh(k)) continue
+      if (links.value.has(k)) {
+        const next = new Map(links.value)
+        next.delete(k)
+        links.value = next
+        cachedAt.delete(k)
+      }
+      keys.add(k)
     }
     if (keys.size) await fetchKeys([...keys])
   }
@@ -197,6 +242,8 @@ export function useVoucherLinkTags(projectId: Ref<string>, year: Ref<number | nu
   async function retryEvidence(key: string | null | undefined): Promise<void> {
     await refreshVoucherEvidence(projectId.value, year.value, [key])
   }
+
+  if (getCurrentScope()) onScopeDispose(clear)
 
   return {
     links, loadForRows, refresh, clear, linksOfKey, linksOfRow, flagOfRow,

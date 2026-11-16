@@ -34,6 +34,7 @@ from app.services import wp_template_finder as F  # noqa: E402
 
 from hypothesis import HealthCheck, given, settings  # noqa: E402
 from hypothesis import strategies as st  # noqa: E402
+from typing import Any
 
 #: 项目铁律：`max_examples=5`，禁 hypothesis 默认 100。
 PBT = settings(

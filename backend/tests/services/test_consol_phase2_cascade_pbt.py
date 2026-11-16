@@ -75,12 +75,19 @@ _PATCH_KEYS = (
 )
 
 
-def _note_stats(note_status: str = "persisted", *, refreshed: int = 4, kept: int = 0, failed: int = 0) -> dict:
+def _note_stats(
+    note_status: str = "persisted",
+    *,
+    refreshed: int = 4,
+    kept: int = 0,
+    failed: int = 0,
+    skip_reason: str | None = None,
+) -> dict:
     """``consol_push_service._refresh_notes`` 同形统计。"""
     return {
         "stale_marked": 6, "distinct_section_count": 3, "node_count": 2,
         "refreshed_count": refreshed, "kept_pulled_count": kept, "failed_count": failed,
-        "skipped_count": 0, "note_status": note_status,
+        "skipped_count": 0, "skip_reason": skip_reason, "note_status": note_status,
     }
 
 
@@ -366,8 +373,8 @@ class TestNotesStep:
         assert STEP_NOTES not in result.steps_skipped
         errors = [e for e in result.errors if e["step"] == STEP_NOTES]
         assert len(errors) == 1
-        assert f"合并附注刷新{word}" in errors[0]["error"]
-        assert "失败 2 个章节×节点" in errors[0]["error"]
+        assert f"附注状态={note_status}" in errors[0]["error"]
+        assert "失败 2" in errors[0]["error"]
         assert "保留单体附注拉数 1" in errors[0]["error"]
         assert recorder.final_status(STEP_NOTES) == "error"
 
@@ -428,3 +435,29 @@ class TestRefreshNotesExclusive:
 
         assert order == ["released", "refresh"]
         assert stats["note_status"] == "persisted"
+
+
+@pytest.mark.parametrize(
+    ("skip_reason", "expected_status"),
+    [
+        ("no_template_type", "skipped"),
+        ("no_sections", "skipped"),
+        ("no_tree", "skipped"),
+        ("context_failed", "error"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_skip_reason_verdict_is_preserved_in_cascade(skip_reason, expected_status):
+    """R3：级联刷新沿用附注 verdict，context_failed 不能落入 skipped。"""
+    patchers = _patch_all(node_count=2, note_status="skipped", refreshed=0, skip_reason=skip_reason)
+    recorder = _ProgressRecorder()
+    result = await _run(patchers, progress_cb=recorder)
+
+    assert recorder.final_status(STEP_NOTES) == expected_status
+    if expected_status == "error":
+        assert result.steps_skipped.count(STEP_NOTES) == 0
+        assert result.errors[-1]["step"] == STEP_NOTES
+        assert "合并计算上下文构建失败" in result.errors[-1]["error"]
+    else:
+        assert STEP_NOTES in result.steps_skipped
+        assert not [error for error in result.errors if error["step"] == STEP_NOTES]

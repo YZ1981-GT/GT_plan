@@ -37,6 +37,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 __all__ = [
     "SectionMutateResult",
+    "acquire_section_lock",
     "mutate_note_section",
     "mutate_note_by_id",
     "stable_hash",
@@ -54,6 +55,28 @@ class SectionMutateResult:
     changed: bool
     before_hash: str
     after_hash: str
+
+
+async def acquire_section_lock(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    year: int,
+    section_id: str,
+) -> bool:
+    """只取章节级 advisory 锁，不读不写 —— 供「业务 mutator 自己写」的调用方复用。
+
+    用途（C2/C3）：`note_followup` / `note_formula_generator` 这类写入方自己完成
+    具体读写，但需要与其他章节写者串行。此时不该走 `mutate_note_section`——
+    那会多读一次整张表并 deepcopy（no-op mutator 等于白白多做一次全表加载）。
+
+    返回 True = 真的取了 PG 事务级锁；False = 非 PG 环境（无锁，靠进程内串行）。
+    事务级锁随 commit / rollback 自动释放，调用方不需要解。
+    """
+    if _dialect_name(db) != "postgresql":
+        return False
+    await _acquire_section_lock(db, project_id, year, section_id)
+    return True
 
 
 async def mutate_note_section(
@@ -89,7 +112,7 @@ async def mutate_note_section(
 
     await _acquire_section_lock(db, project_id, year, section_id)
 
-    is_pg = db.bind is not None and db.bind.dialect.name == "postgresql"
+    is_pg = _dialect_name(db) == "postgresql"
     stmt = sa.select(DisclosureNote).where(
         DisclosureNote.project_id == project_id,
         DisclosureNote.year == year,
@@ -145,7 +168,7 @@ async def mutate_note_by_id(
 
     await _acquire_note_lock(db, note_id)
 
-    is_pg = db.bind is not None and db.bind.dialect.name == "postgresql"
+    is_pg = _dialect_name(db) == "postgresql"
     stmt = sa.select(DisclosureNote).where(
         DisclosureNote.id == note_id,
         DisclosureNote.is_deleted == sa.false(),
@@ -175,6 +198,18 @@ async def mutate_note_by_id(
     )
 
 
+def _dialect_name(db: Any) -> str:
+    """取 session 的方言名；无 ``bind``（测试替身 / 代理）时按非 PG 处理。
+
+    🔴 内核不能假设 ``db`` 一定有 ``bind``：`tests/test_note_workpaper_pull_service.py`
+    的 `_NestedDb` 只实现 `begin_nested` / `execute` / `flush`，直接访问 `db.bind`
+    会让接入方整条链路抛 AttributeError（并把它误记成「公式执行失败」）。
+    """
+    bind = getattr(db, "bind", None)
+    dialect = getattr(bind, "dialect", None)
+    return str(getattr(dialect, "name", "") or "")
+
+
 async def _acquire_section_lock(
     db: AsyncSession,
     project_id: UUID,
@@ -186,7 +221,7 @@ async def _acquire_section_lock(
     事务级（``pg_advisory_xact_lock``）即可：commit / rollback 自动释放，
     不需要本内核再手工释放；跨章节天然并行。
     """
-    if db.bind is None or db.bind.dialect.name != "postgresql":
+    if _dialect_name(db) != "postgresql":
         return
     key = f"note_section:{project_id}:{year}:{section_id}"
     await db.execute(
@@ -197,7 +232,7 @@ async def _acquire_section_lock(
 
 async def _acquire_note_lock(db: AsyncSession, note_id: UUID) -> None:
     """按 note.id 的 advisory 锁；与 _acquire_section_lock 等价、只是 key 换成 note id。"""
-    if db.bind is None or db.bind.dialect.name != "postgresql":
+    if _dialect_name(db) != "postgresql":
         return
     await db.execute(
         sa.text("SELECT pg_advisory_xact_lock(:ns, hashtext(:key))"),

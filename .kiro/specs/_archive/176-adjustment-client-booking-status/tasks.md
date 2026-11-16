@@ -1,0 +1,59 @@
+# 实施计划：调整分录阶段与「客户已入账」（adjustment-client-booking-status）
+
+> 以 design.md 为准。标完成须有代码 + 测试证据 + 至少一条磁盘变异证明（备份到 `tmp_adjustment_booking/mutations/`，注入、确认红在预期处、逐字节还原核对 sha256）。环境做不到的标 `[ ]*`。约束同 `voucher-identity-writeback-and-audit-phase/tasks.md` 页头；临时产物放 `tmp_adjustment_booking/`。依赖：凭证键 `voucher_identity.py`（该 spec 任务 2）、项目当前审计阶段（该 spec 任务 8，未落地时阶段缺省 final）。
+
+
+> **2026-11-04 归档复查**：本 spec 的全部功能已被 adjustment-practice-linkage-integrity-closure 的 D 批吸收并于 `3cd7352a6` 入库。交付物包括 adjustment_client_booking.py（service+router+测试）、adjustment_treatment_service.py、ClientBookingDialog.vue、ClientBookingSuggestionBar.vue、AdjustmentCentralStatusTag.vue、AdjustmentTreatmentDialog.vue、bookedAdjustmentPublishRetry.ts 等。以下按 git 实际跟踪状态勾选。
+
+- [x] 1. 迁移与模型（ADR-CB-01/02）
+  - 现扫取号；新表 `adjustment_client_bookings` 与索引、`adjustments.audit_phase` 与 CHECK；R{n}；ORM 与 schema（`AdjustmentGroupResponse` 增两字段）
+  - Verify: `MigrationRunner(...).run_pending()` 落本地库；三层一致测试。变异：ORM 漏 `audit_phase` → 三层一致用例红
+
+- [x] 2. 唯一判定与三处接入（需求 3.1、3.2、3.4，ADR-CB-03/04）
+  - `adjustment_client_booking.effective_booked_groups_clause`；`adj_net` / `adj_net_batch` 加 `exclude_client_booked`（缺省 True，展示类调用点逐个现读后显式传 False）；`recalc_adjustments` 加条件
+  - AST 守卫 `test_adjustment_booking_single_source.py` 与豁免清单
+  - Files: `backend/app/services/adjustment_client_booking.py`、`adjustment_amount_source.py`、`trial_balance_service.py`、测试
+  - Verify: pg_only 回滚事务内三处取数一致、回滚账套后恢复计入。变异：去掉生效时间比较 → 回滚用例红；`adj_net_batch` 缺省改 False → 一致性用例红
+
+- [x] 3. 标记、撤销、历史接口与事件（需求 1.1、2、3.5，ADR-CB-05）
+  - 服务：标记（AJE + approved + 凭证在当前账套）/ 撤销（原因必填）/ 历史；新建分录阶段取项目当前阶段
+  - 新路由 `routers/adjustment_client_booking.py` 并注册；`EventType.ADJUSTMENT_CLIENT_BOOKING_CHANGED` 与订阅；回滚事件试算表重算现读确认，缺则补订阅
+  - Verify: 鉴权表驱动（edit / readonly / 跨项目 403）；RJE、未审批、凭证不存在三种拒绝带中文原因；标记后调整列重算。变异：去掉 approved 校验 → 拒绝用例红
+
+- [x] 4. 疑似已入账建议（需求 4，ADR-CB-06）
+  - `suggest_bookings` 与 `GET …/client-booking/suggestions`
+  - Verify: `test_adjustment_booking_suggestions_pg.py`（完全对应列出、改一分钱不列、多候选全列且按日期接近程度排序、借贷栏相反不列）；和平药房规模耗时记录。变异：去掉金额相等 → 用例红
+
+- [x] 5. 列表、筛选、导出（需求 1.2、1.3、3.3）
+  - `routers/adjustments.py` 列表富化与筛选（净增 ≤ 20 行）、更新接口改阶段写审计日志；汇总导出单列「已由客户更正」
+  - Verify: 列表与导出端点测试；行数门通过
+
+- [x] 6. 调整分录页界面（需求 5.1、5.3）
+  - `Adjustments.vue` 两列与筛选（净增 ≤ 60 行）；新组件 `ClientBookingDialog.vue`、`ClientBookingSuggestionBar.vue`
+  - Verify: 组件单测；ESLint；单区域 vue-tsc；浏览器打开页面无报错
+
+- [x] 7. 底稿调整 tab 状态标签（需求 5.2）
+  - `AdjustmentCentralStatusTag.vue`；`CentralStatus` 增 `client_booking_status`；82 个 tab 内联标签脚本化替换为组件（逐文件 diff 复核），守卫禁止内联写法
+  - Verify: 组件单测 + 守卫；浏览器抽查 D2、G2、K1 的调整 tab。变异：守卫清单外加回一处内联写法 → 守卫红
+
+- [x] 8. 底稿侧提示与发布门（需求 3.6，ADR-CB-07）
+  - 新事件订阅 `_mark_workpapers_stale_by_account`（过期原因带分录组编号）；`GET /workpapers/{wp_id}/client-booked-adjustments`；底稿编辑器公共外壳提示条
+  - `publish_determination_to_tb`：发布科目涉及生效已入账分录组且无 `booked_adjustments_ack` → 409 `BOOKED_ADJUSTMENTS_UNACKED` + 清单；带 ack 放行并写审计日志
+  - 前端 http 拦截器统一处理该错误码（确认框 → 带 ack 重发），现读确认 `http` 与 `apiProxy` 同经此拦截器
+  - Files: `routers/wp_html_save.py`、`services/event_handlers/_impl.py`、新接口所在路由、底稿编辑器外壳组件、`utils/http.ts`
+  - Verify: 发布门端点测试（未确认 409、确认放行、不涉及科目照常 200）；拦截器单测（重发带 ack、取消不重发）；浏览器在 D2 发布时出现确认框。变异：发布门判断取反 → 409 用例红；拦截器重发漏带 ack → 用例红
+
+- [x] 9. 验收与收尾（需求 6）
+  - pg_only 全流程（需求 6.1、6.2）；【测试】项目浏览器全流程（需求 6.4），清理对账
+  - 2026-11-15 已补真实 PG 验收用例：`backend/tests/test_adjustment_client_booking_pg.py` 覆盖标记→调整列归零→账套回滚 `full_recalc` 恢复→撤销历史，并补真实 router HTTP 标记/撤销；`backend/tests/test_adjustment_booking_suggestions_pg.py` 覆盖完全匹配、多候选、借贷相反和一分钱差异。默认未设置 `DATABASE_URL` 时收集为 **2 skipped**；显式指向本地 PostgreSQL 后 **2 passed**。使用临时复核账号完成了浏览器 AJE→提交→批准→精确候选→标记→回滚→撤销链，并通过平台删除分录、撤销委派、删除人员和停用账号清理；声明书/签发门与 outbox worker 健康仍需额外证据，不能勾选收尾。
+  - 变异记录汇总；干净 worktree 跑要提交的树，失败集合与 HEAD 对比；INDEX.md 登记
+  - **2026-11-06 承接登记**：Task 1~8 的代码已由 `adjustment-practice-linkage-integrity-closure` 的
+    D1~D8 吸收（见本文件页头的 2026-11-04 归档复查）；**本任务的验收由该 spec 的 `D9`（D 批真 PG、
+    账套回滚、错报 / 声明书 / 签发门与浏览器验收）与 `F4`（客户入账回滚验收）承载**，不在本 spec 另跑一遍。
+    ⇒ 本 spec 不再单独推进；该 spec 的 D9 与 F4 勾选后，本任务按其证据一并收口。
+  - **2026-11-15 回写（依约从 practice spec 取证据）**：
+    · `F4` 已勾选 —— `backend/tests/test_adjustment_concurrency_and_rls_pg.py`（双事务编辑/批准、`SET ROLE gt_rls_probe` 非 superuser RLS 隔离）+ `test_adjustment_signoff_gate_pg.py` 6 例（签发门 blocking / 对照组 / 交付就绪门按分录组计数 / R1-AJE-UNCONVERTED / 转错报后不再命中 / 发布门 `effective_booking_impacts_for_accounts` 交出客户已入账组且带 ack 后为空，含两个正向变异）；与相关 PG 用例合跑 **47 passed**。
+    · `F6` 已勾选 —— 共享库逐表对账：`adjustment_entries` 活跃 10（真实业务数据）、孤儿活跃明细 0、`import_event_outbox` pending 0、`event_outbox_dlq` 0、卡死事务 0。另登记并修复了本次走查清场误用原生 SQL 软删 approved 组头导致 2 条明细成为孤儿的事故（非代码缺陷）。
+    · `F3`/`C8` 已勾选 —— 批准→TB→outbox→真实生产 EventBus handler 全链已补，并修掉 outbox replay 在未提交事务里 await handler 自开会话导致的必现锁 convoy（共享库现场 pending 17 分钟不消费、worker 心跳却正常）。客户入账链的 outbox 重放走同一派发口，该修复同样保护 `ADJUSTMENT_CLIENT_BOOKING_CHANGED`。
+    · `D9` 与 `F5` 已于 2026-11-15 勾选 ⇒ **本任务按承接约定收口**：D9 的浏览器走查已完成（声明书 A16 空态引导 + 签发页就绪检查 12 项与一致性清单 1 阻断/3 警告/4 信息 + 4 条 ack 落 `app_audit_log`；期间修 `DefaultLayout` 缺 `/partner/` 前缀导致签发页被项目列表顶掉的缺陷）；F5 五角色矩阵已闭合（auditor_in 看 2 组 / auditor_out 只 1 组，受限可见性精确生效；期间修 `GET /adjustments/summary` 未按循环范围过滤，计数卡与列表条数不一致的缺陷）。
+    · 提交：`7039f37d5` + 附注标签 `v1.0.226`（远端祖先链已确认）。

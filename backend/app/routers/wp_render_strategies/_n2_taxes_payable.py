@@ -91,7 +91,7 @@ async def _fetch_tb_data(ctx: RenderContext, year: str | None = None) -> dict[st
         except (ValueError, TypeError):
             year_int = None
         if year_int is None:
-            return result
+            raise ValueError("N2 取数缺少有效审计年度")
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, year_int
         )
@@ -116,8 +116,8 @@ async def _fetch_tb_data(ctx: RenderContext, year: str | None = None) -> dict[st
             result["credit_amount"] = _parse_num(row.credit_amount)
             result["end_balance"] = _parse_num(row.closing_balance)
     except Exception as e:  # noqa: BLE001
-        logger.warning("N2 render: TB 取数失败: %s", e)
-    return result
+        logger.exception("N2 render: TB 取数失败: %s", e)
+        raise RuntimeError("N2 试算表取数失败") from e
 
 
 # ─── 审定表预填（从 tb_balance 2221% 叶子子科目按税种归类）────────────────────
@@ -271,7 +271,7 @@ async def _build_adjudication_prefill(
         except (ValueError, TypeError):
             year_int = None
         if year_int is None:
-            return []
+            raise ValueError("N2 预填缺少有效审计年度")
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, year_int
         )
@@ -317,8 +317,8 @@ async def _build_adjudication_prefill(
             if r.account_code and r.account_code not in slot["account_codes"]:
                 slot["account_codes"].append(r.account_code)
     except Exception as e:  # noqa: BLE001
-        logger.warning("N2 render: adjudication prefill 构建失败: %s", e)
-        return []
+        logger.exception("N2 render: adjudication prefill 构建失败: %s", e)
+        raise RuntimeError("N2 审定表预填取数失败") from e
 
     # 按源模板 R8~R20 行序排序；不在固定行内的（印花税/其他/兜底科目名）排到末尾
     return sorted(

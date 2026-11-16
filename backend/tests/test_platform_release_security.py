@@ -140,7 +140,7 @@ async def test_ledger_sse_query_is_project_bound(monkeypatch):
     monkeypatch.setattr(ledger_import_v2, "async_session", session_factory)
 
     project_id, job_id = uuid.uuid4(), uuid.uuid4()
-    chunk = await anext(ledger_import_v2._sse_generator(project_id, job_id))
+    chunk = await anext(ledger_import_v2._sse_generator(project_id, job_id))  # noqa: F821 — 内建 anext（py3.10+），ruff 需 target-version 才识别
     assert "job_not_found" in chunk
     sql = str(seen[0])
     assert "import_jobs.id" in sql and "import_jobs.project_id" in sql

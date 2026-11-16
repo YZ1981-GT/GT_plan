@@ -28,16 +28,26 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
+
+interface AIInsight {
+  id: string
+  insight_type: string
+  risk_level: string
+  title: string
+  description: string
+  related_entities?: string[]
+}
 
 // 桩实现 — 后端端点尚未就绪，返回空数据保证编译和运行时不崩溃
 const aiContentApi = {
-  listInsights: (_projectId: string) => Promise.resolve({ data: [] as any[] }),
+  listInsights: (_projectId: string): Promise<{ data: AIInsight[] }> =>
+    Promise.resolve({ data: [] as AIInsight[] }),
 }
 
 const props = defineProps({ projectId: { type: String, required: true } })
-const insights = ref([])
+const insights = ref<AIInsight[]>([])
 
 async function loadInsights() {
   const res = await aiContentApi.listInsights(props.projectId)

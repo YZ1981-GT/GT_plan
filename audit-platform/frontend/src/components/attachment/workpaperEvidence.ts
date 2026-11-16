@@ -14,6 +14,7 @@ import http from '@/utils/http'
 import { attachments as P_att } from '@/services/apiPaths'
 import { invalidateWpEvidenceLinks, type WpEvidenceLink } from '@/composables/useWpEvidenceLinks'
 import { voucherLabel } from '@/utils/voucherIdentity'
+import { ATTACHMENT_UPLOAD_BUSY_MESSAGE, acquireAttachmentUpload } from '@/composables/attachmentUploadGate'
 
 /** 证据类型（与后端 `workpaper_evidence_intake.EVIDENCE_TYPES` 逐项一致，守卫钉住）。 */
 export const EVIDENCE_TYPE_OPTIONS = [
@@ -154,28 +155,34 @@ function unwrap(body: any): any {
 export async function uploadWorkpaperEvidence(opts: UploadWorkpaperEvidenceOptions): Promise<UploadWorkpaperEvidenceResult> {
   const { projectId, wpId, file } = opts
   if (!projectId || !wpId) throw new Error('缺少项目或底稿，无法上传证据')
-  const form = new FormData()
-  const name = opts.fileName || (file as File).name || 'attachment.bin'
-  form.append('file', file, name)
-  if (opts.evidenceType) form.append('evidence_type', opts.evidenceType)
-  if (opts.sheetName) form.append('sheet_name', opts.sheetName)
-  if (opts.cellRef) form.append('cell_ref', opts.cellRef)
-  if (opts.pageRef) form.append('page_ref', opts.pageRef)
-  if (opts.voucherKey) form.append('voucher_key', opts.voucherKey)
-  if (opts.contractKey) form.append('contract_key', opts.contractKey)
-  const onProgress = opts.onProgress
-  const res = await http.post(P_att.evidenceUpload(projectId, wpId), form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-    _silent: true,
-    onUploadProgress: onProgress
-      ? (e: { loaded: number; total?: number }) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)
-      : undefined,
-  } as any)
-  const body = unwrap(res?.data)
-  const attachment = body?.attachment
-  if (!attachment?.id) throw new Error('上传成功但未返回附件编号')
-  void invalidateWpEvidenceLinks(projectId, wpId).catch(() => [])
-  return { attachment, evidenceLink: body?.evidence_link ?? null }
+  const release = acquireAttachmentUpload(`workpaper:${projectId}:${wpId}`)
+  if (!release) throw new Error(ATTACHMENT_UPLOAD_BUSY_MESSAGE)
+  try {
+    const form = new FormData()
+    const name = opts.fileName || (file as File).name || 'attachment.bin'
+    form.append('file', file, name)
+    if (opts.evidenceType) form.append('evidence_type', opts.evidenceType)
+    if (opts.sheetName) form.append('sheet_name', opts.sheetName)
+    if (opts.cellRef) form.append('cell_ref', opts.cellRef)
+    if (opts.pageRef) form.append('page_ref', opts.pageRef)
+    if (opts.voucherKey) form.append('voucher_key', opts.voucherKey)
+    if (opts.contractKey) form.append('contract_key', opts.contractKey)
+    const onProgress = opts.onProgress
+    const res = await http.post(P_att.evidenceUpload(projectId, wpId), form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      _silent: true,
+      onUploadProgress: onProgress
+        ? (e: { loaded: number; total?: number }) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)
+        : undefined,
+    } as any)
+    const body = unwrap(res?.data)
+    const attachment = body?.attachment
+    if (!attachment?.id) throw new Error('上传成功但未返回附件编号')
+    void invalidateWpEvidenceLinks(projectId, wpId).catch(() => [])
+    return { attachment, evidenceLink: body?.evidence_link ?? null }
+  } finally {
+    release()
+  }
 }
 
 /** 附件管理「关联到底稿」的候选项：值是底稿（working_paper）id。 */

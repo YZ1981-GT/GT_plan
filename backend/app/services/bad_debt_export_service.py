@@ -30,7 +30,8 @@ from __future__ import annotations
 
 import io
 import uuid
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
+from typing import TYPE_CHECKING
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, Side
@@ -39,6 +40,13 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.bad_debt_schemas import RowAmounts
+
+if TYPE_CHECKING:  # 只为类型标注导入，避免 service ↔ schema 循环
+    from app.schemas.export_unit_policy import ExportUnitPolicy
+
+# 导出单位的中文标注。与 `export_unit_policy.UNIT_DIVISORS` 一一对应，
+# 守卫 test_export_unit_policy_wiring.py 断言两处键集合相等（防止新增单位时漏一个）。
+_UNIT_LABELS: dict[str, str] = {"yuan": "元", "qian": "千元", "wan": "万元"}
 from app.services.bad_debt_auto_sum import AutoSumEngine
 from app.services.bad_debt_nested_table_service import NestedTableService
 
@@ -98,16 +106,33 @@ class BadDebtExportService:
     async def export_workbook(
         self, wp_index_id: uuid.UUID, meta: BadDebtExportMeta | None = None,
         *, template_only: bool = False,
+        export_policy: "ExportUnitPolicy | None" = None,
     ) -> Workbook:
         """构建并返回 openpyxl Workbook（不落盘）。
 
         Args:
             template_only: True 时输出空模板（金额列全部留空），仅保留树行结构供离线填写。
+            export_policy: 正式导出的单位策略（spec platform-global-display-settings-closure
+                任务 10 / AC-19~AC-22）。**唯一一处**决定「写进文件的金额是元还是万元」：
+                `policy.divisor` 为 1/1000/10000 时，金额列一律 `value / divisor`，
+                并在 R7 写明「金额单位：元 / 千元 / 万元」。传 None 时按元原值输出（兼容旧调用方）。
+
+                此前该 schema 是孤岛（`git grep "from app.schemas.export_unit_policy" -- backend/app`
+                零命中），金额单位只在屏幕上起作用、导出永远是元 —— 用户按万元看数、
+                导出的文件却是元，且文件里没有任何单位标注。
 
         Requirements: 7.1, 7.2, 7.3, 7.4, 7.5 + 1.2(template_only)
         """
         tree = await NestedTableService(self.db).get_tree(wp_index_id)
         meta = meta or BadDebtExportMeta()
+
+        # 单位策略决定「R7 的单位标注」与「金额列除数」，两者必须同源，
+        # 否则会出现「标万元、值是元」这类最危险的不一致。
+        divisor = 1
+        if export_policy is not None:
+            divisor = export_policy.divisor
+            if meta.currency_unit is None:
+                meta.currency_unit = _UNIT_LABELS[export_policy.unit]
 
         wb = Workbook()
         ws = wb.active
@@ -115,8 +140,8 @@ class BadDebtExportService:
 
         self._write_meta(ws, meta)
         self._write_header(ws)
-        next_row = self._write_data_rows(ws, tree, template_only=template_only)
-        self._write_summary_row(ws, tree, next_row, template_only=template_only)
+        next_row = self._write_data_rows(ws, tree, template_only=template_only, divisor=divisor)
+        self._write_summary_row(ws, tree, next_row, template_only=template_only, divisor=divisor)
         self._apply_column_widths(ws)
 
         return wb
@@ -124,13 +149,17 @@ class BadDebtExportService:
     async def export_bytes(
         self, wp_index_id: uuid.UUID, meta: BadDebtExportMeta | None = None,
         *, template_only: bool = False,
+        export_policy: "ExportUnitPolicy | None" = None,
     ) -> io.BytesIO:
         """导出为 BytesIO（供 HTTP 下载 / 流式响应）。
 
         Args:
             template_only: True 时输出空模板（金额列全部留空）。
+            export_policy: 见 export_workbook。
         """
-        wb = await self.export_workbook(wp_index_id, meta, template_only=template_only)
+        wb = await self.export_workbook(
+            wp_index_id, meta, template_only=template_only, export_policy=export_policy,
+        )
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
@@ -205,19 +234,20 @@ class BadDebtExportService:
 
     # ─── 数据区 R12+ ─────────────────────────────────────────────────────────
 
-    def _write_data_rows(self, ws: Worksheet, tree, *, template_only: bool = False) -> int:
+    def _write_data_rows(self, ws: Worksheet, tree, *, template_only: bool = False, divisor: int = 1) -> int:
         """按模板行顺序写父行 + 子行，返回下一个可写行号（用于合计行）。
 
         行顺序：父行(加粗) → 其子行(缩进"  XXX") → 下一父行 → … （Req 7.2, 7.5）
         子行空金额列输出空单元格（None，非 0）（Req 7.3）。
         template_only=True 时所有金额列留空（仅输出行标签结构）。
+        divisor != 1 时按导出单位策略折算金额列。
         """
         row_idx = _DATA_START_ROW
         for parent in tree.parents:
             # 父行：A 列 = row_label，加粗；13 金额列为子行汇总（已在 get_tree 算好）
             self._write_row(
                 ws, row_idx, label=parent.row_label, amounts=parent.amounts, bold=True,
-                skip_amounts=template_only,
+                skip_amounts=template_only, divisor=divisor,
             )
             row_idx += 1
             # 子行：A 列缩进两空格，空金额列留空
@@ -229,15 +259,16 @@ class BadDebtExportService:
                     amounts=child.amounts,
                     bold=False,
                     skip_amounts=template_only,
+                    divisor=divisor,
                 )
                 row_idx += 1
         return row_idx
 
-    def _write_summary_row(self, ws: Worksheet, tree, row_idx: int, *, template_only: bool = False) -> None:
+    def _write_summary_row(self, ws: Worksheet, tree, row_idx: int, *, template_only: bool = False, divisor: int = 1) -> None:
         """写合计行（Req 7.2）：A 列 = "合计"，13 金额列 = Summary 汇总值。"""
         self._write_row(
             ws, row_idx, label="合计", amounts=tree.summary.amounts, bold=True,
-            skip_amounts=template_only,
+            skip_amounts=template_only, divisor=divisor,
         )
 
     def _write_row(
@@ -249,11 +280,13 @@ class BadDebtExportService:
         amounts: RowAmounts,
         bold: bool,
         skip_amounts: bool = False,
+        divisor: int = 1,
     ) -> None:
         """写单行：A 列标签 + B~N 13 金额列。
 
         金额列为 None 时输出空单元格（不写 0）（Req 7.3）。
         skip_amounts=True 时跳过所有金额列（template_only 模式）。
+        divisor != 1 时按导出单位策略折算（用 Decimal 除，不经 float）。
         """
         label_cell = ws.cell(row=row_idx, column=1, value=label)
         if bold:
@@ -263,11 +296,16 @@ class BadDebtExportService:
             return  # template_only：仅写标签列，金额全留空
 
         # B~N 列：column 2..14 对应 amount_b..amount_n
+        _div = Decimal(divisor) if divisor != 1 else None
         for offset, col_name in enumerate(_AMOUNT_COLUMNS):
             col_idx = offset + 2  # B 列起
             value = getattr(amounts, col_name)
             if value is None:
                 continue  # 空值不写（保持空单元格，Req 7.3）
+            if _div is not None:
+                # 单位折算：ROUND_HALF_UP 到 0.01，与账套导入内核同口径。
+                # 必须用 Decimal，float 除法在万元档会产生可观察的尾差。
+                value = (Decimal(value) / _div).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             cell = ws.cell(row=row_idx, column=col_idx, value=_to_number(value))
             cell.number_format = "#,##0.00"
             if bold:

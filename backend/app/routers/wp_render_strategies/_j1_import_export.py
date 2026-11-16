@@ -595,7 +595,19 @@ def _resolve_sheet_type(sheet: str | None, sheet_type: str | None) -> str:
     return resolved
 
 
-@router.api_route("/api/workpapers/{wp_id}/j1/export-template", methods=["GET", "POST"])
+# 🔴 单函数声明 GET+POST 双方法时，FastAPI 只按 (函数名, 路径) 生成一个 operationId，
+#    GET/POST 两个 spec 条目共用 ⇒ OpenAPI 生成报 Duplicate Operation ID（运行无影响、
+#    仅文档噪音）；显式 operation_id 也无效（两个条目仍共用）。拆成两条单方法路由，
+#    各自独立 operationId；同一 handler，行为不变。前端实际只用 GET，POST 为兼容分支
+#    （2026-11-14 现算复核）。注册顺序 POST→GET 与旧行为（多方法同路由）等价。
+@router.get(
+    "/api/workpapers/{wp_id}/j1/export-template",
+    operation_id="export_template_j1_get",
+)
+@router.post(
+    "/api/workpapers/{wp_id}/j1/export-template",
+    operation_id="export_template_j1_post",
+)
 async def export_template(
     wp_id: str,
     sheet_type: str | None = Query(None),
@@ -646,7 +658,14 @@ async def export_template(
     )
 
 
-@router.api_route("/api/workpapers/{wp_id}/j1/export-data", methods=["GET", "POST"])
+@router.get(
+    "/api/workpapers/{wp_id}/j1/export-data",
+    operation_id="export_data_j1_get",
+)
+@router.post(
+    "/api/workpapers/{wp_id}/j1/export-data",
+    operation_id="export_data_j1_post",
+)
 async def export_data(
     wp_id: str,
     sheet_type: str | None = Query(None),

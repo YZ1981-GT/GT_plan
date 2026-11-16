@@ -233,6 +233,55 @@ export interface VcImportResult {
   warnings: string[]
 }
 
+/**
+ * 从 axios 错误里取后端写明的失败原因（R4：三个请求共用同一套解析）。
+ *
+ * 后端错误体有两种形状，且**导出端点是 blob 响应**（`responseType: 'blob'` ⇒ `err.response.data`
+ * 是 Blob 而不是对象），所以必须先把 Blob 读成文本再解析，否则只能拿到通用兜底文案：
+ * - 业务 `HTTPException` 走平台全局处理器：`{"code":400,"message":"仅支持 .xlsx 文件"}`
+ * - starlette / 422 原生：`{"detail": "…"}` 或 `{"detail":[{…}]}`
+ *
+ * 优先顺序与 `utils/http.ts` 的 `extractErrorDetail` 同口径：字符串 detail → message →
+ * 对象 detail 里的 message → 原始文本（不是 JSON 时）。
+ * 解析不出来（断网、超时、CORS）才用调用方给的兜底中文。
+ */
+export async function resolveFailureReason(err: any, fallback: string): Promise<string> {
+  const data = err?.response?.data
+  if (data == null) return fallback
+
+  let payload: any = data
+  if (isBlobLike(data)) {
+    try {
+      const text = await new Promise<string>((resolve, reject) => {
+        const fr = new FileReader()
+        fr.onload = () => resolve(String(fr.result ?? ''))
+        fr.onerror = reject
+        fr.readAsText(data)
+      })
+      try {
+        payload = JSON.parse(text)
+      } catch {
+        // 不是 JSON：后端可能直接回了纯文本原因
+        return text.trim() || fallback
+      }
+    } catch {
+      return fallback
+    }
+  }
+
+  if (typeof payload === 'string') return payload.trim() || fallback
+  if (typeof payload?.detail === 'string' && payload.detail.trim()) return payload.detail
+  if (typeof payload?.message === 'string' && payload.message.trim()) return payload.message
+  if (typeof payload?.detail?.message === 'string' && payload.detail.message.trim()) return payload.detail.message
+  return fallback
+}
+
+/** jsdom 与浏览器双环境下的 Blob 判定（jsdom 的 Blob 不一定与全局 Blob 同源） */
+function isBlobLike(value: any): boolean {
+  return value instanceof Blob
+    || (value != null && typeof value.slice === 'function' && typeof value.size === 'number')
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD2VcImportExport(options: UseD2VcImportExportOptions) {
@@ -259,11 +308,8 @@ export function useD2VcImportExport(options: UseD2VcImportExportOptions) {
       triggerBlobDownload(blob, 'D2-7_凭证检查表模板.xlsx')
       ElMessage.success('凭证检查表模板已导出')
     } catch (err: any) {
-      const reason = err?.response?.data?.detail
-        || err?.response?.data?.message
-        || (typeof err?.response?.data === 'string' ? err.response.data : null)
-        || '导出模板失败，请检查网络后重试'
-      lastError.value = reason
+      // R4：三个请求同一套解析 —— 后端原因优先（blob 响应也要读出来），网络错误才用兜底中文
+      lastError.value = await resolveFailureReason(err, '导出模板失败，请检查网络后重试')
       ElMessage.error(lastError.value!)
     }
   }
@@ -289,28 +335,8 @@ export function useD2VcImportExport(options: UseD2VcImportExportOptions) {
       triggerBlobDownload(blob, 'D2-7_凭证检查表数据.xlsx')
       ElMessage.success('凭证检查表数据已导出')
     } catch (err: any) {
-      let reason: string = '导出数据失败，请检查网络后重试'
-      const data = err?.response?.data
-      if (data instanceof Blob || (data != null && typeof data.slice === 'function' && typeof data.size === 'number')) {
-        // Blob 响应：用 FileReader 解析 JSON 错误体（兼容 jsdom/浏览器双环境）
-        try {
-          const text = await new Promise<string>((resolve, reject) => {
-            const fr = new FileReader()
-            fr.onload = () => resolve(fr.result as string)
-            fr.onerror = reject
-            fr.readAsText(data)
-          })
-          const parsed = JSON.parse(text)
-          reason = parsed?.message || parsed?.detail || reason
-        } catch {
-          // blob 解析失败，使用兜底文案
-        }
-      } else if (typeof data?.detail === 'string') {
-        reason = data.detail
-      } else if (typeof data?.message === 'string') {
-        reason = data.message
-      }
-      lastError.value = reason
+      // R4：与导出模板同一套解析（blob 响应体也要读出来），保证三个请求口径一致
+      lastError.value = await resolveFailureReason(err, '导出数据失败，请检查网络后重试')
       ElMessage.error(lastError.value!)
     }
   }
@@ -381,12 +407,8 @@ export function useD2VcImportExport(options: UseD2VcImportExportOptions) {
 
       return result
     } catch (err: any) {
-      const data = err?.response?.data
-      const reason = data?.detail?.message
-        || (typeof data?.detail === 'string' ? data.detail : null)
-        || data?.message
-        || '导入失败，请检查网络后重试'
-      lastError.value = reason
+      // R4：与两个导出请求同一套解析
+      lastError.value = await resolveFailureReason(err, '导入失败，请检查网络后重试')
       ElMessage.error(lastError.value!)
       return null
     } finally {

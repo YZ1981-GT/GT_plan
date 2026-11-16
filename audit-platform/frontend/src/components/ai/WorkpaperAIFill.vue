@@ -97,15 +97,57 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 
-// 桩实现 — AI 底稿填充后端端点尚未就绪
+interface FillResult {
+  id: string
+  label: string
+  status: string
+  statusLabel: string
+  original?: unknown
+  value?: unknown
+  confidence?: number | null
+  source?: string
+  editing?: boolean
+  editValue?: string
+}
+
+interface FillStep {
+  label: string
+  status: string
+}
+
+interface FillStatus {
+  progress: number
+  status: string
+  steps: FillStep[]
+  results: FillResult[]
+}
+
+interface FillOptions {
+  project_id: string
+  workpaper_id: string | null
+  mode: string
+}
+
+// 桩实现 — AI 底稿填充后端端点尚未就绪。
+// 四个方法的**参数形状与返回形状**照调用方真实用法声明（原先只声明两个、
+// 且 startFill 的签名与调用点不符），这样桩实现也能被类型系统约束住。
 const workpaperFillApi = {
-  startFill: (_projectId: string, _opts: Record<string, unknown>) =>
-    Promise.resolve({ data: { jobId: null } }),
-  getStatus: (_jobId: string) =>
+  startFill: (
+    _opts: FillOptions,
+    _onProgress?: (p: number) => void
+  ): Promise<{ data: FillResult[] }> => Promise.resolve({ data: [] as FillResult[] }),
+  getStatus: (_jobId: string): Promise<{ data: FillStatus }> =>
     Promise.resolve({ data: { progress: 0, status: 'pending', steps: [], results: [] } }),
+  confirmFill: (
+    _id: string,
+    _payload: { accepted: boolean; value?: unknown }
+  ): Promise<{ data: unknown }> => Promise.resolve({ data: {} }),
+  regenerate: (
+    _payload: { project_id: string; workpaper_id: string | null; item_ids: string[] }
+  ): Promise<{ data: FillResult[] }> => Promise.resolve({ data: [] as FillResult[] }),
 }
 
 const props = defineProps({
@@ -116,9 +158,9 @@ const props = defineProps({
 const fillMode = ref('semi')
 const filling = ref(false)
 const fillProgress = ref(0)
-const fillResults = ref([])
+const fillResults = ref<FillResult[]>([])
 const currentWorkpaper = ref('')
-const fillSteps = ref([])
+const fillSteps = ref<FillStep[]>([])
 
 const successCount = computed(() => fillResults.value.filter(r => r.status === 'accepted').length)
 const pendingCount = computed(() => fillResults.value.filter(r => r.status === 'pending').length)
@@ -140,7 +182,7 @@ async function startFill() {
       project_id: props.projectId,
       workpaper_id: props.workpaperId,
       mode: fillMode.value
-    }, (p) => { fillProgress.value = p })
+    }, (p: number) => { fillProgress.value = p })
 
     fillResults.value = res.data || []
     fillProgress.value = 100
@@ -152,24 +194,25 @@ async function startFill() {
   }
 }
 
-async function acceptFill(result) {
+async function acceptFill(result: FillResult) {
   await workpaperFillApi.confirmFill(result.id, { accepted: true, value: result.value })
   result.status = 'accepted'
   result.statusLabel = '已采纳'
 }
 
-async function rejectFill(result) {
+async function rejectFill(result: FillResult) {
   await workpaperFillApi.confirmFill(result.id, { accepted: false })
   result.status = 'rejected'
   result.statusLabel = '已拒绝'
 }
 
-function editFill(result) {
-  result.editValue = result.value
+function editFill(result: FillResult) {
+  // `value` 是 unknown（桩实现无真实类型），编辑框只接受字符串
+  result.editValue = result.value == null ? '' : String(result.value)
   result.editing = true
 }
 
-async function saveEdit(result) {
+async function saveEdit(result: FillResult) {
   await workpaperFillApi.confirmFill(result.id, { accepted: true, value: result.editValue })
   result.value = result.editValue
   result.status = 'accepted'
@@ -203,7 +246,7 @@ async function regeneratePending() {
   }
 }
 
-function confidenceClass(c) {
+function confidenceClass(c: number | null | undefined): string {
   if (!c) return ''
   if (c < 0.7) return 'low'
   if (c < 0.85) return 'medium'

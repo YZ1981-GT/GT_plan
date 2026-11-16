@@ -163,18 +163,42 @@ class ImportJobRunner:
             )
             interrupted_jobs = list(interrupted_result.scalars().all())
             for ij in interrupted_jobs:
-                if ij.current_phase:
-                    # 10.53: 有 checkpoint，走 resume_from_checkpoint
-                    ij.status = JobStatus.queued
-                    ij.progress_pct = 0
-                    ij.progress_message = f"从中断检查点恢复（{ij.current_phase}）"
-                    ij.error_message = None
+                # ── 恢复路径判定（spec platform-global-display-settings-closure 任务 8）──
+                # 🔴 只读 attempt，**不读 `current_phase`**（后者仅作进度显示，
+                #    不能授权复用 staged 行）。判定失败不阻断恢复（回退到旧口径）。
+                try:
+                    from app.services.ledger_import.recovery_classifier import (
+                        decide_recovery,
+                    )
+
+                    decision = await decide_recovery(
+                        db,
+                        project_id=ij.project_id,
+                        year=int(ij.year or 0),
+                        job_options=ij.options if isinstance(ij.options, dict) else {},
+                    )
+                    _action = decision.action
+                    _reason = decision.reason
+                except Exception as exc:  # noqa: BLE001 — 判定失败回退旧口径
+                    logger.warning(
+                        "recover_jobs: job %s 恢复判定失败（回退 current_phase 口径）：%s",
+                        ij.id, exc,
+                    )
+                    _action = "rebuild"
+                    _reason = f"判定失败（{type(exc).__name__}）⇒ 按全量重跑"
+
+                ij.status = JobStatus.queued
+                ij.progress_pct = 0
+                ij.error_message = None
+                if _action == "activation_only":
+                    ij.progress_message = f"恢复：直接激活已封存数据（{_reason}）"
+                elif _action == "resume_finish":
+                    ij.progress_message = f"恢复：补收尾（{_reason}）"
                 else:
-                    # 无 checkpoint，全量重跑
-                    ij.status = JobStatus.queued
-                    ij.progress_pct = 0
-                    ij.progress_message = "中断作业恢复排队（全量重跑）"
-                    ij.error_message = None
+                    # rebuild：旧口径里「有 current_phase 就 resume」不再成立 ——
+                    # attempt 判定说不可续就必须全量重跑（否则会在旧 stage 上重跑
+                    # normalizer，产出混合两批数据的静默错误）。
+                    ij.progress_message = f"中断作业恢复排队（全量重跑：{_reason}）"
             if interrupted_jobs:
                 await db.commit()
                 logger.info(
@@ -742,6 +766,18 @@ class ImportJobRunner:
 
             # ── Phase 4: Run pipeline ──
             force = bool(options.get("force_activate"))
+            # attempt_id 由 submit 写进 ImportJob.options（spec 任务 8）；
+            # 历史 job 没有该键 ⇒ None ⇒ pipeline 跳过 attempt 流转（不阻断导入）。
+            _attempt_id_raw = options.get("attempt_id")
+            _attempt_id: UUID | None = None
+            if _attempt_id_raw:
+                try:
+                    _attempt_id = UUID(str(_attempt_id_raw))
+                except (ValueError, TypeError):
+                    logger.warning(
+                        "ImportJob %s 的 attempt_id 非法（%r），按无 attempt 处理",
+                        job_id, _attempt_id_raw,
+                    )
             result: PipelineResult = await execute_pipeline(
                 job_id=job_id,
                 project_id=project_id,
@@ -754,6 +790,7 @@ class ImportJobRunner:
                 cancel_check=_cancel_check,
                 phase_marker=_phase_marker,
                 append_options=options.get("append"),
+                attempt_id=_attempt_id,
             )
 
             # ── Phase 5: writing → activating → completed（对齐状态机）──

@@ -179,8 +179,13 @@ def test_backend_key_collection_not_empty(backend_keys_by_cycle: dict[str, set[s
 
 
 def test_frontend_regex_finds_keys():
-    """前端正则确实能命中（正则失效时此条打红）。"""
-    hits = _frontend_keys_for(["useH8FormData", "useH9FormData"])
+    """前端正则确实能命中（正则失效时此条打红）。
+
+    🔴 文件位置随重构变化：H8 取数原先在 `useH8FormData.ts`，现已迁到
+    `components/workpaper/h8/core/H8TabAdjudication.vue`（H8 域拆子目录）。
+    只用旧文件名扫会得到空集 —— 那是「守卫失效」而不是「前端没有 tb_values 读取」。
+    """
+    hits = _frontend_keys_for(["useH8FormData", "useH9FormData", "H8TabAdjudication", "H9"])
     assert hits, "前端未扫到任何 tb_values 读取，正则或路径失效"
 
 

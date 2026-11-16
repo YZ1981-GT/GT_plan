@@ -20,7 +20,6 @@ import logging
 import os
 import time
 from decimal import Decimal
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -228,7 +227,8 @@ class ProcedureTableService:
                     deficiency_stmt = sa.select(sa.func.count()).select_from(IssueTicket).where(
                         IssueTicket.project_id == project_id,
                         IssueTicket.category == "internal_control",
-                        IssueTicket.is_deleted == sa.false(),
+                        # 已拒绝和已关闭都是终态，不再计入当前内控缺陷。
+                        IssueTicket.status.notin_(("rejected", "closed")),
                     )
                     def_r = await self.db.execute(deficiency_stmt)
                     def_count = def_r.scalar() or 0

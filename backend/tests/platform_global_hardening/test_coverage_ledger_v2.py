@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 import io
 from pathlib import Path
+from unittest.mock import patch
 
 _SCRIPT = Path(__file__).resolve().parents[2] / "scripts/check/check_coverage_ledger.py"
 _SPEC = importlib.util.spec_from_file_location("coverage_ledger_guard_v2", _SCRIPT)
@@ -131,3 +132,27 @@ def test_report_outputs_full_coverage_and_all_key_categories() -> None:
     assert "Legacy Provider=1" in text
     assert "明确缺失=1" in text
     assert "不确定=3" in text
+
+
+def test_unregistered_code_without_main_entry_is_outside_ledger_population() -> None:
+    with patch.object(guard, "find_main_entry", return_value=None):
+        evaluation = guard.evaluate_ledger(
+            {"J1"},
+            {"schemaVersion": 2, "entries": {}},
+        )
+
+    assert evaluation.findings == []
+    assert evaluation.drifts == []
+    assert evaluation.should_block is False
+
+
+def test_historical_entry_without_main_entry_is_reported_outside_population() -> None:
+    entry = _entry()
+    with patch.object(guard, "find_main_entry", side_effect=lambda code: None if code == "J1" else Path("GtD2.vue")):
+        evaluation = guard.evaluate_ledger(
+            {"J1", "D2"},
+            {"schemaVersion": 2, "entries": {"J1": entry, "D2": _entry()}},
+        )
+
+    assert evaluation.out_of_population == {"J1"}
+    assert evaluation.drifts == []

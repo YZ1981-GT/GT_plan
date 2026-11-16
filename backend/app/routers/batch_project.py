@@ -28,14 +28,22 @@ from app.services.batch_project_service import (
 from app.services.batch_project_workbook import MAX_UPLOAD_BYTES
 from app.services.project_creation_security import enforce_creation_rate_limit
 from app.services.batch_project_execution import (
+    BATCH_PLAN_RESULT_UNKNOWN_ERROR_CODE,
+    BATCH_PLAN_STALE_ERROR_CODE,
     BatchApplyRequest,
     BatchPlanStatusResponse,
     apply_validation_plan,
     build_plan_error_workbook,
     create_validation_plan,
     get_readable_plan,
+    is_stale_plan_error,
     mark_plan_failed,
     plan_status_response,
+)
+from app.services.batch_project_status_lock import (
+    STATUS_BUSY_ERROR_CODE,
+    BatchPlanStatusBusy,
+    with_status_lock_timeout,
 )
 
 router = APIRouter(prefix="/api/projects", tags=["批量建项"])
@@ -120,10 +128,18 @@ async def batch_apply_projects(
             db, plan_id=body.validation_id, actor=current_user,
             idempotency_key=body.idempotency_key,
         )
-        await db.commit()
-        return result
-    except HTTPException:
+    except HTTPException as exc:
         await db.rollback()
+        # 只有「计划陈旧」才落失败态，供客户端凭 status 的 failure_error_code 恢复；
+        # 正在执行 / 幂等键不匹配 / 已过期等状态不得被改写成 failed。
+        if is_stale_plan_error(exc):
+            try:
+                await mark_plan_failed(
+                    db, plan_id=body.validation_id, actor=current_user, error=exc
+                )
+                await db.commit()
+            except Exception:
+                await db.rollback()
         raise
     except Exception as exc:
         await db.rollback()
@@ -134,15 +150,32 @@ async def batch_apply_projects(
             await db.commit()
         except Exception:
             await db.rollback()
-        if isinstance(exc, IntegrityError):
+        if isinstance(exc, IntegrityError) or is_stale_plan_error(exc):
             raise HTTPException(
                 status_code=409,
-                detail="项目或集团关系已被其他操作修改，请重新预校验",
+                detail={
+                    "error_code": BATCH_PLAN_STALE_ERROR_CODE,
+                    "message": "项目或集团关系已被其他操作修改，请重新预校验",
+                },
             ) from exc
         raise HTTPException(
             status_code=500,
             detail="批量建项执行失败，已全部回滚，请重新预校验后重试",
         ) from exc
+    try:
+        await db.commit()
+    except Exception as exc:
+        # 提交确认丢失时业务可能已经落库：不能报 500 让客户端误以为零写入，
+        # 也不能改写已 applied 的回执。按结果未知返回，由 status 读取真实终态。
+        await db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error_code": BATCH_PLAN_RESULT_UNKNOWN_ERROR_CODE,
+                "message": "批量建项结果暂时未知，请稍后查询计划状态确认",
+            },
+        ) from exc
+    return result
 
 
 @router.get("/batch-imports/{validation_id}", response_model=BatchPlanStatusResponse)
@@ -152,7 +185,22 @@ async def get_batch_import_status(
     current_user: User = Depends(get_current_user),
 ) -> BatchPlanStatusResponse:
     # 等待 apply 持有的计划行锁，避免在未提交窗口读取旧的 validated 快照并误报未写入。
-    plan = await get_readable_plan(db, validation_id, current_user, for_update=True)
+    # PG 上用有界 lock_timeout（默认 1.5s）：超时返回可重试的 503，而不是无限等待或
+    # 无锁读到旧快照后让客户端误判「零写入」。
+    try:
+        plan = await with_status_lock_timeout(
+            db,
+            lambda: get_readable_plan(db, validation_id, current_user, for_update=True),
+        )
+    except BatchPlanStatusBusy as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error_code": STATUS_BUSY_ERROR_CODE,
+                "message": "批量建项结果仍在确认中，请稍后重试",
+            },
+            headers={"Retry-After": "1"},
+        ) from exc
     return plan_status_response(plan)
 
 

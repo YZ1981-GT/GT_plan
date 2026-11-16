@@ -348,7 +348,13 @@ class DurableEventOutboxService:
                     exc_info=True,
                 )
 
-        DurableEventOutboxService.forget_all(db)
+        if publications is None:
+            DurableEventOutboxService.forget_all(db)
+        else:
+            bucket = _pending_bucket(db, create=False)
+            if bucket is not None:
+                target_ids = {item.outbox_id for item in targets}
+                bucket[:] = [item for item in bucket if item.outbox_id not in target_ids]
         if report.failed:
             logger.warning(
                 "durable outbox: %s/%s 条事件发布失败并已落 failed 待重放 last_error=%s",

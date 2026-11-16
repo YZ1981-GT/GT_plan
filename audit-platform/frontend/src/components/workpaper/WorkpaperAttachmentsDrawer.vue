@@ -8,7 +8,7 @@
  *
  * Wave 2：来源 tag；Wave 3：解除关联（canEdit 门控）；Wave 4：证据类型声明 / 缺证据提示。
  */
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -66,7 +66,12 @@ const props = defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
 
 const router = useRouter()
+type AttachmentLoadStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'forbidden' | 'error'
 const loading = ref(false)
+const loadStatus = ref<AttachmentLoadStatus>('idle')
+const loadError = ref('')
+let loadSeq = 0
+let loadAbort: AbortController | null = null
 const unlinkingId = ref<string | null>(null)
 const uploading = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -93,6 +98,32 @@ const previewName = ref('')
 const previewType = ref('')
 const previewId = ref('')
 const previewDownloadUrl = ref('')
+let previewOpener: HTMLElement | null = null
+
+function rememberPreviewOpener(source: Event | EventTarget | null | undefined) {
+  const eventLike = source && typeof source === 'object'
+    && ('currentTarget' in source || 'target' in source)
+  const candidate = eventLike
+    ? ((source as Event).currentTarget || (source as Event).target)
+    : source
+  const element = candidate instanceof Element
+    ? ((candidate.closest('button') as HTMLElement | null) || (candidate instanceof HTMLElement ? candidate : null))
+    : null
+  previewOpener = element
+}
+
+function restorePreviewFocus() {
+  const opener = previewOpener
+  previewOpener = null
+  if (!opener?.isConnected) return
+  void nextTick(() => {
+    if (opener.isConnected) opener.focus()
+  })
+}
+
+watch(previewVisible, (open) => {
+  if (!open) restorePreviewFocus()
+})
 
 const ASSOC_LABEL = EVIDENCE_TYPE_LABEL
 
@@ -136,36 +167,75 @@ function positionsText(row: any): string {
 }
 
 async function load() {
+  const mine = ++loadSeq
+  loadAbort?.abort()
   if (!props.wpId) {
     rows.value = []
     evidenceRequirements.value = []
     staleInfo.value = null
+    loadStatus.value = 'empty'
+    loadError.value = ''
+    loadAbort = null
     return
   }
+  const controller = new AbortController()
+  loadAbort = controller
   loading.value = true
+  loadStatus.value = 'loading'
+  loadError.value = ''
   try {
-    const data: any = await api.get(P_att.wpView(props.wpId))
+    const data: any = await api.get(P_att.wpView(props.wpId), {
+      _silent: true,
+      _dedupe: false,
+      signal: controller.signal,
+    } as any)
+    if (mine !== loadSeq) return
     const envelope = Array.isArray(data) ? { items: data } : (data || {})
-    rows.value = envelope.items ?? []
+    if (!Array.isArray(envelope.items)) throw new Error('关联附件响应格式不正确')
+    rows.value = envelope.items
     evidenceRequirements.value = Array.isArray(envelope.evidence_requirements)
       ? envelope.evidence_requirements
       : []
     staleInfo.value = envelope.stale_info && typeof envelope.stale_info === 'object'
       ? envelope.stale_info
       : null
-  } catch {
-    rows.value = []
-    evidenceRequirements.value = []
-    staleInfo.value = null
+    loadStatus.value = rows.value.length ? 'ready' : 'empty'
+  } catch (error: any) {
+    if (mine !== loadSeq || controller.signal.aborted) return
+    const status = Number(error?.response?.status || error?.status || 0)
+    loadStatus.value = status === 403 ? 'forbidden' : 'error'
+    loadError.value = status === 403 ? '你没有查看本底稿附件的权限' : '请检查网络或稍后重试'
   } finally {
-    loading.value = false
-    syncDefaultUploadType()
+    if (mine === loadSeq) {
+      loading.value = false
+      if (loadAbort === controller) loadAbort = null
+      syncDefaultUploadType()
+    }
   }
 }
 
-watch(() => props.modelValue, (open) => { if (open) load() }, { immediate: true })
+function cancelLoad() {
+  loadSeq += 1
+  loadAbort?.abort()
+  loadAbort = null
+}
 
-function preview(row: any) {
+watch(
+  [() => props.modelValue, () => props.wpId, () => props.projectId],
+  ([open]) => {
+    if (open) void load()
+    else cancelLoad()
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  cancelLoad()
+  previewOpener = null
+})
+
+function preview(row: any, opener?: Event | EventTarget | null) {
+  rememberPreviewOpener(opener)
   previewUrl.value = P_att.preview(row.id)
   previewName.value = row.file_name
   previewType.value = row.file_type || ''
@@ -225,6 +295,7 @@ async function unlink(row: any) {
 }
 
 function pickUploadFile(evidenceType: string | null = null) {
+  if (uploading.value || loading.value) return
   pendingUploadType.value = evidenceType
   fileInputRef.value?.click()
 }
@@ -235,7 +306,7 @@ async function onUploadSelected(ev: Event) {
   input.value = ''
   const evidenceType = pendingUploadType.value ?? uploadType.value
   pendingUploadType.value = null
-  if (!file || !props.canEdit || !props.wpId || !props.projectId) return
+  if (!file || !props.canEdit || !props.wpId || !props.projectId || uploading.value) return
   uploading.value = true
   try {
     await uploadWorkpaperEvidence({
@@ -286,7 +357,8 @@ function formatDate(d: string): string {
     append-to-body
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <div v-loading="loading" class="wp-att-drawer">
+    <div v-loading="loading" class="wp-att-drawer" :aria-busy="loading ? 'true' : 'false'">
+      <div v-if="loading" class="wp-att-load-state" role="status" aria-live="polite">正在加载本底稿附件…</div>
       <el-alert
         type="info"
         :closable="false"
@@ -318,6 +390,7 @@ function formatDate(d: string): string {
           type="primary"
           size="small"
           :loading="uploading"
+          :disabled="uploading || loading"
           data-testid="wp-att-upload"
           @click="pickUploadFile()"
         >
@@ -430,19 +503,25 @@ function formatDate(d: string): string {
         />
       </div>
 
+      <div v-if="loadStatus === 'error' || loadStatus === 'forbidden'" class="wp-att-load-error" role="alert" data-testid="wp-att-load-error">
+        <div>{{ loadStatus === 'forbidden' ? '无权查看本底稿附件' : '本底稿附件加载失败' }}</div>
+        <div class="wp-att-load-error__detail">{{ loadError || '请检查网络后重试' }}</div>
+        <button type="button" class="wp-att-retry" data-testid="wp-att-retry" aria-label="重试本底稿附件加载" title="重试本底稿附件加载" @click="load">重试</button>
+      </div>
+
       <el-empty
-        v-if="!loading && rows.length === 0"
+        v-else-if="loadStatus === 'empty'"
         :description="canEdit ? '本底稿暂无关联附件，可在上方选择证据类型后上传' : '本底稿暂无关联附件'"
       >
         <!-- 抽屉内已能直接上传；这里只引导去关联项目里已有的附件 -->
         <el-button @click="goHub">前往附件管理关联已有附件</el-button>
       </el-empty>
 
-      <div v-else class="wp-att-list">
+      <div v-else-if="loadStatus === 'ready'" class="wp-att-list">
         <div v-for="row in rows" :key="row.id" class="wp-att-item">
           <div class="wp-att-item__icon">{{ fileEmoji(row.file_type) }}</div>
           <div class="wp-att-item__info">
-            <div class="wp-att-item__name" :title="row.file_name" @click="preview(row)">{{ row.file_name }}</div>
+            <button type="button" class="wp-att-item__name" :title="`预览 ${row.file_name || ''}`" @click="preview(row, $event)">{{ row.file_name }}</button>
             <div class="wp-att-item__meta">
               <el-tag
                 v-for="src in resolveSourceKeys(row)"
@@ -470,7 +549,7 @@ function formatDate(d: string): string {
           <div class="wp-att-item__actions">
             <!-- 图标按钮只有悬浮提示，读屏读不到 ⇒ 补 aria-label（带文件名，区分多行） -->
             <el-tooltip content="预览" placement="top">
-              <el-button circle size="small" :aria-label="`预览 ${row.file_name || ''}`" @click="preview(row)">
+              <el-button circle size="small" :aria-label="`预览 ${row.file_name || ''}`" @click="preview(row, $event)">
                 <el-icon><View /></el-icon>
               </el-button>
             </el-tooltip>
@@ -577,10 +656,64 @@ function formatDate(d: string): string {
 .wp-att-item__icon { font-size: 24px; flex-shrink: 0; }
 .wp-att-item__info { flex: 1; min-width: 0; }
 .wp-att-item__name {
-  font-size: 13px; font-weight: 600; color: var(--gt-color-primary, #4b2d77); cursor: pointer;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: block;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  font-size: var(--gt-font-size-sm);
+  font-weight: 600;
+  color: var(--gt-color-primary, #4b2d77);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .wp-att-item__name:hover { text-decoration: underline; }
 .wp-att-item__meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 12px; color: var(--gt-color-text-tertiary, #909399); flex-wrap: wrap; }
-.wp-att-item__actions { display: flex; gap: 4px; flex-shrink: 0; }
+.wp-att-load-state {
+  min-height: 64px;
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--gt-color-text-secondary, #606266);
+  font-size: 12px;
+}
+.wp-att-load-error {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--gt-color-text-secondary, #606266);
+}
+.wp-att-load-error__detail { margin-top: 4px; font-size: 12px; }
+.wp-att-retry {
+  margin-top: 10px;
+  padding: 4px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--el-color-primary, #409eff);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.wp-att-item__name:focus-visible,
+.wp-att-retry:focus-visible,
+.wp-att-item__actions :deep(.el-button):focus-visible {
+  outline: 2px solid var(--el-color-primary, #409eff);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .wp-att-item { align-items: flex-start; flex-wrap: wrap; }
+  .wp-att-item__info { min-width: calc(100% - 42px); }
+  .wp-att-item__actions { width: 100%; justify-content: flex-end; }
+  .wp-att-actions-bar { align-items: stretch; }
+  .wp-att-type-select { width: 100%; }
+}
+
+@media (max-width: 390px) {
+  .wp-att-item { padding: 8px; gap: 8px; }
+  .wp-att-item__meta { gap: 5px; }
+  .wp-att-item__actions { flex-wrap: wrap; }
+  .wp-att-actions-bar :deep(.el-button) { width: 100%; margin-left: 0; }
+}
 </style>

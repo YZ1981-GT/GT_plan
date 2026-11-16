@@ -9,10 +9,13 @@
 """
 from __future__ import annotations
 
+import logging
 from typing import Any
 from uuid import UUID
 
 __all__ = ["NoteAIAssistantService"]
+
+_logger = logging.getLogger(__name__)
 
 
 class NoteAIAssistantService:
@@ -190,43 +193,81 @@ class NoteAIAssistantService:
         if self.db is None:
             return []
         try:
-            from sqlalchemy import select, text
+            from sqlalchemy import select
 
-            result = await self.db.execute(
-                text("""
-                    SELECT aux_type, aux_code, aux_name
-                    FROM tb_balance
-                    WHERE project_id = :pid AND year = :year
-                      AND account_code = ANY(:codes)
-                      AND aux_type IS NOT NULL
-                    GROUP BY aux_type, aux_code, aux_name
-                """),
-                {"pid": str(project_id), "year": year, "codes": account_codes},
+            from app.models.audit_platform_models import TbAuxBalance
+            from app.services.dataset_query import get_active_filter
+
+            active_filter = await get_active_filter(
+                self.db,
+                TbAuxBalance.__table__,
+                project_id,
+                year,
+                strict=True,
             )
-            return [dict(r._mapping) for r in result.fetchall()]
-        except Exception:
-            return []
+            result = await self.db.execute(
+                select(
+                    TbAuxBalance.aux_type,
+                    TbAuxBalance.aux_code,
+                    TbAuxBalance.aux_name,
+                )
+                .where(
+                    active_filter,
+                    TbAuxBalance.account_code.in_(account_codes),
+                    TbAuxBalance.aux_type.isnot(None),
+                )
+                .group_by(
+                    TbAuxBalance.aux_type,
+                    TbAuxBalance.aux_code,
+                    TbAuxBalance.aux_name,
+                )
+            )
+            return [dict(row._mapping) for row in result.fetchall()]
+        except Exception as exc:
+            _logger.exception(
+                "查询辅助余额失败 [project=%s year=%s]",
+                project_id,
+                year,
+            )
+            raise RuntimeError("附注 AI 辅助账查询失败") from exc
 
     async def _load_workpaper_data(
         self, project_id: UUID, year: int, wp_code: str
     ) -> dict[str, Any] | None:
-        """Load workpaper parsed_data."""
+        """Load active workpaper parsed_data through its index and project scope."""
         if self.db is None:
             return None
         try:
+            import sqlalchemy as sa
             from sqlalchemy import select
 
-            from app.models.workpaper_models import WpIndex
+            from app.models.core import Project
+            from app.models.workpaper_models import WorkingPaper, WpIndex
 
             result = await self.db.execute(
-                select(WpIndex.parsed_data).where(
+                select(WorkingPaper.parsed_data)
+                .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+                .join(Project, Project.id == WorkingPaper.project_id)
+                .where(
+                    Project.id == project_id,
+                    Project.audit_year == year,
+                    Project.is_deleted == sa.false(),
+                    WorkingPaper.project_id == project_id,
                     WpIndex.project_id == project_id,
                     WpIndex.wp_code == wp_code,
+                    WorkingPaper.is_deleted == sa.false(),
+                    WpIndex.is_deleted == sa.false(),
                 )
             )
             return result.scalar_one_or_none()
-        except Exception:
-            return None
+        except Exception as exc:
+            _logger.exception(
+                "读取底稿 AI 上下文失败 [project=%s year=%s wp_code=%s]",
+                project_id,
+                year,
+                wp_code,
+            )
+            raise RuntimeError("底稿 AI 上下文查询失败") from exc
 
     def _extract_wp_summary(self, wp_data: dict, wp_code: str) -> str:
         """Extract summary text from workpaper data."""
@@ -309,18 +350,31 @@ class NoteAIAssistantService:
         if self.db is None or not account_codes:
             return None
         try:
-            from sqlalchemy import func, select, text
+            import sqlalchemy as sa
+            from sqlalchemy import select
 
+            from app.models.audit_platform_models import TrialBalance
+            from app.services.dataset_query import get_active_filter
+
+            active_filter = await get_active_filter(
+                self.db,
+                TrialBalance.__table__,
+                project_id,
+                year,
+                strict=True,
+            )
             result = await self.db.execute(
-                text("""
-                    SELECT COALESCE(SUM(audited_amount), 0)
-                    FROM tb_balance
-                    WHERE project_id = :pid AND year = :year
-                      AND account_code = ANY(:codes)
-                """),
-                {"pid": str(project_id), "year": year, "codes": account_codes},
+                select(sa.func.coalesce(sa.func.sum(TrialBalance.audited_amount), 0)).where(
+                    active_filter,
+                    TrialBalance.standard_account_code.in_(account_codes),
+                )
             )
             val = result.scalar_one_or_none()
             return float(val) if val is not None else None
-        except Exception:
-            return None
+        except Exception as exc:
+            _logger.exception(
+                "查询试算表审定数失败 [project=%s year=%s]",
+                project_id,
+                year,
+            )
+            raise RuntimeError("附注 AI 试算表查询失败") from exc

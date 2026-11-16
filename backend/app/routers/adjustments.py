@@ -36,12 +36,10 @@ from app.models.audit_platform_models import (
     UnadjustedMisstatement,
 )
 from app.models.audit_platform_schemas import (
-    AccountOption,
     AdjustmentCollaborationAssignRequest,
     AdjustmentCollaborationContributeRequest,
     AdjustmentCollaborationRejectRequest,
     AdjustmentCreate,
-    AdjustmentSummary,
     AdjustmentSyncRequest,
     AdjustmentUpdate,
     ReviewStatusChange,
@@ -653,12 +651,17 @@ async def review_adjustment(
                 },
             )
         await db.commit()
-        await publish_review_events(db)
+        handles = result.pop("_publish_handles", ())
+        publish_report = await publish_review_events(db, handles)
         broadcast_review_changed(project_id, result["succeeded"], change.status.value)
         return {
             "message": "复核批准成功" if change.status == ReviewStatus.approved else "复核驳回成功",
             "notified": result["notified"],
             "review_task_id": result["succeeded"][0].get("review_task_id"),
+            "downstream": {
+                "published": int(getattr(publish_report, "published", 0) or 0),
+                "failed": int(getattr(publish_report, "failed", 0) or 0),
+            },
         }
     except review_flow.ReviewFlowError as exc:
         raise HTTPException(
@@ -699,12 +702,16 @@ async def revoke_adjustment_review(
             db, project_id, affected, actor=user, reason=reason or None,
         )
         await db.commit()
-        await publish_review_events(db)
+        publish_report = await publish_review_events(db, decision.publications)
         broadcast_review_changed(project_id, [affected], ReviewStatus.draft.value)
         return {
             "message": "已撤回复核，调整分录恢复为草稿",
             "notified": notified,
             "tb_update_status": affected.get("tb_update_status"),
+            "downstream": {
+                "published": int(getattr(publish_report, "published", 0) or 0),
+                "failed": int(getattr(publish_report, "failed", 0) or 0),
+            },
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -801,6 +808,7 @@ async def convert_adjustment_to_misstatement(
             entry_group_id=entry_group_id,
             year=year,
             created_by=current_user.id,
+            force=force,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -860,9 +868,17 @@ async def get_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """汇总统计"""
+    """汇总统计（按用户循环范围过滤，与列表端点同口径）"""
     svc = AdjustmentService(db)
-    result = await svc.get_summary(project_id, year)
+    scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
+    allowed_codes: set[str] | None = None
+    if scope_cycles is not None:
+        try:
+            allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("调整汇总按循环过滤：取循环科目失败 project=%s: %s", project_id, exc)
+            allowed_codes = set()
+    result = await svc.get_summary(project_id, year, allowed_codes=allowed_codes)
     return result.model_dump()
 
 
@@ -1427,7 +1443,7 @@ async def export_adjustment_template(
             dv_name.errorTitle = "科目名称必须在项目科目库"
             dv_name.prompt = "从下拉选择二级科目名称, D/F/G/H 列将自动联动填充"
             dv_name.promptTitle = "提示"
-            dv_name.add(f"E2:E200")
+            dv_name.add("E2:E200")
             ws_target.add_data_validation(dv_name)
 
             # B 列: AJE/RJE 类型下拉

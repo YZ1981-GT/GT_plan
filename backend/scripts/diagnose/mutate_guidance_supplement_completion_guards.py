@@ -79,11 +79,22 @@ def _write_bytes(path: Path, data: bytes) -> None:
     path.write_bytes(data)
 
 
+def _anchor_bytes(payload: bytes, fragment: str) -> bytes:
+    """把 LF 书写的锚点片段按目标文件的真实行尾编码（同 ``_apply`` 口径）。
+
+    🔴 ``core.autocrlf=true`` 下目标文件在 Windows 是 CRLF、CI 是 LF；
+    锚点只按 LF 书写，比较前必须归一，否则本机恒 ANCHOR-MISS。
+    """
+    eol = b"\r\n" if b"\r\n" in payload else b"\n"
+    return fragment.encode("utf-8").replace(b"\n", eol)
+
+
 def _assert_anchor(path: Path, old: str, mid: str) -> None:
     payload = _read_bytes(path)
-    if old.encode("utf-8") not in payload:
+    anchor = _anchor_bytes(payload, old)
+    if anchor not in payload:
         raise SystemExit(f"ANCHOR-MISS {mid}: old fragment not found in {path.name}")
-    if payload.count(old.encode("utf-8")) != 1:
+    if payload.count(anchor) != 1:
         raise SystemExit(f"ANCHOR-MISS {mid}: ambiguous in {path.name}")
 
 

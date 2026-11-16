@@ -25,8 +25,8 @@ from tests.workpaper_sync import contract_field_names_scan as S
 REGISTRY = Path(__file__).resolve().parent / "data" / "contract_field_names_frontend_exceptions.json"
 
 #: 登记的组数 / 字段名数（只许减少：接通一组删一组并改小这里；新增要在评审里说明为什么不改契约或前端）
-BASELINE_GROUPS = 29
-BASELINE_NAMES = 364
+BASELINE_GROUPS = 28
+BASELINE_NAMES = 337
 
 
 @pytest.fixture(scope="module")
@@ -78,15 +78,16 @@ def test_extra_scope_entries_exist(corpus: S.Corpus) -> None:
 
 
 def test_wired_table_reports_nothing(misses: dict[str, set[str]]) -> None:
-    """正面对照：字段名已对齐的表（D5-2 / D3-4 / F3-4 / E1-4，批 B 起 D3-5 / F4-2 / G6-5 / D3-7 / D7-7 / D6-5）一个都不报 ——
-    现算不是「什么都报」。"""
+    """正面对照：字段名已对齐的表（D5-2 / D3-4 / F3-4 / E1-4，批 B 起 D3-5 / F4-2 / G6-5 / D3-7 / D7-7 / D6-5，
+    批 D 起 L4-3）一个都不报 —— 现算不是「什么都报」。"""
     for key in ("d5.receivables_financing_detail|D5-2-rows", "d3.prepaid_receipts_detail|D3-ana-credit-rows",
                 "f3.notes_payable_detail|F3-4-rows", "e1.monetary_fund_detail|E1-digital-rows",
                 "d3.prepaid_receipts_detail|D3-lt-rows", "f4.accounts_payable_detail|F4-2-rows",
                 "g6.other_bond_main|G6-5-fair-value-data", "g4.bond_main|G4-7-items",
                 "d3.prepaid_receipts_detail|D3-vc-current-rows", "d3.prepaid_receipts_detail|D3-vc-post-rows",
                 "d7.contract_liabilities_detail|D7-7-period-rows", "d7.contract_liabilities_detail|D7-7-post-rows",
-                "d6.contract_assets_detail|D6-5-rows"):
+                "d6.contract_assets_detail|D6-5-rows",
+                "l4.bonds_payable|L4-3-rows"):
         assert key not in misses, (key, sorted(misses.get(key, ())))
 
 
@@ -136,3 +137,79 @@ def test_contract_scan_sees_row_identity_keys_and_nested_paths() -> None:
     assert ("d3.prepaid_receipts_detail", "D3-ana-credit-rows", "counterCheck") in names
     assert any(cid == "d4.revenue_detail" and item == "D4-2-rows" and seg == "months" for cid, item, seg in names)
     assert len(names) > 3000
+# ═══ 「词干 × 后缀」拼键（spec oo-writeback-template-parity-closure R3.2 批 D，L4-3 教训）═══
+# L4-3 的 38 个契约 json 键与前端运行时键**逐字相同**，但整个键名在源码里从不逐字出现：
+# 词干在 `const PAIR_STEMS = ['priorAje', …]`，后缀在 `for (const unit of ['Qty','Amount'])`，
+# 键在 `` `${stem}${unit}` `` 与 `row[g.stem + unit.suffix]` 里拼出来。旧口径逐字比对 ⇒ 27 条假阴。
+
+
+def test_composed_keys_recognise_real_composition_shapes() -> None:
+    """三种真实写法各自产出键；合成的键不是「凡以 Qty/Amount 结尾」都算。"""
+    src = (
+        "const STEMS = ['priorAje', 'auditedEnd'] as const\n"
+        "type S = (typeof STEMS)[number]\n"
+        "for (const stem of STEMS) {\n"
+        "  row[`${stem}Qty`] = 0\n"
+        "  out[`${stem}${unit}`] = 0\n"
+        "}\n"
+        "for (const unit of ['Qty', 'Amount'] as const) {\n"
+        "  x = 1\n"
+        "}\n"
+        "const LABELS: Record<S, string> = {\n"
+        "  priorAje: 'a',\n"
+        "  auditedEnd: 'b',\n"
+        "}\n"
+        "const g = { stem: 'priorAje', formula: false }\n"
+        "v = row[g.stem + unit.suffix]\n"
+        "const SUFFIXES = [{ suffix: 'Qty' }, { suffix: 'Amount' }]\n"
+    )
+    keys = S.composed_keys(src)
+    assert {"priorAjeQty", "priorAjeAmount", "auditedEndQty", "auditedEndAmount"} <= keys
+    # 反向：词干没配后缀 / 后缀没配词干 / 纯虚构，都不得被合成出来
+    assert "QtyQty" not in keys and "AmountQty" not in keys
+    assert "instrumentNameQty" not in keys, "非词干池里的名字不得被拼"
+
+
+def test_composed_keys_do_not_invent_keys_for_a_file_without_composition() -> None:
+    """阴性对照：没有拼法的文件产不出任何键（否则判据会「什么都认」）。"""
+    assert S.composed_keys("const KEY = 'L4-3-rows'\nexport const x = { a: 1 }") == frozenset()
+
+
+def test_l4_3_composed_keys_are_the_27_exchange_names(corpus: S.Corpus) -> None:
+    """L4-3：30 个以 `Qty`/`Amount` 结尾的契约键里，3 个在处理范围内**字面出现**（两个标量 +
+    `auditedEndAmount`，后者在 tab 的 `applyL4_3Formulas(r).auditedEndAmount` 里），其余 **27 个配对键
+    源码里从不逐字出现、只能靠拼键识别** —— 这 27 个正是旧口径逐字比对误报的那些，双向断言防「什么都认」。"""
+    keys = S.scope_composed_keys(corpus, "L4-3-rows")
+    contracted = {
+        f["json_pointer"].rsplit("/", 1)[-1]
+        for f in json.loads(
+            (S.CONTRACTS_DIR / "l4.bonds_payable.json").read_text(encoding="utf-8")
+        )["sheets"][0]["tables"][0]["fields"]
+    }
+    suffixed = {n for n in contracted if n.endswith(("Qty", "Amount"))}
+    assert len(suffixed) == 30, f"以 Qty/Amount 结尾的契约键数变了：{len(suffixed)}"
+    scope = frozenset().union(*(corpus.tokens[f] for f in S.scope_files(corpus, "L4-3-rows")
+                               if f in corpus.tokens))
+    literal = {n for n in suffixed if n in scope}
+    assert literal == {"auditedEndAmount", "issueAmount", "issueQty"}, f"字面出现的集合变了：{sorted(literal)}"
+    only_composed = suffixed - literal
+    assert len(only_composed) == 27, f"只能靠拼键识别的应有 27 个：{len(only_composed)}"
+    assert only_composed <= keys, f"这些配对键拼不出来：{sorted(only_composed - keys)}"
+    assert "unauditedPriorBogus" not in keys and "accountingClassQty" not in keys
+
+
+def test_mutation_renamed_pair_stem_is_reported(corpus: S.Corpus) -> None:
+    """磁盘变异等价物：把契约的配对键改成前端拼不出的名字 ⇒ 必须报（分母 = 改名的那些）。"""
+    real = S.contract_names()
+    renamed = []
+    hit = 0
+    for cid, item, seg in real:
+        if cid == "l4.bonds_payable" and seg.startswith("priorAje"):
+            renamed.append((cid, item, "priorAjeRenamed" + seg[len("priorAje"):]))
+            hit += 1
+        else:
+            renamed.append((cid, item, seg))
+    assert hit == 2, f"变异靶点没命中（改名前缀改了？）：{hit}"
+    misses = S.compute_misses(corpus, renamed)
+    got = sorted(misses.get("l4.bonds_payable|L4-3-rows", ()))
+    assert got == ["priorAjeRenamedAmount", "priorAjeRenamedQty"], got

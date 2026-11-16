@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "strict": true, "skipLibCheck": true,
+    "noEmit": true, "isolatedModules": true, "moduleDetection": "force",
+    "jsx": "preserve", "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "noFallthroughCasesInSwitch": true,
+    "paths": { "@/*": ["./src/*"] },
+    "baseUrl": "."
+  },
+  "include": [
+    "src/components/workpaper/d1/D1TabDisclosure.vue",
+    "src/components/workpaper/d1/__tests__/d1AmountInputMigration.spec.ts",
+    "src/components/common/GtAmountCell.vue",
+    "src/components/common/GtMeasureCell.vue",
+    "src/components/common/__tests__/GtMeasureCell.spec.ts",
+    "src/components/common/__tests__/GtAmountCell.spec.ts",
+    "src/utils/formatMeasure.ts",
+    "src/types/measureKind.ts",
+    "src/env.d.ts"
+  ]
+}

@@ -105,6 +105,11 @@ class ContextManifestEntry:
     version: str = ""  # 数据版本/fingerprint（地址坐标 stale 检测用）
     stale: bool = False  # 是否为过期数据
     jump_route: str = ""  # 站内深链；目标页仍须重新鉴权
+    #: 内容摘要（``sha256:<hex>``）。目前只有 ``draft_overlay:*`` 条目填充 ——
+    #: 未保存草稿没有可追溯的行 ID，hash 是它唯一的身份证明（需求 6.2）。
+    content_hash: str = ""
+    #: 该来源基于的宿主业务版本（``draft_overlay:*`` 用；需求 6.2 / 6.3 的判定依据）。
+    baseline_version: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -124,6 +129,12 @@ class ContextManifestEntry:
             d["stale"] = True
         if self.jump_route:
             d["jump_route"] = self.jump_route
+        # 两个 overlay 专属键只在有值时出现：缺省（非 overlay 条目）的输出因此
+        # 与加字段前**逐键相同**，既有 manifest 消费者不受影响。
+        if self.content_hash:
+            d["content_hash"] = self.content_hash
+        if self.baseline_version:
+            d["baseline_version"] = self.baseline_version
         return d
 
 

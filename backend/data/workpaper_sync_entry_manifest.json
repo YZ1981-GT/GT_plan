@@ -321,17 +321,17 @@
           "importKind": "dynamic",
           "localName": "WorkpaperWordEditor",
           "loop": null,
-          "mountId": "mount_bc122e0da112d41d7935",
+          "mountId": "mount_6152fd497671f5f2d91a",
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 11,
-            "endLine": 106,
+            "endLine": 180,
             "startColumn": 9,
-            "startLine": 103
+            "startLine": 177
           },
-          "templateNodeOrdinal": 4,
+          "templateNodeOrdinal": 8,
           "wpExpression": ":wp-id=\"wpIdMap[t.wpCode]\""
         }
       ],
@@ -344,7 +344,7 @@
         ],
         "room_model_fact": "frontend_endpoint_without_backend_route",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtA16Bundle.vue#L103",
+          "audit-platform/frontend/src/components/workpaper/GtA16Bundle.vue#L177",
           "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1126",
           "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L1131",
           "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue#L375",
@@ -7662,18 +7662,18 @@
           "importKind": "dynamic",
           "localName": "WorkpaperSyncEditorHost",
           "loop": null,
-          "mountId": "mount_a4e388c3d720519eee6b",
+          "mountId": "mount_9afd042ed9017b5419f2",
           "needsOverlayRule": false,
           "runtimeCardinality": "single",
           "sheetExpression": null,
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 150,
-            "endLine": 187,
+            "endLine": 196,
             "startColumn": 7,
-            "startLine": 187
+            "startLine": 196
           },
-          "templateNodeOrdinal": 103,
+          "templateNodeOrdinal": 107,
           "wpExpression": null
         }
       ],
@@ -36778,11 +36778,11 @@
       }
     }
   ],
-  "manifest_digest": "a45714deb833e624b43faa0eaa44785027c24148784a2156ffe0c25f22fa7be6",
-  "overlay_digest": "597951aa87483908148f7278779d5da0fdb3a31be9194442065e484d9ab81083",
-  "profile_source_digest": "0bf7e85901b6cb980766c771ada19abc28c77e66eb2eb19436a9bf3d7d360d9e",
+  "manifest_digest": "4244bc53d4fc6661fa579ca61e0de8f332a999b0feceb12dd58e2480c593de79",
+  "overlay_digest": "db0345529b1c76b24b5ee055a9cad2a67e74b5f8967149f954c675e0d7d48eef",
+  "profile_source_digest": "70b18cafe6720a54a5249518c5cbc2159795d73ad3ebb04a12d4639987903d39",
   "schema_version": 1,
-  "source_digest": "f4bdfe883f681e88cc105157c4429d710d272ac3a21f95ea87ba30712fefa506",
+  "source_digest": "b76adb534403f61d2d592ad2f7689f9d4c5668a68d741f89d1bf4a22dd390fb6",
   "stats": {
     "by_component": {
       "GtOnlyOfficeSheet": 224,

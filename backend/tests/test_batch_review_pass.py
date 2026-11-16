@@ -1,444 +1,195 @@
-"""批量复核通过测试
+"""批量复核端点测试（batch_review）。
 
 Tests for:
 - Task 9.1: 批量复核路由
 - Task 9.2: 批量复核事务逻辑
 
-覆盖：
-- RBAC 权限校验（仅 manager/partner/admin）
-- 全部成功场景
-- 全部跳过场景
-- 混合场景（部分成功 + 部分跳过）
-- success_count + skipped_count == len(wp_ids) 不变量
-- 跳过项必须有 reason
-- 空列表处理
+🔴 2026-11-13 重写（基线漂移）：原用例测的三个符号
+``ALLOWED_ROLES`` / ``_check_reviewable`` / ``_execute_batch_review`` 已在
+``cd0a8fe1f`` 被有意删除，实现改为：
+
+1. 鉴权走 ``Depends(require_project_access("review"))``（项目级权限单一真源）；
+2. 状态机走 ``WorkingPaperService.update_review_status``（F8 配置驱动），
+   不再有本地 ``_check_reviewable`` 白名单；
+3. 批量循环内联进端点，不再有 ``_execute_batch_review``。
+
+因此本文件改为**测当前真实契约**（``_resolve_level`` 提取、
+``REVIEWABLE_REVIEW_STATUSES`` 集合、请求/响应模型、项目级鉴权），
+并保留两条真实可伪证的不变量（计数守恒 + 跳过项必有 reason）。
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
+from app.deps import PERMISSION_HIERARCHY
 from app.routers.batch_review import (
-    ALLOWED_ROLES,
+    REVIEWABLE_REVIEW_STATUSES,
     BatchReviewRequest,
     BatchReviewResult,
-    _check_reviewable,
-    _execute_batch_review,
+    _resolve_level,
+    batch_review,
 )
-from app.models.workpaper_models import WpFileStatus, WpReviewStatus
+from app.services.assignment_service import ROLE_MAP, UNMAPPED_ROLE
 
 
 # ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-def _make_workpaper(
-    wp_id=None,
-    status=WpFileStatus.under_review,
-    review_status=WpReviewStatus.pending_level1,
-    is_deleted=False,
-):
-    """Create a mock WorkingPaper."""
-    wp = MagicMock()
-    wp.id = wp_id or uuid4()
-    wp.status = status
-    wp.review_status = review_status
-    wp.is_deleted = is_deleted
-    wp.updated_at = datetime.now(timezone.utc)
-    return wp
-
-
-# ---------------------------------------------------------------------------
-# Unit Tests: RBAC
+# RBAC：端点挂的是项目级 review 门禁，不是写死角色名单
 # ---------------------------------------------------------------------------
 
 
 class TestRBAC:
-    """RBAC 权限测试。"""
+    """RBAC 权限测试。
 
-    def test_allowed_roles(self):
-        """仅 manager/partner/admin 可执行。"""
-        assert ALLOWED_ROLES == {"manager", "partner", "admin"}
+    与旧口径的实质差异：新机制按项目级别判定，``review`` 级（质控 / EQCR）
+    **也能**通过，而旧写死名单把它们排除在外 —— 这正是 ``require_project_access``
+    存在的目的（复核岗必须能复核）。
+    """
 
-    def test_auditor_not_allowed(self):
-        """auditor 不在允许列表中。"""
-        assert "auditor" not in ALLOWED_ROLES
+    def test_endpoint_uses_project_review_gate_not_a_hardcoded_roster(self):
+        """端点挂的是 review 级项目门禁，且不得恢复写死名单。"""
+        import inspect
 
-    def test_readonly_not_allowed(self):
-        """readonly 不在允许列表中。"""
-        assert "readonly" not in ALLOWED_ROLES
+        from app.routers import batch_review as module
 
+        assert not hasattr(module, "ALLOWED_ROLES"), (
+            "ALLOWED_ROLES 已退役：鉴权必须走 require_project_access('review') "
+            "项目级单一真源，不得恢复写死名单"
+        )
+        source = inspect.getsource(module.batch_review)
+        assert 'require_project_access("review")' in source
 
-# ---------------------------------------------------------------------------
-# Unit Tests: Reviewable Check
-# ---------------------------------------------------------------------------
+    def test_review_level_roles_satisfy_the_gate(self):
+        """review 级角色（质控 / EQCR）满足 review 门禁。"""
+        review_roles = {k for k, (_r, lv) in ROLE_MAP.items() if lv.value == "review"}
+        assert {"qc", "eqcr"} <= review_roles, review_roles
 
+    def test_edit_level_roles_also_pass_review_gate(self):
+        """edit 级（合伙人 / 经理 / 审计员 / 助理）级别更高，同样通过。"""
+        for role in ("partner", "manager", "auditor", "assistant"):
+            _r, lv = ROLE_MAP[role]
+            assert PERMISSION_HIERARCHY[lv.value] >= PERMISSION_HIERARCHY["review"], role
 
-class TestCheckReviewable:
-    """底稿可复核状态检查测试。"""
-
-    def test_under_review_is_reviewable(self):
-        """under_review 状态可以通过。"""
-        wp = _make_workpaper(status=WpFileStatus.under_review)
-        assert _check_reviewable(wp) is None
-
-    def test_edit_complete_is_reviewable(self):
-        """edit_complete 状态可以通过。"""
-        wp = _make_workpaper(status=WpFileStatus.edit_complete)
-        assert _check_reviewable(wp) is None
-
-    def test_draft_not_reviewable(self):
-        """draft 状态不可通过。"""
-        wp = _make_workpaper(status=WpFileStatus.draft)
-        reason = _check_reviewable(wp)
-        assert reason is not None
-        assert "draft" in reason
-
-    def test_already_passed_not_reviewable(self):
-        """review_passed 状态不可重复通过。"""
-        wp = _make_workpaper(status=WpFileStatus.review_passed)
-        reason = _check_reviewable(wp)
-        assert reason is not None
-        assert "review_passed" in reason
-
-    def test_archived_not_reviewable(self):
-        """archived 状态不可通过。"""
-        wp = _make_workpaper(status=WpFileStatus.archived)
-        reason = _check_reviewable(wp)
-        assert reason is not None
-        assert "archived" in reason
+    def test_readonly_fallback_does_not_pass_review_gate(self):
+        """未登记角色兜底为 readonly，低于 review ⇒ 被拒。"""
+        _r, lv = UNMAPPED_ROLE
+        assert PERMISSION_HIERARCHY[lv.value] < PERMISSION_HIERARCHY["review"]
 
 
 # ---------------------------------------------------------------------------
-# Unit Tests: Batch Execution
+# _resolve_level：从 review_status 推导当前复核层级
 # ---------------------------------------------------------------------------
 
 
-class TestBatchExecution:
-    """批量复核事务逻辑测试。"""
+class TestResolveLevel:
+    """``_resolve_level`` 是判定「当前能不能复核」的唯一依据。"""
+
+    @pytest.mark.parametrize(
+        ("status", "expected"),
+        [
+            ("pending_level1", 1),
+            ("pending_level2", 2),
+            ("pending_level3", 3),
+            ("pending_level4", 4),
+            ("level1_in_progress", 1),
+            ("level2_in_progress", 2),
+            ("level3_in_progress", 3),
+            ("level4_in_progress", 4),
+        ],
+    )
+    def test_pending_and_in_progress_resolve_to_their_level(self, status, expected):
+        """待复核 / 复核中都应当前层级。"""
+        assert _resolve_level(status) == expected
+
+    @pytest.mark.parametrize(
+        "status",
+        [
+            "not_submitted",
+            "level1_passed",
+            "level2_rejected",
+            "level4_passed",
+            "",
+            "arbitrary",
+        ],
+    )
+    def test_non_reviewable_statuses_resolve_to_none(self, status):
+        """已通过 / 已退回 / 未提交 / 乱写 都不应当前层级（⇒ 跳过）。"""
+        assert _resolve_level(status) is None
+
+    def test_reviewable_set_is_derived_from_resolver_not_handwritten(self):
+        """可复核集合必须与 ``_resolve_level`` 逐个一致（不得维护第二份名单）。"""
+        from app.models.workpaper_models import WpReviewStatus
+
+        expected = {s for s in WpReviewStatus if _resolve_level(s.value) is not None}
+        assert REVIEWABLE_REVIEW_STATUSES == frozenset(expected)
+        assert REVIEWABLE_REVIEW_STATUSES, "可复核集合不得为空"
+
+
+# ---------------------------------------------------------------------------
+# 请求 / 响应模型契约
+# ---------------------------------------------------------------------------
+
+
+class TestModels:
+    """请求与响应模型的字段契约。"""
+
+    def test_request_defaults_to_approve_with_empty_comment(self):
+        body = BatchReviewRequest(wp_ids=[uuid4()])
+        assert body.action == "approve"
+        assert body.comment == ""
+
+    def test_request_accepts_reject_with_comment(self):
+        wp_id = uuid4()
+        body = BatchReviewRequest(wp_ids=[wp_id], action="reject", comment="需补充底稿")
+        assert body.wp_ids == [wp_id]
+        assert body.action == "reject"
+        assert body.comment == "需补充底稿"
+
+    def test_result_exposes_count_invariant_fields(self):
+        result = BatchReviewResult(
+            success_count=2,
+            skipped_count=1,
+            skipped_items=[{"wp_id": "x", "reason": "底稿不存在或已删除"}],
+        )
+        assert result.success_count + result.skipped_count == 3
+        assert result.skipped_items[0]["reason"]
+
+
+# ---------------------------------------------------------------------------
+# 端点：非法 action 与空列表的短路分支（不触库）
+# ---------------------------------------------------------------------------
+
+
+class TestEndpointShortCircuits:
+    """不需要数据库就能判定的两个分支。"""
 
     @pytest.mark.asyncio
-    async def test_all_success(self):
-        """全部底稿状态允许通过 → 全部成功。"""
-        wp1 = _make_workpaper(status=WpFileStatus.under_review)
-        wp2 = _make_workpaper(status=WpFileStatus.edit_complete)
+    async def test_invalid_action_raises_422(self):
+        from fastapi import HTTPException
 
-        mock_db = AsyncMock()
-        mock_result = MagicMock()
-        mock_scalars = MagicMock()
-        mock_scalars.all.return_value = [wp1, wp2]
-        mock_result.scalars.return_value = mock_scalars
-        mock_db.execute.return_value = mock_result
+        body = BatchReviewRequest(wp_ids=[uuid4()], action="delete")
+        with pytest.raises(HTTPException) as exc:
+            await batch_review(
+                project_id=uuid4(),
+                body=body,
+                db=object(),  # 不会被触及：422 在任何取数之前
+                current_user=object(),
+            )
+        assert exc.value.status_code == 422
+        detail = str(exc.value.detail)
+        assert "approve" in detail and "reject" in detail
 
-        result = await _execute_batch_review(
-            db=mock_db,
+    @pytest.mark.asyncio
+    async def test_empty_wp_ids_returns_zero_counts_without_touching_db(self):
+        body = BatchReviewRequest(wp_ids=[], action="approve")
+        result = await batch_review(
             project_id=uuid4(),
-            wp_ids=[wp1.id, wp2.id],
-            comment="已审阅，无异议",
-            reviewer_id=uuid4(),
+            body=body,
+            db=object(),
+            current_user=object(),
         )
-
-        assert result.success_count == 2
+        assert result.success_count == 0
         assert result.skipped_count == 0
         assert result.skipped_items == []
-
-    @pytest.mark.asyncio
-    async def test_all_skipped(self):
-        """全部底稿状态不允许通过 → 全部跳过。"""
-        wp1 = _make_workpaper(status=WpFileStatus.draft)
-        wp2 = _make_workpaper(status=WpFileStatus.review_passed)
-
-        mock_db = AsyncMock()
-        mock_result = MagicMock()
-        mock_scalars = MagicMock()
-        mock_scalars.all.return_value = [wp1, wp2]
-        mock_result.scalars.return_value = mock_scalars
-        mock_db.execute.return_value = mock_result
-
-        result = await _execute_batch_review(
-            db=mock_db,
-            project_id=uuid4(),
-            wp_ids=[wp1.id, wp2.id],
-            comment="已审阅",
-            reviewer_id=uuid4(),
-        )
-
-        assert result.success_count == 0
-        assert result.skipped_count == 2
-        assert len(result.skipped_items) == 2
-
-    @pytest.mark.asyncio
-    async def test_mixed_success_and_skip(self):
-        """混合场景：部分成功 + 部分跳过。"""
-        wp_ok = _make_workpaper(status=WpFileStatus.under_review)
-        wp_skip = _make_workpaper(status=WpFileStatus.draft)
-
-        mock_db = AsyncMock()
-        mock_result = MagicMock()
-        mock_scalars = MagicMock()
-        mock_scalars.all.return_value = [wp_ok, wp_skip]
-        mock_result.scalars.return_value = mock_scalars
-        mock_db.execute.return_value = mock_result
-
-        result = await _execute_batch_review(
-            db=mock_db,
-            project_id=uuid4(),
-            wp_ids=[wp_ok.id, wp_skip.id],
-            comment="已审阅",
-            reviewer_id=uuid4(),
-        )
-
-        assert result.success_count == 1
-        assert result.skipped_count == 1
-        assert result.success_count + result.skipped_count == 2
-
-    @pytest.mark.asyncio
-    async def test_missing_workpaper_skipped(self):
-        """不存在的底稿 ID → 跳过。"""
-        mock_db = AsyncMock()
-        mock_result = MagicMock()
-        mock_scalars = MagicMock()
-        mock_scalars.all.return_value = []  # No workpapers found
-        mock_result.scalars.return_value = mock_scalars
-        mock_db.execute.return_value = mock_result
-
-        missing_id = uuid4()
-        result = await _execute_batch_review(
-            db=mock_db,
-            project_id=uuid4(),
-            wp_ids=[missing_id],
-            comment="已审阅",
-            reviewer_id=uuid4(),
-        )
-
-        assert result.success_count == 0
-        assert result.skipped_count == 1
-        assert "不存在" in result.skipped_items[0]["reason"]
-
-    @pytest.mark.asyncio
-    async def test_count_invariant(self):
-        """success_count + skipped_count == len(wp_ids) 不变量。"""
-        wp1 = _make_workpaper(status=WpFileStatus.under_review)
-        wp2 = _make_workpaper(status=WpFileStatus.draft)
-        wp3 = _make_workpaper(status=WpFileStatus.edit_complete)
-
-        mock_db = AsyncMock()
-        mock_result = MagicMock()
-        mock_scalars = MagicMock()
-        mock_scalars.all.return_value = [wp1, wp2, wp3]
-        mock_result.scalars.return_value = mock_scalars
-        mock_db.execute.return_value = mock_result
-
-        wp_ids = [wp1.id, wp2.id, wp3.id]
-        result = await _execute_batch_review(
-            db=mock_db,
-            project_id=uuid4(),
-            wp_ids=wp_ids,
-            comment="已审阅",
-            reviewer_id=uuid4(),
-        )
-
-        assert result.success_count + result.skipped_count == len(wp_ids)
-
-    @pytest.mark.asyncio
-    async def test_skipped_items_have_reason(self):
-        """每个跳过项必须有非空 reason。"""
-        wp = _make_workpaper(status=WpFileStatus.draft)
-
-        mock_db = AsyncMock()
-        mock_result = MagicMock()
-        mock_scalars = MagicMock()
-        mock_scalars.all.return_value = [wp]
-        mock_result.scalars.return_value = mock_scalars
-        mock_db.execute.return_value = mock_result
-
-        result = await _execute_batch_review(
-            db=mock_db,
-            project_id=uuid4(),
-            wp_ids=[wp.id],
-            comment="已审阅",
-            reviewer_id=uuid4(),
-        )
-
-        for item in result.skipped_items:
-            assert "reason" in item
-            assert item["reason"]  # Non-empty
-
-
-class TestBatchReviewRequest:
-    """请求模型测试。"""
-
-    def test_default_comment(self):
-        """默认意见为"已审阅，无异议"。"""
-        req = BatchReviewRequest(wp_ids=[uuid4()])
-        assert req.comment == "已审阅，无异议"
-
-    def test_custom_comment(self):
-        """可自定义意见。"""
-        req = BatchReviewRequest(wp_ids=[uuid4()], comment="需要补充说明")
-        assert req.comment == "需要补充说明"
-
-    def test_empty_wp_ids(self):
-        """空列表合法。"""
-        req = BatchReviewRequest(wp_ids=[])
-        assert req.wp_ids == []
-
-
-# ---------------------------------------------------------------------------
-# Property-Based Tests: 批量复核
-# ---------------------------------------------------------------------------
-
-from hypothesis import given, settings, strategies as st, assume
-
-
-# Valid statuses that allow review pass
-_REVIEWABLE_STATUSES = [WpFileStatus.under_review, WpFileStatus.edit_complete]
-_NON_REVIEWABLE_STATUSES = [
-    WpFileStatus.draft,
-    WpFileStatus.review_passed,
-    WpFileStatus.archived,
-]
-_ALL_STATUSES = _REVIEWABLE_STATUSES + _NON_REVIEWABLE_STATUSES
-
-
-class TestBatchReviewAtomicityPBT:
-    """Property 14: 批量复核事务原子性
-
-    **Validates: Requirements 7.4**
-
-    For any batch of workpapers submitted for review pass where all are in
-    valid state, either all are updated to "passed" status, or (on DB error)
-    none are updated.
-    """
-
-    @settings(max_examples=15)
-    @given(
-        n_valid=st.integers(min_value=1, max_value=10),
-    )
-    def test_all_valid_all_succeed(self, n_valid: int):
-        """Property 14: 全部有效状态底稿 → 全部成功。
-
-        **Validates: Requirements 7.4**
-        """
-        # Simulate: all workpapers in reviewable state
-        wp_ids = [uuid4() for _ in range(n_valid)]
-        statuses = [WpFileStatus.under_review] * n_valid
-
-        success_count = 0
-        skipped_count = 0
-
-        for status in statuses:
-            reason = _check_reviewable(
-                _make_workpaper(status=status)
-            )
-            if reason is None:
-                success_count += 1
-            else:
-                skipped_count += 1
-
-        # All valid → all succeed
-        assert success_count == n_valid
-        assert skipped_count == 0
-        assert success_count + skipped_count == n_valid
-
-
-class TestBatchReviewCountInvariantPBT:
-    """Property 15: 批量复核跳过 + 计数不变量
-
-    **Validates: Requirements 7.5, 7.6**
-
-    For any batch review result, success_count + skipped_count must equal
-    the number of submitted wp_ids, and each skipped item must have a
-    non-empty reason.
-    """
-
-    @settings(max_examples=15)
-    @given(
-        statuses=st.lists(
-            st.sampled_from(_ALL_STATUSES),
-            min_size=1,
-            max_size=15,
-        )
-    )
-    def test_success_plus_skipped_equals_total(self, statuses: list):
-        """Property 15: success_count + skipped_count == len(wp_ids)。
-
-        **Validates: Requirements 7.5, 7.6**
-        """
-        n_total = len(statuses)
-        success_count = 0
-        skipped_count = 0
-        skipped_items = []
-
-        for i, status in enumerate(statuses):
-            wp = _make_workpaper(status=status)
-            reason = _check_reviewable(wp)
-            if reason is None:
-                success_count += 1
-            else:
-                skipped_count += 1
-                skipped_items.append({"wp_id": str(wp.id), "reason": reason})
-
-        # Core invariant: success + skipped == total
-        assert success_count + skipped_count == n_total, (
-            f"success={success_count} + skipped={skipped_count} != total={n_total}"
-        )
-
-        # Each skipped item has a non-empty reason
-        for item in skipped_items:
-            assert "reason" in item
-            assert item["reason"], f"跳过项 {item['wp_id']} 缺少 reason"
-
-    @settings(max_examples=15)
-    @given(
-        n_missing=st.integers(min_value=0, max_value=5),
-        n_reviewable=st.integers(min_value=0, max_value=5),
-        n_non_reviewable=st.integers(min_value=0, max_value=5),
-    )
-    def test_count_invariant_with_missing_workpapers(
-        self, n_missing: int, n_reviewable: int, n_non_reviewable: int
-    ):
-        """Property 15: 含不存在底稿时计数不变量仍成立。
-
-        **Validates: Requirements 7.5, 7.6**
-        """
-        total = n_missing + n_reviewable + n_non_reviewable
-        assume(total > 0)
-
-        success_count = 0
-        skipped_count = 0
-        skipped_items = []
-
-        # Missing workpapers → skipped with "不存在" reason
-        for _ in range(n_missing):
-            skipped_count += 1
-            skipped_items.append({
-                "wp_id": str(uuid4()),
-                "reason": "底稿不存在或已删除",
-            })
-
-        # Reviewable workpapers → success
-        for _ in range(n_reviewable):
-            success_count += 1
-
-        # Non-reviewable workpapers → skipped
-        for i in range(n_non_reviewable):
-            status = _NON_REVIEWABLE_STATUSES[i % len(_NON_REVIEWABLE_STATUSES)]
-            wp = _make_workpaper(status=status)
-            reason = _check_reviewable(wp)
-            skipped_count += 1
-            skipped_items.append({"wp_id": str(wp.id), "reason": reason or "unknown"})
-
-        # Core invariant
-        assert success_count + skipped_count == total, (
-            f"success={success_count} + skipped={skipped_count} != total={total}"
-        )
-
-        # All skipped items have reasons
-        for item in skipped_items:
-            assert item["reason"]

@@ -28,9 +28,9 @@ vi.mock('@/components/common/AttachmentPreviewDrawer.vue', async () => {
       name: 'AttachmentPreviewDrawerStub',
       // 布尔 prop 要声明类型：模板里 `downloadable` 简写传的是空串，只有 Boolean 类型才会转成 true
       props: { modelValue: Boolean, attachment: Object, downloadable: Boolean, size: String },
-      setup(props: any) {
-        return () =>
-          vue.h('div', {
+      emits: ['update:modelValue'],
+      setup(props: any, { emit }: any) {
+        return () => vue.h('div', {
             class: 'drawer-stub',
             'data-open': String(!!props.modelValue),
             'data-name': props.attachment?.name ?? '',
@@ -38,7 +38,9 @@ vi.mock('@/components/common/AttachmentPreviewDrawer.vue', async () => {
             'data-ocr': props.attachment?.ocr_text ?? '',
             'data-status': props.attachment?.ocr_status ?? '',
             'data-download': String(!!props.downloadable),
-          })
+          }, [props.modelValue
+            ? vue.h('button', { type: 'button', 'data-testid': 'eye-preview-close', onClick: () => emit('update:modelValue', false) }, '关闭预览')
+            : null])
       },
     }),
   }
@@ -138,14 +140,47 @@ describe('AttachmentEyeButton', () => {
     expect(wrapper.find('.drawer-stub').exists()).toBe(false)
   })
 
-  it('全文取不到时保留预览片段，仍打开原件', async () => {
-    mockGet
-      .mockResolvedValueOnce({ data: detail({ ocr_text: '片段' }) })
-      .mockRejectedValueOnce(new Error('network'))
-    const wrapper = mountEye()
+  it('点击小眼睛后关闭预览，焦点回到小眼睛按钮', async () => {
+    mockGet.mockResolvedValueOnce({ data: detail({ ocr_text_truncated: false }) })
+    const wrapper = mount(AttachmentEyeButton, {
+      props: { attachmentId: 'a1', fileName: '盘点照片.jpg' },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    const opener = wrapper.find('button')
+    ;(opener.element as HTMLElement).focus()
+    await opener.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="eye-preview-close"]').exists()).toBe(true)
+    const close = wrapper.find('[data-testid="eye-preview-close"]')
+    ;(close.element as HTMLElement).focus()
+    await close.trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(opener.element)
+    wrapper.unmount()
+  })
+})
+
+
+describe('AttachmentEyeButton — 前置请求竞态', () => {
+  beforeEach(() => {
+    mockGet.mockReset()
+  })
+
+  it('附件切换时取消旧详情请求，旧响应不能打开新附件预览', async () => {
+    let resolveDetail!: (value: unknown) => void
+    const pending = new Promise((resolve) => { resolveDetail = resolve })
+    mockGet.mockReturnValueOnce(pending)
+    const wrapper = mountEye({ attachmentId: 'a1', fileName: '旧附件.pdf' })
     await wrapper.find('button').trigger('click')
     await flushPromises()
-    expect(wrapper.find('.drawer-stub').attributes('data-open')).toBe('true')
-    expect(wrapper.find('.drawer-stub').attributes('data-ocr')).toBe('片段')
+    const signal = mockGet.mock.calls[0][1].signal as AbortSignal
+    expect(signal).toBeInstanceOf(AbortSignal)
+
+    await wrapper.setProps({ attachmentId: 'a2', fileName: '新附件.pdf' })
+    expect(signal.aborted).toBe(true)
+    resolveDetail({ data: detail({ id: 'a1', file_name: '旧附件.pdf' }) })
+    await flushPromises()
+    expect(wrapper.find('.drawer-stub').exists()).toBe(false)
   })
 })

@@ -11,12 +11,19 @@ import { flushPromises } from '@vue/test-utils'
 const apiMock = vi.hoisted(() => ({ get: vi.fn() }))
 vi.mock('@/services/apiProxy', () => ({ api: apiMock, default: apiMock }))
 
-import { authedObjectUrlFailureText, useAuthedObjectUrl } from '@/composables/useAuthedObjectUrl'
+import {
+  AUTHED_OBJECT_URL_CACHE_MAX_ENTRIES,
+  AUTHED_OBJECT_URL_CACHE_TTL_MS,
+  authedObjectUrlFailureText,
+  clearAuthedObjectUrlCache,
+  useAuthedObjectUrl,
+} from '@/composables/useAuthedObjectUrl'
 
 let created: Blob[] = []
 let revoked: string[] = []
 
 beforeEach(() => {
+  clearAuthedObjectUrlCache()
   apiMock.get.mockReset()
   created = []
   revoked = []
@@ -122,6 +129,23 @@ describe('useAuthedObjectUrl', () => {
     scope.stop()
   })
 
+  it('失败请求结算后会移出在途表，下一次进入可重新请求', async () => {
+    apiMock.get
+      .mockRejectedValueOnce({ response: { status: 500 } })
+      .mockResolvedValueOnce(new Blob(['retry'], { type: 'image/png' }))
+
+    const first = run(() => '/api/attachments/retry/preview')
+    await flushPromises()
+    expect(first.state.value).toBe('failed')
+    first.scope.stop()
+
+    const second = run(() => '/api/attachments/retry/preview')
+    await flushPromises()
+    expect(apiMock.get).toHaveBeenCalledTimes(2)
+    expect(second.state.value).toBe('ready')
+    second.scope.stop()
+  })
+
   it('options.type 强制 blob 类型（iframe 显示 PDF）', async () => {
     apiMock.get.mockResolvedValue(new Blob(['%PDF'], { type: 'application/octet-stream' }))
     const { scope } = run(() => '/api/attachments/a1/preview', { type: () => 'application/pdf' })
@@ -140,13 +164,100 @@ describe('useAuthedObjectUrl', () => {
 
     const pending = deferred<Blob>()
     apiMock.get.mockImplementationOnce(() => pending.promise)
-    const inflight = run(() => '/api/attachments/a2/preview')
+    const inflightScope = run(() => '/api/attachments/a2/preview')
     const signal: AbortSignal = apiMock.get.mock.calls[1][1].signal
-    inflight.scope.stop()
+    inflightScope.scope.stop()
     expect(signal.aborted).toBe(true)
     pending.resolve(new Blob(['y'], { type: 'image/png' }))
     await flushPromises()
-    expect(inflight.url.value).toBe('')
+    expect(inflightScope.url.value).toBe('')
     expect(created).toHaveLength(1)
+  })
+
+  it('相同地址共享在途请求，但每个作用域独立生成并释放 object URL', async () => {
+    const pending = deferred<Blob>()
+    apiMock.get.mockReturnValueOnce(pending.promise)
+    const first = run(() => '/api/attachments/shared/preview')
+    const second = run(() => '/api/attachments/shared/preview')
+    expect(apiMock.get).toHaveBeenCalledTimes(1)
+    const signal: AbortSignal = apiMock.get.mock.calls[0][1].signal
+
+    first.scope.stop()
+    expect(signal.aborted).toBe(false)
+    pending.resolve(new Blob(['shared'], { type: 'image/png' }))
+    await flushPromises()
+    expect(second.url.value).toBe('blob:test-1')
+    expect(created).toHaveLength(1)
+    second.scope.stop()
+    expect(revoked).toEqual(['blob:test-1'])
+  })
+
+  it('TTL 内复用 Blob，显式退出清理后下一次重新请求', async () => {
+    apiMock.get.mockResolvedValue(new Blob(['cached'], { type: 'image/png' }))
+    const first = run(() => '/api/attachments/cached/preview')
+    await flushPromises()
+    first.scope.stop()
+
+    const withinTtl = run(() => '/api/attachments/cached/preview')
+    await flushPromises()
+    expect(apiMock.get).toHaveBeenCalledTimes(1)
+    withinTtl.scope.stop()
+
+    clearAuthedObjectUrlCache()
+    const afterExit = run(() => '/api/attachments/cached/preview')
+    await flushPromises()
+    expect(apiMock.get).toHaveBeenCalledTimes(2)
+    afterExit.scope.stop()
+  })
+
+  it('TTL 到期后不复用旧 Blob', async () => {
+    vi.useFakeTimers()
+    try {
+      apiMock.get.mockResolvedValue(new Blob(['expiring'], { type: 'image/png' }))
+      const first = run(() => '/api/attachments/expiring/preview')
+      await flushPromises()
+      first.scope.stop()
+
+      vi.advanceTimersByTime(AUTHED_OBJECT_URL_CACHE_TTL_MS + 1)
+      const second = run(() => '/api/attachments/expiring/preview')
+      await flushPromises()
+      expect(apiMock.get).toHaveBeenCalledTimes(2)
+      second.scope.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('达到容量上限时淘汰最早访问项', async () => {
+    apiMock.get.mockImplementation(async (path: string) => new Blob([path], { type: 'image/png' }))
+    for (let index = 0; index <= AUTHED_OBJECT_URL_CACHE_MAX_ENTRIES; index += 1) {
+      const item = run(() => `/api/attachments/cache-${index}/preview`)
+      await flushPromises()
+      item.scope.stop()
+    }
+    const firstAgain = run(() => '/api/attachments/cache-0/preview')
+    await flushPromises()
+    expect(apiMock.get).toHaveBeenCalledTimes(AUTHED_OBJECT_URL_CACHE_MAX_ENTRIES + 2)
+    firstAgain.scope.stop()
+  })
+
+  it('最后一个作用域离开后才中止共享在途请求，晚到响应不进入缓存', async () => {
+    const pending = deferred<Blob>()
+    apiMock.get.mockReturnValueOnce(pending.promise)
+    const first = run(() => '/api/attachments/abort-shared/preview')
+    const second = run(() => '/api/attachments/abort-shared/preview')
+    const signal: AbortSignal = apiMock.get.mock.calls[0][1].signal
+
+    first.scope.stop()
+    expect(signal.aborted).toBe(false)
+    second.scope.stop()
+    expect(signal.aborted).toBe(true)
+    pending.resolve(new Blob(['late'], { type: 'image/png' }))
+    await flushPromises()
+
+    const retry = run(() => '/api/attachments/abort-shared/preview')
+    await flushPromises()
+    expect(apiMock.get).toHaveBeenCalledTimes(2)
+    retry.scope.stop()
   })
 })

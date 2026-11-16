@@ -32,12 +32,10 @@
             <el-form-item v-if="passwordProtected" label="密码">
               <el-input v-model="password" type="password" show-password placeholder="设置PDF打开密码" />
             </el-form-item>
-            <el-form-item label="报表语言">
-              <el-select v-model="exportLanguage" style="width: 100%" placeholder="选择导出语言">
-                <el-option label="中文" value="zh-CN" />
-                <el-option label="English" value="en-US" />
-              </el-select>
-            </el-form-item>
+            <!-- 🔴 原「报表语言」选择器（中文 / English）已删除（spec platform-global-display-settings-closure
+                 任务 10 第三轮评审 NIT：不做双语 PDF）。
+                 它从未被传给任何导出请求，只存在组件内一个 ref + 这里的下拉
+                 ⇒ 用户选了也没有任何效果，属死 UI。守卫 displaySettingsWiring.spec.ts 反向断言其不存在。 -->
           </el-form>
 
           <el-button type="primary" @click="onExport" :loading="exportLoading"
@@ -121,7 +119,7 @@ const projectId = computed(() => route.params.projectId as string)
 const selectedDocs = ref<string[]>([])
 const passwordProtected = ref(false)
 const password = ref('')
-const exportLanguage = ref('zh-CN')
+// 🔴 exportLanguage 已随「报表语言」选择器一并删除（不做双语 PDF，且它从未传到后端）
 const exportLoading = ref(false)
 const historyLoading = ref(false)
 const currentTask = ref<ExportTaskData | null>(null)

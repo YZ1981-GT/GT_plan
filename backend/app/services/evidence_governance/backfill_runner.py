@@ -68,6 +68,55 @@ class BackfillAggregate:
         return self.versions[0]
 
 
+@dataclass
+class ExistingVersionAssessment:
+    """既有治理版本与 legacy 根行的安全兼容判定。"""
+
+    safe: bool
+    reason: str = ""
+    target_version_id: UUID | None = None
+    resolution_kind: str | None = None
+
+
+def assess_existing_version_chain(
+    root: dict, versions: list[dict],
+) -> ExistingVersionAssessment | None:
+    """判定既有版本能否只补 alias，绝不重复创建版本。
+
+    返回 ``None`` 表示该根尚无治理版本，应走正常 M1 创建路径；有版本但
+    链条、scope、current 指针或 legacy version 不一致时返回不安全判定，
+    由生产 apply 预检阻断，避免静默改写历史链。
+    """
+
+    if not versions:
+        return None
+    ordered = sorted(versions, key=lambda row: int(row["version_no"]))
+    expected_numbers = list(range(1, len(ordered) + 1))
+    actual_numbers = [int(row["version_no"]) for row in ordered]
+    if actual_numbers != expected_numbers:
+        return ExistingVersionAssessment(False, "version_no 非连续")
+    project_id = root["project_id"]
+    audit_year = root.get("audit_year")
+    if any(row["project_id"] != project_id or row["audit_year"] != audit_year for row in ordered):
+        return ExistingVersionAssessment(False, "既有版本 scope 与附件根不一致")
+    for previous, current in zip(ordered, ordered[1:]):
+        if current.get("previous_version_id") != previous["id"]:
+            return ExistingVersionAssessment(False, "既有版本 previous_version_id 链不一致")
+    current_id = root.get("current_version_id")
+    if current_id != ordered[-1]["id"]:
+        return ExistingVersionAssessment(False, "current_version_id 未指向最高版本")
+    if ordered[-1].get("availability") != "available":
+        return ExistingVersionAssessment(False, "current 版本不是 available")
+    legacy_version = root.get("version")
+    if legacy_version is not None and int(legacy_version) != len(ordered):
+        return ExistingVersionAssessment(False, "legacy version 与既有版本链长度不一致")
+    return ExistingVersionAssessment(
+        True,
+        target_version_id=ordered[-1]["id"],
+        resolution_kind="root" if len(ordered) == 1 else "current_version",
+    )
+
+
 def _order_component(members: list[dict], member_ids: set[UUID]) -> tuple[list[dict], bool]:
     """把一个连通分量（按 previous_version_id 相连）排序并判定可证明性。
 
@@ -220,6 +269,11 @@ class BackfillReport:
     skipped_existing: int = 0             # 已回填（alias 存在）→ 跳过（幂等）
     checkpoints_done: int = 0
     checkpoints_skipped: int = 0
+    alias_only_roots: int = 0
+    aliases_planned: int = 0
+    versions_planned: int = 0
+    blocked_existing_roots: int = 0
+    blocked_reasons: list[dict] = field(default_factory=list)
     batches: list[dict] = field(default_factory=list)
 
     def as_dict(self) -> dict:
@@ -237,6 +291,11 @@ class BackfillReport:
             "skipped_existing": self.skipped_existing,
             "checkpoints_done": self.checkpoints_done,
             "checkpoints_skipped": self.checkpoints_skipped,
+            "alias_only_roots": self.alias_only_roots,
+            "aliases_planned": self.aliases_planned,
+            "versions_planned": self.versions_planned,
+            "blocked_existing_roots": self.blocked_existing_roots,
+            "blocked_reasons": self.blocked_reasons,
             "batch_count": len(self.batches),
             "batches": self.batches,
         }
@@ -249,6 +308,8 @@ class EvidenceBackfillRunner:
         self.db = db
         self.batch_size = max(1, int(batch_size))
         self._migration_svc_id: UUID | None = None
+        self._existing_versions: dict[UUID, list[dict]] = {}
+        self._existing_assessments: dict[UUID, ExistingVersionAssessment | None] = {}
 
     # -- migration Service Identity ------------------------------------------
 
@@ -309,7 +370,65 @@ class EvidenceBackfillRunner:
         rows = (await self.db.execute(stmt)).mappings().all()
         return [dict(r) for r in rows]
 
-    # -- checkpoint upsert（幂等 batch_key） --------------------------------
+    async def _preflight_existing_versions(
+        self, aggregates: list[BackfillAggregate], report: BackfillReport,
+    ) -> None:
+        """一次性读取既有版本链，apply 前先发现所有阻断，不边写边撞 FK。"""
+
+        from app.models.evidence_governance_models import AttachmentVersion
+
+        self._existing_versions.clear()
+        self._existing_assessments.clear()
+        for aggregate in aggregates:
+            root = aggregate.root
+            root_id = root["id"]
+            rows = (
+                await self.db.execute(
+                    sa.select(
+                        AttachmentVersion.id,
+                        AttachmentVersion.project_id,
+                        AttachmentVersion.audit_year,
+                        AttachmentVersion.version_no,
+                        AttachmentVersion.previous_version_id,
+                        AttachmentVersion.availability,
+                    )
+                    .where(AttachmentVersion.attachment_id == root_id)
+                    .order_by(AttachmentVersion.version_no)
+                )
+            ).mappings().all()
+            existing = [dict(row) for row in rows]
+            assessment = assess_existing_version_chain(root, existing)
+            self._existing_versions[root_id] = existing
+            self._existing_assessments[root_id] = assessment
+            if assessment is not None and not assessment.safe:
+                report.blocked_existing_roots += 1
+                report.blocked_reasons.append(
+                    {"attachment_id": str(root_id), "reason": assessment.reason}
+                )
+            elif assessment is not None and len(aggregate.versions) != 1:
+                report.blocked_existing_roots += 1
+                report.blocked_reasons.append(
+                    {
+                        "attachment_id": str(root_id),
+                        "reason": "既有版本链与多条 legacy 链无法安全一一映射",
+                    }
+                )
+
+    async def _checkpoint_done(self, batch_key: str) -> bool:
+        """dry-run 只读检查已有完成 checkpoint，不创建或更新 checkpoint。"""
+
+        from app.models.evidence_governance_models import EvidenceMigrationCheckpoint
+
+        return bool(
+            await self.db.scalar(
+                sa.select(EvidenceMigrationCheckpoint.id).where(
+                    EvidenceMigrationCheckpoint.migration_version == BACKFILL_MIGRATION_VERSION,
+                    EvidenceMigrationCheckpoint.batch_key == batch_key,
+                    EvidenceMigrationCheckpoint.status == "done",
+                )
+            )
+        )
+
 
     async def _claim_checkpoint(
         self, project_id: UUID, audit_year: int | None, partition: str, input_hash: str
@@ -373,11 +492,10 @@ class EvidenceBackfillRunner:
 
     # -- 单聚合回填 ----------------------------------------------------------
 
-    async def _backfill_aggregate(self, agg: BackfillAggregate, report: BackfillReport) -> int:
-        """回填一个聚合：创建有序 AttachmentVersion + alias + 更新根 attachment。
-
-        返回本聚合创建的 version 数。audit_year 未知的根 → 跳过（不臆造 alias NOT NULL）。
-        """
+    async def _backfill_aggregate(
+        self, agg: BackfillAggregate, report: BackfillReport, *, dry_run: bool = False,
+    ) -> int:
+        """回填一个聚合；既有治理版本只补 alias，不重复插入版本。"""
         from app.models.attachment_models import Attachment
         from app.models.evidence_governance_models import AttachmentVersion, LegacyAttachmentAlias
 
@@ -392,10 +510,41 @@ class EvidenceBackfillRunner:
             report.skipped_no_audit_year += len(agg.versions)
             return 0
 
+        existing_assessment = self._existing_assessments.get(root_id)
+        if existing_assessment is not None:
+            if not existing_assessment.safe:
+                return 0  # apply 前置检查已记录阻断原因
+            if len(agg.versions) != 1:
+                return 0  # 既有链与多条 legacy 链的映射需人工复核
+            report.alias_only_roots += 1
+            report.aliases_planned += 1
+            if dry_run:
+                return 0
+            await self.db.execute(
+                sa.insert(LegacyAttachmentAlias).values(
+                    old_attachment_id=root_id,
+                    attachment_id=root_id,
+                    attachment_version_id=existing_assessment.target_version_id,
+                    project_id=project_id,
+                    audit_year=audit_year,
+                    resolution_kind=existing_assessment.resolution_kind,
+                )
+            )
+            report.aliases_created += 1
+            return 0
+
         created = 0
         prev_av_id: UUID | None = None
         last_av_id: UUID | None = None
         n = len(agg.versions)
+        if dry_run:
+            report.versions_planned += n
+            report.aliases_planned += n
+            report.unverified_chains += int(agg.unverified_chain)
+            report.unknown_creator += sum(
+                1 for vrow in agg.versions if vrow.get("created_by") is None
+            )
+            return 0
         for idx, vrow in enumerate(agg.versions):
             legacy_version = vrow.get("version")
             created_by = vrow.get("created_by")
@@ -485,12 +634,16 @@ class EvidenceBackfillRunner:
         *,
         audit_year: int | None = None,
         commit: bool = True,
+        dry_run: bool = False,
     ) -> BackfillReport:
-        """执行一次 M1 checkpoint backfill；返回 coverage/idempotency 报告。
+        """执行或预览一次 M1 checkpoint backfill。
 
-        小批 checkpoint（batch_size 聚合/批）；每批一个幂等 checkpoint。runner 显式 commit
-        （每批提交，确保 deferrable 约束触发器在批边界校验 + 断点续跑）。
+        ``dry_run=True`` 只读扫描并生成计划，不创建 checkpoint/version/alias；
+        ``commit=False`` 保留旧的事务演练语义，由调用方负责 rollback。apply
+        前会先完成全部既有版本链预检，任何阻断都不会开始分批写入。
         """
+        if dry_run and commit:
+            raise ValueError("dry_run 不能与 commit=True 同时使用")
         report = BackfillReport(project_id=str(project_id), audit_year=audit_year)
         pending = await self._load_pending(project_id, audit_year)
         report.scanned = len(pending)
@@ -501,6 +654,12 @@ class EvidenceBackfillRunner:
 
         aggregates = build_backfill_aggregates(pending)
         report.aggregates = len(aggregates)
+        await self._preflight_existing_versions(aggregates, report)
+        if report.blocked_existing_roots and not dry_run:
+            raise RuntimeError(
+                "backfill 预检阻断：既有版本链不能安全映射 alias；"
+                f" reasons={report.blocked_reasons!r}"
+            )
 
         # 小批：每 batch_size 个聚合一个 checkpoint（按 root id 稳定切批）。
         for start in range(0, len(aggregates), self.batch_size):
@@ -510,12 +669,20 @@ class EvidenceBackfillRunner:
             partition = f"p{start // self.batch_size:04d}"
             # 该批 scope：若单一 year 则用之，否则用根 year（scope 已按 project 过滤）。
             batch_year = audit_year if audit_year is not None else batch[0].root.get("audit_year")
-            cp_id, should = await self._claim_checkpoint(project_id, batch_year, partition, input_hash)
+            batch_key = build_batch_key(project_id, batch_year, partition, input_hash)
+            if dry_run:
+                cp_id = None
+                should = not await self._checkpoint_done(batch_key)
+            else:
+                cp_id, should = await self._claim_checkpoint(
+                    project_id, batch_year, partition, input_hash
+                )
             batch_info = {
                 "partition": partition,
                 "input_hash": input_hash,
                 "aggregates": len(batch),
                 "processed": should,
+                "dry_run": dry_run,
             }
             if not should:
                 report.checkpoints_skipped += 1
@@ -524,27 +691,36 @@ class EvidenceBackfillRunner:
                 continue
             processed = 0
             for agg in batch:
-                processed += await self._backfill_aggregate(agg, report)
+                processed += await self._backfill_aggregate(
+                    agg, report, dry_run=dry_run
+                )
             report.versions_created += processed
             if cp_id is not None:
                 await self._finish_checkpoint(cp_id, processed)
-            report.checkpoints_done += 1
+            if not dry_run:
+                report.checkpoints_done += 1
             report.batches.append(batch_info)
-            if commit:
+            if commit and not dry_run:
                 await self.db.commit()
 
-        if commit:
+        if commit and not dry_run:
             await self.db.commit()
 
         logger.info(
-            "evidence M1 backfill project=%s year=%s scanned=%d aggregates=%d versions=%d "
-            "aliases=%d unverified=%d unknown_creator=%d skipped_no_year=%d cp_done=%d cp_skip=%d",
+            "evidence M1 backfill project=%s year=%s dry_run=%s scanned=%d aggregates=%d versions=%d "
+            "planned_versions=%d aliases=%d planned_aliases=%d alias_only=%d blocked=%d "
+            "unverified=%d unknown_creator=%d skipped_no_year=%d cp_done=%d cp_skip=%d",
             project_id,
             audit_year,
+            dry_run,
             report.scanned,
             report.aggregates,
             report.versions_created,
+            report.versions_planned,
             report.aliases_created,
+            report.aliases_planned,
+            report.alias_only_roots,
+            report.blocked_existing_roots,
             report.unverified_chains,
             report.unknown_creator,
             report.skipped_no_audit_year,

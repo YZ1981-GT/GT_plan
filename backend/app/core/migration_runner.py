@@ -58,6 +58,14 @@ _VERSION_RE = re.compile(r"^V(\d+)__.*\.sql$", re.IGNORECASE)
 # 匹配 R001__xxx.sql 格式（回滚脚本）
 _ROLLBACK_RE = re.compile(r"^R(\d+)__.*\.sql$", re.IGNORECASE)
 
+# 回滚脚本可声明「非空保护表」与 PostgreSQL-only 语句。SQLite 没有
+# PL/pgSQL 的 RAISE EXCEPTION，运行器在执行 R 前先做同等 fail-closed 检查，
+# 并跳过带 dialect 标记的 DO 块，不把 PG 专属语句误送给 SQLite。
+_ROLLBACK_PROTECTED_TABLE_RE = re.compile(
+    r"^\s*--\s*protect-non-empty:\s*([A-Za-z_][A-Za-z0-9_]*)\s*$",
+    re.MULTILINE,
+)
+
 # schema_version 表 DDL
 _SCHEMA_VERSION_DDL = """\
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -742,10 +750,36 @@ class MigrationRunner:
 
         statements = self._split_sql_statements(sql_content)
         logger.debug("[Migration] %s 共 %d 条语句", mig.filename, len(statements))
+        dialect_name = self._engine.dialect.name
+        protected_tables = _ROLLBACK_PROTECTED_TABLE_RE.findall(sql_content)
 
         async with self._engine.begin() as conn:
+            if dialect_name != "postgresql":
+                # R 脚本中的 PostgreSQL DO 块无法由 SQLite 解析；先执行同等
+                # 非空保护，空表时再跳过该块并执行其后的可移植 DROP。
+                for table_name in protected_tables:
+                    try:
+                        row = await conn.execute(
+                            text(f'SELECT 1 FROM "{table_name}" LIMIT 1')
+                        )
+                    except Exception as exc:
+                        # R 的 DROP IF EXISTS 允许表本来不存在；仅对明确的
+                        # SQLite 缺表场景放行，其他错误仍然 fail closed。
+                        if "no such table" not in str(exc).lower():
+                            raise
+                        continue
+                    if row.scalar() is not None:
+                        raise RuntimeError(
+                            f"回滚前置保护失败：{table_name} 仍有数据，拒绝删除"
+                        )
+
             for stmt in statements:
-                await conn.execute(text(stmt))
+                if dialect_name != "postgresql" and any(
+                    line.strip() == "-- dialect:postgresql-only"
+                    for line in stmt.splitlines()
+                ):
+                    continue
+                await conn.exec_driver_sql(stmt)
 
         logger.info("[Migration] ✅ 回滚 %s 执行成功（%d 条语句）", mig.filename, len(statements))
 

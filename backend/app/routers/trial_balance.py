@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -26,6 +27,8 @@ router = APIRouter(
     prefix="/api/projects/{project_id}/trial-balance",
     tags=["trial-balance"],
 )
+
+logger = logging.getLogger(__name__)
 
 
 @router.get("")
@@ -521,3 +524,70 @@ async def set_freeze_status(
         "frozen_by": ws[freeze_key].get("frozen_by"),
         "frozen_at": ws[freeze_key].get("frozen_at"),
     }
+
+
+# ── 正式导出（spec platform-global-display-settings-closure 任务 10 / AC-20）──────
+#
+# 🔴 这条端点是**补一个真实缺陷**：前端 `views/TrialBalance.vue` 的「导出」按钮
+# 一直在调 `P.trialBalance.export(pid)`（= 本路径），而后端从来没有实现
+# ⇒ 用户点一次就是 404，拿不到任何文件。同一形态的 `summary/export` 与
+# `bulk-export` 也只在 `EXPORT_SURFACE_REGISTRY` 里挂着、无真实路由。
+#
+# 出口分类 = **formal**（正式出具）⇒ 必须按 `ExportUnitPolicy` 折算金额并写单位标注
+# （数值与标注同源），且**不得**写 `_GT_EXPORT_META`（那是 data_exchange 的标记）。
+@router.get("/export")
+async def export_trial_balance(
+    project_id: UUID,
+    year: int | None = Query(None, description="审计年度；省略时取项目审计年度，项目没填 ⇒ 422"),
+    company_code: str = Query("001"),
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """导出试算表 xlsx（正式件，按项目 `amount_unit` 折算 + 标注单位）。
+
+    复用 `GET /api/projects/{pid}/trial-balance` 的取数口径（同一 service / 同一
+    缓存 / 同一 scope_cycles 过滤），保证「页面看到的」与「导出的」是同一批行。
+    """
+    from fastapi.responses import Response
+
+    from app.services.export_policy_snapshot import resolve_policy_snapshot_for_project
+    from app.services.trial_balance_export import build_trial_balance_workbook
+
+    resolved_year = await require_project_audit_year(db, project_id, year)
+
+    # 取数：走与页面同一实现（含 scope_cycles 过滤），避免两套口径
+    rows = await get_trial_balance(
+        project_id=project_id,
+        year=resolved_year,
+        company_code=company_code,
+        account_prefix=None,
+        include_movement=False,
+        include_prior=False,
+        db=db,
+        redis=redis,
+        current_user=current_user,
+    )
+
+    # 单位策略快照：构造失败**不阻断导出**（审计证据不是业务前置），
+    # 但此时按元口径出且**不带单位标注来源** —— 用 `logger.warning` 留痕。
+    policy_snapshot: str | None = None
+    try:
+        policy_snapshot = await resolve_policy_snapshot_for_project(
+            db, project_id=project_id, year=resolved_year
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("试算表导出单位策略快照构造失败（按元口径导出）: %s", exc)
+
+    content = build_trial_balance_workbook(
+        rows,
+        policy_snapshot=policy_snapshot,
+        year=resolved_year,
+        company_code=company_code,
+    )
+    filename = f"trial_balance_{resolved_year}_{company_code}.xlsx"
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

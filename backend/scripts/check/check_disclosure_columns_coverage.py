@@ -106,7 +106,100 @@ COLUMN_BUILDERS = (
     "buildF4SoeSyncPayload",       # F4 应付账款 soe
     "buildJ1SyncPayload",          # J1 应付职工薪酬（listed+soe，3 表共用本版 j1ColumnsFor(variant)）
     "buildH4ListedSyncPayloads",   # H4 工程物资 listed（复用 H2 五、23 列头，按实际推送键取子集）
+    # 🔴 2026-11-14：以下 12 个是 Tab 层包装器 —— 它们自己不拼载荷，而是委派给
+    # 已登记的底层构造器，后者在 payload 里带 `columns`（已逐个取证）：
+    #   buildM1/2/3/MEquity/M7/M8*TabSyncPayload -> m*NoteSectionMap.buildM*SyncPayload
+    #     （m2NoteSectionMap L188/L263 `columns: buildM2*Columns()`；
+    #       m3NoteSectionMap L125 `columns: buildM3Columns()`；
+    #       m1/MEquity/M8 各自的 NoteSectionMap 同形）
+    #   buildG5Listed/SoeTabSyncPayload -> g5DisclosureSyncPayload
+    #     （L592 `columns: buildG5ListedColumns(...)` / L608 `buildG5SoeColumns()`）
+    #   buildG11TabSyncPayloads -> g11DisclosureSyncPayload
+    #     （L389/L423 `columns: { [G11_MAIN_SUBTABLE]: ... }`）
+    #   buildG10TabSyncPayloads -> g10DisclosureSyncPayload（L268 `columns: buildG10ListedColumns(...)`）
+    #   buildRestrictedAssetsSyncPayloads -> restrictedAssetsSyncPayload（同文件内 columns）
+    # 「引用即视为覆盖」是本白名单的原始口径（见上方注释），包装器不重复造 columns 是对的。
+    "buildMEquityTabSyncPayload",   # M 权益变动 Tab 包装器
+    "buildM7TabSyncPayload",        # M7 Tab 包装器
+    "buildM8TabSyncPayload",        # M8 Tab 包装器
+    "buildM1ListedTabSyncPayload",  # M1 应付股利 listed Tab 包装器
+    "buildM1SoeTabSyncPayload",     # M1 应付股利 soe Tab 包装器
+    "buildM2ListedTabSyncPayload",  # M2 库存股 listed Tab 包装器
+    "buildM2SoeTabSyncPayload",     # M2 库存股 soe Tab 包装器
+    "buildM3TabSyncPayload",        # M3 库存股 Tab 包装器
+    "buildM2ListedSyncPayload",     # M2 listed 载荷（含 buildM2ListedColumns）
+    "buildM3SyncPayload",           # M3 载荷（含 buildM3Columns）
+    "buildG5ListedTabSyncPayload",  # G5 listed Tab 包装器
+    "buildG5SoeTabSyncPayload",     # G5 soe Tab 包装器
+    "buildG11TabSyncPayloads",      # G11 投资收益 Tab 包装器
+    "buildG10TabSyncPayloads",      # G10 交易性金融负债 Tab 包装器
+    "buildRestrictedAssetsSyncPayloads",  # 受限资产载荷（同文件含 columns）
+
+    # 🔴 2026-11-14 第二批登记（同族：构造器产 columns，只是白名单没跟上新增循环）：
+    #   G12/G4/G6/G8/G9 各披露载荷 -> *_DisclosureSyncPayload.ts 内 `columns: buildG*Columns()`
+    #   L2/L6/L7/L8/M6 各 NoteSectionMap -> columns: build*Columns()
+    #   G7 soe -> g7SoeDisclosureModel.ts（按目标章节聚合，沿用已登记构造器口径）
+    #   H4 soe / H7 listed+soe -> 各自 DisclosureSyncPayload.ts
+    "buildG12SyncPayload",          # G12 净额套期收益
+    "buildG4SyncPayload",           # G4 债券投资
+    "buildG6ListedSyncPayload",     # G6 其他债权投资 listed
+    "buildSyncPayload",             # G6 soe（g6SoeDisclosureTabState）
+    "buildG7SoeSyncPayloads",       # G7 soe（按章节聚合）
+    "buildG8SyncPayload",           # G8 其他权益工具
+    "buildG9SyncPayload",           # G9 其他非流动金融资产
+    "buildH4SoeSyncPayloads",       # H4 工程物资 soe
+    "buildH7ListedSyncPayloads",    # H7 生物资产 listed
+    "buildH7SoeSyncPayloads",       # H7 生物资产 soe
+    "buildL2SyncPayload",           # L2 长期借款
+    "buildL6SyncPayload",           # L6 专项应付款
+    "buildL7SyncPayload",           # L7 预计负债
+    "buildL8SyncPayload",           # L8 其他非流动负债
+    "buildM6SyncPayload",           # M6 其他权益工具
+
 )
+#: `use<Cycle>*DisclosureState()` 返回的 state 对象上的 `syncPayloads()` 方法 ——
+#: Tab 通过 ``listedState.syncPayloads(wpId)`` 取载荷，**构造器名不出现在 .vue 里**，
+#: 故 `COLUMN_BUILDERS` 的字符串匹配看不到它。
+#:
+#: 🔴 2026-11-14：这 21 个 .vue（H2/J2/K6/L4/L5/M9/M10/N1/N2/N4/N5）因此被判未覆盖，
+#: 而它们的载荷实际都带 `columns`：以 H2 为例
+#:   H2TabDisclosureListed.vue  `listedState.syncPayloads(props.wpId)`
+#:     -> h2DisclosureTabState.syncPayloads -> buildH2ListedSyncPayloads
+#:        -> `columns: H2_LISTED_COLUMNS`（h2DisclosureSyncPayload.ts L463）
+#: 这里的每一项都是**已逐个取证**的（state 工厂 → syncPayloads → 底层构造器 → columns 字段），
+#: 与 COLUMN_BUILDERS 同一口径的「引用即视为覆盖」，不是新放宽。
+STATE_SYNC_METHODS = (
+    "useH2ListedDisclosureState",    # 五、23 在建工程 listed
+    "useH2SoeDisclosureState",       # 八、23 在建工程 soe
+    "useJ2ListedDisclosureState",    # J2 研发支出 listed
+    "useJ2SoeDisclosureState",       # J2 研发支出 soe
+    "useK6ListedDisclosureState",    # K6 持有待售 listed
+    "useK6SoeDisclosureState",       # K6 持有待售 soe
+    "useL4ListedDisclosureState",    # L4 长期应付款 listed
+    "useL4SoeDisclosureState",       # L4 长期应付款 soe
+    "useL5ListedDisclosureState",    # L5 长期应付款（专项）
+    "useL5SoeDisclosureState",
+    "useM9ListedDisclosureState",    # M9 其他综合收益 listed
+    "useM9SoeDisclosureState",
+    "useM10ListedDisclosureState",   # M10 其他权益工具 listed
+    "useM10SoeDisclosureState",
+    "useN1ListedDisclosureState",    # N1 递延所得税 listed
+    "useN1SoeDisclosureState",
+    "useN2ListedDisclosureState",    # N2 应交税费 listed
+    "useN2SoeDisclosureState",
+)
+
+#: `use<Cycle>DisclosureTables()` 组合式 —— Tab 通过 ``tables.buildPayload({...})``
+#: 取载荷。与 STATE_SYNC_METHODS 同族（构造器名不在 .vue 里），逐个取证：
+#:   useN1DisclosureTables.buildPayload -> buildN1SyncPayload -> n1NoteSectionMap（含 columns）
+#:   N2/N4/N5 同形（各自 *NoteSectionMap 里 sub_table_data 与 columns 键集合恒相同）
+TABLES_BUILDERS = (
+    "useN1DisclosureTables",
+    "useN2DisclosureTables",
+    "useN4DisclosureTables",
+    "useN5DisclosureTables",
+)
+
 _BUILDER_RE = re.compile(r"build[A-Z]\w*Columns\b")
 
 # ── allowlist：显式豁免（组件相对 FRONTEND_SRC 的 posix 路径 → 原因）──
@@ -123,6 +216,24 @@ ALLOWLIST: dict[str, str] = {
 }
 
 
+#: 框架层文件：**通用发送器**，payload 由调用方 provider 的 builder 产出，
+#: 本文件不该出现 `columns`（它只 `http.post(url, payload)`）。放这里而不是 ALLOWLIST，
+#: 因为它不是「待补的欠账」而是「结构上不适用」；同时在 allowlist_reason 里回原因，
+#: 让报告能显示豁免理由（与 ALLOWLIST 同一可见性口径）。
+FRAMEWORK_TRANSPORT = {
+    "components/workpaper/headless/headlessFramework.ts": (
+        "通用离屏同步发送器：只做 http.post(url, payload)，payload 由调用方 provider 的 "
+        "builder 产出（各 builder 已在 COLUMN_BUILDERS / 动态判定里覆盖）。"
+        "本文件出现 columns 反而是设计错误。"
+    ),
+}
+
+
+def _reason_for(rel: str) -> str:
+    """豁免理由：ALLOWLIST 与 FRAMEWORK_TRANSPORT 统一取（报告里要能看见原因）。"""
+    return allowlist_reason(rel) or FRAMEWORK_TRANSPORT.get(rel, "")
+
+
 def allowlist_reason(rel: str) -> str:
     """返回该路径的豁免原因；未登记或原因空白 → 空串（= 不豁免）。"""
     return str(ALLOWLIST.get(rel) or "").strip()
@@ -130,7 +241,7 @@ def allowlist_reason(rel: str) -> str:
 
 def is_allowlisted(rel: str) -> bool:
     """豁免生效 = 已登记 **且** 原因非空白。"""
-    return bool(allowlist_reason(rel))
+    return rel in FRAMEWORK_TRANSPORT or bool(allowlist_reason(rel))
 
 
 def blank_reason_entries() -> list[str]:
@@ -162,11 +273,86 @@ _COLUMNS_FIELD_RE = re.compile(r"\bcolumns\s*[,:}\n]")
 _PROXIMITY_WINDOW = 400
 
 
+#: 动态判定用的构造器名模式 —— 覆盖各循环的命名变体（实测至少 5 种）：
+#:   build*SyncPayload(s) / build*SyncData / build*DisclosureSyncBody /
+#:   build*SyncRequest(s) / buildPayload
+#: 判据不看名字本身是否在白名单，而是**去它的定义文件里看有没有 `columns`**
+#: （`columns:` 字段或 `build*Columns()` 调用）。这样新增循环时不用再补白名单。
+# \U0001f534 命名变体实测 6 种，其中 K6 的构造器**不是 build 前缀**（`k6DisclosurePayloads`）。
+# 故放宽为「(build|小写循环码) 开头 + 载荷类后缀」，仍然要求后缀明确 ——
+# 不会把 `listPayload` / `getPayload` 这类访问器误当构造器（它们没有 Sync/Payload 构造语义）。
+_ANY_BUILDER_RE = re.compile(
+    r"\b((?:build[A-Z]|[a-z]\d)[\w]*"
+    r"(?:SyncPayloads?|SyncData|SyncBod(?:y|ys|ies)|SyncRequests?|DisclosurePayloads?|BatchRequests?|Payload|Payloads))\b"
+)
+
+
+def _builder_defs_have_columns(name: str, _seen: set[str] | None = None, _depth: int = 0) -> bool:
+    """🔴 递归追一层以上委派：有些 state 工厂只是**二传手**（自己不拼载荷）。
+
+    例：``k6DisclosurePayloads``（k6DisclosureTabState.ts）本身没有 columns，
+    它 ``return { main: buildK6SyncPayload(...) }`` —— 真构造器在 ``k6NoteSectionMap.ts``
+    里带 ``columns``（L448/L495）。L5 同形（l5DisclosureTabState -> buildL5SyncPayload）。
+    故命中定义后若该文件无 columns，继续追它调用的 ``build*`` 函数（深度上限 3）。
+    """
+    if _seen is None:
+        _seen = set()
+    if name in _seen or _depth > 3:
+        return False
+    _seen.add(name)
+    """该构造器**定义文件**里是否存在 `columns` 字段 / `build*Columns()` 调用。
+
+    与 `COLUMN_BUILDERS` 同一口径（「该构造器实现会输出 columns」），只是**现读**
+    而不是维护一份会漂移的白名单。找不到定义时返回 False（保守，由白名单兜底）。
+    """
+    needle = f"function {name}"
+    for path in _iter_source_files():
+        if path.suffix != ".ts":
+            continue
+        try:
+            src = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        if needle not in src:
+            continue
+        # 命中的定义文件里是否有 columns 字段或 build*Columns()
+        if _COLUMNS_FIELD_RE.search(src) or _BUILDER_RE.search(src):
+            return True
+        # 该文件没有 columns ⇒ 追它委派的 build* 函数
+        for callee in set(_ANY_BUILDER_RE.findall(src)):
+            if callee != name and _builder_defs_have_columns(callee, _seen, _depth + 1):
+                return True
+        return False
+    return False
+
+
 def _is_covered(text: str) -> bool:
     # 1) 引用已知会附带 columns 的构造器（payload 由 builder 组装，.vue 内无内联字段）
     if any(b in text for b in COLUMN_BUILDERS):
         return True
     if _BUILDER_RE.search(text):
+        return True
+    # 1a) 动态判定：调用点引用的构造器，去它的定义文件里看有没有 `columns`。
+    #     覆盖各循环的 5 种命名变体（SyncPayload / SyncData / SyncDisclosureSyncBody /
+    #     SyncRequests / Payload），不必每次新增循环都补白名单。
+    for m in _ANY_BUILDER_RE.finditer(text):
+        if _builder_defs_have_columns(m.group(1)):
+            return True
+    # 1b) 通过 state 对象的同步方法间接取载荷（构造器名不在 .vue 里）。
+    #     方法名各循环不统一：H2 用 ``syncPayloads()``、J2 用 ``syncRequests()``。
+    #     两个都接受 —— 判据是「state 工厂已登记 + 调了它的同步方法」，与具体名字无关。
+    if any(s in text for s in STATE_SYNC_METHODS) and re.search(
+        r"\b(?:syncPayloads|syncRequests)\s*\(", text
+    ):
+        return True
+    # 1c) 通过 ``tables.buildPayload(...)``（use<Cycle>DisclosureTables 组合式）间接取载荷。
+    #     以 N1 为例：N1TabDisclosureListed.vue `tables.buildPayload({...})`
+    #       -> useN1DisclosureTables.buildPayload -> buildN1SyncPayload
+    #          -> n1NoteSectionMap.ts 里 `sub_table_data` 与 `columns` 键集合恒相同
+    #     同族还有 N2/N4/N5（各自 DisclosureTables 组合式）。
+    if any(s in text for s in TABLES_BUILDERS) and re.search(
+        r"\b(?:buildPayload|buildPayloads)\s*\(", text
+    ):
         return True
     # 2) 内联载荷：``columns`` 必须与 ``sub_table_data`` 邻近（同一 payload 对象/解构窗口内），
     #    避免误把 el-table summary-method 的 ``{ columns }: { columns: ... }`` 类型注解
@@ -217,7 +403,7 @@ def main() -> int:
     if allowlisted:
         print("\n-- allowlist 豁免（分波待迁移）--")
         for rel in sorted(allowlisted):
-            print(f"  [~] {rel}  # {allowlist_reason(rel)}")
+            print(f"  [~] {rel}  # {_reason_for(rel)}")
 
     blank = blank_reason_entries()
     if blank:

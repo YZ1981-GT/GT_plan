@@ -19,6 +19,7 @@ from app.models.core import User
 from app.services import adjustment_hall_notify as notify
 from app.services import adjustment_review_service as review
 from app.services import adjustment_review_task_service as review_tasks
+from app.services.workpaper_sync.outbox import PendingPublication, PublishReport
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +69,14 @@ def broadcast_review_changed(project_id: UUID, items: list[dict], new_status: st
         pass
 
 
-async def publish_review_events(db: AsyncSession) -> None:
-    """提交后投递本事务记住的耐久事件；失败留在 outbox 自动重试。"""
+async def publish_review_events(
+    db: AsyncSession,
+    publications: list[PendingPublication] | tuple[PendingPublication, ...] | None = None,
+) -> PublishReport:
+    """提交后投递本事务记住的耐久事件，返回本次投递报告；失败留在 outbox 自动重试。"""
     from app.services.workpaper_sync.outbox import DurableEventOutboxService
 
-    await DurableEventOutboxService.publish_pending(db)
+    return await DurableEventOutboxService.publish_pending(db, publications)
 
 
 @router.get("/review-tasks")
@@ -188,6 +192,11 @@ async def review_adjustments_batch(
     except review.ReviewFlowError as e:
         raise _http(e)
     await db.commit()
-    await publish_review_events(db)
+    handles = result.pop("_publish_handles", ())
+    publish_report = await publish_review_events(db, handles)
+    result["downstream"] = {
+        "published": int(getattr(publish_report, "published", 0) or 0),
+        "failed": int(getattr(publish_report, "failed", 0) or 0),
+    }
     broadcast_review_changed(project_id, result["succeeded"], body.status.value)
     return result
