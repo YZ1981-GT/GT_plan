@@ -25,8 +25,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.routers import custom_template_ingestion as module
-from app.routers.custom_template_ingestion import router
+from app.routers import custom_template_publications as module
+from app.routers.custom_template_publications import router
 from app.services.custom_template_ingestion.lifecycles import PublicationState
 from app.services.custom_template_ingestion.publication_registry_store import (
     StoredPublication,

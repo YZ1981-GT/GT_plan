@@ -481,3 +481,74 @@
 - **前端逐 amount region 确认 UI** / publication 页面。
 - **V272 未落共享库**（需用户放行）。
 - 端点未做 Playwright 浏览器实测。
+
+---
+
+## 九、finalize saga 接持久化 ACK（2026-11-15 本轮）—— 打通 PENDING_VISIBILITY → ACTIVE
+
+### 9.1 问题实证
+
+`finalize_saga.run_finalize_saga` 的 `ledger` 参数此前**只接受**
+`InMemoryAckLedger`（内存 dict）：进程一退 ACK 与 visibility 全丢，publication
+永远停在 PENDING_VISIBILITY ⇒ 上一轮已就绪的 `POST /publications/instantiate`
+在真实链路里**永远 409**。
+
+而持久化能力早就在：`guidance_handoff_consumer_service.record_ack` /
+`resolve_visibility` 读写真实 `guidance_consumer_ack` /
+`guidance_handoff_visibility` 表，`finalize_saga` 甚至已经 import 了它们但只用了
+内存替身。
+
+### 9.2 交付内容
+
+| 文件 | 说明 |
+| --- | --- |
+| `app/services/custom_template_ingestion/durable_ack_ledger.py` | 把 `record_ack` / `resolve_visibility` 适配成 saga 的 ledger 协议（`upsert` / `resolve`） |
+| `app/routers/custom_template_publications.py` | **新抽出**：publications 三段端点（list / instantiate / commit-visibility） |
+| `app/routers/custom_template_ingestion.py` | 只留 ingest / preflight / unit-authority / finalize（947 → 594 行） |
+| `app/router_registry/workpaper.py` | 注册新 router |
+| 测试 2 个新文件 | `test_durable_ack_ledger.py`（13 例）+ `test_commit_visibility_routes.py`（13 例） |
+
+**抽出原因**：加完三段后 `custom_template_ingestion.py` 947 行，超 800 行门禁。
+按「超限优先抽模块不抬白名单」拆出，路由前缀不变，前端路径无变化。
+
+### 9.3 关键设计
+
+- **`DurableAckLedger` 与 `InMemoryAckLedger` 同形同语义**：saga 无需改动即可落库。
+- **verdict 冲突必须抛**：内存版有此检查，`record_ack` 本身会静默返回既有行；
+  这里**刻意更严** —— 同幂等键换 verdict 是调用方缺陷，必须暴露。
+- **必需 consumer 是四个**（`REQUIRED_FINALIZE_CONSUMERS`），不用
+  `resolve_visibility` 默认的单 guidance。
+- **`commit-visibility` 鉴权 = `APPROVE_PUBLISH_ORGANIZATION`**（partner / qc），
+  不是发起侧 `PUBLISH_ORGANIZATION`（template_admin）—— 双人复核语义：发起与
+  批准不落在同一 capability 上。
+- **未知 consumer 422**：不能给任意 consumer 灌 ACK。
+- **只有四个全 ACCEPTED 才 ACTIVE**；缺 ACK 保持 PENDING_VISIBILITY；
+  有 REJECTED 落 FAILED。已 ACTIVE 幂等返回（不重复写）。
+
+### 9.4 验证
+
+- ledger 13 passed + 端点 13 passed + 整包 **383 passed**（连跑两轮稳定）。
+- 行数门通过（主 router 947 → 594）。
+- **变异 12/12 RED**：verdict 冲突 / 非法 verdict / resolve 恒 ACTIVE /
+  `_existing` 丢 reason_codes / 批准 capability 门 / 未知 consumer 门 /
+  handoff 身份门 / 非 PENDING 门 / ACTIVE 幂等短路 / REJECTED 不落 FAILED /
+  ACK 未转发 / `runtimeDiscoverable` 恒真。
+
+### 9.5 变异复盘（两条曾假存活）
+
+1. **`reason codes dropped`** —— 源码里 `reason_codes=tuple(row.reason_codes_json or ())`
+   有**两处**（首次 upsert 走 `record_ack`、重放走 `_existing`），我的靶点只写一处
+   且 `expect_n=1`。首轮脚本判成 GREEN 是因为替换了两处而测试只覆盖到一条路径。
+   修正：靶点带上下文唯一定位到 `_existing` 那处，并补
+   `test_idempotent_replay_keeps_reason_codes`。
+2. **`acks not forwarded to ledger`** —— 测试只断言了状态与 transition，
+   没断言 ACK 真的进了 ledger。补 `_FakeLedger.instances[-1].acks` 的
+   数量 / consumer 集合 / verdict 断言。
+
+### 9.6 仍未完成（不得据此标完成）
+
+- **前端 publication 页面** / 逐 amount region 确认 UI。
+- **V272 未落共享库**（需用户放行）。
+- 端点未做 Playwright 浏览器实测。
+- `run_finalize_saga` 本身仍未被生产调用（`commit-visibility` 直接用
+  `DurableAckLedger` 走同一条 `resolve` 判据，但完整 saga 编排尚未接线到端点）。

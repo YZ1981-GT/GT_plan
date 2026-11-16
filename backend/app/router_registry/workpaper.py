@@ -107,6 +107,9 @@ def register_workpaper_routers(app: FastAPI) -> None:
     # 新链 /api/custom-template-ingestion/* 必须 include_router，否则启动 WARNING
     # 且前端上传 404（service 单测绿、路由表空）。无 {wp_id}，自带 capability 校验。
     from app.routers.custom_template_ingestion import router as custom_template_ingestion
+    # publication registry 端点（list / instantiate / commit-visibility）——
+    # 从 custom_template_ingestion 抽出以守 800 行门禁，前缀相同。
+    from app.routers.custom_template_publications import router as custom_template_publications
     # spec workpaper-page-formula-toolbar-closure Task 3：
     # GET/POST /api/workpapers/{wp_id}/capability-snapshot|capability-assert
     from app.routers.wp_capability_snapshot import router as wp_capability_snapshot
@@ -371,7 +374,7 @@ def register_workpaper_routers(app: FastAPI) -> None:
         # ── 辅助组 ──
         "程序管理": [wp_procedures, wp_procedure_trim, wp_step_mapping, wp_evidence],
         "AI与辅助": [wp_ai, wp_ai_confirm, wp_chat, wp_explanation, confirmation_alt_doc_ocr, b14_ai_generate, a171_ai_generate, a177_ai_generate, a176_docx_sync, d1_ai_generate, d2_ai_generate, d2_derecognition, d3_ai_generate, d4_ai_generate, d4_contract_ocr, d5_ai_generate, d6_ai_generate, d7_ai_generate, e1_statement_ocr, e1_cutoff_ocr, e1_large_check_ocr, e1_account_list_ocr, e1_commit_ocr, e1_credit_ocr, f1_ai_generate, f2_ai_generate, f2_contract_ocr, f2_val_ai_generate, f2_val_contract_ocr, f2_spe_ai_generate, f2_spe_contract_ocr, f2_st_ai_generate, f2_st_plan_sync, f2_st_summary_sync, f2_st_contract_ocr, f3_ai_generate, f3_contract_ocr, f4_ai_generate, f4_contract_ocr, f5_ai_generate, f5_contract_ocr, g0_ai_generate, h0_ai_generate, k0_ai_generate, l0_ai_generate, g1_ai_generate, g1_contract_ocr, g2_ai_generate, g3_ai_generate, g4_main_ai_generate, g4_sppi_ai_generate, g4_ecl_ai_generate, g5_ai_generate, g6_main_ai_generate, g6_sppi_ai_generate, g6_ecl_ai_generate, g7_main_ai_generate, g7_method_ai_generate, g7_sub_ai_generate, g8_ai_generate, g8_contract_ocr, g9_ai_generate, g9_contract_ocr, g10_ai_generate, g10_contract_ocr, g11_ai_generate, g11_contract_ocr, g12_ai_generate, g13_ai_generate, g14_ai_generate, h10_ai_generate, h1_ai_generate, h1_depreciation, h1_property_ocr, h1_stocktake_summary_ocr, h1_stocktake_plan_export, h2_ai_generate, h2_interest_cap, h3_ai_generate, h3_transfer_engine, h3_property_ocr, h3_contract_ocr, i1_ai_generate, i1_amortization, i2_ai_generate, i2_capitalization, i3_ai_generate, i3_dcf_engine, i4_ai_generate, i5_ai_generate, i6_ai_generate, k1_ai_generate, k2_ai_generate, k3_ai_generate, k4_ai_generate, k5_ai_generate, k6_ai_generate, k7_ai_generate, k8_ai_generate, k9_ai_generate, k10_ai_generate, k11_ai_generate, k12_ai_generate, k13_ai_generate, j1_ai_generate, j2_ai_generate, j3_ai_generate],
-        "其他": [qc, wp_storage, wp_download, wp_export_import, wp_template_copy, workpaper_summary, process_record, review_conversations, annotations, background_jobs, excel_html, wp_structure, wp_manuals, wp_fine_rules, audit_check, wp_offline, wp_audit_flow_graph, wp_sheet_lock, standard_conversion, attachment_lineage, wp_functional_actions, issue_hints, workpaper_summaries, wp_render_registry, custom_template_ingestion],
+        "其他": [qc, wp_storage, wp_download, wp_export_import, wp_template_copy, workpaper_summary, process_record, review_conversations, annotations, background_jobs, excel_html, wp_structure, wp_manuals, wp_fine_rules, audit_check, wp_offline, wp_audit_flow_graph, wp_sheet_lock, standard_conversion, attachment_lineage, wp_functional_actions, issue_hints, workpaper_summaries, wp_render_registry, custom_template_ingestion, custom_template_publications],
         "科目工作包": [account_packages],
     }
 
