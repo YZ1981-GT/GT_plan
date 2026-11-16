@@ -1,6 +1,6 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：19/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.6 + 3.7 + 5.3 + 5.4 已完成；真源层 / 服务端解析层 / 前端三态与文案 / legacy ledger / 契约守卫 / 变异套件已收口）**
+> **状态：20/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.6 + 3.7 + 5.1 + 5.3 + 5.4 已完成；真源层 / 服务端解析层 / 前端三态与文案 / legacy ledger / 后端契约清单 / 前端契约守卫 / 变异套件已收口）**
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
@@ -128,7 +128,14 @@
 
 ## Phase 5：测试与真实验收
 
-- [ ] 5.1 后端 unit / contract：mapping 唯一性、scope、target sheet、current representation、candidate 拒绝、path boundary、typed error。
+- [x] 5.1 后端 unit / contract：mapping 唯一性、scope、target sheet、current representation、candidate 拒绝、path boundary、typed error。
+  - 先做覆盖度审计：7 类判据**全部已有覆盖**，但分散在 6 个文件里 ⇒ 某类被删时没有任何东西会发现。
+  - `test_sheet_open_unit_contract.py` 提供两样：①**判据清单守卫** `JUDGEMENT_COVERAGE`（7 类 → 具体文件::函数名，逐条查函数定义存在；清单腐化/改名即红）②**补真实缺口** —— `path boundary` 此前只有关键词命中而无真测试，补 6 条（跨项目 / 跨底稿 / 路径逃逸 / 不回退模板 / project_id 必须传请求值 / kind+state 必须在调 resolver 前校验）。
+  - 18 例守卫；变异 6/6 全精确打红零假红。
+  - 🔴 三处承重点不承重（都是「夹具与判据不匹配」）：
+    1. `_RejectingArtifacts` **无条件拒绝** ⇒ 「project_id 传错」观察不到（两种实现都拒）⇒ 补 `_RecordingArtifacts` 按参数校验。
+    2. `candidate` 分支在 `kind`/`state` 校验**之前**独立拦截 ⇒ 把校验改成 `if False:` 后 candidate 用例仍绿（M3 存活）⇒ 补「非 candidate 的非 published 态」（`superseded`/`incoming`/`draft`）与「非 canonical kind」两组。
+    3. `_fake_rows` 的 artifact **没有 `project_id`** 字段 ⇒ `getattr(..., project_id)` 回落到请求值 ⇒ 语义等价 ⇒ M2 存活 ⇒ 给 artifact 加一个**不同的** `project_id`。
   - _R: 1, 2, 7_
 - [ ] 5.2 后端 PG：真实 `WorkpaperContentRepresentation`、bundle、artifact 读取与项目隔离；只读验证先独立事务，写入验收只用【测试】项目并可恢复。
   - _R: 2, 7, 9_
