@@ -203,8 +203,17 @@
     保护格、节点专属记录、来源投影、公式快照和章节 SAVEPOINT 仍复用原写入路径。
     新增/扩展 `test_consol_reaggregate_batch_prefetch.py` **7 passed**（含预计算接线与默认路径保留）；
     主编排文件抽出 `consol_note_reaggregate_prefetch.py`，行数门保持通过。
-    **仍未完成**：差额计算与生产金额逐值对拍、真实 PG 并发下的 C2/C3 全链路验证；
-    Windows 共享 `_overlapped` 资源异常导致本轮磁盘变异子进程无法初始化，未虚报变异通过。
+
+  - **2026-11-17 PG 逐值对拍补证（一次性库 `gt_consol_reaggregate`，临时 schema，3 passed）**：
+    新建 `tests/test_consol_note_reaggregate_pg.py`，复用既有 `test_consol_note_subtree_reaggregate`
+    的完整企业树 / 单体附注 / 试算表 / 抵销分录 / 模板绑定夹具，只把 factory 切换为
+    `GT_CONSOL_REAGGREGATE_PG=1` 的真实 PostgreSQL 临时 schema。
+    逐值核对：A1 叶子现金与合计、A 差额节点银行存款 `-100`、A 中间汇总现金/银行/合计、
+    G 根汇总现金/银行/合计、来源标记 `detail_mapping` / `formula` / `subtree_aggregate`、
+    子企业计数、stale 清理；另复用既有断言验证手工格保留和坏保护元数据章节 SAVEPOINT 回滚。
+    **3/3 passed（36.71s）**，一次性库已 DROP，共享库未写入。
+    **仍未完成**：真实 PG 并发双连接 barrier 与 C2/C3 磁盘变异；后者此前因 Windows `_overlapped`
+    资源异常无法启动子进程，未虚报通过。
 - [ ] C4 Ledger 导入分阶段 profiler；COPY/staging/set-based 合并把真实大项目目标压到 5 分钟内。
   - profiler 骨架 `app/services/ledger_import/profiler.py`（`StagedProfiler` + `StageRecord`）：
     PG 下 `pg_current_wal_lsn()` + `pg_wal_lsn_diff` 自动采集每阶段 WAL 增量字节，非 PG 环境
