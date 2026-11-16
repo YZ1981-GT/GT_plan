@@ -25,12 +25,16 @@ from pathlib import Path
 from typing import Any
 import hashlib
 import json
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+import sqlalchemy as sa
 
 from app.core.config import settings
-from app.deps import get_current_user
+from app.core.database import get_db
+from app.deps import assert_project_permission, get_current_user
 from app.models.core import User
 from app.services.custom_template_ingestion.actions import (
     ACTION_IDS,
@@ -318,4 +322,126 @@ async def preflight_artifact(
         "state": updated["state"],
         "preflight": preflight,
         "preflightDigest": preflight_digest,
+    }
+
+
+class UnitAuthorityRequest(BaseModel):
+    """客户端对 preflight 结构做出的 amount-region authority 裁决。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    workingPaperId: UUID
+    workbookSha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    preflightDigest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    manifest: dict[str, Any]
+    manifestDigest: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+def _canonical_json_digest(value: Any) -> str:
+    return hashlib.sha256(
+        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _validate_authority_manifest(manifest: dict[str, Any]) -> None:
+    """校验 authority manifest 的稳定 amount region 形状，不让自由文本猜单位。"""
+    regions = manifest.get("regions")
+    if not isinstance(regions, list) or not regions:
+        raise HTTPException(status_code=422, detail="manifest.regions 必须是非空数组")
+    allowed_kinds = {"amount", "quantity", "count", "ratio", "exchange_rate", "unit_price", "text"}
+    allowed_scales = {"fraction", "percent_points"}
+    allowed_units = {"yuan", "qian", "wan"}
+    seen: set[str] = set()
+    for region in regions:
+        if not isinstance(region, dict):
+            raise HTTPException(status_code=422, detail="manifest.regions 成员必须是对象")
+        stable_id = region.get("stable_id") or region.get("stableId")
+        kind = region.get("measure_kind") or region.get("measureKind")
+        if not isinstance(stable_id, str) or not stable_id or stable_id in seen:
+            raise HTTPException(status_code=422, detail="amount region stable_id 必须非空且唯一")
+        if kind not in allowed_kinds:
+            raise HTTPException(status_code=422, detail=f"未知 measure_kind: {kind}")
+        seen.add(stable_id)
+        scale = region.get("ratio_scale") or region.get("ratioScale")
+        if kind == "ratio" and scale not in allowed_scales:
+            raise HTTPException(status_code=422, detail="ratio region 必须声明 fraction 或 percent_points")
+        if kind != "ratio" and scale is not None:
+            raise HTTPException(status_code=422, detail="非 ratio region 不得声明 ratio_scale")
+        if kind == "amount":
+            unit = region.get("unit")
+            divisor = region.get("divisor")
+            if unit not in allowed_units or divisor not in {1, 1000, 10000}:
+                raise HTTPException(status_code=422, detail="amount region 的 unit/divisor 无效")
+
+
+@router.put("/artifacts/{artifact_id}/unit-authority")
+async def put_unit_authority(
+    artifact_id: str,
+    body: UnitAuthorityRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """以 artifact sha + preflight digest 为 CAS，落一份不可变 workbook authority。"""
+    from app.models.custom_workbook_unit_authority import CustomWorkbookUnitAuthority
+    from app.models.workpaper_models import WorkingPaper
+
+    _validate_authority_manifest(body.manifest)
+    scope = derive_implicit_scope(user=current_user)
+    quarantine = get_quarantine()
+    try:
+        artifact = quarantine.load_manifest(scope.organization_id, artifact_id)
+    except (FileNotFoundError, QuarantineError) as exc:
+        raise HTTPException(status_code=404, detail="隔离产物不存在或不属于当前组织") from exc
+    if artifact.get("state") != ArtifactState.PREFLIGHT_READY.value:
+        raise HTTPException(status_code=409, detail="artifact 尚未通过 preflight")
+    if artifact.get("sha256") != body.workbookSha256:
+        raise HTTPException(status_code=409, detail="workbook sha256 与 artifact 不一致")
+    if artifact.get("preflightDigest") != body.preflightDigest:
+        raise HTTPException(status_code=409, detail="preflight digest 已变化，请重新预检")
+    if _canonical_json_digest(body.manifest) != body.manifestDigest:
+        raise HTTPException(status_code=409, detail="manifest digest 与请求正文不一致")
+
+    wp = (await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.id == body.workingPaperId,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )).scalar_one_or_none()
+    if wp is None:
+        raise HTTPException(status_code=404, detail="目标底稿不存在")
+    await assert_project_permission(db, current_user, wp.project_id, "edit")
+
+    existing = (await db.execute(
+        sa.select(CustomWorkbookUnitAuthority).where(
+            CustomWorkbookUnitAuthority.working_paper_id == body.workingPaperId,
+            CustomWorkbookUnitAuthority.workbook_sha256 == body.workbookSha256,
+        )
+    )).scalar_one_or_none()
+    if existing is not None:
+        if existing.manifest_digest != body.manifestDigest:
+            raise HTTPException(status_code=409, detail="同一 workbook sha256 已有不同 authority")
+        return {
+            "authorityId": str(existing.id),
+            "workingPaperId": str(existing.working_paper_id),
+            "workbookSha256": existing.workbook_sha256,
+            "manifestDigest": existing.manifest_digest,
+            "idempotent": True,
+        }
+
+    authority = CustomWorkbookUnitAuthority(
+        working_paper_id=body.workingPaperId,
+        workbook_sha256=body.workbookSha256,
+        manifest=body.manifest,
+        manifest_digest=body.manifestDigest,
+        created_by=current_user.id,
+    )
+    db.add(authority)
+    await db.flush()
+    await db.commit()
+    return {
+        "authorityId": str(authority.id),
+        "workingPaperId": str(authority.working_paper_id),
+        "workbookSha256": authority.workbook_sha256,
+        "manifestDigest": authority.manifest_digest,
+        "idempotent": False,
     }
