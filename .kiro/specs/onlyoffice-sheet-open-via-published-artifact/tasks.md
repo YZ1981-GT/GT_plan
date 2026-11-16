@@ -1,6 +1,6 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：11/34（2026-11-16，Phase 0.1~0.3、1.1~1.2、2.1~2.6 已完成；Phase 2 服务端解析层已收口，产品代码仍未迁移已就绪 binding）**
+> **状态：14/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 已完成；Phase 1 真源层与 Phase 2 服务端解析层已收口）**
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
@@ -27,11 +27,21 @@
 - [x] 1.2 实现 `generate_workpaper_sync_sheet_open_bindings.py`：从 manifest、reviewed overlay、provider `wp_match` / sheet declarations 生成 binding。
   - 提供 `--apply` / `--check`；内容不变重跑零 diff；当前生成 197 条 binding，全部保持 `pending` 或 `out_of_scope`，不伪造迁移完成。
   - _R: 1, 8_
-- [ ] 1.3 为 exact / provider / whole workbook 分别建立正向与反向 fixture；provider resolver 必须有稳定 resolver identity。
+- [x] 1.3 为 exact / provider / whole workbook 分别建立正向与反向 fixture；provider resolver 必须有稳定 resolver identity。
+  - 三种 kind 各 2 例（正向 + 反向）：exact（唯一字面量 → target 确定但仍 pending；多字面量 / 多 wp_code 必须拒）· provider（运行时表达式 → 必带 `provider:<digest>`；**声明顺序无关**且声明集合变则 identity 变）· whole_workbook（`mounts` 里的整册标记 → scope 对、target 空；非 xlsx 落 out_of_scope 而非 pending）。
+  - `resolver_identity = provider:<16 位 digest>`，由 `sorted(wp_code_patterns) + sorted(sheet_expressions)` 算 —— 与 manifest 顺序无关，重排不会让已审核 binding 集体失效。
+  - 🔴 两处现读教训：`has_whole_workbook_marker` 扫的是 `mounts`（不是 `wp_match`）；顺序无关用例必须用**单个** wp_code（两个会被判成 ambiguous，provider 分支从未触达 ⇒ 排序变异存活）。
   - _R: 1, 9_
-- [ ] 1.4 把 ambiguous / no target / no entry / stale digest 作为显式 pending reason，不得生成父级兜底映射。
+- [x] 1.4 把 ambiguous / no target / no entry / stale digest 作为显式 pending reason，不得生成父级兜底映射。
+  - `PENDING_REASONS` 封闭域 8 条：`document_type_out_of_scope` / `whole_workbook_target_requires_reviewed_binding` / `exact_candidate_requires_published_artifact_review` / `runtime_sheet_name_requires_provider_binding` / `ambiguous_sheet_target` / `sheet_target_not_declared` / `source_digest_stale` / `manifest_entry_missing`。
+  - `ambiguous` 与「没声明 target」分两条 reason（处置不同：前者要裁决选哪个，后者要补声明）。
+  - 🔴 修一处真缺陷：多 wp_code 的 ambiguous 判定原在 provider **之后** ⇒ 永远进不来（`wp_patterns` 非空即命中 provider），已前移。
+  - 父级兜底守卫：每条 binding 的 `entry_id` / `effective_entry_id` 都必须逐字在 manifest 里。
   - _R: 1, 5_
-- [ ] 1.5 生成 `backend/data/workpaper_sync_sheet_open_bindings.json` 与 source manifest，加入 clean checkout 入库守卫。
+- [x] 1.5 生成 `backend/data/workpaper_sync_sheet_open_bindings.json` 与 source manifest，加入 clean checkout 入库守卫。
+  - 生成物 + 生成器都必须被 `git ls-files` 跟踪（`Path.is_file()` 在本地恒真、在 CI 可能缺文件）。
+  - 源 digest 齐备（Requirement 8.1）：`input_digest`（聚合）+ `source.{manifest,overlay,adjudication,wp_code_adjudication}_digest` + 三份源路径。补了原缺的 `wp_code_adjudication_digest`（只对**被读的那张裁决表**算，改文件里别的段落不该让 binding 变 stale）。
+  - 幂等守卫：同输入重跑 `render()` 必须字节相同。
   - _R: 1, 8, 10_
 
 ## Phase 2：服务端解析与 Published Artifact 读取
