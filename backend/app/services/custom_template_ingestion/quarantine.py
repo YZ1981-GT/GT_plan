@@ -740,6 +740,31 @@ class PrivateQuarantine:
             ))
         return path
 
+    def update_manifest_fields(
+        self,
+        organization_id: str,
+        artifact_id: str,
+        fields: dict[str, Any],
+        *,
+        state: ArtifactState | None = None,
+    ) -> dict[str, Any]:
+        """原子地更新隔离产物的服务端字段，并可推进状态机。
+
+        客户端不能提交任意 manifest；调用方只传服务端计算出的字段。
+        `state` 仍经统一 `transition` 校验，防止 preflight 直接把 QUARANTINED
+        改成任意 publication 状态。
+        """
+        manifest = self.load_manifest(organization_id, artifact_id)
+        if state is not None:
+            current = ArtifactState(manifest["state"])
+            transition(current, state)
+            manifest["previousState"] = current.value
+            manifest["state"] = state.value
+        manifest.update(fields)
+        path = self._manifest_path(organization_id, artifact_id)
+        path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        return manifest
+
     # ── 清理 ──
 
     def delete_artifact(self, organization_id: str, artifact_id: str) -> bool:

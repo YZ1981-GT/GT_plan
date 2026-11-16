@@ -23,6 +23,8 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import hashlib
+import json
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -240,4 +242,80 @@ async def get_quota(current_user: User = Depends(get_current_user)) -> dict[str,
         "limitBytes": limit,
         "admitted": result.admitted,
         "policyVersion": POLICY_V1.version,
+    }
+
+
+@router.post("/artifacts/{artifact_id}/preflight")
+async def preflight_artifact(
+    artifact_id: str,
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """对隔离区 artifact 执行包级 + 语义 preflight，并冻结 preflight digest。
+
+    这是 ingest → preflight 两阶段链的真实 HTTP 接线：
+
+    * 只读取服务端隔离字节，不接受客户端再次上传或传 storage path；
+    * `scan_package_bytes` 与 `run_semantic_preflight` 的结果写回 manifest；
+    * 结果有效才进入 `PREFLIGHT_READY`，否则进入 `PREFLIGHT_FAILED`；
+    * digest 是 canonical JSON 的 SHA-256，后续 authority PUT 必须带同一 digest。
+
+    不生成 HTML / OnlyOffice / WorkingPaper；那是 finalize/instantiate 阶段。
+    """
+    scope = derive_implicit_scope(user=current_user)
+    quarantine = get_quarantine()
+    try:
+        manifest = quarantine.load_manifest(scope.organization_id, artifact_id)
+        if manifest.get("organizationId") != scope.organization_id:
+            raise FileNotFoundError(artifact_id)
+        if manifest.get("state") != ArtifactState.QUARANTINED.value:
+            existing = manifest.get("preflight")
+            if existing is not None:
+                return {
+                    "artifactId": artifact_id,
+                    "state": manifest.get("state"),
+                    "preflight": existing,
+                    "preflightDigest": manifest.get("preflightDigest"),
+                }
+            raise HTTPException(status_code=409, detail="该隔离产物已完成或正在进行 preflight")
+        payload = quarantine.artifact_bytes_path(scope.organization_id, artifact_id).read_bytes()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="隔离产物不存在或不属于当前组织") from exc
+    except QuarantineError as exc:
+        raise HTTPException(status_code=400, detail=exc.reason.to_dict()) from exc
+
+    from app.services.custom_template_ingestion.package_scanner import scan_package_bytes
+    from app.services.custom_template_ingestion.semantic_preflight import run_semantic_preflight
+
+    package = scan_package_bytes(
+        payload,
+        policy=POLICY_V1,
+        filename_hint=manifest.get("displayName"),
+    )
+    result = run_semantic_preflight(
+        payload,
+        package=package,
+        policy=POLICY_V1,
+        filename_hint=manifest.get("displayName"),
+    )
+    preflight = result.to_dict()
+    preflight_digest = hashlib.sha256(
+        json.dumps(preflight, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    target_state = (
+        ArtifactState.PREFLIGHT_READY if result.is_valid else ArtifactState.PREFLIGHT_FAILED
+    )
+    updated = quarantine.update_manifest_fields(
+        scope.organization_id,
+        artifact_id,
+        {
+            "preflight": preflight,
+            "preflightDigest": preflight_digest,
+        },
+        state=target_state,
+    )
+    return {
+        "artifactId": artifact_id,
+        "state": updated["state"],
+        "preflight": preflight,
+        "preflightDigest": preflight_digest,
     }

@@ -105,6 +105,7 @@ def test_ingestion_router_is_registered_in_main_app() -> None:
         "/api/custom-template-ingestion/actions",
         "/api/custom-template-ingestion/ingest",
         "/api/custom-template-ingestion/artifacts/{artifact_id}",
+        "/api/custom-template-ingestion/artifacts/{artifact_id}/preflight",
         "/api/custom-template-ingestion/quota",
     }
     missing = expected - paths
@@ -263,3 +264,61 @@ def test_legacy_chain_is_parallel_and_marked_for_removal(client: TestClient) -> 
     # 迁移删除门存在且是合法日期
     deadline = ingestion_module.LEGACY_MIGRATION_DEADLINE
     assert deadline and len(deadline) == 10 and deadline[4] == "-" and deadline[7] == "-"
+
+
+
+def _valid_xlsx_bytes() -> bytes:
+    """构造最小真实 OOXML 工作簿，避免用假的 ZIP payload 测 preflight。"""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "资产负债表"
+    ws["A1"] = "项目"
+    ws["B1"] = "期末余额"
+    ws["A2"] = "货币资金"
+    ws["B2"] = 123
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
+
+
+def test_preflight_real_xlsx_transitions_and_returns_digest(client: TestClient) -> None:
+    """真实 ingest → preflight：状态、报告和 canonical digest 都由服务端产生。"""
+    payload = _valid_xlsx_bytes()
+    ingested = client.post(
+        "/api/custom-template-ingestion/ingest",
+        files={"file": ("客户报表.xlsx", io.BytesIO(payload), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert ingested.status_code == 200, ingested.text
+    artifact_id = ingested.json()["artifactId"]
+
+    response = client.post(f"/api/custom-template-ingestion/artifacts/{artifact_id}/preflight")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["artifactId"] == artifact_id
+    assert body["state"] == "PREFLIGHT_READY"
+    assert len(body["preflightDigest"]) == 64
+    assert isinstance(body["preflight"].get("findings"), list)
+    serialized = str(body)
+    assert "custom_template_quarantine" not in serialized
+    assert "D:\\" not in serialized
+
+
+def test_preflight_is_idempotent_after_terminal_state(client: TestClient) -> None:
+    """重复 preflight 返回已冻结结果，不重扫、不生成第二份 artifact。"""
+    ingested = client.post(
+        "/api/custom-template-ingestion/ingest",
+        files={"file": ("客户报表.xlsx", io.BytesIO(_valid_xlsx_bytes()), "application/octet-stream")},
+    )
+    artifact_id = ingested.json()["artifactId"]
+    first = client.post(f"/api/custom-template-ingestion/artifacts/{artifact_id}/preflight")
+    second = client.post(f"/api/custom-template-ingestion/artifacts/{artifact_id}/preflight")
+    assert first.status_code == second.status_code == 200
+    assert second.json()["preflightDigest"] == first.json()["preflightDigest"]
+    assert second.json()["state"] == first.json()["state"]
+
+
+def test_preflight_unknown_artifact_is_404(client: TestClient) -> None:
+    response = client.post("/api/custom-template-ingestion/artifacts/not-found/preflight")
+    assert response.status_code == 404, response.text
