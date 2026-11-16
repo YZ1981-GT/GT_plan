@@ -69,6 +69,10 @@ class _Quarantine:
     def load_manifest(self, organization_id, artifact_id):  # noqa: ARG002
         return dict(self.manifest)
 
+    def update_manifest_fields(self, organization_id, artifact_id, fields, *, state=None):  # noqa: ARG002
+        self.manifest.update(fields)
+        return dict(self.manifest)
+
 
 def _manifest():
     return {
@@ -277,3 +281,133 @@ def test_unit_authority_rejects_preflight_digest_mismatch():
     assert response.status_code == 409
     assert "preflight digest" in response.text
     assert not db.added
+
+
+def test_finalize_authority_creates_non_active_handoff_and_is_idempotent():
+    """finalize 只冻结 handoff，不绕过到 ACTIVE/instantiate。"""
+    project_id = uuid.UUID(int=1)
+    db = _Db(SimpleNamespace(id=uuid.UUID(int=2), project_id=project_id, is_deleted=False))
+    quarantine = _Quarantine({
+        "organizationId": "org-1",
+        "state": "PREFLIGHT_READY",
+        "sha256": "a" * 64,
+        "preflightDigest": "b" * 64,
+    })
+    client, q_patch, permission = _client(db, quarantine)
+    with q_patch, permission:
+        authority_response = client.put(
+            "/api/custom-template-ingestion/artifacts/art-1/unit-authority",
+            json=_body(),
+        )
+        assert authority_response.status_code == 200, authority_response.text
+        authority_id = authority_response.json()["authorityId"]
+        body = {
+            "workingPaperId": str(uuid.UUID(int=2)),
+            "authorityId": authority_id,
+            "manifestDigest": _body()["manifestDigest"],
+            "idempotencyKey": "finalize-key-1",
+        }
+        first = client.post(
+            "/api/custom-template-ingestion/artifacts/art-1/finalize",
+            json=body,
+        )
+        second = client.post(
+            "/api/custom-template-ingestion/artifacts/art-1/finalize",
+            json=body,
+        )
+
+    assert first.status_code == 200, first.text
+    assert first.json()["phase"] == "finalized"
+    assert first.json()["runtimeDiscoverable"] is False
+    assert first.json()["idempotent"] is False
+    assert second.status_code == 200, second.text
+    assert second.json()["handoffDigest"] == first.json()["handoffDigest"]
+    assert second.json()["idempotent"] is True
+    assert second.json()["runtimeDiscoverable"] is False
+
+
+def test_finalize_rejects_authority_manifest_digest_drift():
+    project_id = uuid.UUID(int=1)
+    db = _Db(SimpleNamespace(id=uuid.UUID(int=2), project_id=project_id, is_deleted=False))
+    quarantine = _Quarantine({
+        "organizationId": "org-1",
+        "state": "PREFLIGHT_READY",
+        "sha256": "a" * 64,
+        "preflightDigest": "b" * 64,
+    })
+    client, q_patch, permission = _client(db, quarantine)
+    with q_patch, permission:
+        authority_response = client.put(
+            "/api/custom-template-ingestion/artifacts/art-1/unit-authority",
+            json=_body(),
+        )
+        authority_id = authority_response.json()["authorityId"]
+        response = client.post(
+            "/api/custom-template-ingestion/artifacts/art-1/finalize",
+            json={
+                "workingPaperId": str(uuid.UUID(int=2)),
+                "authorityId": authority_id,
+                "manifestDigest": "c" * 64,
+                "idempotencyKey": "finalize-key-2",
+            },
+        )
+    assert response.status_code == 409
+    assert "manifest digest" in response.text
+
+
+def test_finalize_rejects_non_preflight_artifact():
+    project_id = uuid.UUID(int=1)
+    db = _Db(SimpleNamespace(id=uuid.UUID(int=2), project_id=project_id, is_deleted=False))
+    quarantine = _Quarantine({
+        "organizationId": "org-1",
+        "state": "QUARANTINED",
+        "sha256": "a" * 64,
+        "preflightDigest": "b" * 64,
+    })
+    client, q_patch, permission = _client(db, quarantine)
+    with q_patch, permission:
+        response = client.post(
+            "/api/custom-template-ingestion/artifacts/art-1/finalize",
+            json={
+                "workingPaperId": str(uuid.UUID(int=2)),
+                "authorityId": str(uuid.uuid4()),
+                "manifestDigest": "a" * 64,
+                "idempotencyKey": "finalize-key-3",
+            },
+        )
+    assert response.status_code == 409
+    assert "preflight" in response.text
+
+
+def test_finalize_rejects_different_idempotency_handoff():
+    project_id = uuid.UUID(int=1)
+    db = _Db(SimpleNamespace(id=uuid.UUID(int=2), project_id=project_id, is_deleted=False))
+    quarantine = _Quarantine({
+        "organizationId": "org-1",
+        "state": "PREFLIGHT_READY",
+        "sha256": "a" * 64,
+        "preflightDigest": "b" * 64,
+    })
+    client, q_patch, permission = _client(db, quarantine)
+    with q_patch, permission:
+        authority_response = client.put(
+            "/api/custom-template-ingestion/artifacts/art-1/unit-authority",
+            json=_body(),
+        )
+        authority_id = authority_response.json()["authorityId"]
+        base = {
+            "workingPaperId": str(uuid.UUID(int=2)),
+            "authorityId": authority_id,
+            "manifestDigest": _body()["manifestDigest"],
+        }
+        first = client.post(
+            "/api/custom-template-ingestion/artifacts/art-1/finalize",
+            json={**base, "idempotencyKey": "finalize-key-a"},
+        )
+        second = client.post(
+            "/api/custom-template-ingestion/artifacts/art-1/finalize",
+            json={**base, "idempotencyKey": "finalize-key-b"},
+        )
+    assert first.status_code == 200
+    assert second.status_code == 409
+    assert "不同 finalize" in second.text

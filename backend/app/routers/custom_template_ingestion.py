@@ -445,3 +445,107 @@ async def put_unit_authority(
         "manifestDigest": authority.manifest_digest,
         "idempotent": False,
     }
+
+
+class FinalizeAuthorityRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workingPaperId: UUID
+    authorityId: UUID
+    manifestDigest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    idempotencyKey: str = Field(min_length=8, max_length=160)
+
+
+@router.post("/artifacts/{artifact_id}/finalize")
+async def finalize_unit_authority(
+    artifact_id: str,
+    body: FinalizeAuthorityRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """把已确认 authority 冻结成 finalize handoff；不直接发布或实例化。
+
+    这是 custom 两阶段链的 finalize/publication CAS 边界：
+    `PREFLIGHT_READY + authority + manifestDigest` 才能生成 phase=finalized 的
+    handoff。该接口**不**把 artifact 标成 ACTIVE，也不创建 WorkingPaper，后续
+    publication/instantiate 必须消费此 handoff 并另过状态门。
+    """
+    from app.models.custom_workbook_unit_authority import CustomWorkbookUnitAuthority
+    from app.models.workpaper_models import WorkingPaper
+
+    scope = derive_implicit_scope(user=current_user)
+    quarantine = get_quarantine()
+    try:
+        artifact = quarantine.load_manifest(scope.organization_id, artifact_id)
+    except (FileNotFoundError, QuarantineError) as exc:
+        raise HTTPException(status_code=404, detail="隔离产物不存在或不属于当前组织") from exc
+    if artifact.get("state") != ArtifactState.PREFLIGHT_READY.value:
+        raise HTTPException(status_code=409, detail="artifact 尚未通过 preflight")
+    if artifact.get("preflightDigest") is None:
+        raise HTTPException(status_code=409, detail="artifact 缺少 preflight digest")
+
+    wp = (await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.id == body.workingPaperId,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )).scalar_one_or_none()
+    if wp is None:
+        raise HTTPException(status_code=404, detail="目标底稿不存在")
+    await assert_project_permission(db, current_user, wp.project_id, "edit")
+
+    authority = (await db.execute(
+        sa.select(CustomWorkbookUnitAuthority).where(
+            CustomWorkbookUnitAuthority.id == body.authorityId,
+            CustomWorkbookUnitAuthority.working_paper_id == body.workingPaperId,
+        )
+    )).scalar_one_or_none()
+    if authority is None:
+        raise HTTPException(status_code=404, detail="authority 不存在或不属于目标底稿")
+    if authority.workbook_sha256 != artifact.get("sha256"):
+        raise HTTPException(status_code=409, detail="authority 与 artifact sha256 不一致")
+    if authority.manifest_digest != body.manifestDigest:
+        raise HTTPException(status_code=409, detail="authority manifest digest 不一致")
+
+    existing = artifact.get("finalize")
+    if existing is not None:
+        if (
+            existing.get("idempotencyKey") == body.idempotencyKey
+            and existing.get("manifestDigest") == body.manifestDigest
+        ):
+            return {
+                "artifactId": artifact_id,
+                "phase": "finalized",
+                "handoffId": existing["handoffId"],
+                "handoffDigest": existing["handoffDigest"],
+                "idempotent": True,
+                "runtimeDiscoverable": False,
+            }
+        raise HTTPException(status_code=409, detail="artifact 已有不同 finalize handoff")
+
+    handoff = {
+        "phase": "finalized",
+        "handoffId": f"handoff-{artifact_id}-{body.authorityId}",
+        "artifactId": artifact_id,
+        "authorityId": str(body.authorityId),
+        "workingPaperId": str(body.workingPaperId),
+        "workbookSha256": artifact["sha256"],
+        "preflightDigest": artifact["preflightDigest"],
+        "manifestDigest": body.manifestDigest,
+        "idempotencyKey": body.idempotencyKey,
+    }
+    handoff_digest = _canonical_json_digest(handoff)
+    handoff["handoffDigest"] = handoff_digest
+    quarantine.update_manifest_fields(
+        scope.organization_id,
+        artifact_id,
+        {"finalize": handoff},
+    )
+    return {
+        "artifactId": artifact_id,
+        "phase": "finalized",
+        "handoffId": handoff["handoffId"],
+        "handoffDigest": handoff_digest,
+        "idempotent": False,
+        "runtimeDiscoverable": False,
+    }

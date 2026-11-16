@@ -107,6 +107,7 @@ def test_ingestion_router_is_registered_in_main_app() -> None:
         "/api/custom-template-ingestion/artifacts/{artifact_id}",
         "/api/custom-template-ingestion/artifacts/{artifact_id}/preflight",
         "/api/custom-template-ingestion/artifacts/{artifact_id}/unit-authority",
+        "/api/custom-template-ingestion/artifacts/{artifact_id}/finalize",
         "/api/custom-template-ingestion/quota",
     }
     missing = expected - paths
