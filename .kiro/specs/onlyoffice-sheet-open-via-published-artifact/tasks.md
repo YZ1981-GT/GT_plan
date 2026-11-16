@@ -1,6 +1,6 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：15/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 已完成；Phase 1 真源层、Phase 2 服务端解析层、Phase 3.1 前端三态已收口）**
+> **状态：16/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.7 已完成；真源层 / 服务端解析层 / 前端三态 / legacy 调用面 ledger 已收口）**
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
@@ -101,7 +101,11 @@
   - _R: 1, 3, 9_
 - [ ] 3.6 更新 pending / single_onlyoffice / custom / Word 的前端文案与入口门控；不得显示“双向回写”假状态。
   - _R: 4, 5, 6_
-- [ ] 3.7 宿主闭包守卫：迁移 binding 的所有旧 `onlyoffice-config` 调用为 0；未迁移调用逐条存在 ledger、owner 与 reason。
+- [x] 3.7 宿主闭包守卫：迁移 binding 的所有旧 `onlyoffice-config` 调用为 0；未迁移调用逐条存在 ledger、owner 与 reason。
+  - 生成器 `generate_legacy_onlyoffice_caller_ledger.py`（`--apply` / `--check`，幂等）+ 生成物 `backend/data/workpaper_sync_legacy_onlyoffice_callers.json`：现算 **22 个调用方文件 / 27 处代码调用**（非注释、非测试），3 个合法入口（`onlyOfficeEntryConfig.ts` 唯一入口 + `onlyOfficeSheetConfig.ts` URL 拼装 + `utils/http.ts` URL 判断）。
+  - 四条判据：①ledger 与**独立重算**双向相等（不漏登 / 不留死条目）②每条 owner（模块名 kebab-case）+ reason + next 三样齐全且 reason ≠ next ③登记行号必须真实指向含 `onlyoffice-config` 的代码行 ④`migrated`/`ready` binding 的入口不得仍在旧调用面里。
+  - 13 例守卫（含阳性/阴性对照），1 skipped（空分母显式记录）；变异 10/10 全精确打红零假红。
+  - 🔴 承重点两轮不承重：①首版按文件名猜 wp_code（`needle in stem`）—— 但 `exact` 那条是 `B60-1`，ledger 里没有 B60 的调用方 ⇒ 恒空（M10 存活）；②改内容判据后仍存活，因为**测试数据选错**（B60 确实没有 legacy 调用方）⇒ 最终把判据抽成 `_find_migrated_offenders()` 并补阳性对照（注入「K11 已 migrated」断言会红）+ 阴性对照（无关 wp_code 不得报红）。
   - _R: 4, 6, 10_
 
 ## Phase 4：Legacy Drain 与旧路径删除

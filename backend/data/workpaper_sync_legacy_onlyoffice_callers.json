@@ -1,0 +1,214 @@
+{
+  "schema_version": "legacy-onlyoffice-callers:v1",
+  "source_root": "audit-platform/frontend/src",
+  "pattern": "onlyoffice-config",
+  "legit_entrypoints": {
+    "components/workpaper/composables/onlyOfficeEntryConfig.ts": {
+      "lines": [
+        89
+      ],
+      "why": "本 spec 引入的唯一取配置入口（probeOnlyOfficeEntryConfig）"
+    },
+    "components/workpaper/sync/onlyOfficeSheetConfig.ts": {
+      "lines": [
+        18
+      ],
+      "why": "唯一入口内部的 URL 拼装"
+    },
+    "utils/http.ts": {
+      "lines": [
+        304
+      ],
+      "why": "仅判断该 URL 是否要带 client_instance 头"
+    }
+  },
+  "callers": {
+    "components/workpaper/GtOnlyOfficeSheet.vue": {
+      "lines": [
+        190
+      ],
+      "owner": "workpaper-sync",
+      "reason": "sheet 级在线编辑的兼容载体（Requirement 5.1：single_onlyoffice / custom 仍用它）",
+      "next": "binding 晋级 migrated 后由 WorkpaperSyncEditorHost 接管；在此之前保持独立在线编辑"
+    },
+    "components/workpaper/WorkpaperWordEditor.vue": {
+      "lines": [
+        1126,
+        1204
+      ],
+      "owner": "workpaper-sync",
+      "reason": "Word 载体走 Word lane，本 spec 不把 DOCX 映射到 Excel sheet binding（Requirement 5.2）",
+      "next": "由 Word carrier lane 独立管理；本 spec 只保证它不显示「已同步」假状态"
+    },
+    "components/workpaper/WpPopupDocxEditor.vue": {
+      "lines": [
+        65
+      ],
+      "owner": "workpaper-sync",
+      "reason": "Word 弹窗编辑器，同上（Requirement 5.2）",
+      "next": "同 WorkpaperWordEditor"
+    },
+    "components/workpaper/composables/useD2DualMode.ts": {
+      "lines": [
+        93
+      ],
+      "owner": "workpaper-sync",
+      "reason": "D2 大 JSON store 型入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useD3DualMode.ts": {
+      "lines": [
+        86
+      ],
+      "owner": "workpaper-sync",
+      "reason": "D3 关联方入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useD4DualMode.ts": {
+      "lines": [
+        145
+      ],
+      "owner": "workpaper-sync",
+      "reason": "D4 收入入口（13 张受管 sheet 共用一本 artifact）：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useF2DualMode.ts": {
+      "lines": [
+        70
+      ],
+      "owner": "workpaper-sync",
+      "reason": "F2 采购入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useF3DualMode.ts": {
+      "lines": [
+        80
+      ],
+      "owner": "workpaper-sync",
+      "reason": "F3 存货入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useF4DualMode.ts": {
+      "lines": [
+        81
+      ],
+      "owner": "workpaper-sync",
+      "reason": "F4 成本入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useG11DualMode.ts": {
+      "lines": [
+        64
+      ],
+      "owner": "workpaper-sync",
+      "reason": "G11 投资入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useG12DualMode.ts": {
+      "lines": [
+        64
+      ],
+      "owner": "workpaper-sync",
+      "reason": "G12 投资入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useG1DualMode.ts": {
+      "lines": [
+        111,
+        115
+      ],
+      "owner": "workpaper-sync",
+      "reason": "G1 投资入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useG7EquityMethodDualMode.ts": {
+      "lines": [
+        69
+      ],
+      "owner": "workpaper-sync",
+      "reason": "G7 权益法入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useG7SubDualMode.ts": {
+      "lines": [
+        69
+      ],
+      "owner": "workpaper-sync",
+      "reason": "G7 子公司入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useH10DualMode.ts": {
+      "lines": [
+        75
+      ],
+      "owner": "workpaper-sync",
+      "reason": "H10 固定资产入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useH2DualMode.ts": {
+      "lines": [
+        123
+      ],
+      "owner": "workpaper-sync",
+      "reason": "H2 固定资产入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useK10DualMode.ts": {
+      "lines": [
+        177
+      ],
+      "owner": "workpaper-sync",
+      "reason": "K10 管理入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useK11DualMode.ts": {
+      "lines": [
+        181,
+        185
+      ],
+      "owner": "workpaper-sync",
+      "reason": "K11 资产减值（spec 1.3 的 exact 候选，晋级后最先迁移）：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "K11 binding 晋级 migrated 后**首个**切换；在此之前保持独立在线编辑"
+    },
+    "components/workpaper/composables/useK12DualMode.ts": {
+      "lines": [
+        180
+      ],
+      "owner": "workpaper-sync",
+      "reason": "K12 管理入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useK13DualMode.ts": {
+      "lines": [
+        180
+      ],
+      "owner": "workpaper-sync",
+      "reason": "K13 管理入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useK8DualMode.ts": {
+      "lines": [
+        195,
+        201
+      ],
+      "owner": "workpaper-sync",
+      "reason": "K8 管理入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    },
+    "components/workpaper/composables/useK9DualMode.ts": {
+      "lines": [
+        181,
+        188
+      ],
+      "owner": "workpaper-sync",
+      "reason": "K9 管理入口：循环级 composable 各自手写 health + config 预检（本 spec 的统一入口尚在灰度）",
+      "next": "改用 probeOnlyOfficeEntryConfig；binding 晋级 migrated 后删除本地 config 拉取"
+    }
+  },
+  "summary": {
+    "caller_files": 22,
+    "caller_sites": 27,
+    "legit_entrypoint_files": 3,
+    "migrated_binding_callers": 0
+  }
+}
