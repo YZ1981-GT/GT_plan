@@ -419,7 +419,12 @@ def _scan_sheet(
 ) -> tuple[SheetReport, list[str], int]:
     del policy  # 单元格上限在 workbook 级核算
     sheet_name = str(ws.title)
-    sheet_uid = f"sheet:{order}:{_stable_sheet_token(sheet_name)}"
+    # 🔴 sheet_uid 不得含冒号：`namespace_migration.unified_child_entry_id` 用冒号
+    # 作 entry_id 分隔符（`pwi-{wid}:{sheet_uid}`），含冒号的 uid 会被当场拒绝
+    # （`ValueError: sheet_uid 不得含冒号`）。曾用 `sheet:{order}:{token}` 导致
+    # preflight 产出的 uid 无法用于建册 —— 两个模块对同一字段的约定不一致。
+    # 现统一为 `sheet-{order}-{token}`：不含冒号、仍按顺序 + 名称摘要保证稳定唯一。
+    sheet_uid = f"sheet-{order}-{_stable_sheet_token(sheet_name)}"
     state = _sheet_state(ws)
 
     non_empty = 0

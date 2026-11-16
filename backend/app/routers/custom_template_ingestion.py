@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import asyncio
 import hashlib
 import json
 import logging
@@ -642,11 +643,24 @@ async def list_template_publications(
     }
 
 
+class InstantiateSheetInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sheetUid: str = Field(min_length=1, max_length=200)
+    wpCode: str = Field(min_length=1, max_length=64)
+    componentType: str = Field(min_length=1, max_length=64)
+    projectionMode: str = Field(min_length=1, max_length=32)
+    sheetCode: str | None = Field(default=None, max_length=64)
+    manifestVersion: str | None = Field(default=None, max_length=64)
+
+
 class InstantiateFromPublicationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     publicationKey: str = Field(min_length=1, max_length=160)
     workingPaperId: UUID
+    sheets: list[InstantiateSheetInput] = Field(min_length=1)
+    onlyOfficeRoomId: str | None = Field(default=None, max_length=256)
 
 
 @router.post("/publications/instantiate")
@@ -655,17 +669,25 @@ async def instantiate_from_publication(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """把 ACTIVE publication pin 到项目。
+    """把 ACTIVE publication 实例化成整册 workbook 并落库。
 
-    🔴 本端点**不**创建 WorkingPaper，也不写 workbook instance —— 那需要 sheet
-    种子（G-ID + mapping 裁决），属下一段工作。这里只做「ACTIVE 校验 + pin 落库」，
-    并显式返回 `instantiated: false`，避免调用方把 pin 当成已完成实例化。
+    sheet 映射（wpCode / componentType / projectionMode）是**业务裁决**，由调用方
+    提交；服务端只做白名单校验 —— 每个 sheetUid 必须真实出现在该 artifact 的
+    preflight 报告里，拒绝凭空造的 sheet。
     """
     from app.models.workpaper_models import WorkingPaper
+    from app.services.custom_template_ingestion.instantiate_from_publication import (
+        InstantiateError,
+        SheetSeedInput,
+        instantiate_publication,
+    )
     from app.services.custom_template_ingestion.publication_registry_store import (
         PublicationStoreError,
         get_publication,
         pin_project,
+    )
+    from app.services.custom_template_ingestion.workbook_instance import (
+        WorkbookInstanceError,
     )
 
     scope = derive_implicit_scope(user=current_user)
@@ -694,22 +716,84 @@ async def instantiate_from_publication(
             detail=f"publication 当前状态 {pub.state.value} 不可实例化（需 ACTIVE）",
         )
 
+    # preflight 报告是 sheet 白名单的唯一来源。它落在隔离区 manifest 里，
+    # 读取是同步文件 IO ⇒ 放线程池，不阻塞事件循环。
+    quarantine = get_quarantine()
+    artifact_id = pub.candidate_id
     try:
-        await db.run_sync(
-            lambda s: pin_project(
-                s,
-                organization_id=scope.organization_id,
-                project_id=wp.project_id,
-                publication_key=body.publicationKey,
-            )
+        manifest = await asyncio.to_thread(
+            quarantine.load_manifest, scope.organization_id, artifact_id
         )
+    except (FileNotFoundError, QuarantineError) as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="publication 对应的隔离产物已不在，无法校验 sheet 白名单",
+        ) from exc
+    preflight = manifest.get("preflight")
+    if not isinstance(preflight, dict):
+        raise HTTPException(status_code=409, detail="隔离产物缺少 preflight 报告")
+    workbook = preflight.get("workbook")
+    preflight_sheets = (workbook or {}).get("sheets") if isinstance(workbook, dict) else None
+    if not isinstance(preflight_sheets, list) or not preflight_sheets:
+        raise HTTPException(status_code=409, detail="preflight 报告缺少 sheet 列表")
+
+    sheet_inputs = [
+        SheetSeedInput(
+            sheet_uid=s.sheetUid,
+            wp_code=s.wpCode,
+            component_type=s.componentType,
+            projection_mode=s.projectionMode,
+            sheet_code=s.sheetCode,
+            manifest_version=s.manifestVersion,
+        )
+        for s in body.sheets
+    ]
+
+    def _run(session):
+        result = instantiate_publication(
+            session,
+            publication=pub,
+            organization_id=scope.organization_id,
+            project_id=str(wp.project_id),
+            wp_id=str(wp.id),
+            sheet_inputs=sheet_inputs,
+            preflight_sheets=preflight_sheets,
+            onlyoffice_room_id=body.onlyOfficeRoomId,
+        )
+        pin_project(
+            session,
+            organization_id=scope.organization_id,
+            project_id=wp.project_id,
+            publication_key=body.publicationKey,
+        )
+        return result
+
+    try:
+        result = await db.run_sync(_run)
     except PublicationStoreError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except InstantiateError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except WorkbookInstanceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     await db.commit()
     return {
-        "publicationKey": pub.publication_key,
+        "publicationKey": result.publication_key,
+        "workbookInstanceId": result.instance.workbook_instance_id,
         "projectId": str(wp.project_id),
         "pinned": True,
-        "instantiated": False,
-        "reason": "instantiate 需要 sheet 种子（G-ID + mapping 裁决），尚未接线",
+        "instantiated": True,
+        "sheetCount": result.sheet_count,
+        "entries": [
+            {
+                "entryId": c.entry_id,
+                "sheetUid": c.sheet_uid,
+                "wpCode": c.wp_code,
+                "componentType": c.component_type,
+                "projectionMode": c.projection_mode.value,
+            }
+            for c in result.instance.children
+        ],
+        "contextFingerprint": result.instance.context_fingerprint,
+        "workbookGeneration": result.instance.workbook_generation,
     }

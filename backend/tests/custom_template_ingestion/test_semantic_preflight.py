@@ -99,9 +99,15 @@ def test_sheet_report_covers_required_observations() -> None:
     ]}, defined_names={"MainKey": "Main!$A$2"})
     result = run_semantic_preflight(payload)
     sheet = result.workbook.sheets[0]
-    assert sheet.sheet_uid.startswith("sheet:")
+    # 🔴 sheet_uid 供 `unified_child_entry_id` 拼 entry_id，而该函数用冒号作分隔符
+    # 并**明确拒绝**含冒号的 uid。曾用 `sheet:{order}:{token}` 使 preflight 产出的
+    # uid 无法建册（两个模块约定不一致）。现为 `sheet-{order}-{token}`。
+    assert sheet.sheet_uid.startswith("sheet-")
+    assert ":" not in sheet.sheet_uid, "sheet_uid 不得含冒号（保留作 entry 分隔符）"
     assert sheet.sheet_name == "Main"
     assert sheet.order == 0
+    # 顺序 + 名称摘要 ⇒ 同名不同序仍是不同 uid，同序同名稳定不变
+    assert sheet.sheet_uid == f"sheet-0-{sheet.sheet_uid.rsplit('-', 1)[-1]}"
     assert sheet.non_empty_cells >= 3
     assert sheet.formula_count >= 1
     assert sheet.used_range

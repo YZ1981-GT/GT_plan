@@ -404,3 +404,80 @@
 - **publication 前端页面**：目前只有后端端点。
 - **V272 未落共享库**（按纪律不写共享库，需用户放行）。
 - 端点未做 Playwright 浏览器实测。
+
+---
+
+## 八、ACTIVE instantiate 真实落库（2026-11-15 本轮）
+
+### 8.1 问题实证
+
+| 对象 | 实施前状态 |
+| --- | --- |
+| `project_workbook_instance` / `project_workbook_sheet_entry` 表 | **已存在**（V158） |
+| `ProjectWorkbookInstanceRow` / `ProjectWorkbookSheetEntryRow` ORM | **已存在** |
+| `workbook_instance.create_workbook_instance` | 纯函数，有测试，**零生产调用方** |
+| `publication_ops.instantiate_from_active` | **零生产调用方**（只返回内存 dataclass） |
+| `POST /publications/instantiate` | 上一轮只做 pin，显式 `instantiated: false` |
+
+⇒ 缺的是「handoff → sheet 种子 → **落库两张表**」这一段。
+
+### 8.2 发现的真实平台缺陷：`sheet_uid` 格式冲突
+
+| 模块 | 约定 |
+| --- | --- |
+| `semantic_preflight._scan_sheet` | `sheet_uid = f"sheet:{order}:{token}"` —— **含冒号** |
+| `namespace_migration.unified_child_entry_id` | 冒号是 entry_id 分隔符，**明确拒绝**含冒号的 uid |
+
+即 preflight 产出的 `sheet_uid` **无法用于建册**，两模块对同一字段约定不一致。
+现读确认该格式只由 `semantic_preflight` 生成、无其他消费方 ⇒ 修 preflight 侧，
+改为 `sheet-{order}-{token}`（不含冒号，仍按顺序 + 名称摘要保证稳定唯一）。
+
+### 8.3 交付内容
+
+| 文件 | 说明 |
+| --- | --- |
+| `app/services/custom_template_ingestion/instantiate_from_publication.py` | 新增：`build_sheet_seeds`（白名单校验）+ `instantiate_publication`（落库两表） |
+| `app/services/custom_template_ingestion/semantic_preflight.py` | 修 `sheet_uid` 格式（去冒号） |
+| `app/routers/custom_template_ingestion.py` | instantiate 端点接真实实例化；请求体加 `sheets[]` / `onlyOfficeRoomId` |
+| `tests/.../test_instantiate_from_publication.py` | 新增 12 例 |
+| `tests/.../test_publication_routes.py` | 重写 instantiate 用例（8 例） |
+| `tests/.../test_semantic_preflight.py` | 断言新格式 + 「不得含冒号」 |
+
+### 8.4 关键不变量
+
+- **sheet 映射由调用方给，服务端只做白名单**：`component_type` / `wp_code` /
+  `projection_mode` 是业务裁决，preflight 里没有。让服务端猜等于凭空造数据。
+- **`sheetUid` 必须出现在该 artifact 的 preflight 报告里** —— 凭空造的 422。
+- **隐藏页拒绝纳入**（`state != visible`）—— 纳入会得到空 tab。
+- **一份整册只建一个 instance**：child 共享 `current_artifact_id` /
+  `workbook_generation` / `onlyoffice_room_id`。
+- **同一 wp 已建册则拒绝**（422），不静默建第二份。
+- **非 ACTIVE / 跨组织拒绝**；鉴权 `assert_project_permission(..., "edit")`。
+
+### 8.5 验证
+
+- 服务层 12 passed + 端点 13 passed + 整包 **358 passed**。
+- **变异 13/13 RED**：白名单 / 隐藏页 / 重复 uid / 空输入 / 空 preflight 列表 /
+  ACTIVE 门 / 跨组织 / 重复建册 / instance 行未写 / entry 行未写 /
+  路由 preflight 门 / `instantiated` 值 / sheet_uid 冒号格式。
+
+### 8.6 变异复盘（一条曾假存活）
+
+**`router preflight manifest gate removed` 存活** —— 删掉「preflight 不是 dict」
+这层后，下一层「`workbook.sheets` 缺失」也返回 409，只断言状态码的用例照样通过。
+⇒ ①断言具体错误文案（`"缺少 preflight 报告"`）；②为第二层单独写用例
+（`preflight={"workbook": {}}`）。
+
+配套踩坑：测试 helper 用 `preflight if preflight is not None else default`
+会让「显式传 None」也拿到默认报告，导致「缺少 preflight 报告」这条守卫
+**永远测不到**（首版即如此）⇒ 改用模块级哨兵 `_UNSET_PREFLIGHT` 区分
+「未传」与「显式 None」。
+
+### 8.7 仍未完成（不得据此标完成）
+
+- **finalize saga 接持久化 ACK**：`run_finalize_saga` 仍用 `InMemoryAckLedger`，
+  `resolve_visibility` 无生产调用方 ⇒ publication 目前**无法从 PENDING_VISIBILITY
+  推进到 ACTIVE**（instantiate 端点已就绪，但真实链路还差这一步）。
+- **前端逐 amount region 确认 UI** / publication 页面。
+- **V272 未落共享库**（需用户放行）。
+- 端点未做 Playwright 浏览器实测。
