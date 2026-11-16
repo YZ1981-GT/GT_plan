@@ -1130,8 +1130,10 @@ async def resolve_entry_identity(
                     "document_type": artifact.document_type,
                 }
             except PublishedSheetArtifactError as exc:
+                # typed reason（task 2.5）：code 供调用方分支，reason 供直接展示，两者都回。
                 body["status"] = "pending"
-                body["reason"] = exc.error_code
+                body["reason"] = exc.reason
+                body["error_code"] = exc.error_code
                 return body
 
         readiness = await evaluate_entry_readiness(

@@ -1,6 +1,6 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：9/34（2026-11-16，Phase 0.1~0.3、1.1~1.2、2.1~2.4 已完成；产品代码仍未迁移已就绪 binding）**
+> **状态：10/34（2026-11-16，Phase 0.1~0.3、1.1~1.2、2.1~2.5 已完成；产品代码仍未迁移已就绪 binding）**
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
@@ -56,7 +56,12 @@
   - 🔴 顺带修 task 2.1 遗留的真回归：前端契约生成器只认 `USER_SYNC_PREFIX`，把兄弟前缀上的 `entry-identity` 判成「缺 scope 段」而整体 `raise` ⇒ 改为认**全部显式 scope 前缀**并投影 `prefixKind` / `WP_SYNC_SIBLING_PREFIX_TEMPLATE`；`task28` 的 6 条守卫同步（等价鉴权判据 `authorize_wp_read` 而非放宽白名单）。
   - 行数门：抽出 `descriptor_view_identity.py` 后 `materialize_coordinator` 3508 / `wp_sync_router` 3638 / `test_task28` 1957 全部回到门内（未抬白名单）。
   - _R: 3, 8_
-- [ ] 2.5 为 target sheet 缺失、candidate、bundle drift、artifact missing、artifact digest drift 建 typed error 与中文原因。
+- [x] 2.5 为 target sheet 缺失、candidate、bundle drift、artifact missing、artifact digest drift 建 typed error 与中文原因。
+  - `PUBLISHED_SHEET_ARTIFACT_REASONS` 11 条封闭原因表（每条都给出可操作下一步）+ `DEFAULT_UNKNOWN_REASON` 兜底；`PublishedSheetArtifactError.as_dict()` 同时给 `error_code` / `reason` / `detail`。
+  - 新增三类判据：`artifact_candidate_rejected`（candidate 是正常流程中间态，与「state 不是 published」分两类）· `artifact_missing`（路径可解析但文件不在，与 `path_unresolvable` 分两类）· `definition_bundle_drift`（representation 冻结 digest ≠ bundle 行 `canonical_payload_sha256` 现算值，**在读文件之前**拒）。
+  - 端点回 `{reason, error_code}` 两样：只回 code 前端无话可说，只回中文无法分支。
+  - 12 例守卫；变异 9/9 全精确打红零假红。
+  - 🔴 首版把 bundle digest 字段猜成 `bundle_sha256` / `sha256`（真名 `canonical_payload_sha256`）⇒ `getattr(..., "")` 恒空 ⇒ 所有读路径都报 drift。这是「未确认接口先读一次」的又一次实例。
   - _R: 2, 3, 7_
 - [ ] 2.6 为 migrated binding 停止签发旧 config / WOPI / callback；pending / out_of_scope 保留独立在线编辑并在响应标明不同步。
   - _R: 4, 6_

@@ -178,7 +178,9 @@ def test_ready_binding_reads_published_artifact_and_reports_typed_reason(monkeyp
     assert calls[0]["target_sheet"] == "K11-1"
     assert calls[0]["whole_workbook"] is False
     assert body["status"] == "pending"
-    assert body["reason"] == "current_representation_missing"
+    # `error_code` 是机器可读的封闭域；`reason` 是可直接展示的中文原因（task 2.5）。
+    assert body["error_code"] == "current_representation_missing"
+    assert "保存一次以发布首版" in body["reason"], body["reason"]
     assert body["room_ready"] is False
     assert body["allowed_modes"] == ["html"]
     # 失败路径不得留下半截 representation 字段
