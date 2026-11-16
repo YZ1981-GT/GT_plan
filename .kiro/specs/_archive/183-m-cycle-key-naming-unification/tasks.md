@@ -213,3 +213,68 @@
   - INDEX：本 spec 已登记（Active 8）；归档时移入 `_archive/`
   - 🔴 后续 spec `m-cycle-form-storage-cell-projection` 已让 `WP()` 对 M 循环可用
     ⇒ 那 18 条 R2 从「阻塞」降级为「用户可自行链接」（见 5.2 的更新）
+
+---
+
+## §R12 投影层断裂（归档后补实施，2026-11-16；用户拍板「先修真缺陷」）
+
+> 本节记录的是本 spec 归档之后、用户要求「先修键名→投影断裂」时实施的修复。
+> 已归档 spec **不回填修改正文**，因此以追加节形式登记。
+
+### R12.1 定位：棘轮清零之后仍存在的真缺陷
+
+本 spec 已把 65 条棘轮偿还到 18 条（剩下邨用户裁决空着），但**键名对齐不等于值能进 OO**。
+现算（探针，不是推测）`phase5_m_cycle_common._build_store_projection._emit_row_array` 有两个
+独立缺陷，任一都足以让明细值**一格都进不了 OO**：
+
+| # | 缺陷 | 现算 |
+| --- | --- | --- |
+| 1 | 拿契约 `column_key`（下划线）比前端行键（驼峰） | M1 24→**1**（仅 `remark`）；M2 14→**1** |
+| 2 | 行身份取 `rowId`/`row_uuid`/`id`，而 M 前端行只有 `key` | **每行都 `continue`，零行产出** |
+
+两条叠加的实际效果：任务 4 已让逐行 JSON 成为唯一来源，但投影层仍只产出
+`M1-M1-2-row-0-data = {...}` 这种**容器键当标量**的伪字段 —— 它不在契约受管字段里，物化时无处可写。
+
+### R12.2 修法
+
+| 文件 | 行数 | 说明 |
+| --- | --- | --- |
+| `backend/app/services/workpaper_sync/m_cycle_row_key_bridge.py` | 124 | **新**：键名桥单一实现 |
+| `backend/app/services/workpaper_sync/phase5_m_cycle_common.py` | 687 / 800 | `_emit_row_array` 改用桥；新增 `_looks_like_detail_row` 把逐行 JSON 导入行表展开 |
+| `backend/tests/workpaper_sync/test_m_cycle_row_key_bridge.py` | 235 | **新**：30 例 |
+
+🔴 **桥不新造映射表**：契约字段同时带 `column_key`（下划线，用于 `stable_field_key`）与
+`json_pointer` 末段（驼峰 = `MFieldSpec.json_key`）。后者就是 provider 声明的前端键名，认它 = 认 provider 真名。
+
+行身份取法按 `key → rowId → row_uuid → id`，缺失 **fail closed**（不得退回数组下标 —— 那会让行序变化被认成新行）。
+
+### R12.3 验证
+
+| 项 | 结果 |
+| --- | --- |
+| 新守卫 | **30 passed** |
+| M 循环全部相关守卫（投影层 / 存储单一来源 / 棘轮 / 科目单一来源） | **102 passed** |
+| 端到端探针（真实前端行 → 生产投影函数） | 产出 **9** 个字段，全落在真实契约键上，**死键 0** |
+| 行数门 | **exit 0** |
+| 变异 | **2/2 RED**，逐字节还原确认 |
+
+### R12.4 三条不可对齐的 entry（现算，已写成棘轮）
+
+| entry | 前端行键 | provider 字段 | 交集 |
+| --- | ---: | ---: | --- |
+| M3 | 17 | 19 | 1（仅 `remark`） |
+| M5 | 17 | 17 | **0** |
+| M7 | 25 | 18 | 1（仅 `remark`） |
+
+这三条不是键名差异，而是**前端渲染的是另一张表**（M5 模板是盈余公积增减变动，前端行是
+sourceName/beginning/accrual/capitalConversion/lossOffset）。已在守卫里写成 `DISJOINT_ENTRIES` 棘轮：
+一旦有人真对齐了，用例会变红并要求从名单删掉（防止名单腐烂）。
+
+**其余 7 条（M1/M2/M4/M6/M8/M9/M10）已桥接通**（现算交集 2~20 个键）。
+
+### R12.5 环境说明（如实）
+
+`backend/tests/workpaper_sync` 全目录跑不完（超 30 分钟）；其中
+`test_task76_projection_definition_provisioner_pg.py` 等 35 例因**未设 `DATABASE_URL`** 而 error
+（该文件明确「必须真实 PG，不 skip」），`test_readiness_typed_failure_alignment.py` 因
+**已归档 spec 的 evidence 路径**而 collection error —— 两者均与本次改动无关（均不 import `phase5_m_*`）。

@@ -44,6 +44,12 @@ from app.services.workpaper_sync.phase5_entry_orchestration import (
     Phase5EntryConfig,
     build_orchestration,
 )
+from app.services.workpaper_sync.m_cycle_row_key_bridge import (
+    ROW_IDENTITY_KEYS,
+    MRowKeyBridgeError,
+    build_field_index,
+    split_detail_row,
+)
 
 _BACKEND_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 CONTRACT_SCHEMA_VERSION: Final[str] = "contract-definition:v1"
@@ -446,36 +452,36 @@ def build_m_provider(cfg: MEntryConfig) -> types.SimpleNamespace:
                 stable_key=iid, value=fv.value, value_type=fv.value_type, mode=fv.mode,
             )
 
+        # 🔴 键名桥（spec `m-cycle-key-naming-unification` 任务 5）：前端行键是驼峰（`shareholderName`），
+        # 而契约 `column_key` 是下划线（`shareholder_name`）。直接拿 `column_key` 去比对行键只会命中
+        # `remark`（现算 M1 24→1 / M2 14→1）；行身份取 `rowId`/`row_uuid`/`id` 而 M 前端行只有 `key`
+        # ⇒ 每一行都被 `continue` 跳过，零行产出。两条都修在 `m_cycle_row_key_bridge`（单一实现）。
+        bridge_index = build_field_index(contract) if contract else {}
+
         def _emit_row_array(container_id: str, rows: Any) -> None:
-            """整表 JSON 形态：按契约 column_key 展开成行表指针。"""
+            """整表 JSON / 逐行 JSON 形态：按**前端键**（json_pointer 末段）展开成行表指针。"""
             if not isinstance(rows, list):
                 return
             # 容器键自身若不是受管字段，就不产出（它是容器，不是一格）
             if container_id in field_index:
                 _emit_flat(container_id, rows)
                 return
+            if not bridge_index:
+                return
             for row in rows:
                 if not isinstance(row, dict):
                     continue
-                row_uuid = str(row.get("rowId") or row.get("row_uuid") or row.get("id") or "")
-                if not row_uuid:
-                    continue
-                for ckey, raw in row.items():
-                    # 同一 column_key 可能出现在多张表里 ⇒ 逐个匹配（当前 M 每家只有一张明细表）
-                    matched = [
-                        (tkey, spec)
-                        for (tkey, col), spec in column_index.items()
-                        if col == ckey
-                    ]
-                    if not matched:
-                        continue  # 契约没有这一列（前端多出来的列），不产出
-                    for tkey, spec in matched:
-                        key = f"{tkey}/{row_uuid}/{ckey}"
-                        fv = _coerce(raw, spec)
-                        values[key] = FieldValue(
-                            stable_key=key, value=fv.value,
-                            value_type=fv.value_type, mode=fv.mode,
-                        )
+                try:
+                    emitted = split_detail_row(row, field_index=bridge_index)
+                except MRowKeyBridgeError:
+                    # 行身份缺失：不得退回下标（会让同一行被认成新行），也不得静默丢弃
+                    raise
+                for key, raw, spec in emitted:
+                    fv = _coerce(raw, spec)
+                    values[key] = FieldValue(
+                        stable_key=key, value=fv.value,
+                        value_type=fv.value_type, mode=fv.mode,
+                    )
 
         def _try_json(raw: Any) -> Any:
             """容器键的值可能是 JSON 字符串。"""
@@ -487,6 +493,24 @@ def build_m_provider(cfg: MEntryConfig) -> types.SimpleNamespace:
                     except (ValueError, TypeError):
                         return raw
             return raw
+
+        def _looks_like_detail_row(iid: str, value: dict) -> bool:
+            """判定一个 dict 值是否是**明细行**而不是受管标量。
+
+            三个条件同时成立才认：
+            ① item_id 自身**不是**受管字段（否则它本就是一格，照旧 flat）；
+            ② 契约声明了行表（`bridge_index` 非空）；
+            ③ 该 dict 里**至少有一个键能命中契约列**（否则它不是本表的行）。
+            """
+            if iid in field_index or not bridge_index:
+                return False
+            for key in value:
+                if key in ROW_IDENTITY_KEYS:
+                    continue
+                for bucket in bridge_index.values():
+                    if key in bucket:
+                        return True
+            return False
 
         # JSON 数组形态 → 逐行解析（每条是一个 item 记录）
         if isinstance(data, list):
@@ -509,6 +533,11 @@ def build_m_provider(cfg: MEntryConfig) -> types.SimpleNamespace:
                 parsed = _try_json(val)
                 if isinstance(parsed, list):
                     _emit_row_array(iid, parsed)
+                elif isinstance(parsed, dict) and _looks_like_detail_row(iid, parsed):
+                    # 🔴 逐行 JSON（任务 4 后的唯一来源）：`M1-M1-2-row-0-data` 的值是**一个行对象**。
+                    # 它不是受管字段（不在契约里），直接 `_emit_flat` 会把它当成一格标量写入
+                    # 一个死键，而行里的每一个字段都进不了 OO ⇒ 必须按行表指针展开。
+                    _emit_row_array(iid, [parsed])
                 else:
                     _emit_flat(iid, parsed)
 
