@@ -229,6 +229,24 @@
   - 勘误（2026-11-06 整体复核）：「tsvector/GIN 路径代码已有」不实——权威词法链
     `KnowledgeDocSearch._candidates` 仍是 name / content_text / tags 的 `%ILIKE%` + 候选上限，
     没有 tsvector 列、GIN / pg_trgm 索引。
+  - **2026-11-16 补（真实 EXPLAIN 基准已跑，`[ ]*` 保持——索引尚未落地到生产）**：
+    新建 `backend/tests/test_knowledge_retrieval_explain_pg.py`（**5 例**）。一次性库
+    `gt_kb_explain` + 提交型临时 schema，`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`
+    （用 JSON 不用文本：文本计划缩进随版本变，JSON 才能稳定断言索引名）。
+    **实测（20000 行，1% 命中率稀疏查询）**：
+    · `ILIKE`（当前生产实现）→ **Seq Scan，77.7 ms**
+    · `pg_trgm` GIN → **Bitmap Index Scan，68.2 ms**（计划确认真变）
+    · `tsvector` GIN（生成列）→ **67.1 ms**
+    · `pgvector` HNSW（5000 × 1024 维）→ **155.1 ms**
+    🔴 **结论要如实说**：耗时差异很小（正文太短，塞不进 IO 密集区），**真正的收益在计划形态**
+    （Seq Scan → Bitmap Index Scan 意味着行数再涨 10 倍时 ILIKE 会线性劣化、索引不会）。
+    所以「必须换索引」的判据不是当前 ms，而是 `CANDIDATE_CAP`（1000）命中即告警 ——
+    本文件把这条告警钉住（AST 精确到「`logger.warning` 且参数含 `CANDIDATE_CAP`」，
+    因为只查「文件里有 warning」会被别处 warning 顶成假绿，v2 变异实测确认）。
+    **变异 5/5 RED**，逐字节还原。
+    **仍未做**：把 trgm/tsvector 索引真正落到生产迁移（需产品裁决选哪条路径，
+    且要考虑 `knowledge_documents` 已有 2 万+ 行的在线建索引窗口）。
+
 
 ## 批 D 前端大表与请求反馈
 
@@ -298,6 +316,22 @@
     另 2 条纯静态判据（默认值 + 生产模块）**任何环境都跑**，无 bouncer 时 2 passed / 7 skipped。
     **仍未做**：2%→25%→100% 灰度脚本、按副本数计算连接预算（需部署环境）、
     真实后端经 bouncer 的端到端压测。
+    **2026-11-16 追加（连接预算已实现，`[ ]*` 保持——灰度脚本与端到端压测仍缺）**：
+    新建 `backend/app/core/connection_budget.py` + `backend/tests/test_connection_budget.py`
+    （**14 例**）。纯计算模块（不连库），三层收窄：
+    `PG max_connections − superuser_reserved − admin_reserve = 应用总额度`
+    → `/ replicas = 单副本额度` → `− 池外连接 = 单副本池额度`。
+    经 PgBouncer 时**两层约束同时校验**（客户端侧 `replicas × 池 ≤ bouncer MAX_CLIENT_CONN`、
+    服务端侧 `bouncer 实例 × DEFAULT_POOL_SIZE ≤ PG 额度`）—— 只查一层会在另一层打满。
+    🔴 **本轮最重要的实测结论（直接决定 E2 能否扩到 4 worker）**：
+    默认池配置 `50 + 100 = 150/副本` 在 PG 500 连接下
+    · **1~2 副本可行**（2 副本：244/副本，够 150）
+    · **4 副本不可行**：489 总额度 / 4 = 122，扣池外 3 条 = **119 池额度**，
+      需求 150 ⇒ **短 31**；4 × 150 = 600 > 489
+    ⇒ **E2 的「2/4/8 worker」不是调个副本数就行**：4 副本前必须先降池配置或先上
+    PgBouncer（PgBouncer 下 4 副本只需 bouncer 服务端侧 50×N ≤ 489 即可）。
+    **变异 7/7 RED**（漏扣保留 / 不按副本拆分 / 不可行钳成可行 / 只查 bouncer 一层 /
+    只查另一层 / binding_constraint 写死 / 负数不校验），逐字节还原。
 - [~] E2 EventBus、任务、配额、进度和失效状态外置；2/4/8 worker 零丢失/零重复验证。
   - 🔴 platform_jobs / AI tasks 已 DB 耐久，SSE 跨标签已共享；但 EventBus、配额和失效状态仍有进程内部分，
     尚未完成跨 worker 外置和 2/4/8 worker 验证。2026-11-06 增量：接口骨架落地
