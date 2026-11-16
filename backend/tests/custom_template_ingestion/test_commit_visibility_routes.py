@@ -66,7 +66,7 @@ def _stored(
 
 
 class _User:
-    def __init__(self, role: str = "partner") -> None:
+    def __init__(self, role: str = "manager") -> None:
         self.id = uuid.uuid4()
         self.role = SimpleNamespace(value=role)
 
@@ -226,6 +226,7 @@ class TestAuth:
         ).status_code == 403
 
     def test_partner_allowed(self, monkeypatch) -> None:
+        """partner 有 FINALIZE_PROJECT，可推进可见性。"""
         client = _client(
             monkeypatch, user=_User("partner"), db=_Db(),
             publication=_stored(), ledger_state="ACTIVE",
@@ -234,6 +235,37 @@ class TestAuth:
             "/api/custom-template-ingestion/publications/commit-visibility",
             json=_body(acks=_all_acks()),
         ).status_code == 200
+
+    def test_admin_allowed(self, monkeypatch) -> None:
+        """🔴 admin 必须有 FINALIZE_PROJECT —— 浏览器实测曾因误用 approve 权限
+        让 admin 直接 403，而库里 partner/qc 用户数为 0 ⇒ 端点实际无人可用。"""
+        client = _client(
+            monkeypatch, user=_User("admin"), db=_Db(),
+            publication=_stored(), ledger_state="ACTIVE",
+        )
+        assert client.post(
+            "/api/custom-template-ingestion/publications/commit-visibility",
+            json=_body(acks=_all_acks()),
+        ).status_code == 200
+
+    def test_manager_allowed(self, monkeypatch) -> None:
+        client = _client(
+            monkeypatch, user=_User("manager"), db=_Db(),
+            publication=_stored(), ledger_state="ACTIVE",
+        )
+        assert client.post(
+            "/api/custom-template-ingestion/publications/commit-visibility",
+            json=_body(acks=_all_acks()),
+        ).status_code == 200
+
+    def test_qc_rejected(self, monkeypatch) -> None:
+        """qc 只有 APPROVE_PUBLISH_ORGANIZATION（双人复核批准），没有 FINALIZE_PROJECT
+        ⇒ 不得推进可见性（语义分离：批准发布 ≠ 技术推进）。"""
+        client = _client(monkeypatch, user=_User("qc"), db=_Db(), publication=_stored())
+        assert client.post(
+            "/api/custom-template-ingestion/publications/commit-visibility",
+            json=_body(),
+        ).status_code == 403
 
 
 class TestGates:

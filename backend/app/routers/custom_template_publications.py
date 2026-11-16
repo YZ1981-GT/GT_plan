@@ -318,13 +318,16 @@ async def commit_publication_visibility(
     )
     if pub is None:
         raise HTTPException(status_code=404, detail="publication 不存在")
-    # 权限：推进可见性等于「批准组织级发布」⇒ 用 APPROVE_PUBLISH_ORGANIZATION
-    # （partner / qc 持有），而不是发起侧的 PUBLISH_ORGANIZATION（template_admin）。
-    # 双人复核语义：发起与批准不落在同一 capability 上。
+    # 权限：收集 ACK 并推进可见性是 finalize 之后的技术推进，属
+    # `FINALIZE_PROJECT`（manager / admin 持有），与 instantiate 同级。
+    # 🔴 不是 `APPROVE_PUBLISH_ORGANIZATION` —— 后者是**组织级发布的批准权**
+    # （partner / qc 持有、走 ApprovalIntent 双人复核），语义不同。
+    # 曾误用 approve 权限，导致 admin 点「推进可见性」直接 403（浏览器实测抓到），
+    # 而库里 partner/qc 用户数为 0 ⇒ 该端点实际无人可用。
     role = role_of(current_user)
-    if not is_permitted(role, Capability.APPROVE_PUBLISH_ORGANIZATION):
+    if not is_permitted(role, Capability.FINALIZE_PROJECT):
         raise HTTPException(
-            status_code=403, detail="推进 publication 可见性需要发布批准权限"
+            status_code=403, detail="推进 publication 可见性需要 finalize 权限"
         )
 
     if pub.state == PublicationState.ACTIVE:

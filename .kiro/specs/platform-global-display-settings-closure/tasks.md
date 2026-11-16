@@ -676,3 +676,68 @@ state（`IntegrityError`）、JSONB 往返、非法状态转换被拒
   应用后被编辑（登记 `c5a6e5709f34…` / 当前 `608d8ed9e65d…`）。该文件**不是本会话改动**，
   属并发会话；处置原则是「已应用的文件一律不改」，需由其作者裁决是否登记到
   `app/core/migration_drift_ledger.py`。
+
+---
+
+## 十二、publication 页面 Playwright 浏览器实测（2026-11-16）
+
+### 12.1 🔴 浏览器实测抓到真实缺陷：admin 推进可见性 403
+
+页面首屏正常（标题 / 中文提示 / 空态），**0 console error**。造一条真实
+`PENDING_VISIBILITY` publication 后列表正确显示（`待确认可见性` / `可实例化=否`），
+确认弹窗正确列出四个 consumer 名单。
+
+点「确认推进」→ **console 出现 403 Forbidden**，页面显示
+「推进 publication 可见性需要发布批准权限」。
+
+**根因**：`commit-visibility` 端点误用 `APPROVE_PUBLISH_ORGANIZATION`
+（partner / qc 持有，语义是**组织级发布的批准权**，走 ApprovalIntent 双人复核）。
+而现查 `users` 表角色分布：
+
+| role | n |
+| --- | --- |
+| auditor | 100 |
+| admin | 8 |
+| manager | 6 |
+| readonly | 4 |
+
+**`partner` / `qc` 用户数为 0** ⇒ 该端点在实际数据下**无人可用**。
+
+### 12.2 修正
+
+`commit-visibility` 的语义是「finalize 之后收集 ACK 并技术推进可见性」，
+不是「批准组织级发布」⇒ 改用 **`FINALIZE_PROJECT`**（manager / admin 持有，
+与 instantiate 同级）。测试同步补：admin / manager / partner 可推进，
+qc / auditor / readonly 不可（**语义分离：批准发布 ≠ 技术推进**）。
+
+### 12.3 修正后浏览器复测（通过）
+
+| 步骤 | 结果 |
+| --- | --- |
+| 页面加载 | 0 console error |
+| 列表显示真实 publication | `pub-browser-c07bb93d` / `待确认可见性` / `否` |
+| 确认弹窗 | 四 consumer 名单与后端逐值一致 |
+| 点「确认推进」 | 状态 → `已发布（可实例化）` / `可实例化=是`，**0 console error** |
+
+**真实落库核对**：
+
+| 表 | 结果 |
+| --- | --- |
+| `custom_template_publications` | `state=ACTIVE` / `reason=all_acks_accepted` |
+| `guidance_consumer_ack` | **4 行**（entry_namespace / guidance / public_shell / renderer，全 ACCEPTED，version 1.0.0） |
+| `guidance_handoff_visibility` | `state=ACTIVE` / `reason_codes_json=[]` |
+
+### 12.4 清理与回归
+
+- 测试数据按 `publication_key LIKE 'pub-browser-%'` 精确删除：
+  1 pub / 4 acks / 1 visibility；**删除后残留 pubs=0 acks=0 vis=0 orphan=0**。
+- 后端整包 `tests/custom_template_ingestion/` **386 passed**。
+- 权限变异 **3/3 RED**：gate 删除 / **改回 APPROVE（原缺陷）** / 降级为 UPLOAD。
+
+### 12.5 教训
+
+**权限口径必须按「谁会用」定级，不能按字面语义硬套**。`APPROVE_PUBLISH_ORGANIZATION`
+字面上像「发布相关所以用它」，但它属双人复核批准链，与「技术推进可见性」是两回事；
+且当时未核对**该角色在实际数据里是否存在**（partner/qc 为 0）。这类缺陷单测抓不到
+（测试里我造了 partner 用户），**只有浏览器用真实账号才暴露** —— 正是 memory
+铁律「改动后必 Playwright 实测」的价值。
