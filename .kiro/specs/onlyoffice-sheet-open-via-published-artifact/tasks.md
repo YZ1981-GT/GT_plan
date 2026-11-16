@@ -1,6 +1,6 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：5/34（2026-11-16，Phase 0.1~0.3 与 Phase 1.1~1.2 已完成；产品代码未实施）**
+> **状态：7/34（2026-11-16，Phase 0.1~0.3、1.1~1.2、2.1~2.2 已完成；产品代码仍未迁移已就绪 binding）**
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
@@ -36,10 +36,11 @@
 
 ## Phase 2：服务端解析与 Published Artifact 读取
 
-- [ ] 2.1 重构 `/sync/entry-identity`：由 `SheetOpenBindingResolver` 返回真实 manifest `entry_id`，删除对不存在的 `xlsx-sheet/*` entry 的直接假设。
-  - 兼容旧响应字段，但新字段必须含 mapping status、target sheet、representation identity。
+- [x] 2.1 重构 `/sync/entry-identity`：由 `SheetOpenBindingResolver` 返回真实 manifest `entry_id`，删除对不存在的 `xlsx-sheet/*` entry 的直接假设。
+  - 兼容旧响应字段，但新字段必须含 mapping status、target sheet、representation identity；route 级测试覆盖 pending provider mapping 不伪造 entry。
   - _R: 1, 3_
-- [ ] 2.2 把 sheet readiness 接到 binding 后的 effective entry；缺 mapping 时返回 200 pending 或 typed 409，不能把 EntryReadinessNotFound 当成 room ready。
+- [x] 2.2 把 sheet readiness 接到 binding 后的 effective entry；缺 mapping 时返回 200 pending 或 typed 409，不能把 EntryReadinessNotFound 当成 room ready。
+  - `SheetOpenBindingResolver` 在 entry 缺失、provider 未审核、exact 多义时均返回 pending；端点测试证明不会生成 `xlsx-sheet/*` 虚假身份。
   - _R: 1, 3, 7_
 - [ ] 2.3 新增 published artifact reader：通过 current representation id、bundle、contract 与 canonical artifact layout 读取文件，禁止模板 copy / hidden-sheet mutation。
   - _R: 2, 7_

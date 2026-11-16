@@ -1032,7 +1032,8 @@ async def resolve_entry_identity(
     wp_id: uuid.UUID,
     sheet_name: str,
     whole_workbook: bool = Query(default=False),
-    svc: _SyncServices = Depends(_services),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     """按 `(wp_id, sheet_name)` 反查 room entry 身份与可用性 —— 前端**不必**自己造 entry_id。
 
@@ -1059,23 +1060,21 @@ async def resolve_entry_identity(
     与 `GET /readiness` 同口径：**未就绪是合法状态**，不是错误。前端要据此决定
     「留在结构化视图 + 显示原因」，4xx 会让它走异常分支而丢掉原因文案。
     """
+    from app.deps import authorize_wp_read
     from app.routers._wp_sheet_code_resolution import resolve_sheet_wp_code
     from app.routers.wp_onlyoffice_router import _load_wp_or_404
-    from app.services import onlyoffice_room_identity as _room_identity
+    from app.services.workpaper_sync.adapters.registry import build_production_registry
+    from app.services.workpaper_sync.entry_profile import load_entry_manifest
     from app.services.workpaper_sync.entry_readiness import evaluate_entry_readiness
+    from app.services.workpaper_sync.sheet_open_bindings import SheetOpenBindingResolver
 
-    # 授权：与 `/onlyoffice-config` 同一条项目级门（entry-scoped 门要 entry_id，
-    # 而本端点的**目的**正是先把 entry_id 算出来 ⇒ 只能挂项目级）。
-    scope = await _guard(
-        svc,
-        project_id=project_id,
-        wp_id=wp_id,
-        entry_id="__entry_identity__",
-        action="read_entry_readiness",
-    )
-    _, wp_code = await _load_wp_or_404(svc.session, scope.wp_id)
+    # entry_id 尚未知，不能调用带 entry scope 的 `_guard`；先用既有底稿只读门确认
+    # project/wp 归属，再从生成 binding 解析真实 entry。未知 entry 不是越权，而是 pending。
+    authorized_project_id = await authorize_wp_read(db, current_user, wp_id)
+    _, wp_code = await _load_wp_or_404(db, wp_id)
+    if authorized_project_id != project_id:
+        raise HTTPException(status_code=403, detail="底稿项目授权上下文不一致")
 
-    # 换码判据与 `/onlyoffice-config` 共用同一实现 + 同一个模板谓词。
     from app.services.wp_template_finder import find_template_file_any
 
     sheet_code = resolve_sheet_wp_code(
@@ -1084,31 +1083,39 @@ async def resolve_entry_identity(
         whole_workbook,
         has_template=lambda code: find_template_file_any(code) is not None,
     )
-    entry_id = _room_identity.sheet_entry_id(
-        wp_code=sheet_code, sheet_name=sheet_name, whole_workbook=whole_workbook
+    resolution = SheetOpenBindingResolver().resolve(
+        source_wp_code=sheet_code,
+        sheet_name=sheet_name,
+        whole_workbook=whole_workbook,
+        manifest=load_entry_manifest(),
     )
-
-    body: dict[str, Any] = {
-        "entry_id": entry_id,
+    body = resolution.as_dict()
+    body.update({
         "wp_code": sheet_code,
         "room_ready": False,
-        "reason": None,
         "allowed_modes": ["html"],
-    }
+    })
+    binding = resolution.binding
+    entry_id = str(binding.get("entry_id")) if binding else None
+    if entry_id is None:
+        return body
+
     try:
         readiness = await evaluate_entry_readiness(
-            session=svc.session,
-            registry=svc.registry,
-            project_id=scope.project_id,
-            wp_id=scope.wp_id,
+            session=db,
+            registry=build_production_registry(),
+            project_id=project_id,
+            wp_id=wp_id,
             entry_id=entry_id,
         )
-    except Exception as exc:  # noqa: BLE001 — 未注册 adapter / entry 不在 manifest 都属「未就绪」
+    except Exception as exc:  # noqa: BLE001 — 未注册 adapter / entry 不在 manifest 都属 pending
         body["reason"] = f"该底稿尚未接入统一在线编辑（{type(exc).__name__}）"
         return body
 
     body["room_ready"] = bool(readiness.runtime.ready)
     body["allowed_modes"] = list(readiness.allowed_modes)
+    body["effective_entry_id"] = readiness.effective_entry_id
+    body["readiness"] = readiness.as_dict()
     if not body["room_ready"]:
         reason = readiness.reason
         detail = getattr(reason, "detail", None) if reason is not None else None
