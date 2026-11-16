@@ -264,6 +264,17 @@ export interface WorkpaperSyncEditorLaunchDescriptor {
   readonly definitionBundleSha256: string
   readonly definitionBundleSlots: Readonly<Record<string, WorkpaperSyncBundleSlot>>
   readonly documentType: string
+  /**
+   * 视图身份：单 sheet 模式要定位到的**物理** sheet 名（artifact 内）。
+   *
+   * 🔴 与 `documentScope` 一起从 descriptor 冻结而来（spec 2.4）。`onlyoffice_config`
+   * **不含** actionLink（避免与 descriptor 生命周期绑死）⇒ 由
+   * `buildDocEditorConfig` 在消费侧按这两个字段注入。缺了它，room 协议打开会
+   * 永远停在首 sheet（而单 sheet 视图语义无处表达）。
+   */
+  readonly targetSheet: string | null
+  /** `single_sheet` 可带 target 定位；`whole_workbook` 必须不带（否则其它 sheet 被藏起来）。 */
+  readonly documentScope: 'single_sheet' | 'whole_workbook'
   readonly mode: string
   readonly onlyofficeConfig: Readonly<Record<string, unknown>>
   /** 相同 pending token + Idempotency-Key 的成功重放（AC 3.6 的幂等复用）。 */
@@ -412,6 +423,25 @@ export function parseEditorLaunchDescriptor(
     definitionBundleSha256: wire.definition_bundle_sha256 as string,
     definitionBundleSlots: slots,
     documentType: requiredString(wire, 'document_type', 'materialize'),
+    // 视图身份（spec 2.4）：`target_sheet` 可空（单 sheet 契约没声明该 sheet_key = 不定位）；
+    // `document_scope` 封闭两值 —— 未知值 fail-closed（不静默当 single_sheet：
+    // 那会让整册视图被注入 actionLink，其它 sheet 被悄悄藏起来）。
+    targetSheet:
+      typeof wire.target_sheet === 'string' && wire.target_sheet.trim() !== ''
+        ? (wire.target_sheet as string)
+        : null,
+    documentScope: ((): 'single_sheet' | 'whole_workbook' => {
+      const raw = wire.document_scope
+      if (raw === 'single_sheet') return 'single_sheet'
+      if (raw === 'whole_workbook') return 'whole_workbook'
+      // 🔴 未知值 fail-closed：静默当 single_sheet 会让「整册视图」被注入 actionLink
+      // ⇒ 其它 sheet 被悄悄藏起来（Requirement 3.4 禁止的形态）。
+      refuse(
+        'descriptor_document_scope_unknown',
+        `descriptor 的 document_scope=${JSON.stringify(raw)} 不在封闭集合`
+          + " ['single_sheet', 'whole_workbook'] 内",
+      )
+    })(),
     mode: requiredString(wire, 'mode', 'materialize'),
     onlyofficeConfig: config as Record<string, unknown>,
     replayed: wire.replayed === true,

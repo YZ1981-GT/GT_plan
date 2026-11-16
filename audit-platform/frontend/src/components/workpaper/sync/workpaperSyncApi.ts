@@ -36,6 +36,7 @@ import type { WorkpaperSyncCapability } from './workpaperSyncManifest.generated'
 
 import {
   WP_SYNC_ROUTES,
+  WP_SYNC_SIBLING_PREFIX_TEMPLATE,
   WP_SYNC_USER_PREFIX_TEMPLATE,
   type WorkpaperSyncRouteSpec,
 } from './workpaperSyncContract.generated'
@@ -121,6 +122,18 @@ export function encodeEntryId(entryId: string): string {
     .join('/')
 }
 
+/**
+ * sibling 前缀：`…/workpapers/{wp_id}/sync`（**不含** entry_id）。
+ *
+ * 用于「还不知道 entry_id、正要算出它」的端点（`resolve_entry_identity`）。
+ * 模板同样来自生成物（`WP_SYNC_SIBLING_PREFIX_TEMPLATE`），本函数只做替换。
+ */
+export function buildSyncSiblingPrefix(scope: WorkpaperSyncEntryScope): string {
+  return WP_SYNC_SIBLING_PREFIX_TEMPLATE.replace(
+    '{project_id}',
+    segment(scope.projectId, 'project_id'),
+  ).replace('{wp_id}', segment(scope.wpId, 'wp_id'))
+}
 /** 显式 scope 前缀。模板来自生成物，本函数只做替换。 */
 export function buildSyncEntryPrefix(scope: WorkpaperSyncEntryScope): string {
   return WP_SYNC_USER_PREFIX_TEMPLATE.replace(
@@ -167,6 +180,16 @@ export function buildSyncEndpointUrl(
       'route_param_missing',
       `endpoint ${endpoint} 的路径仍有未替换占位符 ${unresolved.join(', ')}`,
     )
+  }
+  // 🔴 `prefixKind` 决定用哪个前缀模板（真源 = 后端 `ENTRY_IDENTITY_PREFIX`）：
+  //   · `primary` —— `…/entries/{entry_id:path}/sync`，含 entry_id；
+  //   · `sibling` —— `…/workpapers/{wp_id}/sync`，**不含** entry_id。
+  //
+  // sibling 存在的全部意义就是「先算出 entry_id」：挂进 primary 会变成
+  // `…/entries/{entry_id}/sync/entry-identity`，前端仍得先知道 entry_id
+  // ⇒ 等于什么都没解决（后端注释实测过那个形状）。
+  if (route.prefixKind === 'sibling') {
+    return buildSyncSiblingPrefix(scope) + suffix
   }
   return buildSyncEntryPrefix(scope) + suffix
 }
@@ -1187,6 +1210,29 @@ export async function adoptSubstrate(
   return request({ endpoint: 'adopt_substrate', scope, body })
 }
 
+/**
+ * `GET …/workpapers/{wp_id}/sync/entry-identity`（spec 2.1）。
+ *
+ * 给定 sheet 名，由后端的 `SheetOpenBindingResolver` 算出**真实 manifest entry_id**。
+ * 这是「前端不必先知道 entry_id」的唯一入口 —— 挂在 sibling 前缀下（见
+ * `buildSyncEndpointUrl` 的 `prefixKind` 分派）。
+ *
+ * 🔴 只传 projectId / wpId：entry_id 正是本调用的**结果**，传进来就是循环依赖。
+ * `sheetName` 走 query（sheet 名可含中文与斜杠，不能进路径段）。
+ */
+export async function resolveEntryIdentity(
+  projectId: string,
+  wpId: string,
+  sheetName: string,
+): Promise<Record<string, unknown>> {
+  return request({
+    endpoint: 'resolve_entry_identity',
+    // entryId 在本端点无意义（不进 URL），给空串让 `segment()` 不去编码它。
+    scope: { projectId, wpId, entryId: '' },
+    query: { sheet_name: sheetName },
+  })
+}
+
 /** 全部 client method 名 → endpoint 名。判据用它证明「每条路由都有唯一消费方」。 */
 export const WORKPAPER_SYNC_CLIENT_ENDPOINTS = Object.freeze({
   adoptSubstrate: 'adopt_substrate',
@@ -1211,4 +1257,5 @@ export const WORKPAPER_SYNC_CLIENT_ENDPOINTS = Object.freeze({
   terminateRecoveryDownloadOnly: 'terminate_recovery_download_only',
   downloadRecoveryArtifact: 'download_recovery_artifact',
   rollbackVersion: 'rollback_version',
+  resolveEntryIdentity: 'resolve_entry_identity',
 } as const)

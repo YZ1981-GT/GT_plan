@@ -85,6 +85,10 @@ export const WP_SYNC_HOST_ERROR_TEXT: Readonly<Record<string, string>> = Object.
   editor_host_docs_api_script_failed: 'OnlyOffice 内核脚本载入失败，未创建编辑器',
   editor_host_config_document_missing:
     'descriptor 内嵌的 OnlyOffice config 缺 document 段，拒绝挂载编辑器',
+  // spec 3.2：单 sheet 视图要往 editorConfig 里注入 actionLink，但服务端 config 里
+  // 连 editorConfig 段都没有 ⇒ 不静默补一个半截的（那会让不完整 config 看起来合法）。
+  editor_host_config_editor_missing:
+    'descriptor 内嵌的 OnlyOffice config 缺 editorConfig 段，无法定位到目标工作表，拒绝挂载编辑器',
   editor_host_editor_side_forcesave_enabled:
     'descriptor 内嵌的 config 打开了编辑器侧自动保存，拒绝挂载编辑器',
 
@@ -245,6 +249,36 @@ export function buildDocEditorConfig(
   // OO 对 `document.token` 的赋值 → 编辑器 -20（见 g4-* 证据 notes）。
   // events 不能进 JSON 克隆，单独挂回。
   const plain = JSON.parse(JSON.stringify(source)) as Record<string, unknown>
+
+  // ── 视图定位（spec 3.2 / Requirement 3.3 / 3.4）──────────────────────────
+  //
+  // 服务端的 `onlyoffice_config` **刻意不含** actionLink（避免与 descriptor 生命周期
+  // 绑死）。所以「把 descriptor 冻结的 target sheet 变成 actionLink」只能发生在
+  // **消费 descriptor 的这一层** —— 它不产生第二份 config，只在既有结构上补一个键。
+  //
+  // 🔴 两种视图必须互斥：
+  //   · single_sheet + targetSheet ⇒ 注入 actionLink（定位到该 sheet）；
+  //   · whole_workbook ⇒ **必须不注入**（整册视图要显示全部 sheet tab，
+  //     带定位会把其它 sheet 悄悄藏起来 —— 那正是 Requirement 3.4 禁止的形态）。
+  //
+  // 目标 sheet 缺失时（`targetSheet === null`）**不注入** —— 契约没声明该 sheet_key
+  // = 不定位，与改动前行为一致。
+  if (descriptor.documentScope === 'single_sheet' && descriptor.targetSheet) {
+    const editorConfig = plain.editorConfig as Record<string, unknown> | undefined
+    if (editorConfig === undefined || editorConfig === null) {
+      // 服务端 config 缺 editorConfig 时**不静默补一个**：那会让一份不完整的 config
+      // 看起来合法。直接拒绝（与 `editor_host_config_document_missing` 同档）。
+      refuse('editor_host_config_editor_missing')
+    }
+    // 只在**没有** actionLink 时注入：服务端若将来自己给了（比如 token 里带了定位），
+    // 不覆盖它 —— 两份定位不一致时以服务端为准。
+    if (!('actionLink' in editorConfig)) {
+      editorConfig.actionLink = {
+        action: { type: 'bookmark', data: descriptor.targetSheet },
+      }
+    }
+  }
+
   return {
     ...plain,
     width: '100%',

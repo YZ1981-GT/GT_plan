@@ -9,7 +9,7 @@
  * spec: workpaper-html-onlyoffice-bidirectional-writeback-closure · Wave 3 Task 31
  */
 
-export const WP_SYNC_CONTRACT_DIGEST = "2e930739460acd8c49a814029e906a3ef7530fe8093f3dad2e67c8afd069c94a"
+export const WP_SYNC_CONTRACT_DIGEST = "32a38aa6c069dcb3738e00ef98867d53e7a3ecb358679116905309a82b84e158"
 
 /**
  * 用户端统一前缀模板。`{entry_id}` 是**多段**值（186 条 entry_id 全部含 `/`，最深四段），
@@ -28,6 +28,13 @@ export interface WorkpaperSyncRouteSpec {
 
 /** 后端**真实**路由表（一路由一方法）。前端只能从这里取路径，不得再拼字面量。 */
 export const WP_SYNC_ROUTES = [
+  {
+    "endpoint": "abandon_conflicts",
+    "idempotencyKey": "absent",
+    "method": "POST",
+    "prefixKind": "primary",
+    "suffix": "/operations/{operation_id}/abandon"
+  },
   {
     "endpoint": "adopt_substrate",
     "idempotencyKey": "absent",

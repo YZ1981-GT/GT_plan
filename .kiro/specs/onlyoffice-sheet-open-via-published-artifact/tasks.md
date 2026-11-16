@@ -1,6 +1,12 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：21/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.6 + 3.7 + 5.1 + 5.3 + 5.4 + 5.6 已完成；全部纯代码判据已收口，余 13 项为真实环境依赖 / 治理收尾）**
+> **状态：22/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.2 + 3.6 + 3.7 + 5.1 + 5.3 + 5.4 + 5.6 已完成；全部纯代码判据已收口）**
+>
+> **余 12 项的真实阻断（现算，不凭记忆）** —— 三类，全部已写明 owner / 证据 / 下一步：
+> - **治理前置（binding 审核）8 项**：3.3 / 3.4 / 3.5 / 4.1 / 4.2 / 4.3 / 4.4 / 5.2。根因 = `workpaper_sync_sheet_open_bindings.json` 197 条里 **`migrated` = 0**（pending 190 / out_of_scope 7）⇒ **无可迁对象**。这些任务的代码侧判据全部已就绪（gate 状态机 17 例 / artifact reader 12 例 / 父级兜底断言 / ledger 22 文件 27 处），缺的是「人工把某条 binding 审核成 `migrated`」这个治理动作。
+> - **治理收尾 2 项**：4.5（`GtOnlyOfficeSheet` 仍是 197 条未迁移 binding 的唯一载体，删不得）/ 5.7（完成门未满足，归档会让「还有 12 项没做」失去可见性）。
+> - **真环境 2 项**：5.5（Playwright 五场景，4 个要 migrated binding）/ 0.4（五角色签字，需人）。
+> - 环境侧**不是**阻断：`audit-onlyoffice` / `audit-postgres` / `audit-redis` 均 healthy。
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
@@ -16,7 +22,10 @@
   - 不得把当前 `sheet_entry_id()` 生成的 `xlsx-sheet/*` 直接当作已存在 entry。
   - 产物：`evidence/sheet-binding-adjudication.json`；首批候选为 K11 provider mapping 与 D4 aggregate source-sheet mapping，custom/Word 明确 out_of_scope。
   - _R: 1, 5_
-- [ ] 0.4 完成五角色范围复核：合伙人确认打开对象与业务含义，项目经理确认 rollout，质控确认不伪造双向，审计助理确认界面文案，EQCR 确认历史 operation / artifact 审计边界。
+- [ ]* 0.4 完成五角色范围复核：合伙人确认打开对象与业务含义，项目经理确认 rollout，质控确认不伪造双向，审计助理确认界面文案，EQCR 确认历史 operation / artifact 审计边界。
+  - **阻断类别：人的裁决**（不是代码、不是环境）。owner = 用户/团队五角色。
+  - 代码侧证据已就绪可审：①打开对象与业务含义 → `backend/data/workpaper_sync_sheet_open_bindings.json`（197 条逐条写明 `mapping_kind` / `status` / `reason`，可逐条裁决）；②rollout → 4.1 的状态机已定 `pending → ready → migrated → draining → retired`（见 design）；③不伪造双向 → 3.6 已加「独立在线编辑（不同步）」提示条 + `sync_mode` 默认 `independent`；④界面文案 → 3.6 的 40 条现算核对 + 12 例守卫；⑤历史 operation / artifact 审计边界 → 5.3 的 ledger（22 文件 / 27 处调用逐条 owner+reason）。
+  - 下一步：把上述四项证据交五角色逐条签字；签字后本项可勾。**不得由我代签。**
   - _R: 5, 6, 10_
 
 ## Phase 1：SheetOpenBinding 真源与生成器
@@ -91,13 +100,33 @@
   - 15 例守卫（原 9 + 新 6）；变异 6/6 全精确打红零假红。
   - 🔴 两轮假绿：① pending 用例用 `room_ready: false` 写 ⇒ pending 被误判成 bound 时也走 legacy，无法区分（M1 存活）⇒ 改 `room_ready: true`（binding 是权威判定）；② 变异脚本用 `"FAIL " in line` 检测，而 vitest 输出带 ANSI 色 ⇒ 检测器恒空，M2 被误判成存活 ⇒ 去 ANSI + 解析 `Tests N failed` 摘要行。
   - _R: 1, 4, 6_
-- [ ] 3.2 为 `WorkpaperSyncEditorHost` 增加 target sheet / whole workbook descriptor 接线；不得在业务 composable 自己调 materialize 或拼 callback URL。
+- [x] 3.2 为 `WorkpaperSyncEditorHost` 增加 target sheet / whole workbook descriptor 接线；不得在业务 composable 自己调 materialize 或拼 callback URL。
+  - 现算缺口：`WorkpaperSyncEditorHost.vue` 里 `target_sheet` / `whole_workbook` / `document_scope` 出现次数**全是 0**；`buildDocEditorConfig` 只把 `descriptor.onlyofficeConfig` 原样克隆 ⇒ room 协议打开**永远停在首 sheet**，单 sheet 视图语义无处表达。
+  - 三处改动：①`workpaperSyncDto.ts` 增 `targetSheet: string | null` / `documentScope: 'single_sheet' | 'whole_workbook'` + mapper（未知 scope fail-closed `descriptor_document_scope_unknown`，带人话 message）；②`buildDocEditorConfig` 按 `documentScope === 'single_sheet' && targetSheet` 注入 `editorConfig.actionLink = { action: { type: 'bookmark', data: targetSheet } }`；③新登记失败码 `editor_host_config_editor_missing`（缺 editorConfig 段时拒绝，不静默补半截 config）。
+  - **为什么注入只能在消费侧**：服务端 `_onlyoffice_config` **刻意不含** actionLink（避免与 descriptor 生命周期绑死），而 Property 11 禁止前端再请求 config ⇒ 「把 target sheet 变成 actionLink」只能发生在消费 descriptor 的那一层。它不产生第二份 config，只在既有结构上补一个键。
+  - 两种视图**互斥**：`whole_workbook` 即便 `targetSheet` 有值也**不注入**（整册要显示全部 sheet tab，带定位会把其它 sheet 悄悄藏起来 —— Requirement 3.4 禁止的形态）；服务端若已给 actionLink **不覆盖**（两份定位不一致时以服务端为准）。
+  - 守卫：新建 `__tests__/workpaperSyncEditorHostRuntime.spec.ts`（该模块此前无专属 spec）9 例 —— single+target 注入 / target=null 不注入 / whole_workbook 不注入 / 不覆盖服务端值 / 缺 editorConfig 拒绝且码已登记 / 其它 config 段逐项保留 / 返回纯对象（OO 可写 `document.token`）/ 码表登记；`workpaperSyncDto.spec.ts` 补 5 例视图身份解析。前端 `src/components/workpaper/sync` **59 files 全绿**。
+  - 变异 **4/4 全打红**（逐字节恢复核对一致）：M1 去掉注入（2 红）· M2 whole_workbook 也注入（1 红）· M3 覆盖服务端值（1 红）· M4 未知 scope 静默当 single_sheet（1 红）。
+  - 🔴 **顺带修三处 2.1/2.4 遗留**（都是「后端改了、前端没跟」的同一类）：①`workpaperSyncDto.spec.ts` / `task69IndependentRegression.spec.ts` / `workpaperSyncApi.spec.ts` 的 descriptor fixture 缺 `target_sheet` / `document_scope`（2.4 把它们加进后端 `DESCRIPTOR_REQUIRED_FIELDS`，前端只跑了后端选集）⇒ 17 条红；②`resolve_entry_identity` 是 `prefixKind: 'sibling'`（`WP_SYNC_SIBLING_PREFIX_TEMPLATE`，**不含** entry_id）而 `buildSyncEndpointUrl` 只用 entry 前缀 ⇒ 该端点**从未有前端 client method**（「每条路由恰一个 client method」21 vs 22 红）—— 这正是 2.1 要解决的问题（「前端仍得先知道 entry_id」），端点建好却调不了等于没解决 ⇒ 补 `buildSyncSiblingPrefix` + `resolveEntryIdentity` + 登记；③通用 URL 判据原断言「每条路由都以 entry 前缀开头且含 entry_id」对 sibling 不成立 —— **判据本来就写错了**（sibling 存在的意义就是不含 entry_id）⇒ 按 `prefixKind` 分派，两种路由各有各的严格判据。
   - _R: 3, 4_
-- [ ] 3.3 迁移一个普通 single-sheet canary，从 `GtOnlyOfficeSheet` 切到 room host；记录 old URL、descriptor、target sheet 与 HTML 回读证据。
+- [ ]* 3.3 迁移一个普通 single-sheet canary，从 `GtOnlyOfficeSheet` 切到 room host；记录 old URL、descriptor、target sheet 与 HTML 回读证据。
+  - **阻断类别：治理前置（binding 审核）**。现算：`migrated` binding = **0 条**（197 条里 pending 190 / out_of_scope 7）⇒ **无可迁对象**。
+  - 为什么不能硬做：canary 的定义是「把一个已审核的 binding 从旧路径切到 room host」。把一条 `pending` 直接当 canary 就是**伪造迁移完成** —— 而 `test_projection_does_not_claim_migration_without_reviewed_binding` 正是钉住这一点的守卫。
+  - 候选已备好（审核后即可做）：`xlsx/b60/gt-b60-bundle`（`mapping_kind=exact`，唯一 exact 候选，reason=`exact_candidate_requires_published_artifact_review`）—— 它是最省审核成本的一条（目标唯一、无运行时表达式）。次选 `xlsx/j1/inspection/j1-tab-general-check`（ambiguous，需先裁决多候选）。
+  - 环境已就绪：`audit-onlyoffice` healthy / `audit-postgres` healthy。
+  - 下一步：①用户裁决 `gt-b60-bundle` 是否可 `migrated`（改 `workpaper_sync_sheet_open_bindings.json` 的 status + 补 reviewed 字段，经生成器 `--check`）；②再做 canary 的 old URL / descriptor / target sheet / HTML 回读四项取证。
   - _R: 3, 9, 10_
-- [ ] 3.4 迁移一个 whole-workbook canary；验证所有 sheet 可见、target sheet 正确、切回 HTML 不丢写。
+- [ ]* 3.4 迁移一个 whole-workbook canary；验证所有 sheet 可见、target sheet 正确、切回 HTML 不丢写。
+  - **阻断类别：治理前置（binding 审核）**。现算：`whole_workbook` 10 条**全为 pending**，reason 全是 `whole_workbook_target_requires_reviewed_binding`（设计如此：整册映射必须人工确认 target 语义，不能由生成器自认）。
+  - 候选：`xlsx/cash-flow-verification` · `xlsx/gt-a112-dual-checklist` · `xlsx/gt-a115-disclosure-checklist` · `xlsx/gt-a38-goodwill-impairment` · `xlsx/gt-b22-a-control-matrix`（另 5 条）。
+  - 代码侧已就绪：3.2 的 `whole_workbook` 分支**明确不注入 actionLink**（整册要显示全部 sheet tab），且有守卫钉住「即便 targetSheet 有值也不注入」。
+  - 下一步：用户裁决其中一条 → 迁移 → 验证「所有 sheet 可见 + 切回 HTML 不丢写」。
   - _R: 3, 9_
-- [ ] 3.5 迁移一个聚合 source sheet；验证映射到子 entry，不回退父级模板。
+- [ ]* 3.5 迁移一个聚合 source sheet；验证映射到子 entry，不回退父级模板。
+  - **阻断类别：治理前置（binding 审核）**。现算：`provider` 173 条全 pending，reason 全为 `runtime_sheet_name_requires_provider_binding`（sheet 名由运行时表达式决定 ⇒ 必须人工确认 resolver 身份可信）。
+  - 候选：`xlsx/d4/analysis/d4-tab-*`（D4 聚合的 4 张 source sheet）· `xlsx/b60/gt-b60-docx-pane`。
+  - 「不回退父级模板」的守卫**已就绪**：`test_sheet_open_bindings.py` 的父级兜底断言（每条 binding 的 `entry_id` / `effective_entry_id` 都必须逐字在 manifest 里）—— 一旦回退到父级模板，那条断言就打红。
+  - 下一步：用户裁决一条 provider binding → 迁移 → 验证映射到子 entry。
   - _R: 1, 3, 9_
 - [x] 3.6 更新 pending / single_onlyoffice / custom / Word 的前端文案与入口门控；不得显示“双向回写”假状态。
   - 先现算再改：模板里 **40 条**含「已同步 / 双向回写」的文案，逐条核对后确认**没有一条**是「在线编辑已同步」的假状态（全部是业务语义：披露表→附注、审定数同步、H9 同步等）⇒ 不需要大改全仓文案。
@@ -115,15 +144,29 @@
 
 ## Phase 4：Legacy Drain 与旧路径删除
 
-- [ ] 4.1 将全局 legacy 开关收敛为 binding 级状态机：pending → ready → migrated → draining → retired。
+- [ ]* 4.1 将全局 legacy 开关收敛为 binding 级状态机：pending → ready → migrated → draining → retired。
+  - **阻断类别：治理前置（binding 审核）**。状态机**代码已就绪**：`backend/app/routers/_wp_onlyoffice_legacy_url_gate.py` 按 binding 级判定，`test_sheet_legacy_gate_binding_states.py` 17 例覆盖五态 + 非法跃迁。
+  - 为什么不能标完成：后三态（`migrated → draining → retired`）需要真实有 binding 走过才能证明。现算 `migrated` = **0 条** ⇒ 后三态在生产上从未被触达（空分母恒真，正是本 spec 反复拒绝的假绿形态）。
+  - 下一步：随 3.3（首条 binding 进 `migrated` 后，draining / retired 才有对象可验）。
   - _R: 6, 8_
-- [ ] 4.2 新增旧 doc key / callback drain ledger：记录签发时间、TTL、binding、entry、generation、终结状态。
+- [ ]* 4.2 新增旧 doc key / callback drain ledger：记录签发时间、TTL、binding、entry、generation、终结状态。
+  - **阻断类别：治理前置**。ledger **读取侧已就绪**（gate 按 binding 状态判定；`workpaper_sync_legacy_onlyoffice_callers.json` 记录 22 文件 / 27 处调用逐条 owner+reason）。
+  - 缺**写入侧有数据**：没有 `migrated` binding 就永远没有「旧 doc key 已签发待 drain」记录 ⇒ ledger 恒空，TTL / 终结状态无法验证。
+  - 下一步：随 3.3。
   - _R: 6, 7, 8_
-- [ ] 4.3 migrated binding 的新请求不得签旧 URL；draining 只接受已签发且 scope / token / generation 全匹配的 callback。
+- [ ]* 4.3 migrated binding 的新请求不得签旧 URL；draining 只接受已签发且 scope / token / generation 全匹配的 callback。
+  - **阻断类别：治理前置**。「不得签旧 URL」判据已就绪（`test_sheet_legacy_gate_binding_states.py` 的 `migrated` 分支 + 3.7 ledger 双向相等）；`draining` 的 scope / token / generation 三匹配也已在 gate 实现。
+  - 缺的仍是**真实 migrated binding**（同 4.1 / 4.2）。
+  - 下一步：随 3.3。
   - _R: 6, 7_
-- [ ] 4.4 旧 direct-write 分支按 binding 逐个删除；删除前守卫要求旧签发数、callback in-flight、drain timeout 连续为 0。
+- [ ]* 4.4 旧 direct-write 分支按 binding 逐个删除；删除前守卫要求旧签发数、callback in-flight、drain timeout 连续为 0。
+  - **阻断类别：治理前置 + 时间**。「连续为 0」需要**真实运行一段时间的观测数据**；当前 0 条 migrated ⇒ 三个计数天然为 0 但**没有观测意义**（空分母恒真）。
+  - 下一步：3.3 完成 → 观察一个完整 drain 周期 → 才能按 binding 逐个删。
   - _R: 2, 6, 10_
-- [ ] 4.5 删除无调用方的 `GtOnlyOfficeSheet` 兼容代码前，完成 grep 0 调用、测试全绿、独立提交与回滚标签；single/custom/Word 豁免必须有真实条件断言。
+- [ ]* 4.5 删除无调用方的 `GtOnlyOfficeSheet` 兼容代码前，完成 grep 0 调用、测试全绿、独立提交与回滚标签；single/custom/Word 豁免必须有真实条件断言。
+  - **阻断类别：治理前置**。现算 `GtOnlyOfficeSheet` **仍有调用方**：它是 `pending` / `out_of_scope` / custom / Word / single_onlyoffice 的**唯一载体**（197 条 binding 里 0 条 migrated）⇒ 现在删会让全部未迁移入口失去在线编辑能力。
+  - 这正是 3.6 加「独立在线编辑（不同步）」提示条的原因：它现在是**有正当职责**的组件，不是遗留垃圾。
+  - 下一步：等 4.4 逐 binding 删完后，调用方才会自然降到 0。
   - _R: 4, 5, 6_
 
 ## Phase 5：测试与真实验收
@@ -137,7 +180,11 @@
     2. `candidate` 分支在 `kind`/`state` 校验**之前**独立拦截 ⇒ 把校验改成 `if False:` 后 candidate 用例仍绿（M3 存活）⇒ 补「非 candidate 的非 published 态」（`superseded`/`incoming`/`draft`）与「非 canonical kind」两组。
     3. `_fake_rows` 的 artifact **没有 `project_id`** 字段 ⇒ `getattr(..., project_id)` 回落到请求值 ⇒ 语义等价 ⇒ M2 存活 ⇒ 给 artifact 加一个**不同的** `project_id`。
   - _R: 1, 2, 7_
-- [ ] 5.2 后端 PG：真实 `WorkpaperContentRepresentation`、bundle、artifact 读取与项目隔离；只读验证先独立事务，写入验收只用【测试】项目并可恢复。
+- [ ]* 5.2 后端 PG：真实 `WorkpaperContentRepresentation`、bundle、artifact 读取与项目隔离；只读验证先独立事务，写入验收只用【测试】项目并可恢复。
+  - **阻断类别：治理前置**。`audit-postgres` healthy（环境可用），但读真实 representation 的前提是**有 migrated binding 指向的 published artifact** —— 当前 0 条。
+  - 代码侧已就绪：`read_current_published_sheet_artifact`（11 条 `PUBLISHED_SHEET_ARTIFACT_REASONS`）+ 12 例守卫；项目隔离在 gate 层。
+  - unit / contract 层已用合成夹具覆盖同一批判据（`test_sheet_published_artifact.py` 12 例）；PG 层要验的是**真实 schema / 真实 bundle 形状**，两者不能互相替代。
+  - 下一步：随 3.3。
   - _R: 2, 7, 9_
 - [x] 5.3 前端 unit / AST：唯一 URL、唯一 binding resolver、migrated 旧调用为 0、pending 文案与模式集合封闭。
   - `onlyOfficeEntryConfigContract.spec.ts` 10 例，四条判据：①**唯一 URL**（`/sync/entry-identity` 字面量在前端必须为 **0** —— 3.1 起从生成契约 `WP_SYNC_SIBLING_PREFIX_TEMPLATE` 取；`onlyoffice-config` 只允许出现在 3 个合法入口或 **3.7 ledger 已登记**的文件里，白名单直接读 ledger 不重抄）②**唯一 binding resolver**（`binding_status` / `bindingStatus` / `BINDING_STATUSES` 只允许在唯一入口出现）③**pending 文案**（`syncMode` 两值封闭；扫**含注释**的全文找「已同步」/「双向回写」肯定式表述）④**模式集合封闭**（与后端 bindings 里出现的状态逐值相等 + 恰好 6 个成员）。
@@ -157,7 +204,14 @@
     6. `test_generated_projection_is_tracked_by_git` 用 `relative_to(REPO)` 对沙箱路径抛 ValueError ⇒ 沙箱模式显式 `pytest.skip` 并说明原因（真实 CI 无 `GT_SHEET_BINDINGS_OUT`，照常执行）。
   - 生成器新增 `GT_SHEET_BINDINGS_OUT` 覆盖（默认写真实路径，语义不变）。
   - _R: 1, 2, 3, 6, 10_
-- [ ] 5.5 Playwright：普通 sheet / whole workbook / 聚合 source sheet / pending fallback / drain 五条 required scenarios；记录网络、console、页面错误、数据快照与 artifact identity。
+- [ ]* 5.5 Playwright：普通 sheet / whole workbook / 聚合 source sheet / pending fallback / drain 五条 required scenarios；记录网络、console、页面错误、数据快照与 artifact identity。
+  - **阻断类别：治理前置（4/5 场景）+ 真环境**。逐场景现算：
+    - 「普通 sheet」/「whole workbook」/「聚合 source sheet」→ 各需一条 **migrated binding**（当前 0 条）；
+    - 「drain」→ 需 4.2 的 drain ledger 有真实记录（当前恒空）；
+    - 「pending fallback」→ **本场景代码已就绪且可单测**（3.6 的「独立在线编辑（不同步）」提示条 + 12 例守卫），但 Playwright 层仍要真浏览器 + 真 OO 容器跑一次取证。
+  - 环境已就绪：`audit-onlyoffice` healthy / `audit-postgres` healthy / `audit-redis` healthy。
+  - 为什么不能用现有单测替代：Playwright 层要验的是**真实 OO iframe 内的 sheet tab 可见性与 actionLink 定位效果** —— 这是 3.2 注入的 `editorConfig.actionLink` 唯一能被证明有效的层级（单测只能证明「config 里那个键被写进去了」）。
+  - 下一步：3.3 完成 → 五场景可逐条跑。
   - _R: 3, 4, 6, 9, 10_
 - [x] 5.6 clean checkout：生成物 `--check`、后端测试、前端定向测试、构建、路由注册、行数门与 git tracked 交付物检查。
   - `backend/scripts/check/check_sheet_open_clean_checkout.py`：**可重复执行的单一入口**（`--skip-tests` 只跑静态项）。7 项检查：①三个生成器 `--check` ②23 个交付物 `git ls-files` 跟踪 ③`entry-identity` 挂在**真实 `app.routes`**（不只查模块级 router —— 本仓踩过「router 存在但没注册」）④**变异残留**（11 类精确靶点 × 8 个生产文件）⑤后端守卫选集 ⑥前端定向测试 ⑦行数门。
@@ -168,6 +222,9 @@
   - 🔴 另两处修复：①路由探测的 JSON 解析被 `app.main` 导入时的 JWT 弱密钥**警告**干扰（取最后一行拿到的是警告）⇒ 改为找第一个以 `[` 开头的行；②probe 脚本放仓库根而 `app` 包在 `backend/` 下 ⇒ 显式设 `PYTHONPATH`（不靠 `cwd`）。
   - _R: 8, 10_
 - [ ] 5.7 更新 umbrella 2.8 的余项状态、INDEX、memory 与归档证据；只有完成门满足后归档本 spec。
+  - **阻断类别：治理收尾（依赖完成门）**。本 spec 的完成门 = 34/34 全勾；当前 22/34（3.2 本轮完成），余 12 项全部依赖上面的治理前置 / 人的裁决 / 真环境。
+  - 不归档的理由：归档会让「还有 12 项没做」这件事失去可见性。按 memory 铁律「归档新判据 = HEAD 干净检出跑守卫」，且 `INDEX.md` 的 Active 表要现扫。
+  - 下一步：0.4 签字 + 3.3 首条 binding 迁移后，逐项收口再归档。
   - _R: 10
 
 ## 依赖图

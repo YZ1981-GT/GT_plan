@@ -175,6 +175,10 @@ function descriptorWire(over: Record<string, unknown> = {}) {
     definition_bundle_sha256: DIGEST_A,
     definition_bundle_slots: { template: slot, instrumentation: slot, contract: slot },
     document_type: 'xlsx',
+    // spec 2.4 起这两个是 descriptor 必填字段（`DESCRIPTOR_REQUIRED_FIELDS`）。
+    // `target_sheet: null` = 不定位（单 sheet 契约没声明该 sheet_key 的合法形态）。
+    target_sheet: null,
+    document_scope: 'single_sheet',
     mode: 'edit',
     onlyoffice_config: { document: { key: 'doc-key-1' } },
     replayed: false,
@@ -717,5 +721,59 @@ describe('stale descriptor / recovery identity 的 409 分型', () => {
 
   it('缺 error_code 时 fail visible', () => {
     expectRefusal(() => classifySyncFailure({ httpStatus: 409 }), 'failure_error_code_missing')
+  })
+})
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// task 3.2：descriptor 的视图身份必须真的被解析出来
+//
+// 🔴 为什么这是真需求：`buildDocEditorConfig` 靠这两个字段决定要不要注入
+// `actionLink`。解析成 `null` / 默认值时，room 协议打开会**永远停在首 sheet**，
+// 而单 sheet 视图语义无处表达（Requirement 3.3）。
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('task 3.2：视图身份解析', () => {
+  it('target_sheet 原样保留（物理 sheet 名，不做归一化）', () => {
+    const descriptor = parseEditorLaunchDescriptor(
+      descriptorWire({ target_sheet: '境外销售收入检查D4-26' }),
+    )
+    expect(descriptor.targetSheet).toBe('境外销售收入检查D4-26')
+  })
+
+  it('target_sheet 缺失或空串归 null（= 不定位）', () => {
+    expect(parseEditorLaunchDescriptor(descriptorWire({ target_sheet: null })).targetSheet).toBeNull()
+    expect(parseEditorLaunchDescriptor(descriptorWire({ target_sheet: '' })).targetSheet).toBeNull()
+    expect(parseEditorLaunchDescriptor(descriptorWire({ target_sheet: '   ' })).targetSheet).toBeNull()
+  })
+
+  it('document_scope=whole_workbook 原样保留', () => {
+    const descriptor = parseEditorLaunchDescriptor(
+      descriptorWire({ document_scope: 'whole_workbook', target_sheet: null }),
+    )
+    expect(descriptor.documentScope).toBe('whole_workbook')
+  })
+
+  it('document_scope 缺失时先被必填字段门拒（不是静默取默认值）', () => {
+    // 🔴 它和 target_sheet 都在 `WP_SYNC_DESCRIPTOR_FIELDS`（真源 = 后端
+    // `DESCRIPTOR_REQUIRED_FIELDS`）里 ⇒ 缺失时 `descriptor_field_missing` 先命中。
+    // 「缺省 ⇒ single_sheet」只作为类型收窄存在，**不是**可达的兼容路径。
+    const wire = descriptorWire()
+    delete (wire as any).document_scope
+    expect(() => parseEditorLaunchDescriptor(wire)).toThrow(/缺字段|document_scope/)
+  })
+
+  it('document_scope 未知值 fail-closed 且带人话 message（不静默当 single_sheet）', () => {
+    // 静默当 single_sheet 会让「整册视图」被注入 actionLink ⇒ 其它 sheet 被藏起来。
+    let caught: any = null
+    try {
+      parseEditorLaunchDescriptor(descriptorWire({ document_scope: 'legacy' }))
+    } catch (e) {
+      caught = e
+    }
+    expect(caught).not.toBeNull()
+    expect(caught.code).toBe('descriptor_document_scope_unknown')
+    expect(String(caught.message)).toContain('legacy')
+    expect(String(caught.message)).toContain('whole_workbook')
   })
 })

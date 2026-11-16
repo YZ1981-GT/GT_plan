@@ -27,6 +27,7 @@ import {
   buildClaimRequestBody,
   buildSyncEndpointUrl,
   buildSyncEntryPrefix,
+  buildSyncSiblingPrefix,
   claimRecoveryCase,
   confirmDescriptor,
   createCloseIntent,
@@ -47,6 +48,7 @@ import {
   readStoreProjection,
   requestForcesave,
   resolveConflicts,
+  resolveEntryIdentity,
   retryOperation,
   rollbackVersion,
   terminateRecoveryDownloadOnly,
@@ -89,6 +91,9 @@ function descriptorPayload() {
     definition_bundle_sha256: DIGEST_A,
     definition_bundle_slots: { template: slot, instrumentation: slot, contract: slot },
     document_type: 'xlsx',
+    // spec 2.4 起 descriptor 必填（`DESCRIPTOR_REQUIRED_FIELDS`）。
+    target_sheet: null,
+    document_scope: 'single_sheet',
     mode: 'edit',
     onlyoffice_config: { document: { key: 'doc-key-1' } },
     replayed: false,
@@ -243,6 +248,8 @@ const DRIVERS: Record<string, () => Promise<unknown>> = {
       resolutions: [{ conflictId: UUID(70), choice: 'incoming' }],
     }).catch(() => null),
   retry_operation: () => retryOperation(SCOPE, UUID(30)).catch(() => null),
+  resolve_entry_identity: () =>
+    resolveEntryIdentity(SCOPE.projectId, SCOPE.wpId, '境外销售收入检查D4-26').catch(() => null),
   rollback_version: () =>
     rollbackVersion(SCOPE, {
       versionId: UUID(80),
@@ -339,18 +346,28 @@ describe('生成的路由表与 client 一一对应', () => {
     expect(mockPost.mock.calls[0][0]).toBe(buildSyncEndpointUrl('adopt_substrate', SCOPE))
   })
 
-  it.each(WP_SYNC_ROUTES.map((route) => [route.endpoint, route.method, route.suffix]))(
-    '%s 真实打到 %s + 生成的 suffix 模板',
-    async (endpoint, method, _suffix) => {
+  it.each(
+    WP_SYNC_ROUTES.map((route) => [route.endpoint, route.method, route.suffix, route.prefixKind]),
+  )(
+    '%s 真实打到 %s + 生成的 suffix 模板（前缀按 prefixKind 分派）',
+    async (endpoint, method, _suffix, prefixKind) => {
       await DRIVERS[endpoint as string]()
       const calls = method === 'GET' ? mockGet.mock.calls : mockPost.mock.calls
       expect(calls.length, `${endpoint} 没有发出 ${method} 请求`).toBe(1)
       const url = calls[0][0] as string
-      expect(url.startsWith(buildSyncEntryPrefix(SCOPE)), url).toBe(true)
-      // 三段显式 scope 都在 URL 里。
+      // 🔴 前缀必须按 `prefixKind` 分派（真源 = 后端 `ENTRY_IDENTITY_PREFIX`）：
+      //   · primary ⇒ entry 前缀，三段 scope 全在；
+      //   · sibling ⇒ sibling 前缀，**不得**含 entry_id（含了就是挂错前缀 ——
+      //     那会让「先算出 entry_id」的端点反过来要求调用方先知道 entry_id）。
       expect(url).toContain(SCOPE.projectId)
       expect(url).toContain(SCOPE.wpId)
-      expect(url).toContain(SCOPE.entryId)
+      if (prefixKind === 'sibling') {
+        expect(url.startsWith(buildSyncSiblingPrefix(SCOPE)), url).toBe(true)
+        expect(url, `${endpoint} 挂到了 entry 前缀下`).not.toContain(SCOPE.entryId)
+      } else {
+        expect(url.startsWith(buildSyncEntryPrefix(SCOPE)), url).toBe(true)
+        expect(url).toContain(SCOPE.entryId)
+      }
       // 没有未替换的占位符。
       expect(url).not.toMatch(/\{[a-z_]+\}/)
     },
@@ -923,5 +940,37 @@ describe('entry readiness API', () => {
       expect(result.reason?.code).toBe(code)
       expect(result.reason?.message).toBe(`原因 ${code}`)
     }
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// spec 2.1：`resolve_entry_identity` 必须走 **sibling** 前缀（不含 entry_id）
+//
+// 🔴 这是本端点的全部意义：前端还不知道 entry_id，正是要算它。
+// 挂进 primary 前缀会变成 `…/entries/{entry_id}/sync/entry-identity`
+// ⇒ 前端仍得先知道 entry_id，等于什么都没解决（后端注释实测过那个形状）。
+// ═══════════════════════════════════════════════════════════════════════════
+describe('spec 2.1：resolve_entry_identity 的 URL 形态', () => {
+  it('打 GET sibling 前缀 + /entry-identity，路径里**没有** entry_id', async () => {
+    mockGet.mockResolvedValueOnce({
+      data: { entry_id: 'xlsx/d4/analysis/d4-tab-customer-price', status: 'resolved' },
+    })
+    await resolveEntryIdentity(SCOPE.projectId, SCOPE.wpId, '境外销售收入检查D4-26')
+
+    const [url, config] = mockGet.mock.calls[0]
+    // 不含 entry_id 段（DEEP_ENTRY 的任何一段都不该出现在 URL 里）
+    expect(url).not.toContain('d4-tab-customer-price')
+    expect(url).toContain(`/workpapers/${SCOPE.wpId}/sync/entry-identity`)
+    expect(url).toContain(`/projects/${SCOPE.projectId}/`)
+    // sheet 名走 query（可含中文与斜杠，不能进路径段）
+    expect(config.params).toEqual({ sheet_name: '境外销售收入检查D4-26' })
+  })
+
+  it('返回值原样透传（entry_id 是后端的裁决结果，前端不改写）', async () => {
+    mockGet.mockResolvedValueOnce({
+      data: { entry_id: 'xlsx/gt-d2-accounts-receivable', status: 'resolved' },
+    })
+    const out = await resolveEntryIdentity(SCOPE.projectId, SCOPE.wpId, '应收账款')
+    expect(out.entry_id).toBe('xlsx/gt-d2-accounts-receivable')
   })
 })

@@ -348,6 +348,9 @@ function descriptorWire(over: Record<string, unknown> = {}): Record<string, unkn
       contract: { type: 'sync_contract', sha256: DIGEST(6) },
     },
     document_type: 'xlsx',
+    // spec 2.4 起 descriptor 必填（`DESCRIPTOR_REQUIRED_FIELDS`）。
+    target_sheet: null,
+    document_scope: 'single_sheet',
     mode: 'edit',
     onlyoffice_config: OO_CONFIG,
     replayed: false,
