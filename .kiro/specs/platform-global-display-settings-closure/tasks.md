@@ -423,6 +423,65 @@
     （AC-19~AC-22、AC-23 的 C 部分、AC-24）
   - **2026-11-18 代码收口（`[~]` 保持）：普通底稿 evidence consumer 已接线，writer 缺口如实保留**：新增 `workpaper_sync/export_evidence.py` 的 current content version → current representation → published artifact 解析与 formal/data_exchange 合同校验；`POST /api/workpapers/{wp_id}/export-xlsx` 在已有 `current_content_version_id` 时先验 evidence，formal 缺 policy pair / representation artifact 不一致返回 409，并在响应头暴露 content version / surface / policy digest；`archive_inventory._workpaper_entries` 对已有 content version 绑定 `content_version_id` / `representation_id` / `artifact_id` / `artifact_sha256` / classification / policy digest，证据无效转 `MISSING`，不回退旧 file_path 充当当前版本证明。新增 `test_workpaper_export_evidence.py` 4 例，相关底稿导出/归档回归 **57 passed**。SQLite/旧隔离 schema 夹具继续兼容；真实 PostgreSQL 生产 schema 缺 evidence 时 fail closed。**仍未完成**：`Repository.create_content_version` 的正式 production writer 尚未接入 V265 四列（证据台账保持 `PARTIAL_WIRING`），历史 current version 的批量回填不做。
 
+  - **2026-11-18 精修（`[~]` 保持）：三条守卫收窄 + PDF 转换链 fail-closed**：
+    ①**台账守卫的按文件名 skip 改成语义判据** —— `test_export_evidence_coverage_ledger.py`
+    第一版把 `export_evidence.py` / `archive_inventory.py` 加进 `path.name` 跳过名单，
+    那是**新的静默脱管口**（文件改名/搬家后 allowlist 静默失效，且无任何断言会发现；
+    memory 铁律 ㉔③）。现算两处命中都是 **consumer 载体**：
+    `ContentExportEvidence(export_surface_class=...)` 的 dataclass kwarg 与
+    `{"source_storage_unit": ...}` 的 evidence dict 键 —— 都是「读出来往下传」，不是写库。
+    改成 `_orm_target_writes()` 只认真正写 `WorkpaperContentVersion` 的四种形态
+    （ORM 构造 / `sa.update(...).values(col=...)` / 同文件引用该 ORM 时的实例属性赋值 /
+    裸 SQL `UPDATE working_paper_content_version`），并配 `test_orm_write_detector_has_bidirectional_mutation_proof`
+    **双向**钉住扫描器（反向：consumer 形态必须不命中；正向：四种写形态必须命中）。
+    **变异验证**：把 `Repository.create_content_version` 真加上 `export_surface_class="formal"`
+    ⇒ 守卫打红并精确报出 `repository.py:1133: WorkpaperContentVersion(export_surface_class=...)`；
+    逐字节还原后 11 passed。
+    ②**`dialect_name` 兼容分支补守卫** —— 这是本批唯一「按方言放行」的旁路，
+    原先零测试。新增 `TestDialectCompatibilityBranch`（4 例：非 PG 旧 schema 返回 None /
+    **PG 缺 evidence 必 fail-closed** / 非 PG 但四列有值仍按正式规则校验 / 无 current version
+    是合法空态）与 `TestEvidenceValidationMatrix`（5 例：data_exchange 合法路径与缺 yuan 拒绝 /
+    formal 带 source_storage_unit 拒绝 / representation 不属于当前 version 拒绝 /
+    未发布 artifact 拒绝）。**两组变异全 RED 且形态正确**：M1 删掉兼容分支 ⇒ 红在
+    `test_non_pg_legacy_schema_returns_none`；M2 让 PG 也走兼容分支 ⇒ 红在
+    `test_postgres_missing_evidence_fails_closed`。
+    ③**归档 `content_evidence` 分支补端到端用例** —— 原先只有源码文本断言
+    （`evidence=evidence or {}` 被改成 `evidence={}` 也全绿，memory 铁律 ㉗⑥）。
+    在 SQLite world 里真建版本链四表（`working_paper_content_version` / `_artifact` /
+    `_representation` / `_sync_entry_state`，补齐全部 NOT NULL 列）并调真实
+    `build_project_inventory`，4 例钉住：formal 完整链 ⇒ 条目 OK 且 evidence 带
+    content_version_id / representation_id / artifact_id / artifact_sha256 / classification /
+    policy_digest / policy_snapshot；data_exchange 链 ⇒ classification 与 source_storage_unit
+    正确；**resolver 抛证据错误 ⇒ 条目转 MISSING 且 arcname 为空**（不得回退 file_path 伪装）；
+    无 current version 的历史底稿 ⇒ 仍 OK 且 evidence 为空。
+    🔴 **分层裁决**：「缺 evidence 必 fail-closed」不能在 SQLite world 里测 ——
+    `bind.dialect.name == "sqlite"` 会走兼容分支返回 None，在 SQLite 上根本到不了
+    fail-closed。方言语义归 ②的脚本化 db 双态用例，归档层只测**消费方行为**
+    （resolver 抛错 → MISSING）。**三组变异全 RED**：M1 `evidence={}` ⇒ 红在两条正向用例；
+    M2 吞掉证据错误降级成 OK ⇒ 红在 MISSING 用例；M3 完全不调 resolver ⇒ 三条全红。
+    ④**PDF 导出不再把 HTML 冒充 PDF 标 completed**（AC-20）—— `render_document` 旧实现在
+    WeasyPrint 缺失时写 `.html` 并返回，`execute_export` 照样标 `completed`、
+    `file_path` 指向 `.html`：用户点「导出 PDF」得到 HTML 而界面显示成功。
+    改为 `_convert_html_to_pdf`（WeasyPrint → **LibreOffice 兜底**，复用
+    `libreoffice_pool.find_soffice_path` 的 4 路径探测，覆盖本机 Program Files 安装）
+    两条链都不可用即抛 `PDFConversionUnavailable`，**不写任何文件**；
+    `execute_export` 遇该异常标 `failed` + `error_message` 并**上抛**，路由映射 **503**。
+    同时把 `resolve_policy_snapshot_for_project` 失败从 `logger.warning` 静默放行改成
+    **422**（AC-20 明文「逐调用方删除参数均失败」）。新增
+    `test_pdf_export_engine_fail_closed.py`（**6 例**，行为判据：真的写 `.pdf` 且 `%PDF` 开头 /
+    不可用时目录**零残留** / 任务 failed 且 `file_path is None` / 源码无 HTML 降级分支 /
+    路由 422 与 503 映射）。**4 组变异全 RED**。
+    🔴 **本批第三次踩「自己的 docstring 把判据打红」**（memory 铁律 ㉖）：
+    `test_no_html_fallback_branch_in_source` 首轮红在自己写的说明文字
+    （`path` 指向 `.html`）上 ⇒ 判据改为先剥 docstring 再 `ast.unparse`。
+    **回归**：本批 5 个受影响测试文件 **118 passed**（含原 57 + 新增 61）；
+    PDF/导出/归档相关 10 个文件 **156 passed / 3 failed**，3 红在
+    `test_wp_template_preview_pdf.py`（401 vs 404/200）—— 在干净 HEAD worktree
+    `tmp_gds_polish/headwt` 上**逐条同红**，属**预存失败**，与本批无关。
+    **仍未完成（如实保留）**：`Repository.create_content_version` 的 V265 四列 production
+    writer 未接入（台账保持 `PARTIAL_WIRING`）；PDF 的浏览器级实测仍需 LibreOffice 转换链
+    + 独占端口实例（C-V 口径）。
+
 - [x] 6C. 附注 Word 普通/clone 路径消费 kind/scale（R6、R9；依赖任务 10 的 `ExportUnitRegion`，与其附注路径子项同批）
   - `NoteWordExporter._render_table` 与 `note_template_table_look.render_cloned_table` 接收同一 `ExportUnitRegion + column_kinds + column_ratio_scales`，kind/scale 取自 6A 的 catalog 与稳定 column_id，只有 amount 执行 policy divisor；`note_template_block_fill.rebuild_block` 按 `<section_id>/<table_id>` 取 region 后交给两条内核。
   - 用 0.2 fraction 与 20 percent_points 双夹具测普通 Word 与 clone Word，四版附注两条路径结果一致；删 clone scale、互换 ratio_scale 的 Word 夹具变异均红在预期断言。（AC-11 的 Word 部分、AC-20、AC-24）
@@ -502,6 +561,13 @@
     `test_report_cell_edit` / `test_multi_year_report` / `test_report_three_path_parity`）。
     **仍未完成（如实保留）**：PDF 直接导出的浏览器实测（需 LibreOffice 转换链，
     本轮只验证了 Excel/Word 侧的 policy 消费）；整包 zip 与归档包的浏览器级验证。
+
+  - **2026-11-18 精修：PDF 转换链缺失不再假装成功（`[~]` 保持）**：本轮不改浏览器验收
+    （LibreOffice 缺失时直接 PDF 验收按本任务原口径保持未完成），只修代码层的
+    「HTML 冒充 PDF 标 completed」真实缺陷，详见任务 10 的 ④。新增守卫
+    `test_pdf_export_engine_fail_closed.py` 6 例 + 4 组变异全 RED。
+    **PDF 直接导出的浏览器实测仍未完成**：需独占端口实例 + 真实【测试】项目 +
+    项目单位 yuan/wan 往返；本轮未启动服务、未写库。
 
 - [x] C-BK. 阶段 C 备份 commit 对象
   - 方法同 A-BK，树内含截至阶段 C 的全部本任务改动块；OID 写入当前工作流目录并核验，随后向父会话发阶段 C 进度消息。

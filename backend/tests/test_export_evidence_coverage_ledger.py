@@ -101,31 +101,79 @@ def _app_python_files() -> list[Path]:
     return [p for p in _APP.rglob("*.py") if "__pycache__" not in p.parts]
 
 
-def _assign_targets(path: Path) -> set[str]:
-    """收集「被赋值的属性名」（`x.col = ...` 或 `Model(col=...)` 或字典键）。"""
+#: 承载 V265 四列的 ORM 类（`class WorkpaperContentVersion(Base)`）
+_ORM_MODEL = "WorkpaperContentVersion"
+
+
+def _callable_name(func: ast.expr) -> str | None:
+    if isinstance(func, ast.Name):
+        return func.id
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return None
+
+
+def _orm_target_writes(path: Path, columns: set[str]) -> list[str]:
+    """只认**真正写 `WorkpaperContentVersion` 列**的形态，不认 dataclass / dict 载体。
+
+    🔴 为什么不能按「属性名出现在赋值里」判（本守卫第一版就是这么写的）：
+    consumer 侧把 evidence 装进 dataclass
+    （`ContentExportEvidence(export_surface_class=...)`）或 evidence dict
+    （`{"source_storage_unit": ...}`）也会命中 —— 那是**读出来往下传**，
+    不是写库。第一版的处理是把这两个文件按文件名 skip 掉，那是新的静默
+    脱管口（memory 铁律 ㉔③：每条收窄都要配反向断言；文件名 allowlist
+    在文件改名 / 搬家后静默失效，且没有任何断言会发现）。
+
+    正解 = 按「写入目标是不是 ORM 类」判，四类形态覆盖全部实际写法：
+
+    ① ``WorkpaperContentVersion(col=...)`` —— ORM 构造；
+    ② ``sa.update(WorkpaperContentVersion).values(col=...)`` —— Core update；
+    ③ 同文件确实引用该 ORM 类时，``<obj>.col = ...`` 实例属性赋值；
+    ④ 裸 SQL ``UPDATE working_paper_content_version`` 且同一语句出现列名。
+
+    ``workpaper_sync_models.py`` 由调用方跳过（那里只有 ``mapped_column``
+    声明，列名必然出现且不写值）。
+    """
     text = path.read_text(encoding="utf-8", errors="replace")
     try:
         tree = ast.parse(text)
     except SyntaxError:
-        return set()
-    names: set[str] = set()
+        return []
+    hits: list[str] = []
+    # ③ 的判据依赖「本文件确实在跟这个 ORM 类打交道」，否则会把任意对象
+    # 的同名属性赋值（例如 dataclass 字段改写）算成写库。
+    mentions_model = any(
+        (isinstance(node, ast.Name) and node.id == _ORM_MODEL)
+        or (isinstance(node, ast.Attribute) and node.attr == _ORM_MODEL)
+        for node in ast.walk(tree)
+    )
     for node in ast.walk(tree):
-        # x.col = value
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Attribute):
-                    names.add(target.attr)
-        # Model(col=value)
         if isinstance(node, ast.Call):
-            for kw in node.keywords:
-                if kw.arg:
-                    names.add(kw.arg)
-        # {"col": value}
-        if isinstance(node, ast.Dict):
-            for key in node.keys:
-                if isinstance(key, ast.Constant) and isinstance(key.value, str):
-                    names.add(key.value)
-    return names
+            name = _callable_name(node.func)
+            if name == _ORM_MODEL:  # ①
+                for kw in node.keywords:
+                    if kw.arg in columns:
+                        hits.append(f"{node.lineno}: {_ORM_MODEL}({kw.arg}=...)")
+            elif name == "values":  # ②
+                chain = ast.unparse(node.func).replace(" ", "")
+                if f"update({_ORM_MODEL})" in chain:
+                    for kw in node.keywords:
+                        if kw.arg in columns:
+                            hits.append(f"{node.lineno}: {chain}({kw.arg}=...)")
+        if mentions_model and isinstance(node, (ast.Assign, ast.AnnAssign)):  # ③
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                if isinstance(target, ast.Attribute) and target.attr in columns:
+                    hits.append(f"{node.lineno}: <obj>.{target.attr} = ...")
+    for match in re.finditer(  # ④
+        r"UPDATE\s+working_paper_content_version\b[^;]*", text, re.S | re.I
+    ):
+        for column in columns:
+            if re.search(rf"\b{column}\b", match.group(0)):
+                hits.append(
+                    f"raw-sql: UPDATE working_paper_content_version ... {column}"
+                )
+    return hits
 
 
 #: AC-22 要求但当前未接线的四列
@@ -152,22 +200,53 @@ class TestUnwiredColumnsStayUnwired:
             if path.name in {
                 "workpaper_sync_models.py",
                 "export_surface_registry.py",
-                # These modules are **evidence consumers/builders**, not content-version
-                # writers. Treating their output dict keys as ORM writes made the
-                # original zero-writer ratchet false-red as soon as task 10 gained
-                # its first consumer integration.
-                "export_evidence.py",
-                "archive_inventory.py",
             }:
                 continue
-            if column in _assign_targets(path):
-                writers.append(str(path.relative_to(_BACKEND)))
+            for hit in _orm_target_writes(path, {column}):
+                writers.append(f"{path.relative_to(_BACKEND)}:{hit}")
         assert not writers, (
             f"{column} 出现了生产写入方 {writers} —— 请同时\n"
             f"  ① 从 backend/data/export_evidence_coverage_ledger.json 删除对应条目\n"
             f"  ② 补上「普通底稿归档绑定 content version」的端到端用例\n"
             f"只接线不删台账会让本守卫恒红（这是有意的）"
         )
+
+    def test_orm_write_detector_has_bidirectional_mutation_proof(self, tmp_path: Path) -> None:
+        """正向/反向双向钉住扫描器本身（memory 铁律 ㉒：只做单向变异会把
+        干净域判成缺陷域；本守卫第一版正是「任何同名属性都算写入」，
+        靠按文件名 skip 才变绿 —— 那是静默脱管口）。
+
+        反向（必须**不**命中）：consumer 侧 dataclass kwarg、evidence dict 键。
+        正向（必须命中）：ORM 构造 / Core update / 实例属性 / 裸 SQL。
+        """
+        consumer = tmp_path / "consumer_like.py"
+        consumer.write_text(
+            "from dataclasses import dataclass\n"
+            "class Evidence:\n"
+            "    export_surface_class: str\n"
+            "def build():\n"
+            "    ev = Evidence(export_surface_class='formal')\n"
+            "    return {'source_storage_unit': None, 'export_surface_class': 'formal'}\n",
+            encoding="utf-8",
+        )
+        assert _orm_target_writes(consumer, {"export_surface_class"}) == []
+        assert _orm_target_writes(consumer, {"source_storage_unit"}) == []
+
+        writer = tmp_path / "writer_like.py"
+        writer.write_text(
+            "import sqlalchemy as sa\n"
+            "from app.models.workpaper_sync_models import WorkpaperContentVersion\n"
+            "def construct(cv_cls):\n"
+            "    return WorkpaperContentVersion(export_surface_class='formal')\n"
+            "def core_update(db):\n"
+            "    return db.execute(sa.update(WorkpaperContentVersion).values(source_storage_unit='yuan'))\n"
+            "def assign(obj):\n"
+            "    obj.export_surface_class = 'formal'\n"
+            "RAW = 'UPDATE working_paper_content_version SET source_storage_unit = 1'\n",
+            encoding="utf-8",
+        )
+        assert _orm_target_writes(writer, {"export_surface_class"}), "ORM 构造/实例赋值未命中"
+        assert _orm_target_writes(writer, {"source_storage_unit"}), "Core update/裸 SQL 未命中"
 
     def test_ledger_has_matching_entries(self) -> None:
         """台账必须逐列登记（不许只写一行概括四列）。"""

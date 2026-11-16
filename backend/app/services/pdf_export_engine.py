@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
@@ -204,10 +206,21 @@ def render_with_ai_statement(html_content: str, reviewer: str = "审计师") -> 
     return html_content
 
 
+class PDFConversionUnavailable(RuntimeError):
+    """PDF 转换链不可用（WeasyPrint 未安装且 LibreOffice 不可用）。
+
+    spec platform-global-display-settings-closure 任务 10 / AC-20：
+    转换器缺失时**不得**把 HTML 当 PDF 交付并标 `completed` ——
+    用户按「导出 PDF」拿到 `.html` 而任务显示成功，是静默撒谎
+    （memory 铁律：报成功的失败比报失败更糟）。调用方据此返回 503。
+    """
+
+
 class PDFExportEngine:
     """PDF导出引擎
 
-    MVP 实现：同步导出，WeasyPrint 可选。
+    转换链：WeasyPrint（若已安装，纯 Python 更快）→ LibreOffice headless。
+    两者都不可用时**抛 `PDFConversionUnavailable`**，不降级为 HTML。
     """
 
     def __init__(self, db: AsyncSession):
@@ -222,25 +235,72 @@ class PDFExportEngine:
         data: dict,
         output_path: Path,
     ) -> Path:
-        """将文档数据渲染为 HTML，如果 WeasyPrint 可用则转为 PDF。
+        """将文档数据渲染为 PDF（WeasyPrint 优先，LibreOffice 兜底）。
 
         Validates: Requirements 7.1, 7.4
+
+        🔴 与旧实现的差别：旧版在 WeasyPrint 缺失时**写 HTML 并返回**，
+        调用方照样把任务标 `completed`、`file_path` 指向 `.html`。
+        用户点「导出 PDF」得到一个 HTML 文件而界面显示成功 —— 静默撒谎。
+        现在转换链不可用即抛 `PDFConversionUnavailable`，由调用方返回 503。
         """
         renderer = _RENDERERS.get(document_type, _render_financial_report_html)
         html_content = renderer(data)
 
-        # Try WeasyPrint → PDF, fallback to HTML
+        pdf_bytes = self._convert_html_to_pdf(html_content)
+        if pdf_bytes is None:
+            raise PDFConversionUnavailable(
+                "PDF 转换链不可用：WeasyPrint 未安装且 LibreOffice 不可用。"
+                "请安装其中任一转换器，或改用 Excel / Word 导出。"
+            )
+        pdf_path = output_path.with_suffix(".pdf")
+        pdf_path.write_bytes(pdf_bytes)
+        logger.info("Rendered PDF: %s", pdf_path)
+        return pdf_path
+
+    @staticmethod
+    def _convert_html_to_pdf(html_content: str) -> bytes | None:
+        """HTML → PDF bytes；两条链都不可用返回 ``None``（不写 HTML 冒充）。"""
         try:
             from weasyprint import HTML  # type: ignore[import-untyped]
-            pdf_path = output_path.with_suffix(".pdf")
-            HTML(string=html_content).write_pdf(str(pdf_path))
-            logger.info("Rendered PDF: %s", pdf_path)
-            return pdf_path
-        except (ImportError, OSError):
-            logger.info("WeasyPrint not available, saving as HTML")
-            html_path = output_path.with_suffix(".html")
-            html_path.write_text(html_content, encoding="utf-8")
-            return html_path
+
+            return HTML(string=html_content).write_pdf()
+        except ImportError:
+            pass
+        except Exception as exc:  # noqa: BLE001 - 转换失败才降级到 LibreOffice
+            logger.warning("WeasyPrint 转换失败，降级 LibreOffice: %s", exc)
+
+        try:
+            from app.services.libreoffice_pool import find_soffice_path
+        except Exception:  # noqa: BLE001 - 池模块缺失时按不可用处理
+            return None
+        soffice = find_soffice_path()
+        if not soffice:
+            return None
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            html_file = Path(tmpdir) / "input.html"
+            html_file.write_text(html_content, encoding="utf-8")
+            try:
+                subprocess.run(
+                    [
+                        soffice,
+                        "--headless",
+                        "--convert-to",
+                        "pdf",
+                        "--outdir",
+                        tmpdir,
+                        str(html_file),
+                    ],
+                    timeout=90,
+                    capture_output=True,
+                    check=True,
+                )
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError) as exc:
+                logger.error("LibreOffice 转换 PDF 失败: %s", exc)
+                return None
+            pdf_file = Path(tmpdir) / "input.pdf"
+            return pdf_file.read_bytes() if pdf_file.exists() else None
 
     # ------------------------------------------------------------------
     # 创建导出任务
@@ -333,6 +393,16 @@ class PDFExportEngine:
             task.file_size = rendered.stat().st_size if rendered.exists() else 0
             await self.db.flush()
             return task
+
+        except PDFConversionUnavailable as e:
+            # 转换链缺失是**环境**问题，不是业务失败：任务标 failed 留痕，
+            # 同时上抛让路由返回 503（可重试 / 换导出格式），不假装成功。
+            logger.error("Export task %s: PDF 转换链不可用: %s", task_id, e)
+            task.status = ExportTaskStatus.failed
+            task.error_message = str(e)
+            task.completed_at = datetime.now(timezone.utc)
+            await self.db.flush()
+            raise
 
         except Exception as e:
             logger.exception("Export task %s failed: %s", task_id, e)
