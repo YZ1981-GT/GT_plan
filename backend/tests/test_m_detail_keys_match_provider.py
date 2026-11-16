@@ -93,8 +93,11 @@ _BASELINE_PROVIDER_ONLY: dict[tuple[str, str], set[str]] = {
     # （删：aging / companyCode / currentAjeDecrease / currentAjeIncrease / currentRjeDecrease /
     #   currentRjeIncrease / overdueReason / priorAdjAje / priorAdjRje / priorOpening / refIndex）
     # 余 7 条全是 D~G / N~Q 的 R2 结构差异（模板「期初数/本期增加/本期减少/期末数」vs
-    # 前端 beginBalance/declaredAmount/paidAmount/endBalance/endAudited 的另一套语义），
-    # 需业务裁决，不能靠键名对齐解决。
+    # 前端 beginBalance/declaredAmount/paidAmount/endBalance/endAudited 的另一套语义）。
+    # 🔴 2026-11-16 更新：**技术阻塞已解除** —— spec `m-cycle-form-storage-cell-projection`
+    #    让 WP() 对 M 循环可用（实测 WP('M1','明细表M1-2','H14') ⇒ Decimal('100')）。
+    #    这 7 条现在可由用户在公式管理里自行链接；**未链接前保持空着**（不猜语义映射）。
+    #    基线继续保留（盯住不恶化），用户显式裁决「业务上不需要」后才删。
     ("M1", "M1DetailRow"): {
         "auditedClosing", "auditedDecrease", "auditedIncrease",
         "auditedOpening", "closingBalance", "decreaseAmount", "increaseAmount",
@@ -106,7 +109,8 @@ _BASELINE_PROVIDER_ONLY: dict[tuple[str, str], set[str]] = {
         # currentRjeDecrease / currentRjeIncrease / increaseMethod / investAmount /
         # investMethod / priorAdjAje / priorAdjRje / verificationRef / verified）。
         # 余 4 条全是 R2 结构差异：模板「出资金额(未审期初/期末)」与
-        # 「审定期初/期末」vs 前端 beginAmount / endAmount 的另一套语义，需业务裁决。
+        # 「审定期初/期末」vs 前端 beginAmount / endAmount 的另一套语义。
+        # 🔴 2026-11-16 更新：技术阻塞已解除（同 M1），可由用户在公式管理里自行链接。
         "auditedClosing", "auditedDecrease", "auditedIncrease", "auditedOpening",
     },
 }

@@ -1,6 +1,6 @@
 # Tasks — M 循环键名统一（占位，未开工）
 
-> **状态：实施中（2026-11-16）**。Phase 0 现算完成（推翻 design §2 的三条前提）、
+> **状态：14/14 ✅（2026-11-16 完成，可归档）**。Phase 0 现算完成（推翻 design §2 的三条前提）、
 > 路径已拍板（A' = 逐行 JSON 单一来源）、任务 4 已实施并通过守卫 + 变异。
 > 剩余：任务 6 收尾（干净 worktree / INDEX 登记 / 归档）。
 > 棘轮从 65 条降到 **18 条**（M1 偿还 25 + M2 偿还 22），余 18 条全是 R2 结构差异 ——
@@ -144,6 +144,10 @@
     `m9-detail-import-refresh.spec.ts` **2 passed**（M9 未动）。
 
   - [x] 5.2 **R2 结构差异：用户 2026-11-16 裁决「拿不准就空着，让用户手动用公式管理实现表间链接」**
+    **✅ 2026-11-16 后续：技术阻塞已解除** —— 新 spec `m-cycle-form-storage-cell-projection`
+    让 `WP()` 对 M 循环可用（端到端实测 `WP('M1','明细表M1-2','H14')` ⇒ `Decimal('100')`）。
+    所以那 18 条 R2 现在**真的可以**由用户在公式管理里链接；具体对照表见该 spec tasks 8.3。
+    本 spec 的处置不变：18 条保留在棘轮基线里（继续盯着），未链接前保持空着。
     **裁决口径**：本 spec **不猜语义映射**。模板列与前端键「疑似同义但不确定」的一律
     **保持空着（不接、不猜、不写默认值）**，由用户在**公式管理**里手动建立表间链接。
     理由：猜错的代价是「前端写 A、后端读 B」的静默数据错位（本 spec 记录过的真实反例：
@@ -201,4 +205,11 @@
     前端 `M2DetailListedRow` 18 键也没有对应的 provider 契约。
     ⇒ 这是「provider 缺整张表」，不是键名不一致，需另立 spec。
 
-- [ ] 6. 收尾：干净 worktree 跑守卫、推送、登记 INDEX
+- [x] 6. 收尾：干净 worktree 跑守卫、推送、登记 INDEX（2026-11-16 完成）
+  - 守卫：`test_m_detail_single_storage_source.py` 11 + `test_m_detail_keys_match_provider.py` 14
+    + `test_m_form_storage_projection.py` 40 = **65 passed**
+  - 推送：`v1.0.262`（任务 4 存储单一来源）/ `v1.0.264`（M1）/ `v1.0.265`（M2）/
+    `v1.0.267`（后续 spec 让 WP() 可用）
+  - INDEX：本 spec 已登记（Active 8）；归档时移入 `_archive/`
+  - 🔴 后续 spec `m-cycle-form-storage-cell-projection` 已让 `WP()` 对 M 循环可用
+    ⇒ 那 18 条 R2 从「阻塞」降级为「用户可自行链接」（见 5.2 的更新）
