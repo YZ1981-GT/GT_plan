@@ -1,6 +1,6 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：7/34（2026-11-16，Phase 0.1~0.3、1.1~1.2、2.1~2.2 已完成；产品代码仍未迁移已就绪 binding）**
+> **状态：8/34（2026-11-16，Phase 0.1~0.3、1.1~1.2、2.1~2.3 已完成；产品代码仍未迁移已就绪 binding）**
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
@@ -42,7 +42,11 @@
 - [x] 2.2 把 sheet readiness 接到 binding 后的 effective entry；缺 mapping 时返回 200 pending 或 typed 409，不能把 EntryReadinessNotFound 当成 room ready。
   - `SheetOpenBindingResolver` 在 entry 缺失、provider 未审核、exact 多义时均返回 pending；端点测试证明不会生成 `xlsx-sheet/*` 虚假身份。
   - _R: 1, 3, 7_
-- [ ] 2.3 新增 published artifact reader：通过 current representation id、bundle、contract 与 canonical artifact layout 读取文件，禁止模板 copy / hidden-sheet mutation。
+- [x] 2.3 新增 published artifact reader：通过 current representation id、bundle、contract 与 canonical artifact layout 读取文件，禁止模板 copy / hidden-sheet mutation。
+  - 实现 `services/workpaper_sync/sheet_published_artifact.py`：`current pointer → representation/artifact row → canonical visibility/path → sha256/size → OOXML target sheet` 五步固定顺序，任一步失败即抛 typed error，**不回退模板**。
+  - 接线 `/sync/entry-identity`：只有 `ready` / `migrated` binding 才读 artifact（`pending` 走不通，防未审核入口被当可开）。
+  - 守卫 4 例（reader）+ 4 例（endpoint，含 pending 不读 / ready 读 / target_sheet 传参）；变异 M1 门控恒假、M2 门控恒真、M3 去 target_sheet 传参**全部精确打红**。
+  - 🔴 M2 首轮存活：pending 用例原先只断言「不抛」，而端点 `except Exception` 把断言吞成 pending ⇒ 改为**记录调用并断言为空**。这是「断言必须落在观测到的副作用上」的又一实例。
   - _R: 2, 7_
 - [ ] 2.4 descriptor 增加 target sheet / document scope 的冻结字段；单 sheet 使用 actionLink，whole workbook 保持完整 artifact 视图。
   - _R: 3, 8_

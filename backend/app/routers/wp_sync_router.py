@@ -1067,6 +1067,10 @@ async def resolve_entry_identity(
     from app.services.workpaper_sync.entry_profile import load_entry_manifest
     from app.services.workpaper_sync.entry_readiness import evaluate_entry_readiness
     from app.services.workpaper_sync.sheet_open_bindings import SheetOpenBindingResolver
+    from app.services.workpaper_sync.sheet_published_artifact import (
+        PublishedSheetArtifactError,
+        read_current_published_sheet_artifact,
+    )
 
     # entry_id 尚未知，不能调用带 entry scope 的 `_guard`；先用既有底稿只读门确认
     # project/wp 归属，再从生成 binding 解析真实 entry。未知 entry 不是越权，而是 pending。
@@ -1101,9 +1105,38 @@ async def resolve_entry_identity(
         return body
 
     try:
+        # 已审核/迁移 binding 才走 artifact reader；当前首版生成物全部 pending，
+        # 不会把未审核入口误读成 ready。
+        sync_services = None
+        if resolution.status in {"ready", "migrated"}:
+            sync_services = build_sync_services(db, current_user)
+            binding = resolution.binding or {}
+            try:
+                artifact = await read_current_published_sheet_artifact(
+                    session=db,
+                    artifact_repository=sync_services.artifacts,
+                    project_id=project_id,
+                    wp_id=wp_id,
+                    entry_id=entry_id,
+                    target_sheet=binding.get("target_sheet"),
+                    whole_workbook=binding.get("document_scope") == "whole_workbook",
+                )
+                body["representation"] = {
+                    "id": str(artifact.representation_id),
+                    "generation": artifact.generation,
+                    "artifact_sha256": artifact.artifact_sha256,
+                    "target_sheet": artifact.target_sheet,
+                    "sheet_names": list(artifact.sheet_names),
+                    "document_type": artifact.document_type,
+                }
+            except PublishedSheetArtifactError as exc:
+                body["status"] = "pending"
+                body["reason"] = exc.error_code
+                return body
+
         readiness = await evaluate_entry_readiness(
             session=db,
-            registry=build_production_registry(),
+            registry=sync_services.registry if sync_services is not None else build_production_registry(),
             project_id=project_id,
             wp_id=wp_id,
             entry_id=entry_id,
