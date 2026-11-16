@@ -58,7 +58,9 @@ describe('WorkpaperEditor 接线', () => {
   it('壳不再自带一份 render-config：侧栏 decision_trace 读 GtWpRenderer / Univer 目录（spec platform-perf-hotspots R4）', () => {
     expect(SCRIPT).not.toContain('useWpRenderer(')
     // 两项事实的取法在 useEditorRendererFacts（行为用例见 useEditorRendererFacts.spec.ts），壳只负责接线
-    expect(SCRIPT).toContain('const { sidePanelDecisionTrace, guidanceContextReady } = useEditorRendererFacts({ useHtmlRenderer, wpRendererRef, univerCatalog, univerSheetIdentityReady, activeSheetContext })')
+    // 末两项是 AI 面板的未保存草稿访问器入参（spec chat-host-draft-overlay Task 4）：
+    // 放在 useEditorRendererFacts 里登记，是因为壳有一道行数棘轮（line-budget.spec.ts）。
+    expect(SCRIPT).toContain('const { sidePanelDecisionTrace, guidanceContextReady } = useEditorRendererFacts({ useHtmlRenderer, wpRendererRef, univerCatalog, univerSheetIdentityReady, activeSheetContext, wpId: () => wpId.value, currentBusinessVersion: () => wpDetail.value?.updated_at ?? null })')
     // Univer 目录请求顺带记下 decision_trace（原先壳为此单独再取一份 render-config）
     expect(SCRIPT).toContain('univerCatalog.value = { wpCode: config?.wp_code ?? null, decisionTrace: config?.decision_trace ?? null }')
     const sidePanel = findElement(descriptor.template!.ast, 'WorkpaperSidePanel')

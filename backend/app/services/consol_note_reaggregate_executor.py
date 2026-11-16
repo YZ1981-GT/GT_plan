@@ -108,6 +108,11 @@ async def execute_consol_note_reaggregate(
     except Exception:
         raise
 
+    if result.get("status") == "failed":
+        failures = result.get("failures") or []
+        first_error = str((failures[0] if failures else {}).get("error") or "重新汇总全部章节失败")
+        raise ConsolReaggregateJobError(first_error)
+
     total = int(result.get("sections_processed") or 0)
     if not await report(total, total, "重新汇总完成，正在保存结果", "finalizing"):
         raise ConsolReaggregateLeaseLost("重新汇总任务租约已失效")

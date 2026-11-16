@@ -338,7 +338,9 @@ class KnowledgeEvidencePromotionService:
                 metadata_status="complete",
                 metadata_missing={},
                 state="available",
-                current_version_id=version_id,
+                # 先以 NULL 建立聚合根，避免 current_version 的循环 FK
+                # 在版本行尚未落库时触发约束；版本落库后再回填。
+                current_version_id=None,
                 version=1,
                 source_type="knowledge_document",
                 provider="knowledge_library",
@@ -383,7 +385,18 @@ class KnowledgeEvidencePromotionService:
             )
             try:
                 async with self.db.begin_nested():
-                    self.db.add_all((attachment, version, promotion))
+                    # 不使用一次 add_all：SQLAlchemy 没有这些治理表之间的 ORM
+                    # relationship，PG 可能先 INSERT promotion，从而触发
+                    # target_attachment_id / target_attachment_version_id 外键。
+                    # 按聚合根 → 版本 → provenance 的顺序逐层 flush，且把循环
+                    # current_version FK 留到版本行可见后再写回。
+                    self.db.add(attachment)
+                    await self.db.flush()
+                    self.db.add(version)
+                    await self.db.flush()
+                    attachment.current_version_id = version_id
+                    await self.db.flush()
+                    self.db.add(promotion)
                     await self.db.flush()
             except IntegrityError:
                 # 同一请求并发到达：唯一键只允许一个 promotion，失败 SAVEPOINT

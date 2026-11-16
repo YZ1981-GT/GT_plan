@@ -25,7 +25,12 @@ async def operation_world(monkeypatch):
 
     snapshot_spy, wake = AsyncMock(side_effect=snapshot), Mock()
     monkeypatch.setattr(operations, "_snapshot", snapshot_spy)
-    monkeypatch.setattr(consol_operation_worker, "wake", wake)
+    # 🔴 2026-11-14：worker 唤醒已收口到 app.core.worker_wakeup 注册表
+    # （业务域不再 import app.workers.*，解 domain-boundary 的 7 条反向依赖）。
+    # 拦 `wake_worker` 与原先拦 `consol_operation_worker.wake` 等价 ——
+    # 前者是唯一调用入口，且注册表里注册的就是后者。
+    from app.core import worker_wakeup
+    monkeypatch.setattr(worker_wakeup, "wake_worker", wake)
     async with make_db(extra_models=(ConsolOperation, ImportEventOutbox)) as factory:
         async with factory() as db:
             pid = await add_project(db, "【合成】R4 合并项目", report_scope="consolidated")

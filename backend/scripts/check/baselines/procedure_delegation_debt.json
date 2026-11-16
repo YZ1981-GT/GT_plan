@@ -1,6 +1,29 @@
 {
-  "metadata": {"debt_ceiling": 12},
+  "metadata": {
+    "debt_ceiling": 12
+  },
   "entries": [
+    {
+      "path": "audit-platform/frontend/src/components/collaboration/NotificationCenter.vue",
+      "symbol": "component:NotificationCenter",
+      "rule": "parallel-my-procedure-tasks-page-route",
+      "fingerprint": "sha256:64d2b9e0beb12b64fa6f535a70736c9a0324ae751ad00048910c2c862dc520bc",
+      "reason": "NotificationCenter adds a '程序任务' notification category tab and routes batch summaries to the canonical MyProcedureTasks.vue via metadata (Task 11 / design F4); it is not a parallel task page, so the coarse heuristic match is acknowledged debt."
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/GtAProgramConsole.vue",
+      "symbol": "component:GtAProgramConsole",
+      "rule": "parallel-my-procedure-tasks-page-route",
+      "fingerprint": "sha256:62e666e8febb2e6fb2f968047bd8e00dd94dcb9aae5570fb7b5b43c64d071062",
+      "reason": "GtAProgramConsole renders an in-place '程序任务' task-overlay column and submit dialog (Task 14); it is the canonical program console, not a parallel MyProcedureTasks page, so the coarse heuristic match is acknowledged debt. 2026-10-24 fingerprint refreshed: spec procedure-trim-generation-delegation-chain task 13 wired the scope-expansion retry into row delegation (no route or task-page change). 2026-10-25 refreshed again: tasks 16 / 18 added row-level trim / restore through the row-task endpoints and per-row read-only for restricted users (still no route or task-page change)."
+    },
+    {
+      "path": "audit-platform/frontend/src/layouts/DefaultLayout.vue",
+      "symbol": "component:DefaultLayout",
+      "rule": "parallel-my-procedure-tasks-page-route",
+      "fingerprint": "sha256:4f5f559624a887eae850edb4010a74749e1eab0a36bc789c9e4ec92fb8dbb0ae",
+      "reason": "DefaultLayout sidebar renders a '程序任务' nav item linking to the canonical MyProcedureTasks route; it is a navigation entry, not a parallel task page."
+    },
     {
       "path": "audit-platform/frontend/src/services/commonApi.ts",
       "symbol": "getMyProcedureTasks",
@@ -9,18 +32,25 @@
       "reason": "Legacy frontend aggregation exposes workpaper-scope ProcedureInstance DTOs as personal tasks until row-task APIs replace it."
     },
     {
+      "path": "audit-platform/frontend/src/views/MyLeadWorkpapers.vue",
+      "symbol": "component:MyLeadWorkpapers",
+      "rule": "parallel-my-procedure-tasks-page-route",
+      "fingerprint": "sha256:71845fee20cc565de5907234ab34bebd77b81b8f3a9f16402ead417a6c89c184",
+      "reason": "MyLeadWorkpapers shows lead-assigned workpapers and links to the canonical MyProcedureTasks for task detail; it is a complementary view, not a parallel task page."
+    },
+    {
       "path": "backend/app/routers/wp_relation_router.py",
       "symbol": "sync_procedure_status",
       "rule": "procedure-state-transition-bypass",
-      "fingerprint": "sha256:e268d76a7f8bb5944804d2b42c380f101129b00e06f7117a8d837b280f24d081",
+      "fingerprint": "sha256:499ea44b79448d87718142d55b07214db7bda07d104eff82200dcf93113b5e9e",
       "reason": "Legacy workpaper-status synchronization writes ProcedureInstance.execution_status directly."
     },
     {
-      "path": "backend/app/routers/wp_review_router.py",
-      "symbol": "submit_review",
+      "path": "backend/app/services/procedure_backfill_runner.py",
+      "symbol": "ProcedureBackfillRunner._map_status_for_wp",
       "rule": "procedure-state-transition-bypass",
-      "fingerprint": "sha256:3cc3c3b42c132af68349cb4a057e5eb815e12e7a19e823f67e30e037a54b8443",
-      "reason": "Legacy review submission directly marks the related ProcedureInstance completed."
+      "fingerprint": "sha256:2759aa4453f84ccea07567ce1e669ffe30424a605f6e35709e638b44845170ce",
+      "reason": "Backfill (Task 15 / Req 2.6 / design D3) is a sanctioned bulk-migration write path that conservatively seeds historical terminal workflow/applicability states via map_legacy_status; it cannot drive tasks through the live actor/version transition chain, so this direct state write is acknowledged, guarded debt (idempotent, only touches migration_confidence IS NULL default tasks)."
     },
     {
       "path": "backend/app/services/procedure_trim_engine.py",
@@ -51,39 +81,11 @@
       "reason": "Legacy trim changes row status without the future row-task transition service."
     },
     {
-      "path": "audit-platform/frontend/src/components/collaboration/NotificationCenter.vue",
-      "symbol": "component:NotificationCenter",
-      "rule": "parallel-my-procedure-tasks-page-route",
-      "fingerprint": "sha256:24425ad1a1ee39bf5cb8c6601d13111d04e22f878f4b5f0fa1c40329884c9e61",
-      "reason": "NotificationCenter adds a '程序任务' notification category tab and routes batch summaries to the canonical MyProcedureTasks.vue via metadata (Task 11 / design F4); it is not a parallel task page, so the coarse heuristic match is acknowledged debt."
-    },
-    {
-      "path": "audit-platform/frontend/src/components/workpaper/GtAProgramConsole.vue",
-      "symbol": "component:GtAProgramConsole",
-      "rule": "parallel-my-procedure-tasks-page-route",
-      "fingerprint": "sha256:da804fb7ee9a5ad5169fee9d2b29e986e0f36b8dfe4402c676b1b76f6b7a230a",
-      "reason": "GtAProgramConsole renders an in-place '程序任务' task-overlay column and submit dialog (Task 14); it is the canonical program console, not a parallel MyProcedureTasks page, so the coarse heuristic match is acknowledged debt. 2026-10-24 fingerprint refreshed: spec procedure-trim-generation-delegation-chain task 13 wired the scope-expansion retry into row delegation (no route or task-page change). 2026-10-25 refreshed again: tasks 16 / 18 added row-level trim / restore through the row-task endpoints and per-row read-only for restricted users (still no route or task-page change)."
-    },
-    {
-      "path": "audit-platform/frontend/src/layouts/DefaultLayout.vue",
-      "symbol": "component:DefaultLayout",
-      "rule": "parallel-my-procedure-tasks-page-route",
-      "fingerprint": "sha256:a84853613280e0ae3c68c0bef5ad2c012a9ed52a15f72ff13528ab867f4bb26f",
-      "reason": "DefaultLayout sidebar renders a '程序任务' nav item linking to the canonical MyProcedureTasks route; it is a navigation entry, not a parallel task page."
-    },
-    {
-      "path": "audit-platform/frontend/src/views/MyLeadWorkpapers.vue",
-      "symbol": "component:MyLeadWorkpapers",
-      "rule": "parallel-my-procedure-tasks-page-route",
-      "fingerprint": "sha256:71845fee20cc565de5907234ab34bebd77b81b8f3a9f16402ead417a6c89c184",
-      "reason": "MyLeadWorkpapers shows lead-assigned workpapers and links to the canonical MyProcedureTasks for task detail; it is a complementary view, not a parallel task page."
-    },
-    {
-      "path": "backend/app/services/procedure_backfill_runner.py",
-      "symbol": "ProcedureBackfillRunner._map_status_for_wp",
+      "path": "backend/app/services/workpaper_review_submission_service.py",
+      "symbol": "WorkpaperReviewSubmissionService._complete_program",
       "rule": "procedure-state-transition-bypass",
-      "fingerprint": "sha256:2759aa4453f84ccea07567ce1e669ffe30424a605f6e35709e638b44845170ce",
-      "reason": "Backfill (Task 15 / Req 2.6 / design D3) is a sanctioned bulk-migration write path that conservatively seeds historical terminal workflow/applicability states via map_legacy_status; it cannot drive tasks through the live actor/version transition chain, so this direct state write is acknowledged, guarded debt (idempotent, only touches migration_confidence IS NULL default tasks)."
+      "fingerprint": "sha256:0615537033b6e44be690d3a579d98fc837db930f6cfd3c0b4f9f090e27bc6c6f",
+      "reason": "复核提交链里把程序实例直接 UPDATE 成 completed，绕过状态机。来源 commit bb29a49f6（v1.0.80 release-blocker-closure），与旧条目 wp_review_router::submit_review 是同一条链的位置迁移（旧函数被删、逻辑搬进 service）。"
     }
   ]
 }

@@ -264,6 +264,7 @@ def write_topn(record: Any, *, headers: Sequence[Any], result: TopNResult, limit
                ) -> dict[str, Any]:
     """把重排结果写进合并附注记录；手工 / 锁定格按单位名称对到新行（对不上的回报）。返回写入摘要。"""
     from app.services.consol_note_detail_apply_service import remap_protected
+    from app.services.consol_note_table_totals import amount_equal
 
     data = dict(record.data) if isinstance(record.data, dict) else {}
     manual, locked = parse_manual_cells(data), parse_locked_cells(record)
@@ -281,12 +282,28 @@ def write_topn(record: Any, *, headers: Sequence[Any], result: TopNResult, limit
         new = old_to_new.get(r)
         if new is None or r >= len(old_rows) or not isinstance(old_rows[r], (list, tuple)) or c >= len(old_rows[r]):
             continue
+        computed_value = result.rows[new][c]
         result.rows[new][c] = str(old_rows[r][c] if old_rows[r][c] is not None else "")
         guard.add((new, c))
-        kept.append({"row": new, "col": c, "kept_value": result.rows[new][c]})
+        kept.append({
+            "row": new,
+            "col": c,
+            "kept_value": result.rows[new][c],
+            "computed_value": computed_value,
+        })
     if guard and result.columns is not None:
         finish_rows(result.rows, result.columns, result.denominator, guard)  # 合计 / 比例按含手工值的行重算
+    filled = [
+        {"row": row_index, "col": col_index, "value": value}
+        for row_index, row in enumerate(result.rows)
+        for col_index, value in enumerate(row[1:], start=1)
+        if (row_index, col_index) not in guard and str(value).strip()
+    ]
     lost = remap_protected(data, record, manual, locked, old_to_new)
+    manual_differs_count = sum(
+        1 for item in kept
+        if not amount_equal(item.get("kept_value"), item.get("computed_value"))
+    )
     data["rows"] = result.rows
     data["headers"] = data.get("headers") or list(headers)
     data["_topn"] = {
@@ -296,9 +313,12 @@ def write_topn(record: Any, *, headers: Sequence[Any], result: TopNResult, limit
     }
     data.update(data_updates or {})
     record.data = data
-    record.is_stale = False
+    from app.services.consol_note_stale_state import clear_stale
+
+    clear_stale(record)
     record.updated_at = datetime.now(timezone.utc)
-    return {"kept": kept, "lost_protected": lost, "units": result.names, "excluded": result.excluded,
+    return {"kept": kept, "filled": filled, "manual_differs_count": manual_differs_count,
+            "lost_protected": lost, "units": result.names, "excluded": result.excluded,
             "beyond_count": result.beyond, "reasons": result.reasons, "approximate": approximate}
 
 
@@ -408,8 +428,9 @@ async def apply_topn_refresh(db: AsyncSession, *, project_id: UUID, section_id: 
         "status": "applied", "section_id": section_id, "node_key": node_key,
         "applied_entity_count": len(applied), "skipped_stale": [], "skipped_entities": skipped,
         "unbound_entities": [], "out_of_scope_count": 0,
-        "filled_count": sum(1 for row in result.rows for cell in row[1:] if str(cell).strip()),
-        "kept_manual_count": len(summary["kept"]), "filled": [], "kept_manual": summary["kept"][:50],
+        "filled_count": len(summary["filled"]),
+        "kept_manual_count": len(summary["kept"]), "manual_differs_count": summary["manual_differs_count"],
+        "filled": summary["filled"], "kept_manual": summary["kept"][:50],
         "template_row_count": 0, "output_row_count": len(result.rows), "dropped_placeholders": [],
         "lost_protected": summary["lost_protected"][:50], "inactive_optional_count": 0, "topn": summary,
     }

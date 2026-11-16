@@ -54,6 +54,10 @@
 
 ### 0.5 行数（`len(text.split("\n"))`，与行数门同口径）
 
+**更新（2026-11-15 重算，`tmp_aqf/probes/recompute_design0.py`）**：下表「现行数」是**设计时**的值，保留原文作对照；
+实施后的现算值见本节末的「实施后现算」小表。两处预算被突破（`query_orchestrator.py` +34 对预算 +30、
+`export_service.py` +89 对预算 +40），都仍在 800 行硬上限内，处置见 §10.8 收口节。
+
 | 文件 | 现行数 | 上限 | 本 spec 预算 |
 |---|---|---|---|
 | backend/app/routers/custom_query.py | 1990 | 白名单 1911 × 1.05 = 2006 | 执行主体移出，净减 |
@@ -65,9 +69,73 @@
 | audit-platform/frontend/src/components/template-library/CustomQueryTab.vue | 1012 | 1500 | +50 以内 |
 | audit-platform/frontend/src/views/AdvancedQueryBuilder.vue | 1149 | 1500 | +50 以内 |
 
+
+**实施后现算（2026-11-15，`len(text.split("\n"))`，`check_file_size.py` 对本表全部文件 exit 0）**
+
+| 文件 | 设计时 | 现算 | 变化 | 上限 / 预算 | 结论 |
+|---|---|---|---|---|---|
+| `backend/app/routers/custom_query.py` | 1990 | **1982** | -8 | 白名单 1911 × 1.05 = 2006（预算 净减） | 在限内 |
+| `backend/app/services/custom_query/query_orchestrator.py` | 743 | **777** | +34 | 800（预算 +30 以内） | 🔴 超预算（+34 > +30，仍在 800 内） |
+| `backend/app/routers/query_builder.py` | 494 | **515** | +21 | 800（预算 +40 以内） | 在限内 |
+| `backend/app/services/custom_query/query_export.py` | 379 | **379** | +0 | 800（预算 +60 以内） | 在限内 |
+| `backend/app/services/custom_query/export_service.py` | 608 | **697** | +89 | 800（预算 +40 以内） | 🔴 超预算（+89 > +40，仍在 800 内） |
+| `audit-platform/frontend/src/components/query/CustomQueryDialog.vue` | 1431 | **1411** | -20 | 1500（预算 净增 ≤ 0） | 在限内 |
+| `audit-platform/frontend/src/components/template-library/CustomQueryTab.vue` | 1012 | **1025** | +13 | 1500（预算 +50 以内） | 在限内 |
+| `audit-platform/frontend/src/views/AdvancedQueryBuilder.vue` | 1149 | **1161** | +12 | 1500（预算 +50 以内） | 在限内 |
+
+本 spec 新增文件（上限 800 / 前端 1500）：
+
+| 文件 | 现算 | 上限 |
+|---|---|---|
+| `backend/app/services/custom_query/query_runs.py` | **284** | 800 |
+| `backend/app/services/custom_query/query_artifacts.py` | **425** | 800 |
+| `backend/app/services/custom_query/query_evidence.py` | **58** | 800 |
+| `backend/app/services/custom_query/version_registry.py` | **162** | 800 |
+| `backend/app/services/custom_query/version_capture.py` | **365** | 800 |
+| `backend/app/services/custom_query/version_compare.py` | **163** | 800 |
+| `backend/app/routers/query_evidence.py` | **389** | 800 |
+| `backend/app/services/custom_query/business_execute.py` | **113** | 800 |
+| `backend/app/models/query_evidence_models.py` | **181** | 800 |
+| `audit-platform/frontend/src/components/query/queryRunFormat.ts` | **72** | 1500 |
+| `audit-platform/frontend/src/components/query/useQueryRunEvidence.ts` | **300** | 1500 |
+| `audit-platform/frontend/src/components/query/QueryRunBanner.vue` | **163** | 1500 |
+| `audit-platform/frontend/src/components/query/QueryEvidenceDrawer.vue` | **153** | 1500 |
+
+⇒ 三处偏离：`query_orchestrator.py`（+34 对预算 +30）、`export_service.py`（+89 对预算 +40）、`custom_query.py`（未净减：1990 → 1982）。前两者仍在 800 行硬上限内，第三处仍低于白名单门限 2006；处置登记在 §10.8 收口节（不抬白名单、不改判据）。
+
 ### 0.6 迁移号
 
-**更新（2026-11-07）**：磁盘最高 V267（255 个 V 文件、202 个 R 文件，`check_migration_versions` exit 0）；共享库 `schema_version` 最高 V267（任务 1 证据：V267 已由迁移器应用）；远端分支 `spec/disclosure-note-doc-upload-and-batch-fill` HEAD 最高 V267（2026-11-06 任务 1 推送）。三处一致，本 spec 新迁移取 V267。旧记（2026-11-04 扫描时）为 V251，已由任务 1 现取 V267。
+**更新（2026-11-15 重算，任务 0 第 5 条）**：三处现算 —— 磁盘 **259** 个 `V*.sql`、最高 **V271**、重复版本号 **0 组**、
+配对 `R*.sql` 206 个；共享库 `schema_version` **261 行、最高 V271**；远端分支
+`spec/disclosure-note-doc-upload-and-batch-fill` **259** 个、最高 **V271**。三处一致。
+
+- 本 spec 的 **V267 已落共享库**（`schema_version` 有 `V267__query_runs_and_artifacts.sql`，
+  `to_regclass('query_runs')` / `to_regclass('query_artifacts')` 均非空，两表各 0 行）
+  ⇒ 任务 10 的「迁移落库」前置**已满足**，不再需要用户放行（requirements D3 的放行对象已不存在）。
+- V268~V271 是**他域**产物（`consol_workpaper_instance` / `ledger_browse_indexes` /
+  `consol_note_stale_semantics` / `ledger_import_attempts`），本 spec 零新增迁移。
+- 旧记（2026-11-04）V251、（2026-11-07）V267 都已过期，按本节为准。
+
+### 0.7 端点鉴权基线三维计数（2026-11-15 现算，调用守卫自己的扫描函数）
+
+口径：调 `tests/test_project_endpoint_authorization_baseline.py` 的
+`_scan_unauthorized` / `_scan_identity_only` / `_scan_prefixed` / `_total_project_endpoints`
+与 `tests/test_project_endpoint_authz_body_carried.py` 的 `_scan`，**不自写扫描器**
+（自写一份会得出另一个数，正是「同一判据写两份」的坑）。
+
+| 维度 | 现算 | 基线常量 | 结论 |
+|---|---|---|---|
+| 路径含 `{project_id}` 的端点总数 | **446** | — | 分母非空 |
+| 同上，真实无鉴权 | **6** | 冻结、禁回填 | 未增加 |
+| 同上，「仅登录不校项目」 | **143** | `_IDENTITY_ONLY_BASELINE = 146` | 已减 3（可下调） |
+| router 级前缀含 `{project_id}` | **735**（project 540 / identity 192 / none 3） | `_PREFIXED_IDENTITY_ONLY_BASELINE = 197` | identity 192 < 197 |
+| 同上，无鉴权档 | **3** | `_PREFIXED_KNOWN_GAPS` 为空 | 3 个全在 `_PREFIXED_SELF_AUTH`（签名 / 回调自鉴权） |
+| 请求体携带项目标识 | **232**（project 150 / identity 78 / none 4） | `_BODY_KNOWN_GAPS` 5 条 | 🔴 见下 |
+
+🔴 **body_carried 维的 `_BODY_KNOWN_GAPS` 有 2 条已失效**（`metabase.py::build_drilldown_url`、
+`metabase.py::get_embed_url` 现已不是 none 档）⇒ `test_body_known_gaps_only_shrink` 在**干净 HEAD 上就红**
+（本 spec 未碰 metabase）。按棘轮契约本该删除这 2 条，但那是**他域端点**（metabase 嵌入），
+删除登记等于代他域确认「已补鉴权」，本 spec 不代改，只登记（见 §10.8 收口节的预存失败清单）。
 
 ## §1 总体流程
 
@@ -564,6 +632,70 @@ generated_at     generated_by {user_id, username}
 ### 10.7 门禁
 
 `check_router_registration`、`check_file_size`、`check_migration_versions`、`check_staged_tree_self_consistency` 全部 exit 0；端点鉴权基线（`test_project_endpoint_authorization_baseline.py`、`test_project_endpoint_authz_body_carried.py`）计数不增；`test_route_shadow_guard.py`、迁移完整性用例、`test_spec_index_consistency.py` 通过；单区域 vue-tsc 0 错误，并用注入错误证明它真的在检查。
+
+
+## §10.8 收口节（2026-11-15，任务 0 / 10 实测与偏离）
+
+本节只记**现算**结果与处置，不改前文原文。
+
+### 1. 现状重算与 §0 的偏离（任务 0）
+
+| 项 | 设计原文 | 现算（2026-11-15） | 处置 |
+|---|---|---|---|
+| 磁盘迁移 | 最高 V267 | **259 个 `V*.sql`、最高 V271、重复 0 组**、`R*.sql` 206 个 | 已在 §0.6 更正 |
+| 共享库 | 最高 V267 | **261 行、最高 V271**，`query_runs` / `query_artifacts` 均存在且各 0 行 | 已在 §0.6 更正；**任务 10 的「待放行」前提消失** |
+| 远端分支 | 最高 V267 | **259 个、最高 V271** | 同上 |
+| `query_orchestrator.py` | 743 → 预算 +30 | **777（+34）** | 超预算 4 行，仍在 800 硬上限内；不改判据、不抬白名单 |
+| `export_service.py` | 608 → 预算 +40 | **697（+89）** | 超预算 49 行，仍在 800 内（抽出 `build_xlsx_file` 带来的），登记不处置 |
+| `custom_query.py` | 1990 → 净减 | **1982（−8）** | 满足 |
+| 其余 5 个文件 | 各 +40~+60 / 净增 ≤0 | 全部在预算内（`QueryBuilder` +21、`query_export` ±0、`CustomQueryDialog` −20、`CustomQueryTab` +13、`AdvancedQueryBuilder` +12） | 满足 |
+| 端点鉴权基线 | 未列 | 路径含 `{project_id}` **446** / 真实无鉴权 **6** / 仅登录 **143**（基线 146）；前缀维 **735**（project 540 / identity **192**，基线 197）；body_carried **232**（project 150 / identity 78 / none 4） | 新增端点未使任何一维增加；已写进 §0.7 |
+
+- 补丁点清单（§5.3 的 5 条）**逐条 `importlib` 解析成功**；AST 扫描另得 18 条清单外的点，
+  其中真属本链路的两条已补进 §5.3（`custom_query._load_step_sheet_mapping`、`paged_fetch.stream_statement`）。
+
+### 2. 任务 10 走查抓到 5 处真实缺陷（都在已标 `[x]` 的任务里）
+
+逐条的证据、修复提交与变异证明见 `tasks.md` 任务 10 的表格。要点：
+
+1. **路由签名把 `_origin` / `_template_id` 变成客户端可传的 query 参数**（运行期依赖树实测）
+   ⇒ 违反 §5.3「路由函数名与签名不变」。修法：HTTP 层抽成内部函数 `_execute_with_http_layer`。
+2. **`version_vector.hash` 字段名拼错**（真名 `vector_hash`）⇒ `AttributeError` 被 `except` 以
+   `logger.debug` 静默吞掉，`result.version` 有值但 `req.version_hash` 恒 None。构建器 `_bv.hash` 同族。
+3. **`query_runs` 的 PG 插入把 `captured_at` 当 ISO 字符串** ⇒ asyncpg `DataError`，运行记录在
+   PostgreSQL 上**永远写不进去**（被降级成「写入失败」，查询照常返回）。
+4. **登记在 SAVEPOINT 内但路由不提交** ⇒ 响应 `run.recorded=true` 而库里 0 行；构建器则**根本没登记**。
+5. 🔴 **导出证据链路整条未实现**：`query_artifacts.seal_artifact` 写完了但**全仓零调用**，
+   `query_export.respond_xlsx` 仍走临时文件发完即删 ⇒ 库里 `query_artifacts` 0 行、证据目录从未创建。
+   **本轮不修**：这是 §6 整条 R4 需求（封存流程 / `build_xlsx_file` 拆分 / 两条导出路径接线 /
+   说明页四行 / 三个响应头 / 下载重验 / 清单端点 + P10 与 M10 / M11），不是接线补丁能糊过去的。
+   ⇒ `tasks.md` 任务 5 已从 `[x]` **如实改回 `[ ]`**。
+
+### 3. 回归基线（现算）
+
+| 项 | 结果 |
+|---|---|
+| 真 PG 全目录 `tests/advanced_query_linkage/` | **940 passed / 0 failed / 0 skipped** |
+| 非 PG 选集（29 文件） | **475 passed / 0 failed**（修复前 2 failed / 472 passed） |
+| 前端选集（35 文件） | **372 passed / 0 failed** |
+| 门禁 | `check_migration_versions` / `check_router_registration` / `check_file_size` / `test_spec_index_consistency` / `test_route_shadow_guard` 全 exit 0 |
+| 变异 | 接线 `V1/V2/V3` 红 + `N1` 绿；缺陷 `M-A/M-B/M-C` 红 + `N1` 绿，**逐字节还原 sha256 全部一致** |
+
+### 4. 预存失败（干净 HEAD `901cfd7a5` 上逐条同红，不属本 spec，未代改）
+
+- `test_project_endpoint_authz_body_carried.py::test_body_known_gaps_only_shrink` ——
+  `_BODY_KNOWN_GAPS` 里 `metabase.py::build_drilldown_url` / `get_embed_url` 两条已失效（现算非 none 档）。
+  删除登记等于代他域确认「已补鉴权」，本 spec 不代改。
+- `tests/scripts/test_hard_cap_ratchet.py` 3 条（`DisclosureEditor.vue` cap 3273 而实际 3263、余量 10；
+  `ReportView.vue` 同类；连带 `test_ratchet_detects_artificially_raised_cap`）。
+
+### 5. 遗留
+
+- **任务 5**（查询证据 R4.1~R4.7）待实现：见上第 2.5 条清单。
+- **任务 10** 的 W2 未走：现库 12 个名称含「测试/E2E/UAT」的项目里只有 2 个有审计年度
+  （`E2E-D4发布测试项目_请勿动_2099` 名字明确「请勿动」；`【E2E】公式管理运行时门禁_2025` 零成员行、四表全 0），
+  录入 AJE 会污染共享库 ⇒ 需一个可写的【测试】项目或用户放行自建。
+- **N1 性能**未在本任务复跑（本 spec 未改取数路径，只加版本采集；采集成本见 §0.3）。
 
 ## §11 Phase 2 预留（本 spec 不实施）
 

@@ -10,15 +10,17 @@
     <!-- 搜索栏 -->
     <div class="gt-kp-search">
       <el-input
+        ref="searchInputRef"
         v-model="keyword"
         placeholder="搜索知识库文档..."
         clearable
         size="default"
+        aria-label="搜索知识库文档"
         @keyup.enter="onSearch"
       >
         <template #prefix>🔍</template>
       </el-input>
-      <el-button type="primary" @click="onSearch" :loading="searching" style="margin-left: 8px">
+      <el-button type="primary" aria-label="搜索知识库文档" title="搜索知识库文档" @click="onSearch" :loading="searching" style="margin-left: 8px">
         搜索
       </el-button>
     </div>
@@ -54,8 +56,13 @@
         </el-table-column>
       </el-table>
 
+      <div v-if="searchStatus === 'error' || searchStatus === 'forbidden'" class="gt-kp-error" role="alert" data-testid="knowledge-picker-error">
+        <div>{{ searchError || (searchStatus === 'forbidden' ? '无权搜索知识库' : '搜索失败，请检查网络后重试') }}</div>
+        <el-button type="primary" size="small" aria-label="重试知识库搜索" title="重试知识库搜索" @click="onSearch">重试</el-button>
+      </div>
+
       <el-empty
-        v-if="searched && !searching && docList.length === 0"
+        v-else-if="searchStatus === 'empty'"
         description="未找到匹配的文档"
         :image-size="60"
       />
@@ -85,7 +92,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Loading } from '@element-plus/icons-vue'
 import { useKnowledge, knowledgePickerOptions, _resolvePickerSelection, _rejectPickerSelection } from '@/composables/useKnowledge'
@@ -94,7 +101,7 @@ import type { KnowledgeDoc } from '@/composables/useKnowledge'
 const visible = defineModel<boolean>('visible', { default: false })
 const route = useRoute()
 
-const { search: doSearch } = useKnowledge()
+const { search: doSearch, searchStatus, searchError } = useKnowledge()
 
 /** 当前底稿上下文（wp_code + account_name），注入搜索请求 */
 const currentContext = computed(() => {
@@ -109,6 +116,7 @@ const searched = ref(false)
 const docList = ref<KnowledgeDoc[]>([])
 const selectedDocs = ref<KnowledgeDoc[]>([])
 const tableRef = ref<any>(null)
+const searchInputRef = ref<any>(null)
 
 const maxSelect = computed(() => knowledgePickerOptions.value?.maxSelect || 5)
 const dialogTitle = computed(() => knowledgePickerOptions.value?.title || '选择知识库文档')
@@ -132,6 +140,9 @@ async function onSearch() {
   selectedDocs.value = []
   try {
     docList.value = await doSearch(keyword.value, currentContext.value)
+  } catch {
+    // useKnowledge 已记录失败态；这里仅避免把请求异常抛到全局，列表不伪装成空结果。
+    docList.value = []
   } finally {
     searching.value = false
   }
@@ -152,12 +163,17 @@ function resetState() {
   searched.value = false
   docList.value = []
   selectedDocs.value = []
+  searchStatus.value = 'idle'
+  searchError.value = ''
 }
 
 // 弹窗打开时重置
 watch(visible, (v) => {
-  if (v) resetState()
-})
+  if (v) {
+    resetState()
+    void nextTick(() => searchInputRef.value?.focus?.())
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -192,5 +208,27 @@ watch(visible, (v) => {
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-primary, #6b4c9a);
   font-weight: 500;
+}
+.gt-kp-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 12px;
+  color: var(--el-color-danger, #f56c6c);
+  text-align: center;
+}
+.gt-kp-error :deep(.el-button):focus-visible { outline: 2px solid var(--el-color-primary, #409eff); outline-offset: 2px; }
+
+@media (max-width: 768px) {
+  .gt-kp-search { align-items: stretch; flex-wrap: wrap; }
+  .gt-kp-search :deep(.el-input) { flex: 1 1 220px; }
+  .gt-kp-search :deep(.el-button) { margin-left: 0 !important; }
+}
+
+@media (max-width: 390px) {
+  .gt-kp-search { flex-direction: column; gap: 8px; }
+  .gt-kp-search :deep(.el-input),
+  .gt-kp-search :deep(.el-button) { width: 100%; }
 }
 </style>

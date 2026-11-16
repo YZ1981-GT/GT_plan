@@ -19,6 +19,15 @@
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </el-tooltip>
+        <el-tooltip content="导出前先检查 4 个沟通议题的填写情况" placement="top">
+          <el-button
+            size="small"
+            :loading="exporting"
+            @click="exportWord"
+          >
+            <el-icon><Download /></el-icon> 导出 Word
+          </el-button>
+        </el-tooltip>
         <span class="gt-a182__save-status">
           <template v-if="saveStatus === 'saving'"><el-icon class="is-loading"><Loading /></el-icon> 保存中...</template>
           <template v-else-if="saveStatus === 'saved' && lastSavedAt">✓ 已保存</template>
@@ -192,9 +201,13 @@
 
 <script setup lang="ts">
 import { ref, computed, toRef, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
-import { Loading, MagicStick } from '@element-plus/icons-vue'
+import { Download, Loading, MagicStick } from '@element-plus/icons-vue'
 import { useA182RegulatoryCommunication } from './composables/useA182RegulatoryCommunication'
+import { api } from '@/services/apiProxy'
+import { downloadFile } from '@/utils/http'
+import { handleApiError } from '@/utils/errorHandler'
 
 
 import { useWorkpaperSyncBridge } from './sync/useWorkpaperSyncBridge'
@@ -218,6 +231,70 @@ const {
   loading, recipient, matters, issuance, projectContext,
   saveStatus, lastSavedAt, loadData, updateRecipient, updateMatter, updateIssuance, flushPendingSaves,
 } = useA182RegulatoryCommunication(wpIdRef)
+
+
+// ─── 导出 Word（先查未完成项、确认后再下载）────────────────────────────────────
+//
+// 端点是 `wp_export_word` 的统一分发：`GET …/export-word/check-incomplete` 返回
+// `{complete, missing_fields, wp_code, reason}`，`GET …/export-word` 返回 docx 文件流。
+// 路径必须带 `/api`（`utils/http` 的 baseURL 是 '/'，少前缀会落到前端页面本身 ——
+// spec platform-performance-residual-findings-closure 的那一类缺陷）。
+//
+// 下载走 `downloadFile`（带 Bearer 头）：`window.open` / `<a href>` 直连 /api 带不上令牌 ⇒ 401。
+const exporting = ref(false)
+
+/** 议题名来自后端（含中文括号），进 `dangerouslyUseHTMLString` 前转义 */
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (ch) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string
+  ))
+}
+
+async function exportWord() {
+  if (exporting.value) return
+  exporting.value = true
+  // 未落库的改动先写回，否则导出的还是旧内容
+  await flushPendingSaves()
+  const base = `/api/projects/${props.projectId}/working-papers/${props.wpId}/export-word`
+  try {
+    const check = await api.get<any>(`${base}/check-incomplete`, { _silent: true } as any)
+    const result = check?.data ?? check ?? {}
+    const missing: string[] = Array.isArray(result.missing_fields) ? result.missing_fields : []
+    if (result.complete === false && missing.length > 0) {
+      try {
+        await ElMessageBox.confirm(
+          // 逐条列出缺哪几项：message box 默认按纯文本渲染，换行要显式转成 <br/>
+          `以下 ${missing.length} 项议题尚未完成：<br/>${missing.map(escapeHtml).join('<br/>')}`
+            + '<br/><br/>继续导出时这些内容在 Word 中会是空白。',
+          '存在未完成项',
+          {
+            confirmButtonText: '继续导出',
+            cancelButtonText: '返回完善',
+            type: 'warning',
+            dangerouslyUseHTMLString: true,
+          },
+        )
+      } catch {
+        return // 用户选择「返回完善」
+      }
+    }
+    // `fileName` 只是 Content-Disposition 缺头时的 fallback（见 `utils/http.ts` 的
+    // `extractFileNameFromDisposition`）；后端正常会给 `filename*=UTF-8''{wp_code}.docx`。
+    // 原先 fallback 用底稿 UUID ⇒ 万一后端没给头，用户拿到一个不可读的 UUID 文件名。
+    // `wp_code` 直接取本次 check 响应的同名字段（`CheckIncompleteResponse.wp_code`），
+    // 不另引 prop：组件只有 `wpId`，再传到宿主会让每个宿主都要改。
+    const wpCode = String(result.wp_code ?? '').trim()
+    await downloadFile(base, {
+      fileName: `${wpCode || 'A18-2 与治理层沟通函'}.docx`,
+      silent: true,
+    })
+    ElMessage.success('已导出 Word')
+  } catch (e) {
+    handleApiError(e, '导出 Word')
+  } finally {
+    exporting.value = false
+  }
+}
 
 
 // ─── sync bridge（替代 legacy mode + GtOnlyOfficeSheet）───

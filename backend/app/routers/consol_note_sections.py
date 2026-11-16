@@ -9,12 +9,10 @@ GET /api/consol-note-sections/{project_id}/{year}/{section_id}/data — 加载�
 import json
 import logging
 import re
-from dataclasses import replace as _replace
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
-import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -233,7 +231,8 @@ async def get_section_detail(standard: str, section_id: str):
         if sec["section_id"] == section_id:
             result = {
                 "section_id": sec["section_id"],
-                # 前端 CP-05 身份校验：回的是哪一版模板的章节（与请求的 standard 不符即拒用）
+                "id": sec.get("id"),
+                # 前端 CP-05 身份校验: 回的是哪一版模板的章节（与请求的 standard 不符即拒用）
                 "template_type": standard,
                 "title": sec["title"],
                 "parent_section": sec.get("parent_section", ""),
@@ -249,6 +248,9 @@ async def get_section_detail(standard: str, section_id: str):
                 result["_row_types"] = sec["_row_types"]
             if sec.get("text_after_table"):
                 result["text_after_table"] = sec["text_after_table"]
+            from app.services.note_table_measure_catalog import attach_consolidated_measure_metadata
+
+            attach_consolidated_measure_metadata(result, standard)
             return result
     return {"error": "章节不存在", "section_id": section_id}
 
@@ -404,12 +406,14 @@ async def get_note_data(
     except HTTPException:
         raise
     if record is None:
-        return {"content": {}, "updated_at": None, "node_key": node_key, "data_digest": None}
+        return {"content": {}, "updated_at": None, "node_key": node_key, "data_digest": None, "is_stale": False, "stale_reason": None, "stale_reason_label": None, "stale_at": None}
+    from app.services.consol_note_stale_state import label_of
+    is_stale = bool(record.is_stale); stale_reason = str(record.stale_reason) if is_stale and record.stale_reason else None
     return {
-        "content": record.data if isinstance(record.data, dict) else {},
-        "updated_at": str(record.updated_at) if record.updated_at else None,
-        "node_key": record.node_key if record.node_key is not None else node_key,
-        "data_digest": digest_of(record),
+        "content": record.data if isinstance(record.data, dict) else {}, "updated_at": str(record.updated_at) if record.updated_at else None,
+        "node_key": record.node_key if record.node_key is not None else node_key, "data_digest": digest_of(record),
+        "is_stale": is_stale, "stale_reason": stale_reason, "stale_reason_label": label_of(stale_reason) if is_stale else None,
+        "stale_at": str(record.stale_at) if is_stale and record.stale_at else None,
     }
 
 
@@ -519,7 +523,7 @@ async def refresh_note_by_formula(
 
     resolved_node_key = _requested_node_key(node_key, body)
     # 节点作用域完整校验（项目/年度/企业树/节点定位）
-    scope = await _resolve_note_scope(db, project_id, year, resolved_node_key, section_id)
+    await _resolve_note_scope(db, project_id, year, resolved_node_key, section_id)
     template_type = await _resolve_requested_template(db, project_id, body)
 
     try:

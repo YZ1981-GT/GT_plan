@@ -8,6 +8,7 @@
         <!-- 工具栏 -->
         <div class="gt-note-toolbar">
           <h4 class="gt-note-section-title">{{ selectedNoteSection.title }}</h4>
+          <ConsolNoteStaleTag :is-stale="selectedNoteSection.isStale" :reason-label="selectedNoteSection.staleReasonLabel" :stale-at="selectedNoteSection.staleAt" />
           <el-tag v-if="noteAggregateSource" size="small" type="info" style="margin-left:8px;flex-shrink:0">
             {{ noteAggregateSource }}
           </el-tag>
@@ -307,6 +308,7 @@
       <div v-if="selectedNoteSection" class="gt-note-detail">
         <div class="gt-note-toolbar">
           <h4 class="gt-note-section-title">{{ selectedNoteSection.title }}</h4>
+          <ConsolNoteStaleTag :is-stale="selectedNoteSection.isStale" :reason-label="selectedNoteSection.staleReasonLabel" :stale-at="selectedNoteSection.staleAt" />
           <el-tag v-if="noteAggregateSource" size="small" type="info" style="margin-left:8px;flex-shrink:0">
             {{ noteAggregateSource }}
           </el-tag>
@@ -803,6 +805,7 @@ import ConsolNoteMappingDialog from '@/components/consolidation/ConsolNoteMappin
 import ConsolNoteTemplateManagerDialog from '@/components/consolidation/ConsolNoteTemplateManagerDialog.vue'
 import ConsolNoteAutoRefreshSwitch from '@/components/consolidation/ConsolNoteAutoRefreshSwitch.vue'
 import ConsolNoteTopnNotice from '@/components/consolidation/ConsolNoteTopnNotice.vue'
+import ConsolNoteStaleTag from '@/components/consolidation/ConsolNoteStaleTag.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import ConsolNoteGridCell from '@/components/consolidation/ConsolNoteGridCell.vue'
@@ -1429,7 +1432,9 @@ function hasPersistedNoteContent(content: Record<string, unknown>): boolean {
   return Object.keys(content).length > 0
 }
 
-function applyPersistedNoteContent(section: any, content: Record<string, unknown>, dataDigest?: unknown) {
+function applyPersistedNoteContent(section: any, content: Record<string, unknown>, dataDigest?: unknown,
+  staleState?: { is_stale?: boolean; stale_reason?: string | null; stale_reason_label?: string | null; stale_at?: string | null },
+) {
   const headers = Array.isArray(content.headers) && content.headers.length
     ? content.headers
     : section.headers
@@ -1437,6 +1442,8 @@ function applyPersistedNoteContent(section: any, content: Record<string, unknown
   section.headers = headers
   section.savedData = { ...content }
   section.dataDigest = normalizeNoteDataDigest(dataDigest)
+  section.isStale = Boolean(staleState?.is_stale); section.staleReason = staleState?.stale_reason || null
+  section.staleReasonLabel = staleState?.stale_reason_label || null; section.staleAt = staleState?.stale_at || null
   section.editRows = toEditRows(headers, rows, content.manual_cells)
   section.baselineEditRows = clonePlain(section.editRows)
   clearNoteDirty()
@@ -1488,12 +1495,14 @@ async function reloadCurrentSectionAfterRefresh(
       : normalizeNoteDataDigest(fallbackDataDigest)
     if (!hasPersistedNoteContent(content)) {
       section.dataDigest = dataDigest
+      section.isStale = Boolean(saved?.is_stale); section.staleReason = saved?.stale_reason || null
+      section.staleReasonLabel = saved?.stale_reason_label || null; section.staleAt = saved?.stale_at || null
       return noteRefreshResult('skipped', context, {
         updatedAt: saved.updated_at || null,
         reason: '当前章节暂无持久化数据',
       })
     }
-    applyPersistedNoteContent(section, content, dataDigest)
+    applyPersistedNoteContent(section, content, dataDigest, saved)
     return noteRefreshResult('done', context, {
       persisted: true,
       updatedAt: saved.updated_at || null,
@@ -2331,7 +2340,7 @@ async function handleReaggregate(): Promise<NoteRefreshResult> {
       if (summary.ok) ElMessage.success(summary.text)
       else ElMessage.warning(summary.text)
     } else if (reloadResult.status === 'failed') {
-      ElMessage.error(`重新汇总完成，但章节重读失败：${reloadResult.reason || '未知原因'}`)
+      ElMessage.error(`重新汇总未完全完成，章节重读失败：${reloadResult.reason || '未知原因'}`)
     } else if (reloadResult.status === 'skipped') {
       ElMessage.warning(`重新汇总未完成：${reloadResult.reason || '暂无持久化数据'}`)
     }
@@ -3151,6 +3160,8 @@ async function onNoteNodeClick(
       baselineEditRows: clonePlain(editRows),
       savedData: savedContent,
       dataDigest,
+      isStale: Boolean(saved?.is_stale), staleReason: saved?.stale_reason || null,
+      staleReasonLabel: saved?.stale_reason_label || null, staleAt: saved?.stale_at || null,
       // Req 20.4：以 ACNR NOTE 地址标识源单体附注 section（reaggregate 溯源），
       // 与统一寻址体系一致，可追溯；仅为标识，不参与计算。
       noteAddr: sourceNoteAddr(sec.section_id),

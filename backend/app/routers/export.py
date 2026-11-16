@@ -11,6 +11,7 @@ Validates: Requirements 7.1-7.10
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from uuid import UUID
 
@@ -27,7 +28,10 @@ from app.models.report_schemas import (
     ExportTaskStatusResponse,
     ExportHistoryResponse,
 )
+from app.services.export_policy_snapshot import resolve_policy_snapshot_for_project
 from app.services.pdf_export_engine import PDFExportEngine
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/export",
@@ -44,10 +48,21 @@ async def create_export_task(
     """创建导出任务并同步执行（MVP 无 Celery）"""
     engine = PDFExportEngine(db)
     try:
+        # spec platform-global-display-settings-closure 任务 10 / AC-21：
+        # 落单位策略快照证据（`export_tasks.unit_policy_snapshot`，V265）。
+        # 失败**不阻断导出**（它是审计证据不是业务前置），但要在日志留痕。
+        unit_policy_snapshot: str | None = None
+        try:
+            unit_policy_snapshot = await resolve_policy_snapshot_for_project(
+                db, project_id=data.project_id
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("导出单位策略快照构造失败（不阻断导出）: %s", exc)
         task = await engine.create_export_task(
             project_id=data.project_id,
             task_type=data.task_type,
             document_type=data.document_type,
+            unit_policy_snapshot=unit_policy_snapshot,
         )
         # MVP: execute synchronously
         task = await engine.execute_export(task.id)

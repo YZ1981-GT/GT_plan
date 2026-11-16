@@ -979,7 +979,7 @@ const activeSheetContext = ref<WorkpaperSheetContext>({
 /** Task 12 shell bridge — live capability snapshot（useShellCapability）。 */
 const { shellOwnerEpoch, shellCapabilityEpoch, shellError, shellCapabilitySnapshot } =
   useShellCapability({ wpId, projectId, activeSheetContext })
-const { sidePanelDecisionTrace, guidanceContextReady } = useEditorRendererFacts({ useHtmlRenderer, wpRendererRef, univerCatalog, univerSheetIdentityReady, activeSheetContext })
+const { sidePanelDecisionTrace, guidanceContextReady } = useEditorRendererFacts({ useHtmlRenderer, wpRendererRef, univerCatalog, univerSheetIdentityReady, activeSheetContext, wpId: () => wpId.value, currentBusinessVersion: () => wpDetail.value?.updated_at ?? null })
 
 const shellLocation = computed<CanonicalWorkpaperLocation | null>(() => {
   if (!wpDetail.value || projectYear.value == null) return null // 未设置审计年度：页面不渲染底稿，没有可定位的年度

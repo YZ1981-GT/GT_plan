@@ -153,7 +153,7 @@
         <el-tab-pane label="重分类" name="rje" />
       </el-tabs>
       <el-input v-model="searchText" clearable size="small" placeholder="搜索编号、摘要、科目" style="width: 210px"
-        @keyup.enter="applyServerFilters" @clear="applyServerFilters" />
+        aria-label="搜索调整分录" @keyup.enter="applyServerFilters" @clear="applyServerFilters" />
       <el-segmented v-model="originFilter" :options="ORIGIN_FILTER_OPTIONS" size="small" class="gt-adj-origin-filter" @change="adjPage = 1">
         <template #default="{ item }">
           <el-tooltip :content="item.tip" placement="top" :disabled="!item.tip" :show-after="200">
@@ -161,12 +161,12 @@
           </el-tooltip>
         </template>
       </el-segmented>
-      <el-select v-model="phaseFilter" size="small" style="width: 112px" @change="adjPage = 1">
+      <el-select v-model="phaseFilter" size="small" style="width: 112px" aria-label="按审计阶段筛选" @change="adjPage = 1">
         <el-option label="全部阶段" value="all" />
         <el-option label="预审提出" value="preliminary" />
         <el-option label="年审提出" value="final" />
       </el-select>
-      <el-select v-model="bookingFilter" size="small" style="width: 168px" @change="adjPage = 1">
+      <el-select v-model="bookingFilter" size="small" style="width: 168px" aria-label="按最终处理筛选" @change="adjPage = 1">
         <el-option label="全部最终处理" value="all" />
         <el-option label="纳入工作试算表" value="included" />
         <el-option label="客户已入账" value="effective" />
@@ -174,7 +174,7 @@
         <el-option label="不予更正" value="unadjusted" />
         <el-option label="待形成处理" value="pending" />
       </el-select>
-      <el-select v-model="sortKey" size="small" style="width: 118px" @change="applyServerFilters">
+      <el-select v-model="sortKey" size="small" style="width: 118px" aria-label="排序字段" @change="applyServerFilters">
         <el-option label="编号排序" value="adjustment_no" />
         <el-option label="金额排序" value="amount" />
         <el-option label="创建时间" value="created_at" />
@@ -182,7 +182,7 @@
       </el-select>
       <el-button size="small" plain @click="toggleSortOrder">{{ sortOrder === 'asc' ? '升序 ↑' : '降序 ↓' }}</el-button>
       <el-button size="small" type="success" plain @click="onGuideSyncFromWp" title="底稿里编的调整分录如何汇聚到这里">📥 从底稿同步</el-button>
-      <el-select v-if="entries.length > 0" v-model="creatorFilter" placeholder="全部编制人" clearable size="small" style="width: 140px" @change="adjPage = 1">
+      <el-select v-if="entries.length > 0" v-model="creatorFilter" placeholder="全部编制人" clearable size="small" style="width: 140px" aria-label="按编制人筛选" @change="adjPage = 1">
         <el-option v-for="person in creatorOptions" :key="person.id" :label="person.name" :value="person.id" />
       </el-select>
       <el-checkbox v-if="entries.length > 0" v-model="collabOnly" size="small" @change="adjPage = 1">仅看协作中</el-checkbox>
@@ -523,8 +523,14 @@ const filteredEntries = computed(() => collabOnly.value
   ? entries.value.filter((entry: any) => entry.has_active_collaboration)
   : entries.value)
 const serverTotal = computed(() => entriesResource.data.value.total)
-const serverStatusCounts = computed(() => entriesResource.data.value.status_counts || {})
-const statusCounts = computed(() => ({ all: serverTotal.value, ...serverStatusCounts.value }))
+// 后端 status_counts 是无固定键的计数字典；显式标注避免 `|| {}` 把类型收敛成 `{}`
+// （HEAD 预存的 TS7053/TS2339：statusCounts[s.value] 与 statusCounts.pending_review 取不到键）。
+const serverStatusCounts = computed<Record<string, number>>(
+  () => (entriesResource.data.value.status_counts || {}) as Record<string, number>,
+)
+const statusCounts = computed<Record<string, number>>(
+  () => ({ all: serverTotal.value, ...serverStatusCounts.value }),
+)
 
 const adjPage = ref(1)
 const adjPageSize = 50
@@ -1072,7 +1078,7 @@ onContextChange(() => {
 .gt-adj-guide-card:focus-visible { outline: 2px solid var(--gt-color-primary); outline-offset: 2px; }
 .gt-adj-guide-card__icon { font-size: var(--gt-font-size-3xl); margin-bottom: 10px; }
 .gt-adj-guide-card__title { font-size: var(--gt-font-size-base); font-weight: 600; color: var(--gt-color-text); margin-bottom: 6px; }
-.gt-adj-guide-card__desc { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); line-height: 1.5; }
+.gt-adj-guide-card__desc { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); line-height: 1.5; }
 .gt-adj-resource-errors { display: grid; gap: 6px; margin-bottom: 8px; }
 .gt-adj-resource-error-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .gt-adj-resource-stale { color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs); }

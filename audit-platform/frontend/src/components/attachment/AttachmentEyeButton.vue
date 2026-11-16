@@ -8,8 +8,9 @@
         size="small"
         :loading="loading"
         :aria-label="`预览 ${displayName}`"
+        :title="`预览 ${displayName}`"
         data-testid="attachment-eye"
-        @click.stop.prevent="open"
+        @click.stop.prevent="open($event)"
       >
         <el-icon><View /></el-icon>
       </el-button>
@@ -31,7 +32,7 @@
  * 只要附件编号即可：点开时取附件信息（文件名 / 类型 / 识别状态；同时校验附件仍在、本人可见），
  * 识别文本被截断时再取全文；预览抽屉第一次点开才挂载。附件已删除或无权查看 ⇒ 中文提示，不开空预览。
  */
-import { computed, ref } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { View } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
@@ -55,6 +56,9 @@ const loading = ref(false)
 const mounted = ref(false)
 const visible = ref(false)
 const target = ref<AttachmentForPreview | null>(null)
+let openSeq = 0
+let openAbort: AbortController | null = null
+let previewOpener: HTMLElement | null = null
 
 const displayName = computed(() => props.fileName || '附件')
 
@@ -67,15 +71,58 @@ function statusOf(err: any): number {
   return Number(err?.response?.status || err?.status || 0)
 }
 
-async function open(): Promise<void> {
+function rememberPreviewOpener(source: Event | EventTarget | null | undefined) {
+  const eventLike = source && typeof source === 'object'
+    && ('currentTarget' in source || 'target' in source)
+  const candidate = eventLike
+    ? ((source as Event).currentTarget || (source as Event).target)
+    : source
+  const element = candidate instanceof Element
+    ? ((candidate.closest('button') as HTMLElement | null) || (candidate instanceof HTMLElement ? candidate : null))
+    : null
+  previewOpener = element
+}
+
+function restorePreviewFocus() {
+  const opener = previewOpener
+  previewOpener = null
+  if (!opener?.isConnected) return
+  void nextTick(() => {
+    if (opener.isConnected) opener.focus()
+  })
+}
+
+watch(visible, (open) => {
+  if (!open) restorePreviewFocus()
+})
+
+function cancelOpen(): void {
+  openSeq += 1
+  openAbort?.abort()
+  openAbort = null
+  loading.value = false
+}
+
+async function open(event?: Event): Promise<void> {
   if (!props.attachmentId || loading.value) return
+  rememberPreviewOpener(event)
+  const mine = ++openSeq
+  openAbort?.abort()
+  const controller = new AbortController()
+  openAbort = controller
   loading.value = true
   try {
     let detail: any
     try {
-      const res = await http.get(P_att.detail(props.attachmentId), { _silent: true } as any)
+      const res = await http.get(P_att.detail(props.attachmentId), {
+        _silent: true,
+        _dedupe: false,
+        signal: controller.signal,
+      } as any)
+      if (mine !== openSeq || controller.signal.aborted) return
       detail = unwrap(res?.data) || {}
     } catch (err: any) {
+      if (mine !== openSeq || controller.signal.aborted) return
       const code = statusOf(err)
       if (code === 404 || code === 403) {
         ElMessage.warning('附件不存在或无权查看')
@@ -84,15 +131,23 @@ async function open(): Promise<void> {
       }
       return
     }
+
     let ocrText: string = detail.ocr_text || ''
     if (detail.ocr_text_truncated) {
       try {
-        const full = await http.get(P_att.ocrText(props.attachmentId), { _silent: true } as any)
+        const full = await http.get(P_att.ocrText(props.attachmentId), {
+          _silent: true,
+          _dedupe: false,
+          signal: controller.signal,
+        } as any)
+        if (mine !== openSeq || controller.signal.aborted) return
         ocrText = unwrap(full?.data)?.ocr_text || ocrText
       } catch {
+        if (mine !== openSeq || controller.signal.aborted) return
         // 全文取不到时保留预览片段，不影响看原件
       }
     }
+    if (mine !== openSeq || controller.signal.aborted) return
     target.value = toAttachmentPreview({
       id: props.attachmentId,
       file_name: detail.file_name || props.fileName,
@@ -103,9 +158,23 @@ async function open(): Promise<void> {
     mounted.value = true
     visible.value = true
   } finally {
-    loading.value = false
+    if (mine === openSeq) {
+      loading.value = false
+      if (openAbort === controller) openAbort = null
+    }
   }
 }
+
+watch(() => props.attachmentId, () => {
+  cancelOpen()
+  visible.value = false
+  target.value = null
+})
+
+onUnmounted(() => {
+  cancelOpen()
+  previewOpener = null
+})
 
 defineExpose({ open })
 </script>

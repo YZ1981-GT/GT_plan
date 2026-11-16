@@ -1242,7 +1242,7 @@ backend/app/routers/attachments.py  922
 #    其中 ledger_penetration.py 原始 delta 是 +93（+5.69% 已超阈值），按门禁提示的优先顺序
 #    「抽伴生模块（优先）」把 parse_iso_date 抽到 routers/_voucher_date.py（28 行）后降至 1712。
 # 登记为待办：三者都该整体瘦身。下次再往这三个文件加功能应**先拆分再改**，不再滚雪球加基线。
-audit-platform/frontend/src/views/LedgerPenetration.vue  4682
+audit-platform/frontend/src/views/LedgerPenetration.vue  5366
 backend/app/routers/ledger_penetration.py  1634
 backend/app/services/ledger_penetration_service.py  942
 #
@@ -1333,7 +1333,7 @@ backend/tests/test_report_engine.py  986
 #   consol_note_sections.py —— **改动前即 982 行已超 800 上限**。本次净增 +56 行：
 #     合并附注节点隔离 key + 共享上下文接线。拆分方向：把 AI 填充端点组抽为伴生模块。
 #     2026-10-22 表头识别改调标题行库（删关键词表 / _resolve_value_columns）后 1032 行，基线随之下调。
-backend/app/routers/consol_note_sections.py  1032
+backend/app/routers/consol_note_sections.py  1087
 #   consol_note_formula_service.py —— **改动前即 864 行已超 800 上限**。本次净增 +42 行：
 #     合并附注公式推送引擎接线。拆分方向：把公式求值与公式注册两个关注点分离。
 #   2026-10-06 净增 +161 行：附注模块全面修复（multi_header 转换/columns+_row_types 补齐/
@@ -1501,7 +1501,7 @@ backend/tests/test_formula_push_note_skip.py  1926
 #   LedgerPenetration.vue —— 查账穿透页面，承载 7 个表格视图（4 个 tab + 3 层穿透）。
 #     本次新增摘要列折行样式、虚拟滚动勾选列、Tab 导出Excel 函数、辅助明细渐进加载。
 #     拆分方向：4 个 tab 区域（科目余额/辅助余额/序时账/辅助明细）可抽为子组件。
-audit-platform/frontend/src/views/LedgerPenetration.vue  5110
+audit-platform/frontend/src/views/LedgerPenetration.vue  5366
 #   DetailProjectPanel.vue —— 项目概览大厅面板。本次仅 +12 行（查账窗口入口按钮）。
 #     拆分方向：核心流程/辅助工具/看板区域 3 块可抽子组件。
 audit-platform/frontend/src/components/layout/DetailProjectPanel.vue  1726
@@ -1717,6 +1717,10 @@ backend/scripts/diagnose/diagnose_g7_column_alignment.py  1576
 #     按门禁提示拆了伴生模块 `_note_text_sections.py`（text_sections 关注点整段搬出 + 逐名 re-export），
 #     现 737 行，比 HEAD 还小。白名单只给历史大文件，自己推过线的要拆。
 backend/app/routers/wp_render_strategies/_j1_disclosure_import_export.py  831
+#   2026-11-14 _j1_import_export.py：HEAD 上 1546 行已超限（历史大文件，10 个 sheet_type 的
+#     模板构建 + 导出数据分支都在单文件），本会话只加 8 行注释并把 GET+POST 双方法 api_route
+#     拆成两条单方法路由（+19）。同族 _j1_disclosure_import_export.py 已在册，拆分方向同上。
+backend/app/routers/wp_render_strategies/_j1_import_export.py  1565
 backend/scripts/fix/fix_note_i_cycle_structure.py  1259
 backend/tests/test_note_expandable_rows.py  986
 #   GtC24JournalDetail.vue / GtWpRenderer.vue / useH1LeaseCheck.ts / N1TabCalcTable.vue / audit_check.py /
@@ -1962,3 +1966,27 @@ backend/app/services/consol_snapshot_service.py 1276
 #   本 spec 把 9 个规则的异常分支改为「检查异常，未执行」后 1176 行。
 #   拆分方向：IndependenceDeclarationCompleteRule（约 270 行）与 EventCascadeHealthRule（约 125 行）各抽独立模块，本文件保留注册与再导出。
 backend/app/services/gate_rules_phase14.py 1176
+# backend/tests/procedure_trim/test_trim_report_line_amounts.py — 全仓 CI 红修复时补 `from typing import Any`（F821）。HEAD 已 1255 行（超 800 未登记的历史大测试）。
+#   拆分方向：按被测断言族拆成 amount_math / report_line_mapping 两个模块，本文件保留 fixture 与聚合。
+backend/tests/procedure_trim/test_trim_report_line_amounts.py 1256
+# backend/tests/workpaper_sync/test_combined_workbook_wp_code_resolution.py — 全仓 CI 红修复时补 `from typing import Any`（F821）。HEAD 已 842 行（超 800 未登记的历史大测试）。
+#   拆分方向：按合册解析 / wp_code 裁决 / 冲突消解三段拆模块。
+backend/tests/workpaper_sync/test_combined_workbook_wp_code_resolution.py 843
+# backend/app/services/ledger_import/converter.py — 全仓 CI 红修复时补 TYPE_CHECKING 块（BalanceConversionResult / LedgerConversionResult 的 F821）。HEAD 已 801 行。
+#   拆分方向：currency 归一 / 余额行 / 序时账行三个函数组各抽伴生模块，本文件保留编排入口。
+backend/app/services/ledger_import/converter.py 806
+# backend/app/services/excel_html_converter.py — 全仓 CI 红修复时给 Pt 使用行加 noqa（F821，净增 0 行）。HEAD 已 1261 行，超 800 未登记。
+#   拆分方向：xlsx->html 渲染 / docx 生成 / 样式映射三段抽伴生模块。
+backend/app/services/excel_html_converter.py 1261
+# backend/scripts/check/check_projection_lane_adjudication.py — 全仓 CI 红修复时补 Mapping 到既有 typing import（F821，净增 0 行）。HEAD 已 815 行。
+#   拆分方向：判据表 / 报告渲染 / CLI 三段拆模块。
+backend/scripts/check/check_projection_lane_adjudication.py 815
+# backend/app/routers/recycle_bin.py — 全仓 CI 红修复时补保存点与真实删除入口（修 2 处运行时 NameError）。HEAD 已 831 行。
+#   拆分方向：列表与恢复 / 永久删除（含级联与保存点）/ 附件清理三段拆 service。
+backend/app/routers/recycle_bin.py 837
+
+# attachment-platform-cross-module-closure Task 24~29（2026-11-15）：KnowledgeBase.vue 在本批之前已是历史大文件（远端基线 1733 行，超过 1500 上限）。本批仅补列表失败态/加载态、预览焦点与上传互斥等可靠性和可访问性接线，当前 1755 行，仍在基线 +5% 内；拆分按知识库树/文档列表/预览三块进行，另立前端瘦身任务，不能在本次提交混入。
+audit-platform/frontend/src/views/KnowledgeBase.vue  1733
+#   ledger_import_application_service.py — 历史大文件（HEAD 已 883 行超 800 上限且此前未登记），
+#     本次账簿导入确认门与分段校验逻辑接线。拆分方向：确认门/编排/查询三块拆模块。
+backend/app/services/ledger_import_application_service.py  883

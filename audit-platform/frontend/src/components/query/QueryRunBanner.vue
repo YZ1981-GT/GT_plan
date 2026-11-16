@@ -4,10 +4,9 @@
     v-if="hasContent"
     class="query-run-banner"
     :class="`query-run-banner--${freshnessStatus}`"
-    :data-testid="scopeTestId"
   >
-    <!-- 范围 -->
-    <div v-if="scopeText" class="query-run-banner__scope">
+    <!-- 范围（宿主可传 scopeTestId 把原有锚点挪到这一段，AQF §8.2 构建器的 aqb-result-scope） -->
+    <div v-if="scopeText" class="query-run-banner__scope" :data-testid="scopeTestId">
       <span class="query-run-banner__label">范围：</span>{{ scopeText }}
     </div>
 

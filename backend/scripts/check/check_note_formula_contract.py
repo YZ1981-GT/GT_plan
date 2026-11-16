@@ -17,6 +17,7 @@ Props:  Property 3（合计不写公式 binding）/ Property 4（合计口径 �
 from __future__ import annotations
 
 import argparse
+import re
 import json
 import sys
 from pathlib import Path
@@ -264,17 +265,28 @@ def check_all() -> list[str]:
         elif source == DERIVED_SOURCE_CROSS_CHECK:
             derived_cross.append(p)
 
-    if preset_movement_sections != binding_movement_sections:
+    # 🔴 2026-11-14 判据修正：从「两个集合必须相等」改为「预设章节必须真实存在」。
+    #
+    # 原判据假设「movement / 合计章节要么由预设驱动、要么由 binding 驱动，二者必居其一」。
+    # 实测证伪 —— 这是**双轨**，不是二选一：
+    #   * 预设 `note_formula_derivation`：单元格间的**算式**
+    #     （变动表 `期末 = 上年年末 + 本期增加 − 本期减少`，即 ROW('C1')+ROW('C2')-ROW('C3')），
+    #     作用是**勾稽校验**；
+    #   * binding：单元格的**取数来源**（如 `closing_balance` 绑
+    #     `trial_balance.audited_amount` 取审定数），作用是**实测填充**。
+    # 同一章节两者并存、且数学上应相等（勾稽关系），本来就不该「集合相等」。
+    # 要求相等会让所有「纯勾稽校验章节」永远无法通过。
+    #
+    # 保留的真判据（可伪证）：**预设指向的章节必须真实存在于 bindings**
+    # —— 这抓的是脏数据（实测抓到过 18 条 preset 把「八、计入递延收益的政府补助」
+    # 写成截断的「三、计入递延收益的政」，章号与标题都不对）。
+    missing_preset_sections = sorted(
+        (preset_movement_sections | preset_sum_sections) - set(bindings)
+    )
+    if missing_preset_sections:
         problems.append(
-            "[P14] movement 章节集合不一致："
-            f"仅预设 {sorted(preset_movement_sections - binding_movement_sections)[:5]}，"
-            f"仅 binding {sorted(binding_movement_sections - preset_movement_sections)[:5]}"
-        )
-    if preset_sum_sections != binding_sum_sections:
-        problems.append(
-            "[P14] 合计登记章节集合不一致："
-            f"仅预设 {sorted(preset_sum_sections - binding_sum_sections)[:5]}，"
-            f"仅 binding {sorted(binding_sum_sections - preset_sum_sections)[:5]}"
+            "[P14] 预设指向的章节在 note_template_bindings 里不存在（章节名/章号写错）："
+            f"{missing_preset_sections[:5]}"
         )
 
     # --- Property 15：cross_check 同源 --------------------------------------
@@ -295,12 +307,40 @@ def check_all() -> list[str]:
         if (p.get("formula_type") or "") != (src.get("formula_type") or ""):
             problems.append(f"[P15] formula_type 与报表侧不一致：{target}")
 
-    # --- Property 13：linkage 未被批量填 ------------------------------------
+    # --- Property 13：linkage 未被**批量臆造** ------------------------------
+    #
+    # 🔴 2026-11-14 判据收紧为「业务条目必须 ⊆ _backlog 点名的 code」。
+    #
+    # 原判据是「业务条目数必须为 0」。那防的是「一次性批量臆造几百条错误映射」
+    # （`_rules` ② 的原话：「禁止臆造大量报表行→附注单元格映射（映射错=写错披露）」）。
+    # 但 `_backlog` 自己又写着「已 seed：BS-002 货币资金…BS-005 应收票据…」——
+    # 即**按 `_backlog` 逐节核实、增量维护**才是合规做法。两条规则互相矛盾，
+    # 于是 P13 从 BS-002/BS-005 落库那一刻起恒红。
+    #
+    # 现在的判据两头都守住，且可伪证：
+    #   ① 业务条目引用的 report_row_code 必须在 `_backlog` 里被点过名
+    #      （`_backlog` 是唯一登记处，写明逐节核实的依据；没登记就加条目 = 臆造）
+    #   ② 条目数不得超过 `_backlog` 点名的 code 数
+    #      （防「登记 2 条却塞 200 条」）
+    # 判据不写死具体 code 清单 —— 新增 seed 只需同步 `_backlog` 文案。
     linkage = _load(LINKAGE_PATH)
-    business_keys = [k for k in linkage if isinstance(k, str) and not k.startswith("_")]
-    if business_keys:
+    business_keys = [
+        k for k in linkage if isinstance(k, str) and not k.startswith("_")
+    ]
+    backlog_codes = set(
+        re.findall(r"\b(?:BS|IS)-\d+\b", str(linkage.get("_backlog") or ""))
+    )
+    unregistered = sorted(k for k in business_keys if k not in backlog_codes)
+    if unregistered:
         problems.append(
-            f"[P13] report_note_linkage.json 出现业务条目（应为 0）：{business_keys[:5]}"
+            "[P13] report_note_linkage.json 出现**未在 _backlog 登记**的业务条目"
+            f"（先按 _rules ② 逐节核实源模板并在 _backlog 写明依据，再加条目）："
+            f"{unregistered[:5]}"
+        )
+    if len(business_keys) > len(backlog_codes):
+        problems.append(
+            f"[P13] 业务条目数 {len(business_keys)} 超过 _backlog 点名的 code 数 "
+            f"{len(backlog_codes)}：{sorted(business_keys)[:5]}"
         )
 
     print("# 附注公式数据契约守卫")

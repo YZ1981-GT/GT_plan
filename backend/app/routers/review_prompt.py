@@ -9,6 +9,8 @@ Requirements: 3.1, 3.2, 3.3, 3.4, 4.1, 7.1, 7.2, 7.3, 7.4, 10.3
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import io
 import logging
 import uuid
@@ -30,6 +32,9 @@ from app.services.ai_review_verdict import resolve_ai_review_verdict
 from app.services.batch_review_service import BatchReviewService
 from app.services.llm_response_parser import LlmResponseParser, ReviewFinding
 from app.services.review_prompt_service import ReviewPromptService
+
+if TYPE_CHECKING:
+    from app.services.batch_review_service import BatchReviewReport
 
 logger = logging.getLogger(__name__)
 

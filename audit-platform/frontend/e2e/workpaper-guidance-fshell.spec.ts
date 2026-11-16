@@ -23,9 +23,11 @@ const PROJECT_ID =
   process.env.TEST_PROJECT_ID ||
   '0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49'
 
+// 🔴 该 spec 已归档（`_archive/17-2026-10-03-verified-batch/`），
+//    T20-playwright 证据目录只存在于归档区；指向活跃区会静默建出空目录。
 const EVIDENCE_DIR = path.resolve(
   __dirname,
-  '../../../.kiro/specs/workpaper-guidance-content-closure/basis/T20-playwright',
+  '../../../.kiro/specs/_archive/17-2026-10-03-verified-batch/workpaper-guidance-content-closure/basis/T20-playwright',
 )
 
 type HostKind = 'html' | 'univer' | 'onlyoffice'

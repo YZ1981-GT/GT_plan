@@ -232,6 +232,7 @@ async def execute_pipeline(
     cancel_check: CancelChecker | None = None,
     phase_marker: PhaseMarker | None = None,
     append_options: dict[str, Any] | None = None,
+    attempt_id: UUID | None = None,
 ) -> PipelineResult:
     """v2 引擎纯数据管线（detect → parse → convert → validate → write → activate）。
 
@@ -248,6 +249,9 @@ async def execute_pipeline(
         phase_marker: F14 checkpoint 回调 async (phase) → None；每个关键 phase
             完成后调用，用于持久化 ``ImportJob.current_phase``。回调内部异常
             被 pipeline 吞掉（持久化失败不应阻断主流程）。
+        attempt_id: 账套导入 attempt UUID（spec platform-global-display-settings-closure
+            任务 8）。为 None 时跳过 attempt 状态流转（旧 job / 兼容路径），
+            **不阻断导入**——attempt 是新增的恢复证据，不能让历史 job 失败。
 
     Returns:
         PipelineResult
@@ -757,6 +761,58 @@ async def execute_pipeline(
     # ── Activate ──
     logger.info("Pipeline %s phase=activate_dataset %s", job_id, staging_dataset_id)
     await _progress(90, "激活数据集")
+
+    # ── attempt 状态流转（spec platform-global-display-settings-closure 任务 8）──
+    # 🔴 attempt_id 由 submit 落进 ImportJob.options，调用方（worker）取出后传进来。
+    #    为 None 时全部跳过（旧 job / 兼容路径），不阻断导入。
+    # 🔴 三次 CAS 的第二次（seal）与第三次（begin_activation）在这里；
+    #    base token 由唯一入口 `resolve_base_token` 现读，与 submit / detect 同口径。
+    if attempt_id is not None:
+        from app.services.ledger_import.attempt_service import (
+            SealEvidence,
+            begin_activation,
+            seal_attempt,
+        )
+        from app.services.ledger_import.base_token_resolver import resolve_base_token
+
+        async with async_session() as att_db:
+            from sqlalchemy import select as _sel
+
+            from app.models.dataset_models import LedgerImportAttempt as _LIA
+
+            attempt = (
+                await att_db.execute(_sel(_LIA).where(_LIA.id == attempt_id))
+            ).scalars().first()
+            if attempt is not None:
+                current_token = await resolve_base_token(
+                    att_db, project_id=project_id, year=import_year
+                )
+                try:
+                    # 第二次 CAS：seal（写证据供 activation-only 复用）
+                    evidence = SealEvidence(
+                        unit_contract_digest=attempt.unit_contract_digest,
+                        bundle_digest=attempt.bundle_digest,
+                        row_counts={
+                            "tb_balance": total_balance_written,
+                            "tb_aux_balance": total_aux_balance_written,
+                            "tb_ledger": total_ledger_written,
+                            "tb_aux_ledger": total_aux_ledger_written,
+                        },
+                        post_hash=None,  # post-hash 由 writer 侧算；此处留 None 表示未采集
+                    )
+                    await seal_attempt(
+                        att_db, attempt, current=current_token, evidence=evidence
+                    )
+                    # 第三次 CAS：进入 activating
+                    await begin_activation(att_db, attempt, current=current_token)
+                    await att_db.commit()
+                except Exception as exc:  # noqa: BLE001 — attempt 流转失败不阻断导入
+                    await att_db.rollback()
+                    logger.warning(
+                        "Pipeline %s attempt %s 状态流转失败（不阻断导入）：%s",
+                        job_id, attempt_id, exc,
+                    )
+
     async with async_session() as act_db:
         activated_dataset = await activate_dataset(
             act_db,
@@ -778,6 +834,30 @@ async def execute_pipeline(
             expected_active_dataset_id=expected_base_id(append_options),
         )
         await act_db.commit()
+
+    # 第四次流转：activation 完成（记下新 dataset_id）
+    if attempt_id is not None:
+        from app.services.ledger_import.attempt_service import finish_activation
+
+        async with async_session() as fin_db:
+            from sqlalchemy import select as _sel2
+
+            from app.models.dataset_models import LedgerImportAttempt as _LIA2
+
+            attempt2 = (
+                await fin_db.execute(_sel2(_LIA2).where(_LIA2.id == attempt_id))
+            ).scalars().first()
+            if attempt2 is not None:
+                try:
+                    await finish_activation(fin_db, attempt2, dataset_id=activated_dataset.id)
+                    await fin_db.commit()
+                except Exception as exc:  # noqa: BLE001 — 不阻断导入
+                    await fin_db.rollback()
+                    logger.warning(
+                        "Pipeline %s attempt %s finish_activation 失败（不阻断）：%s",
+                        job_id, attempt_id, exc,
+                    )
+
     _mark("activate_dataset_done")
 
     # ── 发布 LEDGER_DATASET_ACTIVATED（提交之后，内联投递）──

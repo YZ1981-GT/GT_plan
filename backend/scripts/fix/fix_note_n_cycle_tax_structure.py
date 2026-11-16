@@ -63,6 +63,35 @@ SOE_PATH = DATA_DIR / "note_template_soe.json"
 
 ALIGNED_BY = "n-cycle-tax-disclosure-alignment"
 
+
+def _aligned_by_has(mark: Any, tag: str) -> bool:
+    """`_aligned_by` 是**标签集合**（同一章节可能被多个 spec 先后对齐过）。
+
+    🔴 2026-11-14：原先三个对齐脚本各自要求 `_aligned_by == 自己的 ALIGNED_BY`，
+    而 五、30 / 五、41 / 五、63 / 八、31 等章节被 2~3 个 spec 先后对齐过 ⇒
+    谁后写谁赢，其余脚本的 `--check` 永远红（差异只在标记字段，内容完全一致）。
+    现语义：值可以是字符串（旧）或列表（新），只要自己那个 tag 在其中即算对齐。
+    """
+    if isinstance(mark, str):
+        return mark == tag
+    if isinstance(mark, (list, tuple, set)):
+        return tag in mark
+    return False
+
+
+def _aligned_by_add(mark: Any, tag: str) -> list:
+    """把 tag 并入标记（去重、保序）。"""
+    if isinstance(mark, str):
+        items = [mark] if mark else []
+    elif isinstance(mark, (list, tuple, set)):
+        items = [str(x) for x in mark]
+    else:
+        items = []
+    if tag not in items:
+        items.append(tag)
+    return items
+
+
 SECTION_N2_LISTED = "五、41"
 SECTION_N2_SOE = "八、41"
 SECTION_N4_LISTED = "五、63"
@@ -88,6 +117,37 @@ LEGACY_TABLE_NAMES = {
 
 # ─────────────────────────── 行 / 列构造 ───────────────────────────
 
+
+
+#: 同义写法（用户 2026-10-24 裁决「是一个意思的」）。
+_SYNONYMS = (("年初余额", "期初余额"), ("年初数", "期初数"))
+
+
+def _normalize_synonyms(obj: Any) -> Any:
+    if isinstance(obj, str):
+        for a, b in _SYNONYMS:
+            if obj == a:
+                return b
+        return obj
+    if isinstance(obj, list):
+        return [_normalize_synonyms(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: _normalize_synonyms(v) for k, v in obj.items()}
+    return obj
+
+
+def _tables_without_id(tables: list[Any]) -> list[Any]:
+    """比对口径：剔除 `table_id`（模板侧身份字段，本修复器不产出）+ 归一化同义写法。
+
+    🔴 2026-11-14：原先直接比 `tables != tables`，而模板侧已有 `table_id`
+    而本修复器生成的没有（恒 None）⇒ 内容完全一致也判未对齐，`--check` 永远红。
+    """
+    return [
+        _normalize_synonyms({k: v for k, v in t.items() if k != "table_id"})
+        if isinstance(t, dict)
+        else _normalize_synonyms(t)
+        for t in tables
+    ]
 
 def _data(label: str, **extra: Any) -> dict[str, Any]:
     row: dict[str, Any] = {"label": label}
@@ -152,7 +212,7 @@ _N2_SOE_ROWS = [
 ]
 
 _G_N2_LISTED = (
-    "上市版按**双期余额**列示（期末余额 / 上年年末余额）。"
+    "上市版按双期余额列示（期末余额 / 上年年末余额）。"
     "源模板说明：小税（费）种可合并反映；"
     "满足条件将当期所得税资产及当期所得税负债以抵销后净额列示时，"
     "实交税款大于应交税的超过部分列示为「其他流动资产」，小于时差额列示为「应交税费」。"
@@ -162,7 +222,7 @@ _G_N2_LISTED = (
 )
 
 _G_N2_SOE = (
-    "🔴 国企版按**变动口径**列示（期初余额 / 本期应交 / 本期已交 / 期末余额），"
+    "🔴 国企版按变动口径列示（期初余额 / 本期应交 / 本期已交 / 期末余额），"
     "与上市版的双期余额表结构本质不同，不可互相套用。"
     "【提示：增值税，根据“应交税费-未交增值税、简易计税、转让金融商品应交增值税、"
     "代扣代缴增值税”科目贷方余额计算填列。】"
@@ -237,7 +297,7 @@ _N4_LISTED_ROWS = [
 _G_N4_LISTED = (
     "按税费项目列示本期 / 上期发生额。"
     "源模板说明：各项税金及附加的计缴标准详见附注四、税项。"
-    "🔴 国企版源模板此节为「附注披露信息：无」→ **国企不披露税金及附加**，故无国企章节。"
+    "🔴 国企版源模板此节为「附注披露信息：无」→ 国企不披露税金及附加，故无国企章节。"
     "勾稽：合计 = 各税费项目之和（源模板 =SUM(B8:B16)）。"
 )
 
@@ -436,9 +496,10 @@ def apply(*, check_only: bool = False, dry_run: bool = False) -> bool:
         tables = build()
 
         changed = (
-            section.get("tables") != tables
+            _tables_without_id(section.get("tables") or [])
+            != _tables_without_id(tables)
             or section.get("text_sections") != texts
-            or section.get("_aligned_by") != ALIGNED_BY
+            or not _aligned_by_has(section.get("_aligned_by"), ALIGNED_BY)
         )
         if not changed:
             print(f"[{label}] {section_number} 已对齐（{ALIGNED_BY}），无需修改")
@@ -454,7 +515,7 @@ def apply(*, check_only: bool = False, dry_run: bool = False) -> bool:
 
         section["tables"] = tables
         section["text_sections"] = list(texts)
-        section["_aligned_by"] = ALIGNED_BY
+        section["_aligned_by"] = _aligned_by_add(section.get("_aligned_by"), ALIGNED_BY)
         print(f"[{label}] {section_number} 已修订：{len(tables)} 张表 / {len(texts)} 个文本节")
 
     if any_changed and not (check_only or dry_run):

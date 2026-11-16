@@ -307,8 +307,15 @@ class TestAnalyticalReviewRouting:
         assert result == "a17-summary"
 
     def test_a18_regulatory_letter(self):
+        """A18-2 现在渲染专属组件 ``a18-2-regulatory-communication``。
+
+        原先断言 ``regulatory-letter`` 是过期的：`wp_code_overrides.json` 里 0 个 wp_code 指向
+        `regulatory-letter`（`GtRegulatoryLetter.vue` 运行期不可达，仅作参考实现），
+        `A18-2` 精确指向 `a18-2-regulatory-communication`（`GtA182RegulatoryCommunication.vue`）。
+        spec `api-prefix-fix-recovery` 任务 4 顺带修正（该断言在 HEAD 上已红）。
+        """
         result = derive_component_type(_make_classification("D-检查表", wp_code="A18-2"))
-        assert result == "regulatory-letter"
+        assert result == "a18-2-regulatory-communication"
 
     def test_a1_15_not_affected(self):
         """A1-15 仍路由到 checklist-table，不受 A1-13/A1-14 影响。"""

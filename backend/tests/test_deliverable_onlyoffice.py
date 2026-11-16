@@ -191,7 +191,7 @@ async def test_property_54_onlyoffice_unavailable_degradation(
         monkeypatch.setattr(OnlyOfficeCallbackService, "health_check", _fake_health)
         # EQCR 判定隔离（无需真实 staff/assignment 表）
         monkeypatch.setattr(
-            "app.routers.deliverable._is_project_eqcr",
+            "app.routers.deliverable.is_project_eqcr",
             _async_false,
         )
 
@@ -373,7 +373,7 @@ async def test_unit_core_endpoints_available_when_onlyoffice_down(
 
         monkeypatch.setattr(OnlyOfficeCallbackService, "health_check", _down)
         monkeypatch.setattr(
-            "app.routers.deliverable._is_project_eqcr", _async_false
+            "app.routers.deliverable.is_project_eqcr", _async_false
         )
 
         pid, tid, vno = seed["project_id"], seed["task_id"], seed["version_no"]

@@ -83,10 +83,12 @@ flowchart TD
 """
 from __future__ import annotations
 
+from typing import Any
+
 import logging
 import re
 import uuid
-from decimal import Decimal, InvalidOperation
+from decimal import InvalidOperation
 
 from app.core.database import async_session as async_session_factory
 from app.models.audit_platform_schemas import EventPayload, EventType

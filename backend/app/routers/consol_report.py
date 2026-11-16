@@ -88,9 +88,9 @@ async def generate_consol_reports(
             status_code=409,
             detail={"code": "OPERATION_CONFLICT", "message": str(exc)},
         ) from exc
-    from app.workers.consol_operation_worker import wake
+    from app.core.worker_wakeup import wake_worker
 
-    wake()
+    wake_worker("consol_operation_worker")
     return {
         "message": "合并报表已进入更新队列",
         "applicable_standard": standard,

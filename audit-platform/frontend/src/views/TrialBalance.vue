@@ -989,7 +989,7 @@
                   'gt-tb-var-warn': Math.abs((Number(row.audited) - Number(row.unadjusted)) / Number(row.unadjusted)) > 0.3,
                   'gt-tb-var-danger': Math.abs((Number(row.audited) - Number(row.unadjusted)) / Number(row.unadjusted)) > 0.5,
                 }">
-                  {{ ((Number(row.audited) - Number(row.unadjusted)) / Math.abs(Number(row.unadjusted)) * 100).toFixed(1) }}%
+                  <GtMeasureCell :value="((Number(row.audited) - Number(row.unadjusted)) / Math.abs(Number(row.unadjusted)) * 100)" :kind="MEASURE_KIND_RATIO" :ratio-scale="RATIO_SCALE_PERCENT_POINTS" />
                 </span>
               </template>
             </template>
@@ -1386,7 +1386,6 @@ import { usePasteImport } from '@/composables/usePasteImport'
 import { usePermission } from '@/composables/usePermission'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 // Domain-split composables (platform-global-hardening Req 6.1/6.3)
-import { useTbSummary } from '@/views/composables/useTbSummary'
 import { useTbBalanceCheck } from '@/views/composables/useTbBalanceCheck'
 import { useTbCellInteraction } from '@/views/composables/useTbCellInteraction'
 import {
@@ -1402,10 +1401,9 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
 import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
-
-const route = useRoute()
-const router = useRouter()
-const projectStore = useProjectStore()
+import GtMeasureCell from '@/components/common/GtMeasureCell.vue'
+import { MeasureKind as MK, RatioScale as RS } from '@/types/measureKind'
+const MEASURE_KIND_RATIO = MK.RATIO, RATIO_SCALE_PERCENT_POINTS = RS.PERCENT_POINTS, route = useRoute(), router = useRouter(), projectStore = useProjectStore()
 const { canEdit, onContextChange } = useAuditContext()
 const { add: decAdd, sub: decSub } = useDecimalCalc()
 
@@ -4003,22 +4001,22 @@ async function onTbSumImportFile(e: Event) {
   :deep(.gt-tb-font-xs),
   :deep(.gt-tb-font-xs) th .cell,
   :deep(.gt-tb-font-xs) td .cell,
-  :deep(.gt-tb-font-xs) .el-table__body { font-size: var(--gt-font-size-xs) !important; }
+  :deep(.gt-tb-font-xs) .el-table__body { font-size: var(--gt-display-font-size, 11px) !important; }
 
   :deep(.gt-tb-font-sm),
   :deep(.gt-tb-font-sm) th .cell,
   :deep(.gt-tb-font-sm) td .cell,
-  :deep(.gt-tb-font-sm) .el-table__body { font-size: var(--gt-font-size-xs) !important; }
+  :deep(.gt-tb-font-sm) .el-table__body { font-size: var(--gt-display-font-size, 12px) !important; }
 
   :deep(.gt-tb-font-md),
   :deep(.gt-tb-font-md) th .cell,
   :deep(.gt-tb-font-md) td .cell,
-  :deep(.gt-tb-font-md) .el-table__body { font-size: var(--gt-font-size-sm) !important; }
+  :deep(.gt-tb-font-md) .el-table__body { font-size: var(--gt-display-font-size, 13px) !important; }
 
   :deep(.gt-tb-font-lg),
   :deep(.gt-tb-font-lg) th .cell,
   :deep(.gt-tb-font-lg) td .cell,
-  :deep(.gt-tb-font-lg) .el-table__body { font-size: var(--gt-font-size-sm) !important; }
+  :deep(.gt-tb-font-lg) .el-table__body { font-size: var(--gt-display-font-size, 14px) !important; }
 
   :deep(.el-table th .cell) {
     font-weight: 600;

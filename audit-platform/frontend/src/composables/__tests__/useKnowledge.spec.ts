@@ -35,7 +35,12 @@ describe('useKnowledge.search', () => {
     const [url, config] = mockGet.mock.calls[0]
     expect(url).toBe('/api/knowledge-library/search')
     expect(url).toBe(knowledgeLibrary.search)
-    expect(config).toEqual({ params: { q: '治理层', context: 'A10 货币资金' } })
+    expect(config).toMatchObject({
+      params: { q: '治理层', context: 'A10 货币资金' },
+      _silent: true,
+      _dedupe: false,
+    })
+    expect(config.signal).toBeInstanceOf(AbortSignal)
     expect(rows.map((r) => r.id)).toEqual(['d1'])
     expect(searchResults.value).toEqual(rows)
   })
@@ -43,7 +48,8 @@ describe('useKnowledge.search', () => {
   it('不带上下文时不发送 context 参数', async () => {
     mockGet.mockResolvedValue([])
     await useKnowledge().search('函证')
-    expect(mockGet.mock.calls[0][1]).toEqual({ params: { q: '函证' } })
+    expect(mockGet.mock.calls[0][1]).toMatchObject({ params: { q: '函证' }, _silent: true, _dedupe: false })
+    expect(mockGet.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal)
   })
 
   it('空白查询不发请求', async () => {
@@ -52,17 +58,20 @@ describe('useKnowledge.search', () => {
     expect(mockGet).not.toHaveBeenCalled()
   })
 
-  it('接口失败返回空列表且复位 searching', async () => {
-    mockGet.mockRejectedValue(new Error('boom'))
+  it('接口失败抛出并保留可见失败态，不伪装成空列表', async () => {
+    mockGet.mockRejectedValue({ response: { status: 500 } })
     const k = useKnowledge()
-    const rows = await k.search('函证')
-    expect(rows).toEqual([])
+    await expect(k.search('函证')).rejects.toBeTruthy()
     expect(k.searching.value).toBe(false)
+    expect(k.searchStatus.value).toBe('error')
+    expect(k.searchError.value).toContain('搜索失败')
   })
 
-  it('非数组响应按空列表处理（不把包装体当结果行）', async () => {
+  it('非数组响应报格式错误，不把包装体当成空结果', async () => {
     mockGet.mockResolvedValue({ results: [{ id: 'x' }] })
-    expect(await useKnowledge().search('函证')).toEqual([])
+    const k = useKnowledge()
+    await expect(k.search('函证')).rejects.toThrow('响应格式不正确')
+    expect(k.searchStatus.value).toBe('error')
   })
 })
 

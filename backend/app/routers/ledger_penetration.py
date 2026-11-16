@@ -634,22 +634,36 @@ async def smart_import(
     custom_mapping_query: Optional[str] = Query(None, description="兼容旧版 query custom_mapping"),
     append_strategy: Optional[str] = Form(None, description="增量追加策略：skip / overwrite"),
     balance_carry_confirmed: bool = Form(False, description="确认沿用上一版本余额表"),
+    unit_confirmation: Optional[str] = Form(
+        None,
+        description="单位确认合同 JSON（由预览结果确认后提交）",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
     """智能导入（异步后台）：解析多个文件并写入数据库。
 
     立即返回 accepted，前端通过 /api/data-lifecycle/import-queue/{project_id} 轮询进度。
-    适合大文件（>10MB 或 >100万行）避免 HTTP 超时。
+    适合大文件（>10MB 或 >100万行）避免 HTTP 超时。直传文件必须同时携带
+    预览令牌和单位确认合同；已有 bundle-only 路径保持兼容。
     """
+    from app.services.ledger_import.unit_confirmation_gate import (
+        require_direct_file_confirmation,
+    )
     from app.services.ledger_import_application_service import LedgerImportApplicationService
 
+    confirmed_unit = require_direct_file_confirmation(
+        files=files,
+        upload_token=upload_token,
+        unit_confirmation=unit_confirmation,
+    )
     return await LedgerImportApplicationService.submit_import_job(
         project_id=project_id,
         user_id=str(current_user.id),
         db=db,
         files=files,
         upload_token=upload_token,
+        unit_confirmation=confirmed_unit,
         year=year,
         custom_mapping=custom_mapping or custom_mapping_query,
         payload_style="ledger",

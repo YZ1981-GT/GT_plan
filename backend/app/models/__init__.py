@@ -49,6 +49,8 @@ from app.models.dataset_models import (
     ImportJob,
     JobStatus,
     LedgerDataset,
+    LedgerImportAttempt,
+    LedgerImportAttemptStatus,
     OutboxStatus,
 )
 from app.models.report_models import (
@@ -258,6 +260,7 @@ __all__ = [
     "ImportStatus",
     "DatasetStatus",
     "JobStatus",
+    "LedgerImportAttemptStatus",
     "ArtifactStatus",
     "ActivationType",
     "OutboxStatus",
@@ -274,6 +277,7 @@ __all__ = [
     "Materiality",
     "ImportBatch",
     "LedgerDataset",
+    "LedgerImportAttempt",
     "ImportJob",
     "ImportArtifact",
     "ImportEventOutbox",

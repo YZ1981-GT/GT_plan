@@ -251,10 +251,26 @@ class PDFExportEngine:
         task_type: ExportTaskType,
         document_type: str | None = None,
         created_by: UUID | None = None,
+        *,
+        export_year: int | None = None,
+        document_types: list[str] | None = None,
+        unit_policy_snapshot: str | None = None,
     ) -> ExportTask:
         """创建导出任务记录。
 
         Validates: Requirements 7.2, 7.7
+
+        spec platform-global-display-settings-closure 任务 10 / AC-21：新增三个可选字段
+        落 `unit_policy_snapshot` 证据（V265 已建列）。**全部默认 None**，
+        既有调用方行为逐字节不变。
+
+        - `export_year`：导出年度（V265 的 `export_year` 列）。缺失时保持 None
+          （不猜当前年——猜出来的年度会让「按年度取数」的验收误判）。
+        - `document_types`：多文档类型列表（V265 的 `document_types` 列）。
+          单文档时调用方仍可只传 `document_type`（旧契约保持）。
+        - `unit_policy_snapshot`：`ExportUnitPolicy` 的 canonical JSON
+          （含 `unit` / `divisor` / `canonical_digest`）——**这是正式导出的单位证据**，
+          缺它则无法审计「这份交付件是按哪个单位出的」。
         """
         task = ExportTask(
             project_id=project_id,
@@ -263,6 +279,9 @@ class PDFExportEngine:
             status=ExportTaskStatus.queued,
             progress_percentage=0,
             created_by=created_by,
+            export_year=export_year,
+            document_types=document_types,
+            unit_policy_snapshot=unit_policy_snapshot,
         )
         self.db.add(task)
         await self.db.flush()

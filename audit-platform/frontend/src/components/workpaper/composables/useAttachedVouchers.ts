@@ -212,9 +212,14 @@ export async function queryVoucherLinks(
   projectId: string,
   year: number,
   keys: string[],
+  signal?: AbortSignal,
 ): Promise<Record<string, VoucherLink[]>> {
   if (keys.length === 0) return {}
-  const res = await http.post(P_ledger.voucherLinksQuery(projectId), { year, keys }, { _silent: true, _dedupe: false } as any)
+  const res = await http.post(
+    P_ledger.voucherLinksQuery(projectId),
+    { year, keys },
+    { _silent: true, _dedupe: false, signal } as any,
+  )
   const data = unwrap<{ links?: Record<string, VoucherLink[]> }>(res)
   return data?.links && typeof data.links === 'object' ? data.links : {}
 }

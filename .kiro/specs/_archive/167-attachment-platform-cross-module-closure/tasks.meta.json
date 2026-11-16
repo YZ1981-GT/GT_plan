@@ -1,0 +1,136 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "24. 附件/行级证据/凭证/知识列表区分空与失败并支持重试；项目附件页按能力控制写操作": [
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794702403136
+      },
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794702413671
+      },
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794702778015
+      }
+    ],
+    "25. 统一预览竞态与 URL 释放；限制上传重叠；缓存加 TTL/容量/退出清理；附件列表分页": [
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794702403215
+      },
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794702788141
+      },
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794703414571
+      }
+    ],
+    "26. 完成键盘、焦点、aria/alt/title 与 390/768px 布局；补前端守卫和变异": [
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794702403272
+      },
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794703425152
+      },
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794705107385
+      }
+    ],
+    "27. 修复验证环境（声明依赖 pgvector、Node 可执行环境），运行聚焦后端/前端测试": [
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794702403319
+      },
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794705119262
+      },
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794706021172
+      }
+    ],
+    "28. Playwright 真实走查底稿、凭证、合同、函证、知识晋升、AI 附件、输出溯源、归档，并恢复测试数据": [
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794702403378
+      },
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794706034144
+      },
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794708131480
+      }
+    ],
+    "29. 干净 worktree 全量差集验证、迁移/回退演练、五角色复盘，更新 INDEX/memory": [
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794702403438
+      },
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794708143582
+      }
+    ],
+    "30. 共享库迁移与历史附件路径/backfill 应用（执行前向用户展示清册和回退方案并停点确认）": [
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794702403518
+      }
+    ],
+    "31. 单一提交并按版本工具推送当前分支": [
+      {
+        "executionId": "23322922-e02a-4e00-a1e8-f9241c0983bb",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794702403561
+      },
+      {
+        "executionId": "ee2da110-658c-44ff-a9ee-b5d9485b1cd0",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794712370058
+      },
+      {
+        "executionId": "ee2da110-658c-44ff-a9ee-b5d9485b1cd0",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794712625555
+      },
+      {
+        "executionId": "ee2da110-658c-44ff-a9ee-b5d9485b1cd0",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794712658781
+      },
+      {
+        "executionId": "ee2da110-658c-44ff-a9ee-b5d9485b1cd0",
+        "chatSessionId": "sess_11354f7c-a5f6-4275-855c-773c5b58bad6",
+        "timestamp": 1794713898279
+      }
+    ]
+  }
+}

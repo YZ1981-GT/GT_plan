@@ -157,8 +157,16 @@ async def create_draft(
     author_user_id: uuid.UUID,
     reviewer_user_id: uuid.UUID,
     reason: str | None = None,
+    actor_user_id: uuid.UUID | None = None,
 ) -> GuidancePublication:
-    """创建 draft 版本。legacy/template/BCD 抽取只导入此状态。"""
+    """创建 draft 版本。legacy/template/BCD 抽取只导入此状态。
+
+    🔴 `actor_user_id` 原先函数体里用了、参数表里没有（`author_user_id` 才是作者），
+    调用一次就 NameError。补为显式参数并默认回退到作者，保持既有调用点零改动；
+    需要区分「写库作者」与「事件审计者」的调用方显式传值即可。
+    """
+    if actor_user_id is None:
+        actor_user_id = author_user_id
     _assert_capability(actor_user_id, reviewer_user_id)
     content_digest = compute_content_digest(content_json)
     pub = GuidancePublication(

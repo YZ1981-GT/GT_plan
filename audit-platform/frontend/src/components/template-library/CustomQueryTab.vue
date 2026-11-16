@@ -241,6 +241,18 @@
         </div>
 
         <div class="gt-cqt-result-body">
+          <!-- 信息条（AQF §8.2：结果头下方显示范围 / 数据版本 / 采集时间 / 时效） -->
+          <QueryRunBanner
+            :run-info="evidence.runInfo.value"
+            :version="evidence.version.value"
+            :captured-at="evidence.version.value?.captured_at ?? null"
+            :freshness="evidence.freshness.value"
+            :checking="evidence.checking.value"
+            :unavailable="Boolean(evidence.checkError.value)"
+            @check="evidence.checkFreshness()"
+            @requery="executeQuery()"
+            @open-drawer="evidence.drawerVisible.value = true"
+          />
           <AcnrTargetResults :block="result.acnr_results" :project-id="formCtx.project_id" />
           <el-empty
             v-if="!executing && result.rows.length === 0 && !queryError"
@@ -401,6 +413,7 @@ import {
 import MyTemplatesDialog from '@/components/query/MyTemplatesDialog.vue'
 import { useQueryRunEvidence } from '@/components/query/useQueryRunEvidence'
 import QueryEvidenceDrawer from '@/components/query/QueryEvidenceDrawer.vue'
+import QueryRunBanner from '@/components/query/QueryRunBanner.vue'
 import { restoreTemplateQuery, type QueryTemplateItem } from '@/components/query/queryTemplateRestore'
 import { describeQueryError, queryErrorToast, type QueryErrorText } from '@/components/query/queryErrorText'
 import { columnTypesOf, formatQueryCell, isAmountCell } from '@/components/query/queryCellFormat'

@@ -25,8 +25,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Literal, Sequence
 
+from app.core import startup_candidate_gate as _candidate_gate
 from app.core import startup_deferred as _deferred
 from app.core import startup_migrations as _migrations
+from app.workers.worker_helpers import write_heartbeat
 
 Criticality = Literal["critical", "best_effort"]
 TaskStatus = Literal["ok", "skipped", "failed", "deferred"]
@@ -188,6 +190,9 @@ async def run_startup_tasks(
             deferred.append(spec)
             results.append(StartupTaskResult(spec.name, spec.phase, "deferred", 0, reload_handoff.deferred_detail()))
             continue
+
+        if _candidate_gate.apply_policy(spec, results, report, _set_runtime_report, StartupTaskResult, desensitize_detail):
+            continue
         skip_reason: str | None = None
         if spec.skip_condition is not None:
             try:
@@ -295,12 +300,10 @@ async def _task_acnr_redis_inject(_ctx: StartupContext) -> None:
     if acnr_redis is not None:
         set_redis_client(acnr_redis)
 
-
 def _task_register_event_handlers(_ctx: StartupContext) -> None:
     from app.services.event_handlers import register_event_handlers
 
     register_event_handlers()
-
 
 def _task_register_a13_event_handlers(_ctx: StartupContext) -> None:
     from app.services.a13_event_handler import register_a13_event_handlers
@@ -368,11 +371,12 @@ def _task_register_phase_handlers(_ctx: StartupContext) -> None:
         logging.getLogger("audit_platform").warning("[启动] 公式推送 handler 注册失败: %s", e)
 
     # formula-global-settings-sync R8：公式有效定义变化 → 报表标过期重算 / 底稿 / 附注 / 合并附注
+    # （🔴 2026-11-14 抽到伴生模块 startup_formula.py：本文件已超行数门禁，
+    #   且那里含「outbox 专用派发器注册已完成」的断言，见其文档头）
     try:
-        from app.services.event_bus import event_bus
-        from app.services.formula_settings.propagation import register_formula_settings_handlers
+        from app.core.startup_formula import register_formula_settings_startup
 
-        register_formula_settings_handlers(event_bus)
+        register_formula_settings_startup()
     except Exception as e:
         logging.getLogger("audit_platform").warning("[启动] 公式设置传播 handler 注册失败: %s", e)
 
@@ -699,6 +703,62 @@ def _task_print_ready(ctx: StartupContext) -> None:
 # Workers — each has a stable name in the registry / report
 # ---------------------------------------------------------------------------
 
+async def _supervise_worker(
+    run_fn: Callable[[asyncio.Event], Awaitable[None]],
+    stop_event: asyncio.Event,
+    worker_name: str,
+    *,
+    restart_delay_seconds: float = 5.0,
+) -> None:
+    """监督必须持续运行的耐久 worker，异常退出时有限退避后重启。
+
+    正常 stop_event / CancelledError 是关闭信号，不重启；普通 return 或异常才视为
+    意外退出。当前只由 outbox replay 使用，避免把“配置关闭即正常 return”的条件 worker
+    误判成故障。
+    """
+    consecutive_failures = 0
+    while not stop_event.is_set():
+        try:
+            await run_fn(stop_event)
+            if stop_event.is_set():
+                return
+            consecutive_failures += 1
+            logger.error(
+                "[worker-supervisor] %s 意外结束（return），将在 %.1fs 后重启",
+                worker_name,
+                restart_delay_seconds,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001 - supervisor 必须保护应用生命周期
+            consecutive_failures += 1
+            logger.exception(
+                "[worker-supervisor] %s 意外崩溃（第 %d 次），将在 %.1fs 后重启",
+                worker_name,
+                consecutive_failures,
+                restart_delay_seconds,
+            )
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=restart_delay_seconds)
+        except asyncio.TimeoutError:
+            pass
+
+
+async def _heartbeat_loop(
+    stop_event: asyncio.Event,
+    *,
+    worker_name: str,
+    interval_seconds: float = 20.0,
+) -> None:
+    """独立维持心跳，避免业务退避/长事务期间 TTL 过期。"""
+    while not stop_event.is_set():
+        await write_heartbeat(worker_name)
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
+        except asyncio.TimeoutError:
+            pass
+
+
 def _make_worker_starter(
     worker_import: str,
     attr: str = "run",
@@ -708,7 +768,12 @@ def _make_worker_starter(
 
         mod = importlib.import_module(worker_import)
         run_fn = getattr(mod, attr)
-        task = asyncio.create_task(run_fn(ctx.stop_event))
+        if worker_import == "app.workers.outbox_replay_worker":
+            task = asyncio.create_task(
+                _supervise_worker(run_fn, ctx.stop_event, "outbox_replay_worker")
+            )
+        else:
+            task = asyncio.create_task(run_fn(ctx.stop_event))
         ctx.worker_tasks.append(task)
 
     return _start
@@ -792,6 +857,8 @@ def start_all_workers(stop_event: asyncio.Event) -> list[asyncio.Task]:
     """
     ctx = StartupContext(stop_event=stop_event)
     for spec in _worker_specs():
+        if _candidate_gate.skip_reason(spec.name):
+            continue
         if spec.skip_condition is not None and spec.skip_condition(ctx):
             continue
         spec.run(ctx)
@@ -833,6 +900,9 @@ STARTUP_TASKS: tuple[StartupTaskSpec, ...] = (
         criticality="critical",
         run=_task_setup_logging,
     ),
+    StartupTaskSpec(
+        name="verify_candidate_tree_identity", phase="bootstrap", criticality="critical",
+        run=_candidate_gate.verify_tree_identity),
     StartupTaskSpec(
         name="run_migrations",
         phase="migration",

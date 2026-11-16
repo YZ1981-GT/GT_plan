@@ -136,6 +136,7 @@ def _emit_consol_note_stale(
     year: int,
     section_id: str | None,
     count: int,
+    reason: str = "standalone_note_saved",
 ) -> None:
     """广播 consol.note_stale SSE 事件（合并页 F5 实时感知，ADR-CONSOL-304）。
 
@@ -152,6 +153,7 @@ def _emit_consol_note_stale(
                 "year": year,
                 "section_id": section_id,
                 "stale_count": count,
+                "reason": reason,
             },
         )
     except Exception as exc:  # pragma: no cover - 兜底，不阻断业务

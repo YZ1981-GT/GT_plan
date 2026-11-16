@@ -16,7 +16,14 @@ import { mount } from '@vue/test-utils'
 import http from '@/utils/http'
 import { voucherKeyString } from '@/utils/voucherIdentity'
 import { resetVoucherEvidenceIndexForTest } from '@/composables/useVoucherEvidenceIndex'
-import { rowVoucherKey, useVoucherLinkTags, voucherLinkText, type VoucherLink } from '../useVoucherLinkTags'
+import {
+  rowVoucherKey,
+  useVoucherLinkTags,
+  voucherLinkText,
+  VOUCHER_LINKS_CACHE_TTL_MS,
+  VOUCHER_LINKS_MAX_CACHED_KEYS,
+  type VoucherLink,
+} from '../useVoucherLinkTags'
 import VoucherLinkTags from '../VoucherLinkTags.vue'
 
 const post = http.post as unknown as ReturnType<typeof vi.fn>
@@ -125,11 +132,41 @@ describe('批量查询与缓存', () => {
     const pid = ref(PID)
     const tags = useVoucherLinkTags(pid, ref(2025))
     const pending = tags.loadForRows([line('0012')])
+    const signal = post.mock.calls[0][2].signal as AbortSignal
     pid.value = 'p-2'
     await nextTick()
+    expect(signal.aborted).toBe(true)
     slow.resolve({ data: { links: { [keyOf('0012')]: [link()] } } })
     await pending
     expect(tags.links.value.size).toBe(0)
+  })
+
+  it('缓存超过 TTL 后重新查询，而不是无限复用旧列表', async () => {
+    vi.useFakeTimers()
+    try {
+      post.mockResolvedValue({ data: { links: {} } })
+      const tags = useVoucherLinkTags(ref(PID), ref(2025))
+      await tags.loadForRows([line('0012')])
+      expect(post).toHaveBeenCalledTimes(1)
+      vi.advanceTimersByTime(VOUCHER_LINKS_CACHE_TTL_MS + 1)
+      await tags.loadForRows([line('0012')])
+      expect(post).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('缓存达到容量上限时淘汰最早访问的键，后续可再次读取', async () => {
+    post.mockImplementation(async (_url: string, body: { keys: string[] }) => ({
+      data: { links: Object.fromEntries(body.keys.map((key) => [key, []])) },
+    }))
+    const tags = useVoucherLinkTags(ref(PID), ref(2025))
+    const rows = Array.from({ length: VOUCHER_LINKS_MAX_CACHED_KEYS + 1 }, (_, i) => line(String(i).padStart(5, '0')))
+    await tags.loadForRows(rows)
+    expect(tags.links.value.size).toBeLessThanOrEqual(VOUCHER_LINKS_MAX_CACHED_KEYS)
+    const calls = post.mock.calls.length
+    await tags.loadForRows([rows[0]])
+    expect(post.mock.calls.length).toBe(calls + 1)
   })
 })
 
@@ -212,6 +249,15 @@ describe('凭证层并入凭证证据（spec attachment-voucher-evidence-binding
     expect(wrapper.emitted('retry')).toHaveLength(1)
   })
 
+  it('凭证证据加载中不伪装成尚未挂到底稿', () => {
+    const wrapper = mount(VoucherLinkTags, {
+      props: { links: [], linkStatus: 'ready', evidenceStatus: 'loading' },
+      global: { stubs: { AttachmentEyeButton: true } },
+    })
+    expect(wrapper.text()).toContain('凭证证据查询中')
+    expect(wrapper.text()).not.toContain('尚未挂到底稿')
+  })
+
   it('标签：证据条目「D2-4 · 凭证证据 2 份」用蓝色，挂凭橙色、抽凭绿色', () => {
     const ElTag = { props: ['type'], template: '<i class="tag" :data-type="type"><slot /></i>' }
     const ev = { working_paper_id: 'wp-d2', wp_code: 'D2-4', wp_name: '凭证检查表', wp_missing: false as const, source: 'evidence' as const,
@@ -265,7 +311,11 @@ describe('凭证层：查询状态、可点标签、导入状态（spec voucher-
     })
     expect(wrapper.find('[data-testid="voucher-links-unknown"]').text()).toContain('挂接状态未知')
     expect(wrapper.text()).not.toContain('尚未挂到底稿')
-    await wrapper.find('button').trigger('click')
+    const retry = wrapper.find('button')
+    expect(retry.attributes('type')).toBe('button')
+    expect(retry.attributes('aria-label')).toBe('重试凭证挂接状态查询')
+    expect(retry.attributes('title')).toBe('重试凭证挂接状态查询')
+    await retry.trigger('click')
     expect(wrapper.emitted('retry-links')).toHaveLength(1)
   })
 

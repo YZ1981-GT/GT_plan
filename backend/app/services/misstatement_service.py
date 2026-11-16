@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -137,11 +137,13 @@ class UnadjustedMisstatementService:
         management_communication_at: datetime | None = None,
         auditor_evaluation: str | None = None,
         required_review_status: ReviewStatus | None = None,
+        force: bool = False,
     ) -> MisstatementResponse:
         """从一笔 AJE 分录组创建正式未更正错报。
 
         ``required_review_status`` 由处理状态入口传 ``approved``；旧的显式“被驳回
         AJE 转错报”接口通过兼容别名调用且不借此混淆内部复核与管理层不更正。
+        ``force`` 仅供明确的备用转换场景绕过已有正式错报幂等记录。
         """
         adj = Adjustment.__table__
         # 1. 取分录组首行 id 作为幂等键
@@ -177,7 +179,7 @@ class UnadjustedMisstatementService:
             _UM.is_deleted == sa.false(),
         )
         existing = (await self.db.execute(existing_q)).scalar_one_or_none()
-        if existing is not None:
+        if existing is not None and not force:
             err = ValueError("ALREADY_CONVERTED")
             err.misstatement_id = str(existing.id)  # type: ignore[attr-defined]
             raise err
@@ -240,7 +242,11 @@ class UnadjustedMisstatementService:
             management_communication_at=management_communication_at,
             auditor_evaluation=(auditor_evaluation or "").strip() or None,
             source_wp_code=await self._derive_source_wp_code(project_id, account_codes),
-            source_identity=f"adjustment:{entry_group_id}",
+            source_identity=(
+                f"adjustment:{entry_group_id}"
+                if not force
+                else f"adjustment:{entry_group_id}:force:{uuid4()}"
+            ),
             created_by=created_by,
         )
         # F50 / Sprint 8.19: AJE 转错报也绑定当前 active dataset
@@ -263,6 +269,8 @@ class UnadjustedMisstatementService:
         entry_group_id: UUID,
         year: int,
         created_by: UUID | None = None,
+        *,
+        force: bool = False,
     ) -> MisstatementResponse:
         """兼容旧显式入口；调用本身不把内部驳回解释为管理层不更正。"""
         return await self.create_from_adjustment_group(
@@ -270,6 +278,7 @@ class UnadjustedMisstatementService:
             entry_group_id,
             year,
             created_by,
+            force=force,
         )
 
     # ------------------------------------------------------------------

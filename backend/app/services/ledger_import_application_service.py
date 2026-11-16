@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.dataset_models import JobStatus
+from app.schemas.ledger_unit_contract import UnitConfirmationInput
 from app.services.import_job_service import ImportJobService
 from app.services.import_queue_service import ImportQueueService
 from app.services.ledger_import_upload_service import LedgerImportUploadService
@@ -781,12 +782,24 @@ class LedgerImportApplicationService:
         files: list[UploadFile] | None = None,
         file: UploadFile | None = None,
         upload_token: str | None = None,
+        unit_confirmation: UnitConfirmationInput | dict[str, Any] | str | None = None,
         year: int | None = None,
         custom_mapping: str | dict[str, Any] | None = None,
         payload_style: str = "ledger",
         append_strategy: str | None = None,
         balance_carry_confirmed: bool = False,
     ) -> dict[str, Any]:
+        from app.services.ledger_import.unit_confirmation_gate import (
+            confirmation_options,
+            require_direct_file_confirmation,
+        )
+
+        parsed_unit_confirmation = require_direct_file_confirmation(
+            files=files,
+            file=file,
+            upload_token=upload_token,
+            unit_confirmation=unit_confirmation,
+        )
         parsed_mapping = cls.parse_custom_mapping(custom_mapping)
         append_options = None
         if append_strategy is not None:
@@ -831,6 +844,38 @@ class LedgerImportApplicationService:
             upload_token=resolved_token,
         )
         created_by = UUID(user_id) if user_id else None
+
+        # 账套导入 attempt（spec platform-global-display-settings-closure 任务 8）。
+        # 🔴 在**建 job 之前**落 attempt：attempt 是恢复的唯一证据，job 先落而 attempt
+        #    后落会让「job 已在队列、attempt 不存在」这段窗口里的重启无法判定该重跑还是接管。
+        # 🔴 base token 由唯一入口 `resolve_base_token` 解析（detect 侧同口径），
+        #    三次 CAS（submit / seal / activation）都以它为基准。
+        from app.services.ledger_import.attempt_service import create_attempt
+        from app.services.ledger_import.base_token_resolver import resolve_base_token
+
+        base_token = await resolve_base_token(db, project_id=project_id, year=year or 0)
+        confirmation_payload = confirmation_options(parsed_unit_confirmation)
+        attempt = await create_attempt(
+            db,
+            project_id=project_id,
+            year=year or 0,
+            upload_token=resolved_token,
+            payload_style="account_chart" if payload_style == "account_chart" else "ledger",
+            unit_confirmation=dict(confirmation_payload),
+            base=base_token,
+            unit_contract_digest=(
+                # 🔴 真实字段名是 `unit_evidence_digest`（不是 contract_digest）——
+                # 本 spec 复核时按命名习惯猜过一次，实测报 AttributeError。
+                # 该字段是用户确认时的证据指纹；dataset 侧的 contract digest 由
+                # `resolve_base_token` 从 source_summary 读，两者不混用。
+                getattr(parsed_unit_confirmation, "unit_evidence_digest", None)
+                if parsed_unit_confirmation is not None
+                else None
+            ),
+            bundle_digest=None,  # seal 时冻结（bundle 在 pipeline 里流式写完才算得出）
+            created_by=created_by,
+        )
+
         import_job = await ImportJobService.create_job(
             db,
             project_id=project_id,
@@ -843,6 +888,10 @@ class LedgerImportApplicationService:
                 "upload_token": resolved_token,
                 "force_activate": False,
                 "append": append_options,
+                # attempt id 进 options：pipeline / 恢复入口据此取 attempt 证据，
+                # 不必按 project+year 反查（反查会取到并发提交的另一条 attempt）。
+                "attempt_id": str(attempt.id),
+                **confirmation_payload,
             },
             created_by=created_by,
         )

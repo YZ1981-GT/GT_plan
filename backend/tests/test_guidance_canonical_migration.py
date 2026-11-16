@@ -5,7 +5,11 @@ import json
 from copy import deepcopy
 
 from app.services.guidance_inventory import GUIDANCE_DIR
-from backend.scripts.fix.migrate_guidance_canonical_schema import (
+# 🔴 `backend.scripts.…` 只在**仓库根**可导入；pytest 的 rootdir 是 `backend/`
+#    （`backend/pytest.ini` 的 testpaths=tests，CI 也 `working-directory: backend`），
+#    此时顶层包名是 `scripts` 不是 `backend` ⇒ 原写法在本地与 CI 都恒 ModuleNotFoundError。
+#    改用相对 backend 的绝对包名，两种工作目录下一致。
+from scripts.fix.migrate_guidance_canonical_schema import (
     migrate_document,
     validate_canonical_structure,
     validate_lossless,

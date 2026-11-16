@@ -27,6 +27,7 @@ from app.core.database import async_session, get_db
 from app.deps import require_project_access, require_project_access_stream
 from app.models.core import User
 from app.models.dataset_models import ImportJob, JobStatus
+from app.schemas.ledger_unit_contract import UnitConfirmationInput
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,10 @@ class SubmitRequest(BaseModel):
     upload_token: str
     year: int
     confirmed_mappings: list[dict]
+    unit_confirmation: UnitConfirmationInput | None = Field(
+        None,
+        description="可选的单位确认合同；bundle-only 旧客户端可暂不传",
+    )
     force_activate: bool = False
     adapter_id: Optional[str] = None
     # F42 / Sprint 7.10 + 10.43：用户明确覆盖规模警告后重发的标记
@@ -300,6 +305,7 @@ async def submit_import(
             force_activate=body.force_activate,
             created_by=current_user.id,
             adapter_id=body.adapter_id,
+            unit_confirmation=body.unit_confirmation,
             append_strategy=body.overlap_strategy if body.incremental else None,
             balance_carry_confirmed=body.balance_carry_confirmed,
         )

@@ -161,11 +161,11 @@ CONSOL_NOTE_WRITERS: tuple[ConsolNoteWriterSpec, ...] = (
     # 只改状态列的入口单独登记为 stale；它们不改 data，也不要求保护格解析。
     _w(
         "consol-note-stale-before-push",
-        "app.services.consol_push_service:_mark_notes_stale",
+        "app.services.consol_push_notes:_mark_notes_stale",
         "合并推送开始前把项目年度全部合并附注标为待更新",
         "stale",
         permission=("background",),
-        evidence="sa.update(ConsolNoteData).values(is_stale=True)，不写 data",
+        evidence="sa.update(ConsolNoteData).values(**stale_values(...))，不写 data",
     ),
     _w(
         "consol-note-stale-formula-year",
@@ -173,15 +173,7 @@ CONSOL_NOTE_WRITERS: tuple[ConsolNoteWriterSpec, ...] = (
         "公式设置传播按年度/章节标记合并附注待更新（domain=consol_note）",
         "stale",
         permission=("system", "background"),
-        evidence="sa.update(ConsolNoteData).values(is_stale=True)，不写 data",
-    ),
-    _w(
-        "consol-note-stale-formula-txn",
-        "app.services.formula_settings.stale_marks:mark_consol_note_stale",
-        "公式定义写入同事务内标记受影响合并附注待更新",
-        "stale",
-        permission=("system", "background"),
-        evidence="sa.update(ConsolNoteData).values(is_stale=True)，不写 data",
+        evidence="sa.update(ConsolNoteData).values(**stale_values(...))，不写 data",
     ),
     _w(
         "consol-note-stale-source-section",
@@ -189,7 +181,7 @@ CONSOL_NOTE_WRITERS: tuple[ConsolNoteWriterSpec, ...] = (
         "子企业附注保存后按已确认绑定标记上级合并附注待更新",
         "stale",
         permission=("background",),
-        evidence="仅赋值 record.is_stale=True 并 flush，不改 record.data",
+        evidence="mark_stale(record, ConsolNoteStaleSource.STANDALONE_NOTE_SAVED)；不改 record.data",
     ),
 )
 
@@ -223,7 +215,7 @@ CONSOL_NOTE_WRITER_EXCLUSIONS: dict[str, str] = {
     "app.services.consol_note_formula_refresh_handler:handle_consol_note_formula_refresh": (
         "事件刷新器只做开关/陈旧检查并调用 fill_note_sections，内容写入归 fill_by_formula"
     ),
-    "app.services.consol_push_service:_refresh_notes": (
+    "app.services.consol_push_notes:_refresh_notes": (
         "推送编排器只调用 stale 标记和 fill_note_sections；直接写入入口已分别登记"
     ),
     "app.services.consol_note_reaggregate_executor:execute_consol_note_reaggregate": (

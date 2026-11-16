@@ -1852,7 +1852,7 @@ async def test_property_24_writeback_permission_gate(
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_current_user] = _override_get_current_user
     # admin 分支越过成员校验后还会查 EQCR 委派与交付件归属：mock 答不了，置空（鉴权本身仍由真实判定执行）
-    _guards = [patch("app.routers.deliverable._is_project_eqcr", new=AsyncMock(return_value=False)),
+    _guards = [patch("app.routers.deliverable.is_project_eqcr", new=AsyncMock(return_value=False)),
                patch("app.routers.deliverable_lineage._ensure_task_in_project", new=AsyncMock(return_value=None))]
     for _g in _guards:
         _g.start()
@@ -1947,7 +1947,7 @@ async def test_property_25_app_audit_log_written(action_type: str):
     # Clear previous audit log entries
     initial_log_count = len(audit_logger._recent_actions)
     # 回填 / 刷新走交付中心 _guard_action（admin 仍查 EQCR 委派）+ 交付件归属校验：mock 答不了，鉴权另测
-    _guards = [patch("app.routers.deliverable._is_project_eqcr", new=AsyncMock(return_value=False)),
+    _guards = [patch("app.routers.deliverable.is_project_eqcr", new=AsyncMock(return_value=False)),
                patch("app.routers.deliverable_lineage._ensure_task_in_project", new=AsyncMock(return_value=None))]
     for _g in _guards:
         _g.start()

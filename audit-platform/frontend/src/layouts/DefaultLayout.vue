@@ -129,6 +129,8 @@ import GlobalSearchDialog from '@/components/common/GlobalSearchDialog.vue'
 import { Bell, DataAnalysis, DataLine, Lock, CaretBottom } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { initGlobalBackspace } from '@/composables/useNavigationStack'
+import { useGlobalTableLayout } from '@/composables/useGlobalTableLayout'
+import { useDisplayPreferencesRuntime } from '@/composables/useDisplayPreferencesRuntime'
 import { isTextEntryTarget } from '@/utils/shortcuts'
 import { handleApiError } from '@/utils/errorHandler'
 import { useRoleContextStore } from '@/stores/roleContext'
@@ -142,6 +144,13 @@ import { routeViewKey } from '@/utils/routeViewKey'
 const route = useRoute()
 const router = useRouter()
 initGlobalBackspace(router)
+
+// ─── 显示偏好运行时（platform-global-display-settings-closure 阶段 A）───
+// 布局层是已认证主应用的唯一挂载点：运行时按账号加载偏好并写根变量，
+// 全局表格监听器在字号/密度变化后重排已挂载的 Element Plus 表格。
+// 设置页、Aa 面板只读写同一个 store，不在子组件重复安装或发起 GET。
+useDisplayPreferencesRuntime()
+useGlobalTableLayout()
 
 // UI-1: 方向性页面过渡动画（前进 slide-left，后退 slide-right）
 const transitionName = ref('slide-left')
@@ -315,7 +324,12 @@ const FULLWIDTH_PATHS = [
   '/my-procedures',
 ]
 // '/workpapers/'：底稿短链（定位后替换到编辑器）不是项目子路径，不加则落进浏览模式、路由内容不渲染（acnr T16）
-const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/', '/eqcr/', '/workpapers/']
+// '/display-settings'：全宽独立设置页（spec platform-global-display-settings-closure 任务 5），
+//   不加这条会落进三栏浏览模式、右侧被项目详情占掉 ⇒ 普通用户看不到自己的显示偏好面板
+// '/partner/'：合伙人签发页（`/partner/sign-decision/:projectId/:year`）不是项目子路径，
+//   不加则 `isBrowseMode` 判 true ⇒ 页面被项目列表/详情顶掉，签发清单根本看不到
+//   （2026-11-15 adjustment-practice-linkage-integrity-closure D9/F5 浏览器实测）
+const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/display-settings', '/dashboard/', '/eqcr/', '/workpapers/', '/partner/']
 
 function isFullWidthPath(p: string): boolean {
   if (FULLWIDTH_PATHS.includes(p)) return true

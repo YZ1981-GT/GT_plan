@@ -2,7 +2,7 @@
 
 ## Overview
 
-> **状态**：46/50（2026-11-02）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
+> **状态**：47/50（2026-11-15）。本文是新一轮剩余闭环计划；归档旧 spec 的复选框不迁移到这里。
 >
 > 🔴 2026-11-01 第二轮勘误（三条，净 −1）：
 > - **3.5 完成** `[ ] → [x]`：最后两批共 51 个宿主接入共享 presentation 门，棘轮基线
@@ -98,7 +98,7 @@
     后端选集 added 0 / resolved 11、前端 sync added 0 / resolved 0；另记两类采集期崩溃与六个门禁命令结果）。
   - _AC: 1.3, 1.4, 12.1_
 
-- [ ] 0.5 锁定 AC → design → task → evidence 引用闭合性
+- [x] 0.5 锁定 AC → design → task → evidence 引用闭合性
   - 脚本验证 7 条 AC 每条至少由一项任务和一个可执行验收面承接，且不存在未定义 AC 引用。
   - 已完成部分：`test_no_task_cites_an_undefined_ac` / `test_every_registered_ac_is_carried_by_some_task`
     / `test_every_registered_ac_has_an_executable_surface_on_disk`（承接面必须**真实存在于磁盘**，
@@ -143,6 +143,58 @@
       定义 JSON 声明后不再硬编码 spec 名，AST 发现看不见它 ⇒ 如实移到登记表的
       `outside_discovery`（它仍按定义 JSON 解析各 spec 的 tasks.md，由判据层模块覆盖）。
       现算 `ok 11 / retired 1 / registered_unreviewed 23`，上限同步收到 23。
+  - ✅ **2026-11-15 完成（两条缺口逐一收口）**：
+    * **① `registered_unreviewed` 逐个复核完毕**（23 → 12）。方法 = 对每条现算
+      「它解析哪份文档的哪个锚点 × 锚点在 active / 归档快照的命中矩阵」+ 运行期入口实测
+      （`tmp_spec_consumers/probe_anchors.py` / `probe_runtime.py` / `probe_run_consumers.py`，
+      结论落 `anchor_verdicts.json` / `runtime_verdicts.json` / `run_verdicts.json`）。
+      结果：**10 条改判 `ok`**（按内容择路 3 条 · 显式钉死归档快照 1 条 · 读 active 投影且锚点
+      成立 5 条 · 仅判路径存在性 1 条）、**13 条如实保留 `registered_unreviewed`** 并逐条写明
+      **断在哪份文档的哪个锚点**（不掩盖、不抬上限）。
+      🔴 复核过程中抓到 4 类真问题，逐条登记在登记表的 `note` 里：
+      ⓐ `check_task72_pre_delete_eligibility_gate.py` 的 `--check` 现算崩在「tasks.md 里找不到
+      任务 72」—— 与 task70 第四批修的三处**同族**（任务正文只在归档快照），task70 修了、
+      它没修；ⓑ `generate_task62_generic_docx_adjudication.py` 写死 active 却解析 AC 7.7
+      （只在归档）⇒ `--check` 抛 `Task62GeneratorError`；ⓒ task60/63/64 三个生成器 `--check`
+      报产物 drift（非文档形态问题，已如实分开记）；ⓓ
+      `mutate_task7_staged_artifact_boundary_guards.py` 的 design 措辞靶点与
+      `test_workpaper_staged_artifact_boundary_contract.py::test_spec_docs_keep_the_explicit_disclaimer`
+      是**同一处失锚**（active design 已无「不宣称文件系统与 PostgreSQL 同事务」整句）。
+    * **② 两组规定变异都做了，且都精确打红**（`tmp_spec_consumers/mutate_05.py`，
+      逐字节恢复 + sha256 前后核对 `f731ce64…` / `92dbc56e…`）：
+      | 变异 | 期望 | 实测 | 红在哪 |
+      | --- | --- | --- | --- |
+      | M0 基线（不改） | GREEN | rc=0 / 0 failed | — |
+      | M1 把 `requirements.md` 的 `1.3.` 改成 `1.31.` | RED | rc=1 | `test_requirements_ac_set_equals_the_paradigm_projection` |
+      | M2 把 `## Phase 0：` 改成 `## 阶段 0：` | RED | rc=1 | `test_phase_headings_keep_the_machine_parseable_shape`（本轮新增） |
+      | M3 阴性对照：Phase 标题只加一句括号措辞 | GREEN | rc=0 | — |
+      🔴 **M2 首轮没打红**：仓库里当时**没有任何判据解析 `## Phase <N>：` 形态**（现算
+      0 处）⇒ 把 Phase 改成「阶段」无判据可红。这正是任务正文点名要补的那条边。已补
+      `test_phase_headings_keep_the_machine_parseable_shape`（形态 + 编号 0..N 连续 + 标题非空，
+      分母非空断言防退化成空集恒绿）与它的双向自检
+      `test_phase_heading_predicate_is_falsifiable`（合法形态命中 / 改「阶段」/ 去全角冒号 /
+      小写 phase 三种变体都必须命中不到）。补完 M2 精确打红、M3 阴性对照仍绿。
+    * **顺带的口径修正（不是放宽判据）**：
+      ⓐ 判据原只认 `resolve_spec_dir` + `require_matches` 一对字符串，于是
+      `check_task70…gate.py`（走 `spec_doc(..., must_contain=...)`，第四批拆模块时起的名）
+      被**误判成缺陷** ⇒ 改为认**两种等价形态**并新增 `_BY_CONTENT_FORMS`，同时**收紧**成
+      「必须真有内容判别参数」（`test_by_content_forms_are_both_recognised_and_neither_is_a_free_pass`
+      双向自检：只传 `require_files` 判否、写死 active 判否）。
+      ⓑ 新增 `hardcoded_archive_path` 这一类并配可伪证断言
+      （`test_hardcoded_archive_consumers_really_pin_the_archive`：标了该类就必须真有
+      `_archive/` 路径字面量）—— 变异脚本「钉死一个已知快照」与「按内容择路」都自洽，
+      但混记会让前一类蹭到后一类的判据。
+      ⓒ `_UNREVIEWED_CEILING` 23 → **12**（棘轮跟着收）。
+    * **登记表结构变化**：`test_data_file_paths_resolve.py`（本轮删掉已失效的 capacity_profile
+      登记后不再含 spec 名）与 `test_task70_oo_scenario_gate.py`（已改为经
+      `gate.tasks_md()` 间接取文档）移入 `outside_discovery` 并写明由谁覆盖；
+      **新增发现 2 条**此前不在分母里的消费方（`fix_spec_index_archive_paths.py` /
+      `test_spec_index_consistency.py`，均实测可跑通、判 `ok`）——
+      这正是「分母由机器现算」的价值：加脚本会自动进视野。
+    * **验证**：`test_umbrella_spec_reference_closure.py` **28 passed**（原 26，新增 2 条）；
+      `test_data_file_paths_resolve.py` 全绿（删失效登记后）；
+      `workpaper_sync_current_state.json` 重生成后 `--check` rc=0
+      （漂移只有 6 个 digest / 快照日期字段，属上游事实变化）。
   - _AC: 1.3, 1.4, 1.5, 1.7, 12.1, 12.8, 12.9_
 
 - [x] 0.6 修复被 spec 文档重写打坏的 7 个机器消费方
@@ -406,6 +458,56 @@
     `test_task20_writer_gate.py` 不再从本文解析「接手语」：Wave 6 的移交链（20 → 30 → 71）、依赖图
     gates、冻结红基线改绑归档快照（按内容标记定位，与 0.6 同一实现）；**当前**归属从里程碑定义里
     `writer_gate_issue_zero(multi_resolver)` 的 producer 现读（即本任务），待清行名单读上面那条现算更正。
+  - ✅ **2026-11-15 第 ① 步已交付：停止签发旧 URL 的开关 + drain 语义**（本条仍 `[ ]`，
+    余 ②③④）。
+    * **先纠一条过期登记**：`blocking_task: "21,25,26,36"` **已不成立**，逐项现算——
+      room 全套能力都在（`rooms.RoomService` / `room_launch.resolve_room_contents` /
+      `sign_room_contents_token` / `build_signed_launch_config`；`wp_sync_router` 里
+      `materialize` / `confirm-descriptor` / `forcesave` / `close-intents` /
+      `rooms/{id}/contents` / `rooms/{id}/onlyoffice-callback` 六条端点齐备），
+      representation 供给 **465 条 / 84 entry**（不是 0）。所以「外部依赖阻断」是过期说法。
+    * **真实阻塞换成了另一件事**：两套链路并存 —— 旧式
+      `/sheets/{sheet}/onlyoffice-config` + 它签发的 `wopi/contents` /
+      `/onlyoffice-callback` 仍有 **78 处调用 / 29 个文件**（room 协议侧 25 个文件）。
+      旧链路要求这三个端点**各自解析一次目标文件**，这才是 `multi_resolver` 4 行的成因。
+    * **本步交付**（`settings.ONLYOFFICE_LEGACY_URL_ISSUE`）：
+      - 默认 `True` = 沿用旧行为（零回归、可随时回滚，与 `ONLYOFFICE_JWT_ENFORCE` 同一范式）；
+      - 置 `False` = 对**已具备 room 供给**（`readiness.runtime.ready`）的 entry 返
+        `409 legacy_onlyoffice_url_retired` + 可操作中文文案 + `allowed_modes`，
+        引导前端改走 `sync/entries/{entry_id}/materialize` → descriptor → room contents；
+      - **fail-open 到旧路径**的方向是刻意选的：供给未就绪 / readiness 算不出来
+        （entry 不在 manifest、adapter 未注册）一律照旧签发 —— 反过来做会让一批 entry
+        同时失去两条路，等于在线编辑彻底打不开（Requirement 12.8 禁做假切换）。
+    * **判据不另造**：门读的是 `entry_readiness.evaluate_entry_readiness` 的
+      `runtime.ready` —— 与 `GET /sync/entries/{id}/readiness`、前端「在线编辑不可用」
+      提示**同一个函数**（3.1/3.5 建立的单一来源）。
+    * **守卫** `backend/tests/workpaper_sync/test_legacy_onlyoffice_url_retirement_gate.py`
+      （8 例）：拒绝态（409 + 码 + 文案 + effective entry）· **fail-open 态**
+      （供给不就绪照旧签发）· **判据缺失态**（readiness 抛异常也照旧签发）·
+      门确实委派单一来源 · 开关默认 True · 开关被**有效** if 条件读取（AST）·
+      AST 谓词反向自检。
+    * **变异 9/9 符合预期**（`tmp_spec_consumers/mutate_gate_28.py`，逐字节恢复
+      sha256 前后一致）：M0 基线 GREEN；M1/M2 门退化恒放行 RED；M3 409→404 RED；
+      M4 error_code 改掉 RED；M5 回执用请求 entry RED；M6 fail-open 只兜一种异常 RED；
+      M7 开关默认翻 False RED；**M8 router 不读开关 RED**；M9 阴性对照 GREEN。
+    * 🔴 **M8 首轮存活**（真实判据缺口，已修）：原判据是
+      `"settings.ONLYOFFICE_LEGACY_URL_ISSUE" in source`，而变异把条件改成
+      `if False:` 后那个字符串仍留在源码里 ⇒ 判据照绿而门永不执行。改 AST 判
+      「存在属性读取」+「该读取处在不含恒假常量的 if 条件里」，并补
+      `test_ast_flag_predicate_rejects_a_short_circuited_flag` 双向自检
+      （`if False and settings.X:` 判否、只在字符串里提一句判否）。
+    * **回归**：受影响选集 136 例 → **135 passed / 1 failed**。该 1 failed 是
+      `test_task70_oo_scenario_gate.py::TestReportIsFreshAndByteLocked::test_gate_check_passes`
+      —— **预存环境漂移，非本步引入**：现算差异 132 处全部是活库/环境事实
+      （`content_version_rows` 436→443、`registered_entry_ids` 32→35、
+      `artifact_environment.backend_root` 还指向别的会话的
+      `tmp_workpaper_sync_repair\push_wt\backend`、报告自身 `git_status` M），
+      那份报告与本步改的两个文件零交集（`git diff` 确认报告未被改动）。
+      ruff 相对基线**新增 0**（4 条 F401 在干净 HEAD 上同样存在）。
+    * **余下三步**（本步刻意不做，见上方 ①②③④）：
+      ② 前端 29 文件 78 处迁到 room 协议（16 个 dual-mode composable 同批）；
+      ③ 旧 doc key drain 窗口结束才删 legacy direct-write 分支；
+      ④ single_onlyoffice / Word / custom 单独裁决。
   - 🔴 **2026-11-04 清册事实盲区（writer gate 的分母，与上面 4 条 multi_resolver 不同族）**：
     `_record_sql_text` 只认 `text("…")` 的字面量实参，SQL 先赋给局部变量再 `text(update_sql)` 的写库
     路径整条看不见。公式运行时底稿适配器 `WorkpaperMutationAdapter.restore_many`（基线 `8352d7b38` 上还有

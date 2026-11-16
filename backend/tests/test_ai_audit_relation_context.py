@@ -93,3 +93,87 @@ async def test_relation_context_without_project_or_year_reads_nothing() -> None:
     )
     assert rows == []
     assert db.statements == []
+
+
+# ---------------------------------------------------------------------------
+# 底稿证据按 evidence_links 取（2026-11-15 真实库实测抓到的静默失效）
+#
+# 缺陷：原实现用 `EvidenceRef.source_id == host.resource_id`（底稿 id）匹配，
+# 但真实库 29 条 active evidence_refs 的 source_id 全部是 **attachment_version id**
+# （都能在 attachment_versions 里找到，wp_id 一条都匹配不上）⇒ 底稿宿主的
+# evidence 段永远 0 条。底稿证据的权威来源是 evidence_links(wp_id, attachment_id)。
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_workpaper_evidence_uses_evidence_links_not_evidence_refs() -> None:
+    """底稿宿主必须查 evidence_links(wp_id)，且不得再用 source_id 当 wp_id。"""
+    project_id, wp_id = uuid4(), uuid4()
+    attachment_id, link_id = uuid4(), uuid4()
+    db = _Db([
+        _Result(scalar="E1"),                      # wp_code
+        _Result(rows=[]),                          # 关联底稿
+        _Result(rows=[]),                          # TB
+        _Result(rows=[]),                          # 调整
+        _Result(rows=[]),                          # 报表（无 report_row 时可能不查）
+        _Result(rows=[]),                          # 附注
+        _Result(scalar=None),                      # 上年项目
+        _Result(rows=[SimpleNamespace(             # evidence_links 命中 1 条
+            id=link_id, attachment_id=attachment_id, sheet_name="审定表E1-1",
+            cell_ref="C8", evidence_type="voucher", check_conclusion="相符",
+            created_at=None, file_name="银行回单.pdf",
+        )]),
+        _Result(rows=[]),                          # 知识标签
+    ])
+    host = SimpleNamespace(
+        project_id=project_id, year=2025,
+        resource_type=HostType.workpaper, resource_id=str(wp_id),
+    )
+    rows = await build_audit_relation_context(
+        db, host=host, user=SimpleNamespace(id=uuid4())
+    )
+    evidence = [row for row in rows if row.source_type == "evidence"]
+    assert len(evidence) == 1, rows
+    item = evidence[0]
+    assert "银行回单.pdf" in item.label
+    assert "审定表E1-1!C8" in item.content
+    assert "相符" in item.content
+    assert item.jump_route == f"/attachments?attachment_id={attachment_id}"
+
+    joined = " ".join(db.statements).lower()
+    assert "evidence_links" in joined, "底稿证据必须查 evidence_links"
+    # 底稿宿主不得再拿 wp id 去 evidence_refs.source_id 匹配
+    assert "evidence_refs" not in joined, "底稿宿主不应再查 evidence_refs"
+
+
+@pytest.mark.asyncio
+async def test_note_host_still_uses_evidence_refs_source_id() -> None:
+    """非底稿宿主保留 EvidenceRef.source_id 语义（该列对非底稿源是正确的）。"""
+    project_id, note_id = uuid4(), uuid4()
+    db = _Db([
+        _Result(scalar="五、1"),                   # note_section
+        _Result(rows=[]),                          # 关联底稿
+        _Result(rows=[]),                          # TB
+        _Result(rows=[]),                          # 调整
+        _Result(rows=[]),                          # 报表
+        _Result(rows=[]),                          # 附注
+        _Result(scalar=None),                      # 上年项目
+        _Result(rows=[SimpleNamespace(
+            id=uuid4(), label="回函扫描件", evidence_type="confirmation",
+            evidence_id="ev-1", created_at=None,
+        )]),
+        _Result(rows=[]),                          # 知识标签
+    ])
+    host = SimpleNamespace(
+        project_id=project_id, year=2025,
+        resource_type=HostType.note, resource_id=str(note_id),
+    )
+    rows = await build_audit_relation_context(
+        db, host=host, user=SimpleNamespace(id=uuid4())
+    )
+    evidence = [row for row in rows if row.source_type == "evidence"]
+    assert len(evidence) == 1
+    assert "回函扫描件" in evidence[0].label
+    joined = " ".join(db.statements).lower()
+    assert "evidence_refs" in joined
+    assert "evidence_links" not in joined

@@ -36,10 +36,16 @@ from app.services.workpaper_sync.target_bound_registration import (
 MANIFEST = BACKEND / "data/workpaper_sync_entry_manifest.json"
 TMP = ROOT / "tmp_workpaper_sync_runtime_probe"
 PROBE_MANIFEST = TMP / "pending_probe_manifest.json"
-OUTPUT = (
-    ROOT / ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/"
-    "evidence/phase4-pending-runtime-readiness.json"
+
+# spec 目录经 resolve_spec_dir 解析（归档后回退 `_archive/`），见
+# tests/test_spec_dir_archive_resilience.py 的门禁要求：check 脚本不得写死 active spec 路径。
+from _spec_dir import resolve_spec_dir  # noqa: E402
+
+SPEC_DIR = resolve_spec_dir(
+    "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+    require_files=["evidence/phase4-pending-runtime-readiness.json"],
 )
+OUTPUT = SPEC_DIR / "evidence/phase4-pending-runtime-readiness.json"
 
 
 async def collect() -> dict[str, Any]:

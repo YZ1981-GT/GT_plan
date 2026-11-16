@@ -50,6 +50,8 @@ from app.models.audit_platform_models import TrialBalance
 from app.routers import wp_formula as router_mod
 from tests.d_cycle_extraction._endpoint_doubles import (
     AuthGateSessionMixin,
+    FakeExecuteResult,
+    FakeSessionWriteMixin,
     admin_user,
     formula_row,
     patch_d_cycle_aux_aggregation,
@@ -117,19 +119,16 @@ st_amount = st.decimals(
 # ===========================================================================
 
 
-class _SaveResult:
-    def __init__(self, *, scalar=None, rows=None):
-        self._scalar = scalar
-        self._rows = rows or []
+class _SaveResult(FakeExecuteResult):
+    """``AsyncSession.execute`` 结果替身（共享件薄壳，见 `_endpoint_doubles`）。
 
-    def scalar_one_or_none(self):
-        return self._scalar
-
-    def scalars(self):
-        return SimpleNamespace(all=lambda: list(self._rows))
+    审计链 / 年度解析 / 成员级别查询各自的取值入口（``.all()`` / ``.scalars()`` /
+    ``.scalar_one_or_none()`` / ``.mappings()``）都在共享件里覆盖 —— 少一个就会以
+    AttributeError 把「替身不全」伪装成「生产回归」。
+    """
 
 
-class _SaveSession(AuthGateSessionMixin):
+class _SaveSession(FakeSessionWriteMixin, AuthGateSessionMixin):
     """记录 execute SQL，用于断言无 DB 写回（Property 13）。"""
 
     def __init__(self, *, wp, wp_code, user_formulas=None):
@@ -138,6 +137,7 @@ class _SaveSession(AuthGateSessionMixin):
         self.user_formulas = user_formulas or []
         self.committed = False
         self.executed_sql: list[str] = []
+        self._init_write_side()
 
     async def execute(self, stmt, params=None):
         s = str(stmt)

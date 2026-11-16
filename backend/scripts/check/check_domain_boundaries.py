@@ -49,6 +49,70 @@ KIND_FORBIDDEN = "forbidden_edge"
 KIND_CYCLE = "cycle"
 KIND_AMBIGUOUS_OWNER = "ambiguous_owner"
 
+#: **技术分层兜底域** —— 它们不是业务域，与业务域不在同一个对等平面上：
+#:   * ``backend-services`` = ``backend/app/services/**``（未归属具体业务域的 service）
+#:   * ``backend-workers``  = ``backend/app/workers/**``
+#:   * ``backend-routers``  = ``backend/app/routers/**`` + ``router_registry/**``
+#:
+#: 🔴 2026-11-14：manifest 原先把「业务域」（consolidation / notes / reports /
+#: qc-review …）与这三个**技术分层**画在同一张对等依赖图里，于是出现两类系统性误报：
+#:   - ``evidence -> backend-services``（evidence 用 attachment_service 这类通用 service）
+#:   - ``consolidation -> backend-workers``、``procedures -> backend-routers`` …
+#: 这些不是「业务域越界」，而是**分层引用**：业务实现本就落在 services/routers/workers
+#: 这一层。要求每个业务域把它们写进 ``may_depend_on`` 只会让 manifest 退化成
+#: 「所有域都列出所有技术层」的冗余表，判据也随之失去信号。
+#:
+#: 现语义（分层而非对等）：
+#:   1. 业务域 -> 技术分层：**恒允许**（业务实现本就要落在这些层）
+#:   2. 技术分层 -> 任意：**恒允许**（兜底域可引用任何具体实现）
+#:   3. 业务域 -> 业务域：仍按 ``may_depend_on`` **严格判定** —— 真正的架构边界在这
+#: ``may_depend_on`` 里显式列出的技术层名字保留（向后兼容，不再起判据作用）。
+TECHNICAL_LAYERS: frozenset[str] = frozenset(
+    {"backend-services", "backend-workers", "backend-routers"}
+)
+
+#: **启动编排横切文件** —— 应用组合根，必须集中引用所有域来注册订阅 / handler / 启动任务。
+#:
+#: 🔴 2026-11-14：这些文件是「零依赖注入框架」的固有形态，不是架构违规：
+#:   * ``backend/app/core/startup_registry.py`` —— STARTUP_TASKS + 各域 handler 注册
+#:   * ``backend/app/main.py`` —— lifespan 装配
+#: 实测 ``startup_registry.py`` 的**全部**跨域 import 都在函数体内（38 处，0 处模块级），
+#: 即延迟导入：只在对应启动任务执行时才加载。这与「模块级双向耦合」是两回事，但
+#: `ast.walk` 提取的 import 集合不区分两者，于是它们被计成 `core -> <每个业务域>`。
+#:
+#: 更关键：这些横切边把依赖图连成**一个 22 节点强连通分量**（baseline 里那条 cycle），
+#: 而该 SCC 的存在只反映「组合根引用了所有人」这一事实 —— 不是真实的域间循环依赖。
+#: 豁免这些文件后 SCC 自然拆开，`may_depend_on` 才能重新表达**域间**的真实边界。
+#:
+#: 边界（避免豁免过宽）：只按**精确文件路径**豁免，不做目录通配；这些文件仍受
+#: 「unowned production module」检查（它们归属 core，有 owner）。
+#: 精确路径（后端组合根）。
+STARTUP_COMPOSITION_ROOTS: frozenset[str] = frozenset(
+    {
+        "backend/app/core/startup_registry.py",
+        "backend/app/main.py",
+    }
+)
+
+#: **前端组合根前缀** —— 与后端组合根同理：SPA 的路由表与布局层必须引用各特性视图，
+#: 这是「组合」而不是「域间耦合」。实测：
+#:   * ``router/domains/*.ts`` —— RouteRecordRaw 里 `component: () => import('@/views/...')`
+#:   * ``layouts/*.vue`` —— 布局壳挂载导航 / 全局搜索等跨域入口
+#: 这些文件逐个列出 12 条 feature 视图不现实（新增页面就要改门禁），故按目录前缀豁免。
+#: 边界：仅这两个目录，不做**通配到任意层**（`router/domains/` 与 `layouts/` 都是组合层，
+#: 不承载业务逻辑）。
+FRONTEND_COMPOSITION_ROOT_PREFIXES: tuple[str, ...] = (
+    "audit-platform/frontend/src/router/domains/",
+    "audit-platform/frontend/src/layouts/",
+)
+
+
+def _is_composition_root(rel: str) -> bool:
+    """该文件是否为**组合根**（横切编排，不是域间耦合）。"""
+    if rel in STARTUP_COMPOSITION_ROOTS:
+        return True
+    return any(rel.startswith(prefix) for prefix in FRONTEND_COMPOSITION_ROOT_PREFIXES)
+
 EXCLUDE_DIR_NAMES = {
     "__pycache__",
     ".git",
@@ -419,9 +483,18 @@ def collect_edges(
                 continue
             if dst_domain == src_domain:
                 continue
+            # 🔴 启动编排横切豁免（见 STARTUP_COMPOSITION_ROOTS 文档头）：
+            #   组合根必须引用所有域来注册 handler/任务；它的延迟导入不构成域间耦合，
+            #   也不该参与 cycle 检测（否则整张图连成一个 SCC）。
+            #   这里的 `continue` 同时**不把该边计入 domain_edges**，故后续 SCC 检测看不到它。
+            if _is_composition_root(rel):
+                continue
             domain_edges.add((src_domain, dst_domain))
             allowed = domains[src_domain].may_depend_on
-            if dst_domain not in allowed:
+            # 🔴 分层豁免（见 TECHNICAL_LAYERS 文档头）：
+            #   业务域 -> 技术分层 / 技术分层 -> 任意 ⇒ 分层引用，不是架构越界。
+            _layered = dst_domain in TECHNICAL_LAYERS or src_domain in TECHNICAL_LAYERS
+            if not _layered and dst_domain not in allowed:
                 identity = f"{KIND_FORBIDDEN}:{src_domain}->{dst_domain}:{rel}->{tgt}"
                 forbidden.append(
                     Violation(

@@ -70571,12 +70571,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 0,
-      "table_id": "99b825c2-e325-5b05-a8b9-263534174adf",
+      "table_id": "ce85833a-f90c-5182-8565-78029bcecd1f",
       "table_name": "其他应收款",
       "header_fingerprint": "7e72a91360b4ddfb680f57dce48e1e22f8b10866aab15e0549a3226eaaf7be85",
       "columns": [
         {
-          "column_id": "e603657b-9e26-52d1-9b53-0d7248517a18",
+          "column_id": "0c8d16ec-5a33-5f81-abaf-87206428c24e",
           "index": 0,
           "path": [
             "项目"
@@ -70587,7 +70587,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "7fce81dc-1d4e-58f3-8f6a-11599955f2b6",
+          "column_id": "067fb1c9-a732-5f6c-a342-e6798fa43c88",
           "index": 1,
           "path": [
             "期末余额"
@@ -70598,7 +70598,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "526a1e1f-ab3a-5ae2-bb49-2c657d433f04",
+          "column_id": "42bb3888-3b27-5795-8b2f-8a3dcf2ce000",
           "index": 2,
           "path": [
             "上年年末余额"
@@ -70614,12 +70614,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 1,
-      "table_id": "09c426df-b019-56f7-9ff5-ff1b38cc9ae5",
+      "table_id": "eb1d2070-124b-529e-aed3-ea69026b7daf",
       "table_name": "应收利息分类",
       "header_fingerprint": "7e72a91360b4ddfb680f57dce48e1e22f8b10866aab15e0549a3226eaaf7be85",
       "columns": [
         {
-          "column_id": "0e74f560-c33f-5980-a8db-39b870127852",
+          "column_id": "b561045f-bc20-5838-8840-ff38a7dd06e3",
           "index": 0,
           "path": [
             "项目"
@@ -70630,7 +70630,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "437aa343-697f-58c7-9328-0bdd1253f39b",
+          "column_id": "2ab45e6c-dbd7-52e7-b828-efbe88c489a8",
           "index": 1,
           "path": [
             "期末余额"
@@ -70641,7 +70641,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "9973b4b0-1299-5d81-adc7-aa3e3ac912b5",
+          "column_id": "1f1c3434-7d34-5e2c-8a6f-177f71869dcc",
           "index": 2,
           "path": [
             "上年年末余额"
@@ -70657,12 +70657,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 2,
-      "table_id": "65532aec-3433-5349-8991-6b95fbf554d5",
+      "table_id": "d58b1c87-7909-52b7-bd09-845e298acccc",
       "table_name": "重要逾期利息",
       "header_fingerprint": "c35bd225daa84621b80e2b5aef9916d27ec1723987bd0e4fe97ae3662f056107",
       "columns": [
         {
-          "column_id": "7f9846f3-6af8-5d0c-9522-6cf38bfc1ac4",
+          "column_id": "3befa2b3-07e2-5a9c-bf04-55c02212cf8b",
           "index": 0,
           "path": [
             "借款单位"
@@ -70673,7 +70673,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "634a735e-ea4a-5cb2-8822-3379dec5e11b",
+          "column_id": "40c8220d-ed68-5dd6-bb18-3af179277d8c",
           "index": 1,
           "path": [
             "期末余额"
@@ -70684,7 +70684,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "dfb72e2d-7730-5ebe-b94f-42d9262e7eb2",
+          "column_id": "176ee3e5-76c0-5b42-a708-918cd78de47f",
           "index": 2,
           "path": [
             "逾期时间(月)"
@@ -70695,7 +70695,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "7caba4c2-4b28-5ea0-a6a0-d6142bf53d21",
+          "column_id": "40bc2c83-2554-517b-8d5f-013a270f8fa5",
           "index": 3,
           "path": [
             "逾期原因"
@@ -70706,7 +70706,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "8ebaf3e6-45b6-582f-8e12-7678615495f6",
+          "column_id": "c038dea8-2d02-5e5d-a32a-ba6b98eaa5b2",
           "index": 4,
           "path": [
             "是否发生减值及其判断依据"
@@ -70722,12 +70722,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 3,
-      "table_id": "3cc6a1ac-d30c-5925-9c18-1954dbc05547",
+      "table_id": "a5ac5464-59e0-51fb-869a-ebb6abc89add",
       "table_name": "应收股利",
       "header_fingerprint": "1f02937d272d09956aa7db58d330dcce62b4beea2ef7378e3d8ae804a52e9559",
       "columns": [
         {
-          "column_id": "09ad23c2-7ffd-5882-b616-0f7530050bfd",
+          "column_id": "cf9a4012-2406-57a5-9876-1bc0d088133d",
           "index": 0,
           "path": [
             "项目(或被投资单位)"
@@ -70738,7 +70738,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "b2294d45-70b9-5403-ae8d-74682bd0cf3e",
+          "column_id": "e2431207-1e1e-5f8f-a3df-aa4ea9bb7875",
           "index": 1,
           "path": [
             "期末余额"
@@ -70749,7 +70749,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "ab7d311a-0444-50b2-bad6-6292eb9b9afe",
+          "column_id": "9e4e8625-81ba-57e0-b151-177b195c797b",
           "index": 2,
           "path": [
             "上年年末余额"
@@ -70765,12 +70765,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 4,
-      "table_id": "4a099026-4c81-5946-8bcb-f4535d5cf1dc",
+      "table_id": "ec2d0d9a-6971-5e6c-b43d-51f278aa0037",
       "table_name": "重要的账龄超过1年的应收股利",
       "header_fingerprint": "a80e302d52bd41a3bc573765ee6919dae3f9efdf2f2a31d8a5a535f545418853",
       "columns": [
         {
-          "column_id": "1dfc8cc2-ca4e-5b09-b35c-7423dd1bc1e0",
+          "column_id": "30eff359-5136-575d-9f5f-82a8ec4efd15",
           "index": 0,
           "path": [
             "项目(或被投资单位)"
@@ -70781,7 +70781,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "9f8c9912-81b6-59fa-8f78-982b9fdbab73",
+          "column_id": "37dcbcae-26bb-5fd0-bef4-eb9b0a89f054",
           "index": 1,
           "path": [
             "期末余额"
@@ -70792,7 +70792,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "0b9a8fda-9248-5134-a977-674307152609",
+          "column_id": "b04004ed-91e5-5070-a7f9-23c6926eeaf1",
           "index": 2,
           "path": [
             "账龄"
@@ -70803,7 +70803,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "1e6f12ee-6c0b-5550-876c-7f0908cd13ff",
+          "column_id": "c3f05875-2df0-5abf-9da9-476790dae4a9",
           "index": 3,
           "path": [
             "未收回的原因"
@@ -70814,7 +70814,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "edb2acd6-3bb4-5b7d-b73c-b6b6570019fb",
+          "column_id": "b38a38d2-eb52-53db-b734-82a420b8368b",
           "index": 4,
           "path": [
             "是否发生减值及其原因"
@@ -70830,12 +70830,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 5,
-      "table_id": "f9f3d121-9b00-5fb1-9d76-fd8097651348",
+      "table_id": "f88aff03-c42c-5f79-ae5a-7c7157f1c6e2",
       "table_name": "按账龄披露",
       "header_fingerprint": "c21360b75cf0b8724bb89d82aef51842f10eda1d0ce3ca4f35c9a2effd01aa5d",
       "columns": [
         {
-          "column_id": "5da7869f-6d34-5a2e-843e-f7fe8cee29c4",
+          "column_id": "02029b53-ac13-56ea-aadc-c94e17dedb11",
           "index": 0,
           "path": [
             "账龄"
@@ -70846,7 +70846,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3b4214b3-52f7-555d-89bf-2d743c03de17",
+          "column_id": "55214136-96db-507d-a661-aa11110c756e",
           "index": 1,
           "path": [
             "期末余额"
@@ -70857,7 +70857,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "bf907b2a-1052-50af-bbdf-3e63ef36fd1f",
+          "column_id": "cc05ce8a-7caa-5a21-8261-d6516a2fdfc4",
           "index": 2,
           "path": [
             "上年年末余额"
@@ -70873,12 +70873,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 6,
-      "table_id": "13e8cda1-10c4-5ace-bb94-0252f0730b63",
+      "table_id": "e0048d6c-fcdb-50de-9f71-a4c7b98ae41f",
       "table_name": "按款项性质披露",
       "header_fingerprint": "c7b06b518c29ccb73808cd47e5558b76ebd9b3c5475f63a848370ecca3e42882",
       "columns": [
         {
-          "column_id": "88346131-03a0-56ab-b1e3-19b8b2ac8afc",
+          "column_id": "51feb728-3e1c-5cd4-b4eb-a925eedaa549",
           "index": 0,
           "path": [
             "项目"
@@ -70889,7 +70889,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "1beddcf2-ab96-56c1-80d7-7bd91d170ede",
+          "column_id": "8d11bd1f-6a5b-555d-87de-ba2cb3075f8e",
           "index": 1,
           "path": [
             "期末金额",
@@ -70901,7 +70901,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e8ac2596-da2f-5347-b20d-2a5a9077302a",
+          "column_id": "370eb228-7980-5196-8866-28e6203c79c6",
           "index": 2,
           "path": [
             "期末金额",
@@ -70913,7 +70913,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "ae8bf16f-9eea-5eb0-9726-7672a571a7df",
+          "column_id": "828bd54c-9743-563b-be80-a90cf83095ec",
           "index": 3,
           "path": [
             "期末金额",
@@ -70925,7 +70925,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e8e95b22-f9f2-5990-860c-9d21bbacc075",
+          "column_id": "309d097a-04e2-5dee-a96d-0115262d537c",
           "index": 4,
           "path": [
             "上年年末金额",
@@ -70937,7 +70937,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "d34729ac-89bf-59b9-8ffe-be75c2bc0c5f",
+          "column_id": "96181803-3c65-563f-b4a9-7a84d91c44d7",
           "index": 5,
           "path": [
             "上年年末金额",
@@ -70949,7 +70949,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "044543ab-f276-540d-9ddd-40cfb6880c99",
+          "column_id": "3714933b-6aa5-56df-bd7c-41280c04a107",
           "index": 6,
           "path": [
             "上年年末金额",
@@ -70966,12 +70966,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 7,
-      "table_id": "5a6f10eb-9f73-5bba-827a-5cba759550f7",
+      "table_id": "a4619b53-4b0c-5be0-bdd4-eeb3e1bc4daa",
       "table_name": "期末处于第一阶段的坏账准备",
       "header_fingerprint": "8d9f5b352710a3cb64e9c5474a104c20700d91f63ef4e79062fdcf26c5077a03",
       "columns": [
         {
-          "column_id": "4648bcb4-689d-5111-a9a0-97fd93ef6e45",
+          "column_id": "99e7405c-5422-56b6-b0e9-5cadfdd156b3",
           "index": 0,
           "path": [
             "类别"
@@ -70982,7 +70982,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "359441dd-de25-5084-81b6-7d92fbbacd0d",
+          "column_id": "c0b59158-a216-5391-abe8-03fc17c39964",
           "index": 1,
           "path": [
             "账面余额"
@@ -70993,7 +70993,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "eb81fb12-76bf-518b-820d-a9c1601591a8",
+          "column_id": "75fc0547-bb55-57c2-a20f-f45424465096",
           "index": 2,
           "path": [
             "未来12个月内的预期信用损失率(%)"
@@ -71004,7 +71004,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "08318d82-70c7-5c86-b49a-d12363c97e54",
+          "column_id": "64fa864f-96bb-50b6-89f1-658a47722255",
           "index": 3,
           "path": [
             "坏账准备"
@@ -71015,7 +71015,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "87a9b636-7566-593b-be05-b5a7f8babba9",
+          "column_id": "60ed4198-6841-5f48-b9c2-cb81e4686a29",
           "index": 4,
           "path": [
             "账面价值"
@@ -71026,7 +71026,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "19a84ab6-f13a-5cb3-921a-c6dc800b16e5",
+          "column_id": "737eb843-e859-5726-95d4-182637d0b330",
           "index": 5,
           "path": [
             "理由"
@@ -71042,12 +71042,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 8,
-      "table_id": "4f4bf1e0-8956-5cbd-9d34-cd867c296324",
+      "table_id": "8358d890-901e-5f08-821d-d611be2583f1",
       "table_name": "期末处于第二阶段的坏账准备",
       "header_fingerprint": "6cb1f6cf6c7c6ecf57f9a510447eb643b2f39c96020a41fcbfaa29d08ba3f6d3",
       "columns": [
         {
-          "column_id": "3f63e5d6-6b5c-5cab-ad38-d505a7b6f12e",
+          "column_id": "1cc7f1e1-9570-51f8-8e75-d73ca6dd0901",
           "index": 0,
           "path": [
             "类别"
@@ -71058,7 +71058,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e60975fe-91b3-5b0b-af7d-9e506a2b48b3",
+          "column_id": "f3642c20-1318-58d0-998b-275d9c01c6c0",
           "index": 1,
           "path": [
             "账面余额"
@@ -71069,7 +71069,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "06e91ef2-1ea9-5992-b1e1-c1fcb0f3b6fb",
+          "column_id": "bd7a3f09-e2d0-5e73-ac59-8acc26c26c75",
           "index": 2,
           "path": [
             "整个存续期预期信用损失率(%)"
@@ -71080,7 +71080,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "f4220e83-336a-589b-b8d5-74d625c6165b",
+          "column_id": "c5805376-df80-5a62-af2c-9350a1ec7da0",
           "index": 3,
           "path": [
             "坏账准备"
@@ -71091,7 +71091,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "789c470b-8337-51ff-8a42-61bb810e42e1",
+          "column_id": "da016500-a839-5deb-807f-bea3dd94cb27",
           "index": 4,
           "path": [
             "账面价值"
@@ -71102,7 +71102,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "da5ef83b-f902-57a7-944f-ea5fbca72b91",
+          "column_id": "1391d20d-b769-53dd-8a9c-16d06ae1f859",
           "index": 5,
           "path": [
             "理由"
@@ -71118,12 +71118,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 9,
-      "table_id": "39b99f1b-da19-5841-9b74-c7817cd49dd1",
+      "table_id": "d49941b3-7499-5ef3-a47b-eaaacb2e52ae",
       "table_name": "期末处于第三阶段的坏账准备",
       "header_fingerprint": "6cb1f6cf6c7c6ecf57f9a510447eb643b2f39c96020a41fcbfaa29d08ba3f6d3",
       "columns": [
         {
-          "column_id": "6f0cf8f9-d0c1-51d8-bddd-9f97b023ae09",
+          "column_id": "062ecf59-a61b-5521-8a8a-4c7e64d576a3",
           "index": 0,
           "path": [
             "类别"
@@ -71134,7 +71134,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "9c9c620c-2fa2-5064-815c-8e10b77179e1",
+          "column_id": "8a77984e-a879-54f2-8910-372a38610338",
           "index": 1,
           "path": [
             "账面余额"
@@ -71145,7 +71145,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "8ead3c70-7933-55c5-aaf3-6f7a5b0652e5",
+          "column_id": "0d16303e-60fe-5bbe-946c-831e426e4f08",
           "index": 2,
           "path": [
             "整个存续期预期信用损失率(%)"
@@ -71156,7 +71156,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "29428fc5-590e-5aa3-ae67-8e655fc9bf47",
+          "column_id": "07095c40-c080-5eb4-8165-9db9196f589b",
           "index": 3,
           "path": [
             "坏账准备"
@@ -71167,7 +71167,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "98b43426-ffdb-5720-8496-0f8375a0f977",
+          "column_id": "365d8f38-9590-58e9-ab46-f17639ee147f",
           "index": 4,
           "path": [
             "账面价值"
@@ -71178,7 +71178,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4bdf1543-a351-5c99-afa5-67bc1df57328",
+          "column_id": "381ef413-d21d-55a9-be85-d4792cbd0c01",
           "index": 5,
           "path": [
             "理由"
@@ -71194,12 +71194,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 10,
-      "table_id": "88d055b0-3669-5d22-8444-8613975cb6be",
+      "table_id": "92e2c275-78e0-5e32-b622-67cd08fe857a",
       "table_name": "上年年末处于第一阶段的坏账准备",
       "header_fingerprint": "8d9f5b352710a3cb64e9c5474a104c20700d91f63ef4e79062fdcf26c5077a03",
       "columns": [
         {
-          "column_id": "e2edb16b-9891-5e3f-964c-7476661d85a3",
+          "column_id": "7d3dbc97-b78b-51b5-87a5-1ac8162d3855",
           "index": 0,
           "path": [
             "类别"
@@ -71210,7 +71210,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "81bf3f43-85e7-5a40-a227-25901bb24667",
+          "column_id": "400b43ee-a474-557a-a9d4-fa92276c1b67",
           "index": 1,
           "path": [
             "账面余额"
@@ -71221,7 +71221,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "41493c2f-1d42-53a1-97a9-5bf25b7b38ba",
+          "column_id": "88e7b15e-e814-5712-bc98-8c2a6119be5f",
           "index": 2,
           "path": [
             "未来12个月内的预期信用损失率(%)"
@@ -71232,7 +71232,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "f5f9b434-a963-54fb-9bc3-8bc8c6d03cae",
+          "column_id": "24818628-da58-565c-899e-5ae2ef883f3b",
           "index": 3,
           "path": [
             "坏账准备"
@@ -71243,7 +71243,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "61e1973b-56df-5a79-8d19-7f56906794e4",
+          "column_id": "9e8532a7-973e-56d3-8f00-111949c4d041",
           "index": 4,
           "path": [
             "账面价值"
@@ -71254,7 +71254,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "b1ad4f54-0363-53d1-a1dd-dcbf35ffd948",
+          "column_id": "3384c630-63b9-5154-8a2a-b75eb84cc916",
           "index": 5,
           "path": [
             "理由"
@@ -71270,12 +71270,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 11,
-      "table_id": "771f43ec-e0be-51fa-a385-b3cfd000fd7c",
+      "table_id": "f012b733-097c-5dab-b410-c80d70be0599",
       "table_name": "上年年末处于第二阶段的坏账准备",
       "header_fingerprint": "6cb1f6cf6c7c6ecf57f9a510447eb643b2f39c96020a41fcbfaa29d08ba3f6d3",
       "columns": [
         {
-          "column_id": "3b4a0cc1-dd6a-5af4-9c65-e2c9fd922a36",
+          "column_id": "7b507fc2-e60d-5f62-94dd-6a404b9178ec",
           "index": 0,
           "path": [
             "类别"
@@ -71286,7 +71286,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "d4570669-be27-59da-bddd-fa67bed06acc",
+          "column_id": "fc67d8a5-a574-575e-a189-b994c0c781dc",
           "index": 1,
           "path": [
             "账面余额"
@@ -71297,7 +71297,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3aded5d9-2a3a-5430-96bc-1274034a4cc8",
+          "column_id": "3ab3277a-6ede-5ca1-8005-f1affe07ac3c",
           "index": 2,
           "path": [
             "整个存续期预期信用损失率(%)"
@@ -71308,7 +71308,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "f0e32b23-dcfe-5f79-ac7f-ce7935c26077",
+          "column_id": "e8109583-5a5a-5a21-9b77-335c49f4af0a",
           "index": 3,
           "path": [
             "坏账准备"
@@ -71319,7 +71319,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "9e49c21a-2be5-5110-bc23-69f0aa0f6aed",
+          "column_id": "dd5e7c15-6595-57e6-89ed-a26c9a648d42",
           "index": 4,
           "path": [
             "账面价值"
@@ -71330,7 +71330,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "42710fa7-666e-573d-bfa2-0ee6fe1ac852",
+          "column_id": "f2504fde-4091-5afe-923c-6ba72dfe5e0c",
           "index": 5,
           "path": [
             "理由"
@@ -71346,12 +71346,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 12,
-      "table_id": "430291f0-0369-5779-bddc-0e0c317f6bb6",
+      "table_id": "59df487c-e3f3-51cd-9956-5f389a8ec39d",
       "table_name": "上年年末处于第三阶段的坏账准备",
       "header_fingerprint": "6cb1f6cf6c7c6ecf57f9a510447eb643b2f39c96020a41fcbfaa29d08ba3f6d3",
       "columns": [
         {
-          "column_id": "642a6281-668e-5483-9ea0-fcb347187e3f",
+          "column_id": "cb36aded-c0e9-5dfe-968a-61dc78edbed5",
           "index": 0,
           "path": [
             "类别"
@@ -71362,7 +71362,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "a2ceb8e6-9461-5fd6-8515-ee1255d112bc",
+          "column_id": "2197c93b-31ff-598b-bc16-ff1f9d6c331c",
           "index": 1,
           "path": [
             "账面余额"
@@ -71373,7 +71373,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "20be0e9b-d245-5e74-b80a-307b49ebad25",
+          "column_id": "15cf7b9e-2b21-5ba6-8581-5d8d9d933edb",
           "index": 2,
           "path": [
             "整个存续期预期信用损失率(%)"
@@ -71384,7 +71384,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "a7a8ec2d-f15a-5cde-8fd1-c369e692ac8f",
+          "column_id": "c3149c10-e0d0-5b57-a7e4-601c0da974e4",
           "index": 3,
           "path": [
             "坏账准备"
@@ -71395,7 +71395,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "58259fdd-c908-5247-b5b6-78847b282265",
+          "column_id": "dbc286d6-192e-5f2c-a8c6-2df4877c84dc",
           "index": 4,
           "path": [
             "账面价值"
@@ -71406,7 +71406,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "bdf677a4-dea2-510c-83e9-6f35a418ac95",
+          "column_id": "7e162ba4-3257-50ab-8ab9-5d221727369f",
           "index": 5,
           "path": [
             "理由"
@@ -71422,12 +71422,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 13,
-      "table_id": "260499b3-7712-58dd-a9a3-ce86271f56a9",
+      "table_id": "1fd6d7ea-8eaa-5405-8e34-86a2a9188cc9",
       "table_name": "本期计提、收回或转回的坏账准备情况",
       "header_fingerprint": "e04c986de8f291f108204ad9fe6aa69970b0c76228985e3d2c1e092c43ef17c0",
       "columns": [
         {
-          "column_id": "17cbaa00-cd22-560e-afe6-19993d071522",
+          "column_id": "61a59feb-62e8-5350-acda-f419cabcb5f0",
           "index": 0,
           "path": [
             "坏账准备"
@@ -71438,7 +71438,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3e48919d-b4c9-5f90-bb0c-39ac374d5f1b",
+          "column_id": "5b58df6e-82d0-5d43-97be-bd3291ce8c24",
           "index": 1,
           "path": [
             "第一阶段",
@@ -71450,7 +71450,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "78f0cdd1-a733-5497-b8f1-d1ca6d761e32",
+          "column_id": "d11e6c47-3f75-52d1-8d06-45f6606add14",
           "index": 2,
           "path": [
             "第二阶段",
@@ -71462,7 +71462,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "bd865c0b-ac1e-5e16-b565-af40d2ba5f5a",
+          "column_id": "63d8982a-ae8b-505c-a0dd-cb415db80801",
           "index": 3,
           "path": [
             "第三阶段",
@@ -71474,7 +71474,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "d842e867-605a-5dcf-8318-7e5091d96c63",
+          "column_id": "0a4881ce-5e16-5f34-acfa-0641cdfd01f8",
           "index": 4,
           "path": [
             "合计"
@@ -71490,12 +71490,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 14,
-      "table_id": "48334303-72cf-5154-9e1e-118959c72011",
+      "table_id": "810f8c4e-a033-5731-98f9-e80c92bf45a2",
       "table_name": "本期转回或收回金额重要的坏账准备",
       "header_fingerprint": "ce882fe82835e7e40a377089c13f5fe95f0fb46480b66f9ea4e7ff9d20d29605",
       "columns": [
         {
-          "column_id": "b6f94445-2c5b-5f42-8ba7-028f1416c86f",
+          "column_id": "3581e020-37ff-5a29-a4fe-96a5c06204e2",
           "index": 0,
           "path": [
             "单位名称"
@@ -71506,7 +71506,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e54bef07-3c7f-5c89-9a68-0e35b1939f6a",
+          "column_id": "0bbb8955-c743-54c2-8354-33ddc62f9e3a",
           "index": 1,
           "path": [
             "转回原因"
@@ -71517,7 +71517,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "5a4620de-0b9d-52f5-8d03-61c46f942841",
+          "column_id": "277a4456-6ec1-5d55-b69c-2338c322229a",
           "index": 2,
           "path": [
             "收回方式"
@@ -71528,7 +71528,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c6779a5f-f60a-57ee-9f9e-8789e32f465e",
+          "column_id": "a0d418c7-91d9-54b7-8665-f8cf719e294c",
           "index": 3,
           "path": [
             "原确定坏账准备的依据"
@@ -71539,7 +71539,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "9678ba57-c969-5576-845e-d5cee9130a12",
+          "column_id": "3ab29096-a42e-5a80-b8a1-c505c30b67d9",
           "index": 4,
           "path": [
             "转回或收回金额"
@@ -71555,12 +71555,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 15,
-      "table_id": "87102e78-452c-5abe-8bb5-c659458e6a20",
+      "table_id": "3c58e79e-dc6d-5c8e-87ca-70fc7e4a2f86",
       "table_name": "本期实际核销的其他应收款情况",
       "header_fingerprint": "60ec39f27432be5a82cb9721a84273bff9586b1924d762e528739604eb599529",
       "columns": [
         {
-          "column_id": "9c329629-a49b-5590-ab54-c8a2ec4576ff",
+          "column_id": "1028674a-1252-5d02-9203-96971d7545af",
           "index": 0,
           "path": [
             "项目"
@@ -71571,7 +71571,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c52b4ce3-aebe-587f-942e-b1cf509ecafd",
+          "column_id": "79118859-3708-55e0-82e7-d5158c7746d2",
           "index": 1,
           "path": [
             "核销金额"
@@ -71587,12 +71587,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 16,
-      "table_id": "ca4d1023-ae08-5e20-b348-63ab78e22194",
+      "table_id": "c3ec2d71-8872-5740-93ea-f5617165d905",
       "table_name": "重要的其他应收款核销情况（逐项披露）",
       "header_fingerprint": "63f6ea6904b7f0f7e25b54a0316ef9f4d850e4421e43404308bdbcb2000e25b9",
       "columns": [
         {
-          "column_id": "ea4e0ede-2535-521f-a407-de535c8380ef",
+          "column_id": "393f53b6-e0b7-5695-9127-f0060710d029",
           "index": 0,
           "path": [
             "单位名称"
@@ -71603,7 +71603,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "542029b1-ce41-572f-b258-23e0e7d21317",
+          "column_id": "a70a32fd-95cd-5075-a6d4-bb4ff21059bc",
           "index": 1,
           "path": [
             "其他应收款性质"
@@ -71614,7 +71614,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e023df32-7059-5ceb-8d76-d338324ed3aa",
+          "column_id": "31ce378f-e0ad-566b-847f-8888dcabbf19",
           "index": 2,
           "path": [
             "核销金额"
@@ -71625,7 +71625,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "6ff2814c-7703-5fd8-8b3c-dc92ca48a084",
+          "column_id": "1aa160ab-9b4c-5023-ae5f-9ee969ca4389",
           "index": 3,
           "path": [
             "核销原因"
@@ -71636,7 +71636,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "2703df2d-fa96-5479-91cc-2499826d8f0d",
+          "column_id": "4f3c11c6-dc40-5fa1-a128-07c8bee3692a",
           "index": 4,
           "path": [
             "履行的核销程序"
@@ -71647,7 +71647,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "ddfd12b4-e364-5d17-a228-ff3e265d055d",
+          "column_id": "a7d3b062-2954-54d6-8300-035084c963ef",
           "index": 5,
           "path": [
             "款项是否由关联交易产生"
@@ -71663,12 +71663,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 17,
-      "table_id": "f436c733-8bab-5790-8afd-bb205a4c0202",
+      "table_id": "7fd2b5f4-7979-5b81-8772-ce96a878f3f7",
       "table_name": "按欠款方归集的其他应收款期末余额前五名单位情况",
       "header_fingerprint": "659826bebb3cbccb34c8e6b0622f63e7ae89a1ba040d2eec77ff327d01ac8b86",
       "columns": [
         {
-          "column_id": "9edb38ab-724d-55bb-9174-84c9fba86939",
+          "column_id": "f98b05ed-73d4-5d6d-a74c-ce47db91d94b",
           "index": 0,
           "path": [
             "单位名称"
@@ -71679,7 +71679,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "1ab4b615-ee7e-5d55-a97c-2341569c5b5a",
+          "column_id": "1c648981-8539-5119-9a30-60bf53dd1246",
           "index": 1,
           "path": [
             "款项性质"
@@ -71690,7 +71690,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "1f7480f7-2a7b-5936-bb39-40ab14f11716",
+          "column_id": "ea4d91c0-6221-50a7-85c2-1aeaf007da08",
           "index": 2,
           "path": [
             "其他应收款期末余额"
@@ -71701,7 +71701,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "2b42c596-2309-59db-b588-3cd25df90a4c",
+          "column_id": "1c818ef3-d533-59df-b12b-b26bf426a798",
           "index": 3,
           "path": [
             "账龄"
@@ -71712,7 +71712,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "763fb8b5-5b5d-5427-90fd-4844ae692c6c",
+          "column_id": "147fd469-6d60-5be7-9c12-e5fade3e4a32",
           "index": 4,
           "path": [
             "占其他应收款期末余额合计数的比例(%)"
@@ -71723,7 +71723,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "d8e9dfc8-2cea-5878-9175-ffd26f8b17ed",
+          "column_id": "bfd1ecb3-6877-58cb-9acd-dcf6146d41ed",
           "index": 5,
           "path": [
             "坏账准备期末余额"
@@ -71739,12 +71739,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 18,
-      "table_id": "fd35b8c4-bf4f-511f-b922-691145189aab",
+      "table_id": "5109677b-2c7b-5991-a319-8d76f92508d1",
       "table_name": "应收政府补助情况",
       "header_fingerprint": "20b6c284e678f63b318d9af1b150f1aafa5820f25b71a1caee89a322ffc4bf67",
       "columns": [
         {
-          "column_id": "b96e8980-9425-5015-bed4-7919be6708db",
+          "column_id": "357bb585-3c0c-5add-a4dd-25879f87cba4",
           "index": 0,
           "path": [
             "单位名称(注:政府补助的发文单位)"
@@ -71755,7 +71755,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4fe31c9c-918f-513a-8dce-665c34b6d340",
+          "column_id": "16d2041d-b0d6-5eff-bc80-d5b2c8b8df32",
           "index": 1,
           "path": [
             "政府补助项目名称"
@@ -71766,7 +71766,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "42a823ba-f265-5887-9b38-b56237444b57",
+          "column_id": "f7ca4b8e-f235-5463-be0c-e5c106ac1225",
           "index": 2,
           "path": [
             "期末余额"
@@ -71777,7 +71777,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "635be140-3464-56a4-943d-6417248f242d",
+          "column_id": "99f2548e-f943-5a55-b3d4-b884b23d8f53",
           "index": 3,
           "path": [
             "账龄"
@@ -71788,7 +71788,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "80e9e323-f59f-5844-96c7-2d370e53c378",
+          "column_id": "64da5ab6-cc7a-5c2b-8202-14082b9741bd",
           "index": 4,
           "path": [
             "预计收取的时间、金额及依据"
@@ -71804,12 +71804,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 19,
-      "table_id": "a8e18714-7c76-52cb-bb3a-9447d1f1def9",
+      "table_id": "aa4a96b6-71f4-5d48-91bd-62c4db872313",
       "table_name": "因金融资产转移而终止确认的其他应收款情况",
       "header_fingerprint": "f124aca90af11975c861463639df0cdc6bf8b95dc09a2652293c932cf0bb80b1",
       "columns": [
         {
-          "column_id": "e78cea90-e600-5c76-a5ae-78d349ef2cf5",
+          "column_id": "8ec45edc-668b-5c15-87f5-b0de2f009580",
           "index": 0,
           "path": [
             "项目"
@@ -71820,7 +71820,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "2e7ef4ae-79c9-5c9c-b608-c9d63d62a2e3",
+          "column_id": "342ea875-9f5a-523d-9120-80bec4d6c7d8",
           "index": 1,
           "path": [
             "转移方式"
@@ -71831,7 +71831,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4a4b4a31-475f-550f-a138-e3f7fabdfb59",
+          "column_id": "4bfec6be-9118-5c7a-bcc1-c98d5a8eb72f",
           "index": 2,
           "path": [
             "终止确认金额"
@@ -71842,7 +71842,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "bf9e9af4-3869-51b3-9076-fe8f0c312368",
+          "column_id": "74054b3d-2791-51a0-a1dd-0954550c1518",
           "index": 3,
           "path": [
             "与终止确认相关的利得或损失"
@@ -71858,12 +71858,12 @@
       "variant": "listed",
       "section_id": "十六、其他应收款",
       "table_index": 20,
-      "table_id": "9ebde5fe-1371-55bd-b0a0-878f22681123",
+      "table_id": "26b35dc0-2826-5539-b349-ba0ed884a3c7",
       "table_name": "转移其他应收款且继续涉入形成的资产、负债的金额",
       "header_fingerprint": "ca089b27b17cf3bd73df676690329fc75cd2d42dd0f96a953025fff3ea21c2f3",
       "columns": [
         {
-          "column_id": "1099ca6c-d12e-525f-963e-559ebb160c43",
+          "column_id": "1e333fab-cb7d-5755-82ec-e6d16f04ede5",
           "index": 0,
           "path": [
             "项目"
@@ -71874,7 +71874,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "164c3c8c-1ccb-54e7-86fa-12505de85b5f",
+          "column_id": "4b30202a-2b9e-50e7-bd46-6a586cc8e1cd",
           "index": 1,
           "path": [
             "期末数"
@@ -71890,12 +71890,12 @@
       "variant": "listed",
       "section_id": "十六、应收票据",
       "table_index": 0,
-      "table_id": "50f8d20a-599a-568f-b922-15b7aebdf19e",
+      "table_id": "3b04b78c-ec44-57ba-a5aa-1a651663d60d",
       "table_name": "应收票据",
       "header_fingerprint": "3e5f61c8655a2bc3869c294595041a26403c8ab7b92c8e39e2958b466f6ff535",
       "columns": [
         {
-          "column_id": "4261bbed-3bff-5cc2-ac7f-53c61c1774b3",
+          "column_id": "79008d7e-7c0b-5153-9b19-3136abc99bb7",
           "index": 0,
           "path": [
             "票据种类"
@@ -71906,7 +71906,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "9ef90865-62b7-5244-8cf3-be8ba40fae5c",
+          "column_id": "810fc927-fa94-58a8-a32f-8569999fcd01",
           "index": 1,
           "path": [
             "期末余额",
@@ -71918,7 +71918,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "a2044b8a-917c-51e9-a0ed-30dad0d1c8a6",
+          "column_id": "3b15636a-f16f-559a-bfca-3400c89fab1e",
           "index": 2,
           "path": [
             "期末余额",
@@ -71930,7 +71930,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "18ecf0eb-fd8b-546e-a589-7da05a0d4dfd",
+          "column_id": "000a6294-6111-53e1-bb3a-1f2af7c567c1",
           "index": 3,
           "path": [
             "期末余额",
@@ -71942,7 +71942,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c1ca4360-7a4e-58c7-8756-7d56b1200065",
+          "column_id": "d3b8083e-99f8-502d-8878-ae19237a4fe0",
           "index": 4,
           "path": [
             "上年年末余额",
@@ -71954,7 +71954,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c9a5510d-a4fb-543f-911d-d3b717970136",
+          "column_id": "53bed200-50b4-5ee6-8d35-05c001d27a35",
           "index": 5,
           "path": [
             "上年年末余额",
@@ -71966,7 +71966,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "75605bd0-b5be-51d0-951c-85425c4f1c80",
+          "column_id": "a3f35bbd-9315-50b3-9323-107d903204c3",
           "index": 6,
           "path": [
             "上年年末余额",
@@ -71983,12 +71983,12 @@
       "variant": "listed",
       "section_id": "十六、应收票据",
       "table_index": 1,
-      "table_id": "5f17dd07-8681-5fb5-ad1f-63b0b12c40e6",
+      "table_id": "3b8d146f-1f64-55ff-bad3-46695774a8c3",
       "table_name": "期末已质押的应收票据",
       "header_fingerprint": "7605fd92b0b7a4d1cb8f3c68ef670b679144adb55ada2af8a23ea203664c1260",
       "columns": [
         {
-          "column_id": "7c05efc4-9937-599e-8d16-48462b4ab20f",
+          "column_id": "f9d46f7a-9a8f-58c0-b180-c5026ef06bef",
           "index": 0,
           "path": [
             "种类"
@@ -71999,7 +71999,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "38c55539-22e1-5090-93ac-c6f4adfd2ebb",
+          "column_id": "98910ce2-981c-5675-bf58-bee0e1616405",
           "index": 1,
           "path": [
             "期末已质押金额"
@@ -72015,12 +72015,12 @@
       "variant": "listed",
       "section_id": "十六、应收票据",
       "table_index": 2,
-      "table_id": "d0fd3312-f1dd-52c4-b95e-b36afce972c0",
+      "table_id": "e8dd3baa-7251-5350-80f4-37f2d886140b",
       "table_name": "期末已背书或贴现但尚未到期的应收票据",
       "header_fingerprint": "09486566adc12291a71ff47b45eca6b5c92c943f283d090e3c523ddd15643f68",
       "columns": [
         {
-          "column_id": "8c9dc933-d0ff-5340-bb7e-89038161d11c",
+          "column_id": "7faee38b-c7ba-595e-a280-e698b51702e7",
           "index": 0,
           "path": [
             "种类"
@@ -72031,7 +72031,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "d00f56ef-e04d-5299-84a2-07e163d356ee",
+          "column_id": "80c3111e-42f4-5820-9490-9946bb45fe4d",
           "index": 1,
           "path": [
             "期末终止确认金额"
@@ -72042,7 +72042,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "b79e687f-d38d-5cfb-8048-3c15629b9888",
+          "column_id": "ecc8a3be-0847-5beb-9171-f458cade0bd2",
           "index": 2,
           "path": [
             "期末未终止确认金额"
@@ -72058,12 +72058,12 @@
       "variant": "listed",
       "section_id": "十六、应收票据",
       "table_index": 3,
-      "table_id": "488755af-44e0-5c26-90ef-b94e09edee98",
+      "table_id": "2dc60046-b0af-5dec-ba63-0e312beba833",
       "table_name": "期末因出票人未履约而其转应收账款的票据",
       "header_fingerprint": "0f5036eb0be996e052d8ce9f51a870117e97e9c864392d676d3f86a9524e11a5",
       "columns": [
         {
-          "column_id": "3357ec26-7ebd-584d-a4c3-3eb929c0a070",
+          "column_id": "ac4969ae-168a-51ac-8a5b-41a3fa61103b",
           "index": 0,
           "path": [
             "种类"
@@ -72074,7 +72074,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "990cc14f-544f-5ca1-b4ae-2097064c516c",
+          "column_id": "3d088603-33f1-57b1-b17e-71740ce2da00",
           "index": 1,
           "path": [
             "期末转应收账款金额"
@@ -72090,12 +72090,12 @@
       "variant": "listed",
       "section_id": "十六、应收票据",
       "table_index": 4,
-      "table_id": "6c043ea7-7697-5a3f-bb07-353feffe37e2",
+      "table_id": "73ab9887-3af2-59d7-b819-01d68e845f67",
       "table_name": "按坏账计提方法分类（期末余额）",
       "header_fingerprint": "f80a277dfc20a193060964698b75a5f32495b8e252cd9d49ea31ca302ab88b78",
       "columns": [
         {
-          "column_id": "9916c5da-991b-5069-af9f-a9009ec1b0c9",
+          "column_id": "b8c03aed-864a-51d6-a70b-560f39eff45d",
           "index": 0,
           "path": [
             "类别"
@@ -72106,7 +72106,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "f59650e6-5f59-5208-9af6-0e792bb92d7e",
+          "column_id": "08b480c8-6f60-5a63-9d42-f891ed868652",
           "index": 1,
           "path": [
             "期末余额",
@@ -72118,7 +72118,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "150e8025-cb13-584f-ae51-28cd4444e75b",
+          "column_id": "83dc28df-dbe7-5f51-ba7e-0b93cfa2e41e",
           "index": 2,
           "path": [
             "期末余额",
@@ -72130,7 +72130,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "a5b20beb-0ecd-58d2-b077-3760b70cda1c",
+          "column_id": "b1fef071-3c45-5dc6-9cf1-343ef16a3d22",
           "index": 3,
           "path": [
             "期末余额",
@@ -72142,7 +72142,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "04d668fe-5fe9-5c7b-a582-8410fb79538a",
+          "column_id": "886fceac-45da-5499-8d54-4347b46fde4a",
           "index": 4,
           "path": [
             "期末余额",
@@ -72154,7 +72154,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "182d1481-d107-51a3-8a8c-4b0d837f4eb7",
+          "column_id": "1aaddc0e-92db-5eb9-b57d-52bd9aec828b",
           "index": 5,
           "path": [
             "期末余额",
@@ -72171,12 +72171,12 @@
       "variant": "listed",
       "section_id": "十六、应收票据",
       "table_index": 5,
-      "table_id": "a08c54ec-0e17-57bb-b199-1b4217c39870",
+      "table_id": "87311d7c-04ee-5835-ab1a-853952b6b48e",
       "table_name": "按坏账计提方法分类（续：上年年末余额）",
       "header_fingerprint": "8181da5a1e2b02cb2b79231ff0526d7ab58177989e7886801dcf8cd203bb1f0a",
       "columns": [
         {
-          "column_id": "8732b691-4f6c-5884-976d-5bd18da6fc04",
+          "column_id": "623044b1-efd1-51a0-a8c5-7f4e324bfa07",
           "index": 0,
           "path": [
             "类别"
@@ -72187,7 +72187,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "f35c7a9d-22f9-57c7-9e38-17f2550087c0",
+          "column_id": "b7252619-f8d4-5ded-a087-e87f0e18d2ee",
           "index": 1,
           "path": [
             "上年年末余额",
@@ -72199,7 +72199,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "009ddca0-d024-566d-8ad3-e920bfe69a43",
+          "column_id": "2158f11b-f680-5540-a912-32f68dc2762a",
           "index": 2,
           "path": [
             "上年年末余额",
@@ -72211,7 +72211,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "49c55d7f-0e89-5d7b-8a10-f1f25a01152e",
+          "column_id": "35c96e26-b715-503b-998e-8610f86d81b0",
           "index": 3,
           "path": [
             "上年年末余额",
@@ -72223,7 +72223,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "a7139bf3-8dc5-569c-ab82-670fafbc931a",
+          "column_id": "6b295c6d-1e94-5b51-9be4-164064f40595",
           "index": 4,
           "path": [
             "上年年末余额",
@@ -72235,7 +72235,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "3b51d718-e0c6-555e-b270-400580f77ecd",
+          "column_id": "66e88e16-c56e-579b-9364-3bc142fd39d2",
           "index": 5,
           "path": [
             "上年年末余额",
@@ -72252,12 +72252,12 @@
       "variant": "listed",
       "section_id": "十六、应收票据",
       "table_index": 6,
-      "table_id": "c82b48c1-9485-55b2-9e34-68afad2de16a",
+      "table_id": "ab2065f2-be5e-50f1-b38d-be54d0551e1a",
       "table_name": "按单项计提坏账准备的应收票据（期末余额）",
       "header_fingerprint": "a8b12ac43574e1667ba2e6c13b8a9f251dddad528c8c747104a227cc5bb984e9",
       "columns": [
         {
-          "column_id": "2697838e-adf2-514d-8933-4c8a108adc11",
+          "column_id": "14ce9ec9-138c-5612-aa76-430721892292",
           "index": 0,
           "path": [
             "名称"
@@ -72268,7 +72268,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c8b25bc4-1aac-5962-895a-52c21e478bd8",
+          "column_id": "389010ab-217a-5a13-a290-4b553cfe3c19",
           "index": 1,
           "path": [
             "账面余额"
@@ -72279,7 +72279,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "8e0307cf-9e6e-58fa-bcf4-a3907654107b",
+          "column_id": "76b030a9-3bcc-5f6d-b57e-cfcaf5e014bf",
           "index": 2,
           "path": [
             "坏账准备"
@@ -72290,7 +72290,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "aa2edae7-b5f1-51cf-b631-4521616476ed",
+          "column_id": "60727919-e799-529f-b07e-037e9daf7d4e",
           "index": 3,
           "path": [
             "预期信用损失率(%)"
@@ -72301,7 +72301,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "4e54a436-41b3-5c6b-a440-925f34a9bd03",
+          "column_id": "9bc59a1f-fa13-5c08-9509-4533fceb3308",
           "index": 4,
           "path": [
             "计提依据"
@@ -72317,12 +72317,12 @@
       "variant": "listed",
       "section_id": "十六、应收票据",
       "table_index": 7,
-      "table_id": "bbc8f021-de6f-5b66-9049-ecc7d7188287",
+      "table_id": "af63222c-be9f-5e6d-9dd8-431957eed2de",
       "table_name": "按单项计提坏账准备的应收票据（续：上年年末余额）",
       "header_fingerprint": "a8b12ac43574e1667ba2e6c13b8a9f251dddad528c8c747104a227cc5bb984e9",
       "columns": [
         {
-          "column_id": "cbd278de-5376-5f25-bd1f-006815bf15fd",
+          "column_id": "53082b2b-9d3f-581e-9704-77e5eabac3a4",
           "index": 0,
           "path": [
             "名称"
@@ -72333,7 +72333,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "662cbca3-35ae-5b19-83c8-4e007fa2fc35",
+          "column_id": "3068d11b-db43-53c4-9767-c3e5ed2c8f77",
           "index": 1,
           "path": [
             "账面余额"
@@ -72344,7 +72344,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "25ad2a98-978d-5131-b5e5-c7d55683ff6b",
+          "column_id": "a0208cfd-dea4-5871-94bc-611b06b78470",
           "index": 2,
           "path": [
             "坏账准备"
@@ -72355,7 +72355,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "56463ca4-c43a-524b-9dd2-261c4f136c1f",
+          "column_id": "78c05859-b80d-5ca4-b968-61fe6821500a",
           "index": 3,
           "path": [
             "预期信用损失率(%)"
@@ -72366,7 +72366,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "f69dc1bf-581f-57f4-9667-7a8d8e34dc71",
+          "column_id": "25dd4305-49cd-54cc-b20f-bc3cd8e7f13c",
           "index": 4,
           "path": [
             "计提依据"
@@ -72382,12 +72382,12 @@
       "variant": "listed",
       "section_id": "十六、应收票据",
       "table_index": 8,
-      "table_id": "736207dc-b17b-59b0-ae68-26f253fd0025",
+      "table_id": "4eb6fd79-b875-5987-af30-fe42eaffec1c",
       "table_name": "组合计提项目：银行承兑汇票",
       "header_fingerprint": "1f07a36ab1c375025496bfeaba43a38674c4f2c50bbe6937ac65bb448f8516df",
       "columns": [
         {
-          "column_id": "9e994a74-c50e-5abb-8823-5180c223c381",
+          "column_id": "8fa64cfc-d976-574c-a553-ee4ae8e8a192",
           "index": 0,
           "path": [
             "名称"
@@ -72398,7 +72398,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "67bea083-e890-5953-8ddb-57c4e13a825b",
+          "column_id": "df0759bb-58db-5647-94f6-420700b612d5",
           "index": 1,
           "path": [
             "期末余额",
@@ -72410,7 +72410,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3200e19a-59d5-5e34-960f-a1928f8fc899",
+          "column_id": "0b41e7d8-43c2-54d9-8648-6db61148b242",
           "index": 2,
           "path": [
             "期末余额",
@@ -72422,7 +72422,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "eba140f7-ea5b-5bf4-9890-3bc9c4de398b",
+          "column_id": "92855a1c-cf75-517a-9ef5-c40da081b181",
           "index": 3,
           "path": [
             "期末余额",
@@ -72434,7 +72434,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "03addde5-89b7-5a06-8d27-2dac1b9e69e9",
+          "column_id": "590dbeab-6a28-50c8-b149-83e8c03b2cb1",
           "index": 4,
           "path": [
             "上年年末余额",
@@ -72446,7 +72446,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "95432c76-1303-54a5-8fb6-f3ef1c6bdbcd",
+          "column_id": "863e7d3b-3c44-5e34-a980-2d4c5385dbc4",
           "index": 5,
           "path": [
             "上年年末余额",
@@ -72458,7 +72458,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "16b3e8a6-3c02-5068-b6ed-919d76722c04",
+          "column_id": "2dd55d7c-5542-55e1-93b1-c656ccf31d6c",
           "index": 6,
           "path": [
             "上年年末余额",
@@ -72475,12 +72475,12 @@
       "variant": "listed",
       "section_id": "十六、应收票据",
       "table_index": 9,
-      "table_id": "df9a0fd6-b726-50e6-bf86-65a9d5270ce2",
+      "table_id": "2005ac67-b7de-53ba-841b-6a119b0a214e",
       "table_name": "组合计提项目：商业承兑汇票",
       "header_fingerprint": "1f07a36ab1c375025496bfeaba43a38674c4f2c50bbe6937ac65bb448f8516df",
       "columns": [
         {
-          "column_id": "7aca270e-6ec3-56ed-bc4b-3567044e5401",
+          "column_id": "e2b7d0aa-f32a-55ce-9ecc-4cc3512d799e",
           "index": 0,
           "path": [
             "名称"
@@ -72491,7 +72491,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "ed8cdd9d-a6ca-545d-91d1-3f37ff89b182",
+          "column_id": "33236a74-7828-56b2-a711-1be83ab89707",
           "index": 1,
           "path": [
             "期末余额",
@@ -72503,7 +72503,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "fe8a4060-6439-5505-940c-7f9ae565adf8",
+          "column_id": "929a6583-a8e7-567e-a50c-c3f020f8d201",
           "index": 2,
           "path": [
             "期末余额",
@@ -72515,7 +72515,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "1e266ac0-a5c5-58be-bbcf-2d141746383d",
+          "column_id": "553ddfef-040b-5884-804a-84fa54f42f08",
           "index": 3,
           "path": [
             "期末余额",
@@ -72527,7 +72527,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "fe9c64cb-ee47-5c40-89c6-4a3808a494a2",
+          "column_id": "91809d24-d42a-5851-b099-5dd29ce971dc",
           "index": 4,
           "path": [
             "上年年末余额",
@@ -72539,7 +72539,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "fc11053a-8ab4-5c55-a4e9-a77d5eafb871",
+          "column_id": "77f743dc-21a8-57f7-90cf-8145b6a60dc9",
           "index": 5,
           "path": [
             "上年年末余额",
@@ -72551,7 +72551,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "51b3bfe6-b667-53f7-acf8-4aa211ec514e",
+          "column_id": "c3b43e01-585b-5d3f-a59d-f0b97b4d600f",
           "index": 6,
           "path": [
             "上年年末余额",
@@ -72568,12 +72568,12 @@
       "variant": "listed",
       "section_id": "十六、应收票据",
       "table_index": 10,
-      "table_id": "f68664d8-5392-55c9-9dfc-5db52f23ba48",
+      "table_id": "6f9520be-affb-5fb1-916b-b7575f1364d8",
       "table_name": "本期计提、收回或转回的坏账准备情况",
       "header_fingerprint": "e41efe0ecb698b0f6703f73b7fdbf302bf752e58e94992900e9e76ab2f497718",
       "columns": [
         {
-          "column_id": "d78b8202-c229-57b7-8e32-7aa925bbc924",
+          "column_id": "65b4948f-7294-5355-8bf3-c0f59c786e2b",
           "index": 0,
           "path": [
             "项目"
@@ -72584,7 +72584,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c89dfda9-aca9-53f9-8b07-298c656f709b",
+          "column_id": "8ec04201-6265-550f-9102-f8afafceff3e",
           "index": 1,
           "path": [
             "坏账准备金额"
@@ -72600,12 +72600,12 @@
       "variant": "listed",
       "section_id": "十六、应收票据",
       "table_index": 11,
-      "table_id": "8c9a9cfb-5629-5aec-b699-483a127850dd",
+      "table_id": "f3093c4e-1607-53f3-8522-adafeacdf4bf",
       "table_name": "本期转回或收回金额重要的坏账准备",
       "header_fingerprint": "ce882fe82835e7e40a377089c13f5fe95f0fb46480b66f9ea4e7ff9d20d29605",
       "columns": [
         {
-          "column_id": "9afec92f-38eb-54a0-b7bd-74854beb88d8",
+          "column_id": "9f1f8e75-2997-5a31-a922-e018fadd2bca",
           "index": 0,
           "path": [
             "单位名称"
@@ -72616,7 +72616,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3576cbe5-ffc0-56da-8fc1-30b32be69932",
+          "column_id": "93891280-0cba-55c1-927a-b1b6c7212681",
           "index": 1,
           "path": [
             "转回原因"
@@ -72627,7 +72627,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "65d4e27a-9064-5f9d-aca2-be48422ddab4",
+          "column_id": "fd22d66f-77b7-545b-9481-600a90734674",
           "index": 2,
           "path": [
             "收回方式"
@@ -72638,7 +72638,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c1271f80-9350-586f-a61a-8311a39475ca",
+          "column_id": "b3ca3dbf-996e-5515-a379-33e539ba3502",
           "index": 3,
           "path": [
             "原确定坏账准备的依据"
@@ -72649,7 +72649,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "fdd235eb-aa06-5aca-8a6e-247af344e2e8",
+          "column_id": "414ba262-d4f0-5634-b2ac-7e19ad5cc526",
           "index": 4,
           "path": [
             "转回或收回金额"
@@ -72665,12 +72665,12 @@
       "variant": "listed",
       "section_id": "十六、应收票据",
       "table_index": 12,
-      "table_id": "eb943221-28ba-5749-b336-07adf30c6eb2",
+      "table_id": "5b04682c-6c69-5476-9b0c-5f94e75e4326",
       "table_name": "本期实际核销的应收票据情况",
       "header_fingerprint": "5a7dfbf610bd582181035ba244c88ccddb6e5daf3566465b88bc37d441b41337",
       "columns": [
         {
-          "column_id": "435786f5-ab5e-5d39-9c13-22f80dad645f",
+          "column_id": "a022857a-1888-52d4-96e5-5bbfcad49295",
           "index": 0,
           "path": [
             "项目"
@@ -72681,7 +72681,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c1131054-c264-5ee2-b929-9c98c1a18f10",
+          "column_id": "5c1e26f3-61fa-597d-8a75-f5fa3d8aca28",
           "index": 1,
           "path": [
             "核销金额"
@@ -72697,12 +72697,12 @@
       "variant": "listed",
       "section_id": "十六、应收票据",
       "table_index": 13,
-      "table_id": "fdd18db8-0967-5c6d-873b-e34e9b0768d5",
+      "table_id": "41b30ea4-5c74-520f-9be1-1c5eea7fc522",
       "table_name": "重要的应收票据核销情况（逐项披露）",
       "header_fingerprint": "89786a19fe166b204715db645b99631a90fbebe2cf561f7c1654b14dfd827f2f",
       "columns": [
         {
-          "column_id": "46546f36-dc30-5938-8ce5-8287fa3f66a9",
+          "column_id": "d147ae4f-5928-5db6-b9b3-78aac5d18c2c",
           "index": 0,
           "path": [
             "单位名称"
@@ -72713,7 +72713,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c742f17e-b1e7-5c1c-b8e6-8017ac5d90dc",
+          "column_id": "4d54baff-2160-5ce2-b003-d1846affdb51",
           "index": 1,
           "path": [
             "应收票据性质"
@@ -72724,7 +72724,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "9bceced9-a0f2-5b05-81af-929923ae87da",
+          "column_id": "e8c76e3d-a925-513d-9773-a0541b18dd49",
           "index": 2,
           "path": [
             "核销金额"
@@ -72735,7 +72735,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "65109ca1-5878-506f-9171-d307c8152f6d",
+          "column_id": "7ab5a6cc-0fc8-5241-a115-14dc7b7928c0",
           "index": 3,
           "path": [
             "核销原因"
@@ -72746,7 +72746,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c2428b52-eafe-50e4-89b6-f9d296631aed",
+          "column_id": "658a704b-2722-500b-87df-f317ee4be6a0",
           "index": 4,
           "path": [
             "履行的核销程序"
@@ -72757,7 +72757,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "77908bbc-e1c0-5093-955a-407408d9aadf",
+          "column_id": "2ff4e173-5185-5a96-b62a-71c7fd133a68",
           "index": 5,
           "path": [
             "款项是否由关联交易产生"
@@ -72773,12 +72773,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 0,
-      "table_id": "0331f98e-2587-5a4f-bc7f-d9648ab50e83",
+      "table_id": "a5ccf78c-9de2-5f51-a0d4-9eeb2db579fa",
       "table_name": "按账龄披露",
       "header_fingerprint": "c21360b75cf0b8724bb89d82aef51842f10eda1d0ce3ca4f35c9a2effd01aa5d",
       "columns": [
         {
-          "column_id": "4c2f68c7-069d-5569-8414-2521f97cbbf5",
+          "column_id": "5520699b-56a4-5bf2-b6de-6a022cac6a23",
           "index": 0,
           "path": [
             "账龄"
@@ -72789,7 +72789,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "9a477a8a-47a7-5531-9ff1-a9936d26c82c",
+          "column_id": "33874931-746e-525f-97cc-2aab74a7eb80",
           "index": 1,
           "path": [
             "期末余额"
@@ -72800,7 +72800,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "1d386b7a-877e-53f6-a23a-7fe1764248fa",
+          "column_id": "72d0c84b-82ad-53ea-8716-dbb2dca6950a",
           "index": 2,
           "path": [
             "上年年末余额"
@@ -72816,12 +72816,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 1,
-      "table_id": "397ed986-7c5c-58ee-80f2-8d699e5b8690",
+      "table_id": "3780d6e5-fdc9-569d-b419-b4707be03f4c",
       "table_name": "按坏账计提方法分类披露",
       "header_fingerprint": "d86935ff7c1756b3f5746032581dcddc09677d5dc94486f727785b3f353ad675",
       "columns": [
         {
-          "column_id": "624c5ed3-e903-5503-af3d-8434f90a10be",
+          "column_id": "f145495c-f521-5a43-b659-7e5e177bc9a3",
           "index": 0,
           "path": [
             "类别"
@@ -72832,7 +72832,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e563e97a-837c-5351-a5c3-634ab37430e3",
+          "column_id": "b56eea79-6f6a-5fc5-bb86-956a0a1ba3aa",
           "index": 1,
           "path": [
             "账面余额",
@@ -72844,7 +72844,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "879262bd-9afb-5dd9-8049-cf16459d586d",
+          "column_id": "03371f69-d7d6-554f-80f0-dedb15c4a1f4",
           "index": 2,
           "path": [
             "账面余额",
@@ -72856,7 +72856,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "2a9afb3b-4f4b-5c53-b692-1708c405d7e9",
+          "column_id": "14cf38a4-ec3e-5323-9900-1014552bea3e",
           "index": 3,
           "path": [
             "坏账准备",
@@ -72868,7 +72868,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "7ece9ead-9a78-5708-bc5e-12052ee9774a",
+          "column_id": "f566b83a-bfa6-5d03-a730-a534e1f235aa",
           "index": 4,
           "path": [
             "坏账准备",
@@ -72880,7 +72880,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "85c0d15d-cf59-57be-98de-bef9b5fbe06c",
+          "column_id": "854e10dd-e1a8-5a06-b44e-a59ec4102fdf",
           "index": 5,
           "path": [
             "账面价值"
@@ -72896,12 +72896,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 2,
-      "table_id": "628d9dfa-1bca-5417-a58b-9cdb62ce1747",
+      "table_id": "eda48a38-792b-5e6d-bc23-c11d630c43a7",
       "table_name": "按坏账计提方法分类披露（续：上年年末余额）",
       "header_fingerprint": "d86935ff7c1756b3f5746032581dcddc09677d5dc94486f727785b3f353ad675",
       "columns": [
         {
-          "column_id": "af908f5a-3178-5500-ab1f-006910a0dfe8",
+          "column_id": "c9a84e88-a168-5ff0-8691-43f0a22971a6",
           "index": 0,
           "path": [
             "类别"
@@ -72912,7 +72912,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "2f8023ab-70b6-581a-9b57-18b18239dbd5",
+          "column_id": "eb4be9e1-5693-5024-8261-c57c925d4682",
           "index": 1,
           "path": [
             "账面余额",
@@ -72924,7 +72924,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "5d11f4ea-9c5e-5cb5-852b-d7f139bb307e",
+          "column_id": "b1d4ff54-c513-5c18-b9f4-6449cac4a52f",
           "index": 2,
           "path": [
             "账面余额",
@@ -72936,7 +72936,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "b07cb1ed-f142-5c1f-92d1-36eb4c219a8b",
+          "column_id": "7e2fcab6-0932-524a-924c-bc0519e19a01",
           "index": 3,
           "path": [
             "坏账准备",
@@ -72948,7 +72948,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c548b24a-b631-58b9-95c8-02e78c18c226",
+          "column_id": "a959dc51-2a93-5315-8865-e164a7d9a34a",
           "index": 4,
           "path": [
             "坏账准备",
@@ -72960,7 +72960,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "31e092be-ccc1-5969-859d-9054a307f0cf",
+          "column_id": "f8ab686a-9b3a-5bf6-a5b9-68d728a630ad",
           "index": 5,
           "path": [
             "账面价值"
@@ -72976,12 +72976,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 3,
-      "table_id": "767c9ff7-750c-5fc6-95bf-b5ca4d966a4a",
+      "table_id": "c0c088b3-6a0c-5459-806e-959d334b45f5",
       "table_name": "按单项计提坏账准备的应收账款",
       "header_fingerprint": "ac4f4176abd9c64f4f5b947fcab320cc7f9fe3ef1a240abc55bcd3ff48a7e42e",
       "columns": [
         {
-          "column_id": "211ca2c9-18d4-500f-a83e-cf6a5c718370",
+          "column_id": "bd744711-25d3-5e99-8aa2-b905c471c2a7",
           "index": 0,
           "path": [
             "名称"
@@ -72992,7 +72992,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4468f4d6-e3df-5633-a121-b3356b4b8511",
+          "column_id": "c1d94bfd-7d96-572c-bdb6-db20f225eaae",
           "index": 1,
           "path": [
             "期末余额",
@@ -73004,7 +73004,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "15b27050-ee66-517f-83c8-32f13279bd18",
+          "column_id": "e32ffe34-b545-5b13-8f31-8a8851e3c8ab",
           "index": 2,
           "path": [
             "期末余额",
@@ -73016,7 +73016,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4167ae3f-c58f-5dfe-9d82-ba0f3b2ec5be",
+          "column_id": "42557d5f-4e05-5461-b98a-d312e6aef4e2",
           "index": 3,
           "path": [
             "期末余额",
@@ -73028,7 +73028,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "7317c5f6-35eb-5e5d-bdfb-c6b8d9ab5e86",
+          "column_id": "c8eba152-2a69-51eb-aea3-b30867e292ce",
           "index": 4,
           "path": [
             "期末余额",
@@ -73045,12 +73045,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 4,
-      "table_id": "98311bcc-7270-5040-bd4a-a7961a2a37fb",
+      "table_id": "c07735da-c1cc-56d3-ab4f-0ebb8ab1b62a",
       "table_name": "按单项计提坏账准备的应收账款（续：上年年末余额）",
       "header_fingerprint": "718d85d6e41f50f5329c40794753672db9645e1127b80621851ae5562cb64e20",
       "columns": [
         {
-          "column_id": "e0eff183-de87-54ba-976e-080cc73adefa",
+          "column_id": "bec57528-c854-5471-86ed-232b9f60cf78",
           "index": 0,
           "path": [
             "名称"
@@ -73061,7 +73061,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c4060559-a40f-5955-961c-b501de0ff5f8",
+          "column_id": "02882a2b-2123-5271-855e-c852a9f9611e",
           "index": 1,
           "path": [
             "账面余额"
@@ -73072,7 +73072,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "981a876a-07d3-5c78-b202-359c9d2f8336",
+          "column_id": "a6964ea2-8c2a-58d5-a4db-6a729b22dd5a",
           "index": 2,
           "path": [
             "坏账准备"
@@ -73083,7 +73083,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "11294af8-25d9-5fa6-9f68-af6e05af4fd4",
+          "column_id": "2ff5812c-e7d3-5639-89a4-c9ddd5a2e833",
           "index": 3,
           "path": [
             "预期信用损失率(%)"
@@ -73094,7 +73094,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "2cccd6f6-d441-520a-ad43-4214a4c17d7b",
+          "column_id": "da550ef7-aba8-58e3-86ba-eeca728b8dc7",
           "index": 4,
           "path": [
             "计提依据"
@@ -73110,12 +73110,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 5,
-      "table_id": "b6f96b8f-d792-507c-82a2-4d6f296caecd",
+      "table_id": "9f8e060e-062f-53f8-81a8-e041ccf6466e",
       "table_name": "组合计提项目：应收中央企业客户",
       "header_fingerprint": "d19ed80db34ed55e72f47c8558e26d74d8577a6e5b9ff13c7c885b7da93331b4",
       "columns": [
         {
-          "column_id": "808e51f0-9c19-53f7-956d-58017fb8b5d8",
+          "column_id": "30cc2466-1959-5984-aa62-938a768129bf",
           "index": 0,
           "path": [
             "账龄"
@@ -73126,7 +73126,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4ef2e1cf-af35-5363-b3aa-997cb7a85c26",
+          "column_id": "3d8c1ff5-d542-5668-9f54-2259c09638ab",
           "index": 1,
           "path": [
             "期末余额",
@@ -73138,7 +73138,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e1138aee-8e27-5ca4-b390-640b700bc1f8",
+          "column_id": "73717bd4-772e-56a7-9437-7029077b474e",
           "index": 2,
           "path": [
             "期末余额",
@@ -73150,7 +73150,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "68d1e5d6-619a-50d8-be2c-12356b2c38c4",
+          "column_id": "42a5cdca-0147-5941-8aa7-ef00ee8b8fef",
           "index": 3,
           "path": [
             "期末余额",
@@ -73162,7 +73162,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "e43f9e49-2fb8-528a-acbd-a5371df1b3b2",
+          "column_id": "0518b860-8267-5dfa-8753-591b3b501c89",
           "index": 4,
           "path": [
             "上年年末余额",
@@ -73174,7 +73174,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "62e5f47f-d932-519c-863b-a8c596444d2d",
+          "column_id": "76e42070-fb53-536f-8c12-e6ca06d5bb51",
           "index": 5,
           "path": [
             "上年年末余额",
@@ -73186,7 +73186,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "a97cc554-ecee-54d3-bd2f-d9fafd8f7c6b",
+          "column_id": "d6f6fceb-1728-5562-9eea-f0aa2950c0b9",
           "index": 6,
           "path": [
             "上年年末余额",
@@ -73203,12 +73203,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 6,
-      "table_id": "647da7de-390c-5b54-9d72-eb51a8326c4a",
+      "table_id": "e2fab683-6598-5390-ad8f-4a2c1aef38e5",
       "table_name": "组合计提项目：应收地方国有企业客户",
       "header_fingerprint": "d19ed80db34ed55e72f47c8558e26d74d8577a6e5b9ff13c7c885b7da93331b4",
       "columns": [
         {
-          "column_id": "d2b261fd-ae12-5ad9-aea4-29a28d2c8e84",
+          "column_id": "23250243-e0a3-563c-b3c1-fdebcbc16887",
           "index": 0,
           "path": [
             "账龄"
@@ -73219,7 +73219,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "7a3237f2-fa2f-554d-a494-61de6cad8a7d",
+          "column_id": "1cb5fc6e-d205-5f43-b4e7-2c0010a2bc41",
           "index": 1,
           "path": [
             "期末余额",
@@ -73231,7 +73231,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "8c1f9393-dcbd-5edb-9bc7-7ac3b8e43847",
+          "column_id": "20a4b4fc-182d-59ec-a12e-a7d70dca8a72",
           "index": 2,
           "path": [
             "期末余额",
@@ -73243,7 +73243,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3c28c0e0-4512-533f-ad82-b91768c70102",
+          "column_id": "af80add7-821c-5040-8485-a3872e4a9472",
           "index": 3,
           "path": [
             "期末余额",
@@ -73255,7 +73255,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "84f63798-70fb-5be4-8ff6-54881c569d63",
+          "column_id": "dcafb823-5842-5478-9bee-63d83624c099",
           "index": 4,
           "path": [
             "上年年末余额",
@@ -73267,7 +73267,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "76ee7e1a-7913-55db-9c62-770db868e583",
+          "column_id": "56242a57-7e12-5201-b755-93bddd4c244c",
           "index": 5,
           "path": [
             "上年年末余额",
@@ -73279,7 +73279,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "dbe9e904-e6d7-5b46-a140-fcb85f821e0f",
+          "column_id": "ef29275f-02e0-5a7a-b417-029b56dc8fda",
           "index": 6,
           "path": [
             "上年年末余额",
@@ -73296,12 +73296,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 7,
-      "table_id": "cc039719-85fe-5d58-bb4b-36b51378414a",
+      "table_id": "c1bb066d-b227-545b-ba54-59299d85529c",
       "table_name": "组合计提项目：应收海外企业客户",
       "header_fingerprint": "d19ed80db34ed55e72f47c8558e26d74d8577a6e5b9ff13c7c885b7da93331b4",
       "columns": [
         {
-          "column_id": "f3dc1a9e-01fb-5d1f-a6de-90ab492b6aab",
+          "column_id": "8fcf4a48-fdcb-5d10-8c1a-a3c3ad38adab",
           "index": 0,
           "path": [
             "账龄"
@@ -73312,7 +73312,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "233799d1-3caf-58a3-94db-e4c6722174ba",
+          "column_id": "67666022-6220-511b-8095-4f52101a7146",
           "index": 1,
           "path": [
             "期末余额",
@@ -73324,7 +73324,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "64d89622-3ef6-5eb6-bf16-55f80076d78d",
+          "column_id": "db06ada3-2ff7-5b3b-94c8-37d6fae26852",
           "index": 2,
           "path": [
             "期末余额",
@@ -73336,7 +73336,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "412c79f4-6ec5-5941-ac73-e3d6277559a3",
+          "column_id": "6b80e4d6-d9f3-58e7-9b7f-4cc96331cd7e",
           "index": 3,
           "path": [
             "期末余额",
@@ -73348,7 +73348,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "5b38e1f5-7a07-5e2c-a70a-a2a12e126a5a",
+          "column_id": "a52f4c8c-d336-59dd-a704-fa9b607ebb0c",
           "index": 4,
           "path": [
             "上年年末余额",
@@ -73360,7 +73360,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "14b2d1e3-49d3-576a-9da0-3dedf87eb3c3",
+          "column_id": "16621cf8-bf68-5819-8d86-1fb7756ee69c",
           "index": 5,
           "path": [
             "上年年末余额",
@@ -73372,7 +73372,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "05ed7222-9122-54fd-a105-41174996eb78",
+          "column_id": "3318ee81-f24f-5170-b262-6e33fcdc9f41",
           "index": 6,
           "path": [
             "上年年末余额",
@@ -73389,12 +73389,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 8,
-      "table_id": "4c050e22-4c91-5bc0-8374-969f7a437abd",
+      "table_id": "77a4f0ef-ad6c-590e-a597-c91206c8ad8a",
       "table_name": "组合计提项目：组合4",
       "header_fingerprint": "d19ed80db34ed55e72f47c8558e26d74d8577a6e5b9ff13c7c885b7da93331b4",
       "columns": [
         {
-          "column_id": "2e8123f0-419e-5c32-9fba-add1a634828e",
+          "column_id": "ea3b7a60-bbc8-57a7-8ea9-c715c790e840",
           "index": 0,
           "path": [
             "账龄"
@@ -73405,7 +73405,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4a2bb60f-133b-5d11-b166-2cece4e96447",
+          "column_id": "b2bad19f-daa2-5fa1-8ae9-9e8ae6fc8813",
           "index": 1,
           "path": [
             "期末余额",
@@ -73417,7 +73417,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "f3d405a4-0f09-5c6c-af6a-ddaa14d33eaf",
+          "column_id": "95a3837f-3a60-5e2a-813b-a1b746cc7b48",
           "index": 2,
           "path": [
             "期末余额",
@@ -73429,7 +73429,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "d906f1d4-f02c-5143-8511-55c4106307f9",
+          "column_id": "c5940939-f3d1-5e86-8ac2-c98ac761f25b",
           "index": 3,
           "path": [
             "期末余额",
@@ -73441,7 +73441,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "7fa5f47e-42fe-5e1d-bbb4-0b1c93088691",
+          "column_id": "d3d9a722-3660-53bf-98ab-5bdd63ca27a5",
           "index": 4,
           "path": [
             "上年年末余额",
@@ -73453,7 +73453,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "bbcb86d0-6f4a-505c-aaaa-cfe6a83470e2",
+          "column_id": "096a0776-7d8f-5044-85c9-f985e0042da2",
           "index": 5,
           "path": [
             "上年年末余额",
@@ -73465,7 +73465,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "1792496a-cd70-56fc-be95-198212a18f02",
+          "column_id": "5b593bf6-ce93-53ba-8445-02f7cf03b145",
           "index": 6,
           "path": [
             "上年年末余额",
@@ -73482,12 +73482,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 9,
-      "table_id": "658c4e71-21c2-5509-9852-55f35dfe11a6",
+      "table_id": "b33a7e20-041f-5a2d-82f1-b9cd71218f58",
       "table_name": "组合计提项目：组合5",
       "header_fingerprint": "d19ed80db34ed55e72f47c8558e26d74d8577a6e5b9ff13c7c885b7da93331b4",
       "columns": [
         {
-          "column_id": "9a243af4-885c-5493-bf5a-c2b82c2b06bb",
+          "column_id": "f609a836-0a85-5e49-ae08-501ff63b0eb7",
           "index": 0,
           "path": [
             "账龄"
@@ -73498,7 +73498,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "7c323791-c47c-538a-949e-50d7471e3121",
+          "column_id": "dc32f032-f1b1-52a4-99dd-51e76c450b69",
           "index": 1,
           "path": [
             "期末余额",
@@ -73510,7 +73510,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3f1da680-f7fb-58c4-9020-14b00b93e303",
+          "column_id": "49b716a3-49eb-5db5-a42a-57461f600222",
           "index": 2,
           "path": [
             "期末余额",
@@ -73522,7 +73522,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "df54ef50-cdc3-5402-8196-45f5e57370f9",
+          "column_id": "11c605a4-d5ad-5034-9c40-8626cef8d444",
           "index": 3,
           "path": [
             "期末余额",
@@ -73534,7 +73534,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "10772ac9-db7b-52a9-b632-faeb2446fa63",
+          "column_id": "6d5613c3-2163-5d3d-93a9-c798abf3a4d6",
           "index": 4,
           "path": [
             "上年年末余额",
@@ -73546,7 +73546,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "cef59eb6-57c1-548b-8ee9-79f457251098",
+          "column_id": "9806c30b-2156-570a-bd34-fb392e29987e",
           "index": 5,
           "path": [
             "上年年末余额",
@@ -73558,7 +73558,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "948dbe40-b198-54b2-a683-ff730a7a4498",
+          "column_id": "62af04e8-d629-5e99-9322-99eb70a3d9f8",
           "index": 6,
           "path": [
             "上年年末余额",
@@ -73575,12 +73575,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 10,
-      "table_id": "e286a504-add3-54ba-ad22-813b1f40b0fc",
+      "table_id": "d231477a-f083-569c-b803-dc1cad1f062d",
       "table_name": "本期计提、收回或转回的坏账准备情况",
       "header_fingerprint": "fe385f240215f8d78617992e9b3ccad57aefba5a8d955f1f45366459394d0625",
       "columns": [
         {
-          "column_id": "5835401e-fa62-54cd-99f7-6747c5e280a5",
+          "column_id": "6cad352f-a166-53c0-8a49-c397c60c06cc",
           "index": 0,
           "path": [
             "项目"
@@ -73591,7 +73591,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "62d483d3-1d1a-5c27-b3e9-09388bba11f2",
+          "column_id": "122bf6fe-fb6b-58e8-af68-9064a47d4749",
           "index": 1,
           "path": [
             "坏账准备金额"
@@ -73607,12 +73607,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 11,
-      "table_id": "39090763-1b77-5dfc-b9f5-95d543ab031e",
+      "table_id": "0765783e-da71-5cf2-ad75-e3e1bb212210",
       "table_name": "转回或收回金额重要的坏账准备",
       "header_fingerprint": "ce882fe82835e7e40a377089c13f5fe95f0fb46480b66f9ea4e7ff9d20d29605",
       "columns": [
         {
-          "column_id": "f78d68bc-8526-5a54-bd40-834bffff6a9b",
+          "column_id": "f960d418-5539-5c62-afb4-ead67694d86e",
           "index": 0,
           "path": [
             "单位名称"
@@ -73623,7 +73623,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "5860387e-4621-50e5-8c10-58513da2bf02",
+          "column_id": "a1f9bc72-7ea5-5ccf-89bb-7361ae25cf19",
           "index": 1,
           "path": [
             "转回原因"
@@ -73634,7 +73634,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c4e49493-b9d6-526f-a533-f412aaf48b04",
+          "column_id": "7947bf1c-cdda-5b24-a25f-4a9c23effbda",
           "index": 2,
           "path": [
             "收回方式"
@@ -73645,7 +73645,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "bfc296be-29ff-5a4f-8c2f-bd38beb48fc6",
+          "column_id": "d6210e60-fb7d-516f-92b0-7a30101bb094",
           "index": 3,
           "path": [
             "原确定坏账准备的依据"
@@ -73656,7 +73656,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "16919d34-a25f-5c68-8481-a06c451776f9",
+          "column_id": "56212173-6546-5036-90a7-f751f61f051e",
           "index": 4,
           "path": [
             "转回或收回金额"
@@ -73672,12 +73672,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 12,
-      "table_id": "e9c260eb-a690-55c5-bf33-b2cbcc18d927",
+      "table_id": "fee6be0e-8d12-5f51-bdbe-7171b620be26",
       "table_name": "本期实际核销的应收账款情况",
       "header_fingerprint": "60ec39f27432be5a82cb9721a84273bff9586b1924d762e528739604eb599529",
       "columns": [
         {
-          "column_id": "6f88bc91-2bb7-5885-b20c-c64bcdeaa051",
+          "column_id": "03070dcb-1f89-56c5-9c7d-f956853a6a06",
           "index": 0,
           "path": [
             "项目"
@@ -73688,7 +73688,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "2ee2314b-e9c0-5f59-b309-dc6dc4a3175c",
+          "column_id": "1f3e0b59-0a15-5c88-a2d3-0894da2fc183",
           "index": 1,
           "path": [
             "核销金额"
@@ -73704,12 +73704,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 13,
-      "table_id": "1d9fd91f-0270-5969-9e8c-d83876c6947e",
+      "table_id": "aa1bae55-e333-5a98-ab2e-1392e1bba85e",
       "table_name": "重要的应收账款核销情况（逐项披露）",
       "header_fingerprint": "7d28c01faf7a001ccf2bd1ae96ff5a19b0b50e6619869f2a0a760c7e329fc922",
       "columns": [
         {
-          "column_id": "54ee6bbb-bbc3-57c8-b351-aed905d6b4aa",
+          "column_id": "4946b926-3f4c-5fbd-ab06-080780e3bf0a",
           "index": 0,
           "path": [
             "单位名称"
@@ -73720,7 +73720,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "75910dba-835f-5c30-80a1-4d75ea7b038b",
+          "column_id": "380cc94c-3490-54bc-a321-82dd5367c904",
           "index": 1,
           "path": [
             "应收账款性质"
@@ -73731,7 +73731,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "27411a82-3069-5817-8fc6-33a54f2a1076",
+          "column_id": "d38d2d80-84ec-559e-ad7a-a439c7cd59e4",
           "index": 2,
           "path": [
             "核销金额"
@@ -73742,7 +73742,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "5050c362-01bf-524f-b2d9-19b1dc4e96ce",
+          "column_id": "aa01b262-33a1-5cec-bffc-fa5db6b595e6",
           "index": 3,
           "path": [
             "核销原因"
@@ -73753,7 +73753,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c2fae1cc-fe54-5e07-964e-86b070022f60",
+          "column_id": "cd93f2f7-b7b8-55dd-bef6-4cfa93f01d14",
           "index": 4,
           "path": [
             "履行的核销程序"
@@ -73764,7 +73764,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "5bb5bea2-bc91-527c-adec-6d92c0ce359e",
+          "column_id": "907ff1b3-a362-5aa3-86c8-4c38c9ed05c4",
           "index": 5,
           "path": [
             "款项是否由关联交易产生"
@@ -73780,12 +73780,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 14,
-      "table_id": "81ce7a4d-cdd3-56ef-82b1-0ce57682ab99",
+      "table_id": "d6ffb041-551d-5e58-9d76-d080bb6c20c3",
       "table_name": "按欠款方归集的应收账款和合同资产期末余额前五名单位情况",
       "header_fingerprint": "2a5e2c2bac5337fdc5629bf32651b03157ce2aec1af3a91e679706b65defd6f8",
       "columns": [
         {
-          "column_id": "dcbe2ce5-39f8-5b75-9542-43dc570d6ba3",
+          "column_id": "532c95c6-ea24-5b31-bdbb-52ae61763342",
           "index": 0,
           "path": [
             "单位名称"
@@ -73796,7 +73796,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3877246c-f11d-571b-b5ff-94233e6774b4",
+          "column_id": "c5ac7ece-e0be-536f-be53-7a425fca06fe",
           "index": 1,
           "path": [
             "应收账款期末余额"
@@ -73807,7 +73807,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "a9d8c061-9729-57f1-a7aa-52e2614145f7",
+          "column_id": "acfe6070-2f34-5a86-bd0d-08d14bc8a753",
           "index": 2,
           "path": [
             "合同资产期末余额"
@@ -73818,7 +73818,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "624ab665-7063-55b4-808f-45b456c509b2",
+          "column_id": "e1126bdf-b63e-524f-b09a-b7987ab545cb",
           "index": 3,
           "path": [
             "应收账款和合同资产期末余额"
@@ -73829,7 +73829,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "a84bfe83-f885-5826-be37-0f5e7a3230ad",
+          "column_id": "4b09c8e0-6171-586b-871e-b3f55822bb97",
           "index": 4,
           "path": [
             "占应收账款和合同资产期末余额合计数的比例%"
@@ -73840,7 +73840,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "dbc4310c-cb05-5fb7-92c2-a4cf23a32b45",
+          "column_id": "b55e3670-e3ec-54d6-bb1b-d0b4e19c23de",
           "index": 5,
           "path": [
             "应收账款坏账准备和合同资产减值准备期末余额"
@@ -73856,12 +73856,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 15,
-      "table_id": "aed8c96e-0a8a-5d72-981b-fdcfffc6ef97",
+      "table_id": "73cdbaf3-ca7b-5472-91d6-2cafdd4b97e4",
       "table_name": "因金融资产转移而终止确认的应收账款情况",
       "header_fingerprint": "f124aca90af11975c861463639df0cdc6bf8b95dc09a2652293c932cf0bb80b1",
       "columns": [
         {
-          "column_id": "cb33d29f-ef7c-52d3-afb6-7d670401b40d",
+          "column_id": "afa1beca-259f-592c-beb9-4030f03680dc",
           "index": 0,
           "path": [
             "项目"
@@ -73872,7 +73872,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "5e2fae98-927c-5f30-b553-648a35f2240b",
+          "column_id": "e83c8dd9-4e62-5dd3-a04d-a567cfdf49ec",
           "index": 1,
           "path": [
             "转移方式"
@@ -73883,7 +73883,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "9e5f6aaf-41a7-5e0f-8a6e-4def9967f9e5",
+          "column_id": "22798848-7759-5cfe-a0ca-c2846413fb59",
           "index": 2,
           "path": [
             "终止确认金额"
@@ -73894,7 +73894,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4d37143a-3d26-5f1c-9d8b-a995369fb027",
+          "column_id": "b67b4a2a-d7b2-57c7-98ad-247b01803bd1",
           "index": 3,
           "path": [
             "与终止确认相关的利得或损失"
@@ -73910,12 +73910,12 @@
       "variant": "listed",
       "section_id": "十六、应收账款",
       "table_index": 16,
-      "table_id": "a0b06b02-3570-5a2f-87d8-80f5ef4e31ba",
+      "table_id": "f8cb9d0f-6b02-59bf-a31c-9c5649a3d96f",
       "table_name": "转移应收账款且继续涉入形成的资产、负债的金额",
       "header_fingerprint": "78bb76a90a615d5657ea7fd6d1e3003b014e4fb8efb231529f6dc77e1f56f26f",
       "columns": [
         {
-          "column_id": "f1e1eb10-c273-5d69-bfed-47fffa1178e4",
+          "column_id": "7bfcaae9-755d-5085-afbc-7b0b221b9055",
           "index": 0,
           "path": [
             "项目"
@@ -73926,7 +73926,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "7b689cb2-f0ea-56a9-9e3c-139381b0bc8b",
+          "column_id": "e2f65a80-81df-5a23-8c07-e5748476a4b0",
           "index": 1,
           "path": [
             "资产转移方式"
@@ -73937,7 +73937,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "91c8a1b9-689a-52dc-8fdd-8223b08ff586",
+          "column_id": "2734ee26-24ca-5f64-93d3-0f5a6583cfd3",
           "index": 2,
           "path": [
             "继续涉入形成的资产金额"
@@ -73948,7 +73948,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "89795068-0523-5e3c-9d6f-894042a2129a",
+          "column_id": "08d2f504-dec7-501d-bd45-0f1eb38aa316",
           "index": 3,
           "path": [
             "继续涉入形成的负债金额"
@@ -74007,12 +74007,12 @@
       "variant": "listed",
       "section_id": "十六、营业收入与营业成本",
       "table_index": 0,
-      "table_id": "d1d1fccf-4b17-58b1-8b61-441e535b6c3c",
+      "table_id": "7da1cb3d-2cce-5134-8455-520f0f375ddd",
       "table_name": "营业收入和营业成本",
       "header_fingerprint": "c52574ac8742838dc4fb3d893222df23f37851daa889d5fa33b731114d23e4fb",
       "columns": [
         {
-          "column_id": "2e7da450-c542-50ba-91f6-b5acbe9f708e",
+          "column_id": "7a601a63-79b0-5242-a3c7-22883f7be2e6",
           "index": 0,
           "path": [
             "项目"
@@ -74023,7 +74023,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "1f2b6872-3211-5d3a-8189-c8072ed84566",
+          "column_id": "56700c74-2a73-537c-b5c8-c48dad09811d",
           "index": 1,
           "path": [
             "本期发生额",
@@ -74035,7 +74035,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "9037f1f8-5923-5695-ad4f-680447da2e82",
+          "column_id": "1d7232b7-ad46-5fa9-a2d3-7bacb84db99f",
           "index": 2,
           "path": [
             "本期发生额",
@@ -74047,7 +74047,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "73c48b51-9016-5298-9686-d1f7881e4106",
+          "column_id": "bf23d7ee-ba86-52f0-a282-e25a0f604b3b",
           "index": 3,
           "path": [
             "上期发生额",
@@ -74059,7 +74059,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "bd40aebb-cd8e-5b9a-b74a-5c94ebe43f82",
+          "column_id": "3e9996e6-33a5-579e-94b3-877db6bbe30d",
           "index": 4,
           "path": [
             "上期发生额",
@@ -74076,12 +74076,12 @@
       "variant": "listed",
       "section_id": "十六、营业收入与营业成本",
       "table_index": 1,
-      "table_id": "2c542509-7f0d-59d1-a70d-2fc1c462f3d6",
+      "table_id": "e1beebed-a578-5741-8baf-f2fb49f7998b",
       "table_name": "营业收入、营业成本按行业（或产品类型）划分",
       "header_fingerprint": "e3e4aeb177f80cb0d4271d4146013d02914e95364418f84bf03731344266057f",
       "columns": [
         {
-          "column_id": "d5d67b8b-e7c5-5f98-8fc6-df5c1b4d191e",
+          "column_id": "bf050ae8-3727-5c62-956e-22d658cabc15",
           "index": 0,
           "path": [
             "主要产品类型(或行业)"
@@ -74092,7 +74092,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "b2d59f77-e926-5ede-a500-f2e75da4128d",
+          "column_id": "821694e7-718c-5286-af75-817df082cc0a",
           "index": 1,
           "path": [
             "本期发生额",
@@ -74104,7 +74104,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "01e44023-658f-5b0e-bda7-fab1fb979152",
+          "column_id": "ca210662-ae25-5277-a662-ee951476b8ab",
           "index": 2,
           "path": [
             "本期发生额",
@@ -74116,7 +74116,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "fd9b3025-ba58-53c8-8975-3f9b6592349d",
+          "column_id": "be500134-df06-539f-8df1-10d09a4ff63a",
           "index": 3,
           "path": [
             "上期发生额",
@@ -74128,7 +74128,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "57c0f776-e4df-54f1-a3a6-5498a0e01c7e",
+          "column_id": "7c67505b-4fa2-5f39-a1c3-f94b783d7155",
           "index": 4,
           "path": [
             "上期发生额",
@@ -74145,12 +74145,12 @@
       "variant": "listed",
       "section_id": "十六、营业收入与营业成本",
       "table_index": 2,
-      "table_id": "0fbae996-c094-5ac4-821d-4541757c6275",
+      "table_id": "db4550eb-ee89-5e54-bc14-4cf738180a45",
       "table_name": "营业收入、营业成本按地区划分",
       "header_fingerprint": "0aa01d98ef8a73910485642cee307c821cb126fc396b208c12b13c13f85727a3",
       "columns": [
         {
-          "column_id": "d5a722c8-d258-5f21-82d6-32cb9ab74281",
+          "column_id": "cc9b488a-21a1-591f-aede-b05bc5a0f674",
           "index": 0,
           "path": [
             "主要经营地区"
@@ -74161,7 +74161,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "87ed49e9-6109-56e6-832e-8bc433f78be0",
+          "column_id": "7e6086b0-b370-575f-afcb-adfdc45b873f",
           "index": 1,
           "path": [
             "本期发生额",
@@ -74173,7 +74173,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "50f31dd5-5cac-5578-91e1-2ef21f0f59ef",
+          "column_id": "a2776bce-068c-5437-84e9-f629fe686bff",
           "index": 2,
           "path": [
             "本期发生额",
@@ -74185,7 +74185,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4af25eee-0a71-561a-86db-7703c2ea564e",
+          "column_id": "abeccc0f-566c-5fbc-b761-514268aa6569",
           "index": 3,
           "path": [
             "上期发生额",
@@ -74197,7 +74197,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "cb82d98b-31b7-543e-8f12-cffa03ccca98",
+          "column_id": "edf71bec-20a4-5d98-9c75-8162c29cfee7",
           "index": 4,
           "path": [
             "上期发生额",
@@ -74214,12 +74214,12 @@
       "variant": "listed",
       "section_id": "十六、营业收入与营业成本",
       "table_index": 3,
-      "table_id": "d40f1e4a-5682-5def-af8f-b87d9846bbc8",
+      "table_id": "69fe4b57-3a98-55fa-a6c7-b5627da5e791",
       "table_name": "营业收入、营业成本按分解信息",
       "header_fingerprint": "bf71d2a3c943c9a0265f7d1c7c6370ce9061d13328b899b14b49907e8102c1c7",
       "columns": [
         {
-          "column_id": "8d367174-4af6-5d4c-b638-28321f1c97b2",
+          "column_id": "3a9ad3ad-afc7-5a87-b040-7375ae4d48c9",
           "index": 0,
           "path": [
             "项目"
@@ -74230,7 +74230,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "2d88e920-0c7b-5a1e-b0f2-e4ccc04c41cc",
+          "column_id": "51217fda-fcc4-502e-94d2-9754dd266aee",
           "index": 1,
           "path": [
             "消费品",
@@ -74242,7 +74242,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "8ad708d4-1080-5ac9-8c7e-8cd1e943c747",
+          "column_id": "38d79854-707b-57b4-9fe7-1b22f4e42675",
           "index": 2,
           "path": [
             "消费品",
@@ -74254,7 +74254,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "617f9c87-369e-5cfc-b837-58ccccd5bd71",
+          "column_id": "ca1db11e-028b-5eb3-ade0-8aa337a10047",
           "index": 3,
           "path": [
             "汽车",
@@ -74266,7 +74266,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "2fbfb60b-e2b0-5fb7-bc1d-3ddf4d3a4752",
+          "column_id": "9f6bc450-2130-5373-8dda-7d9db06f4625",
           "index": 4,
           "path": [
             "汽车",
@@ -74278,7 +74278,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "28c86e5c-13ce-5320-b7d4-0ac89ecac301",
+          "column_id": "72a93d83-97a0-5aa8-ab7c-7135b3668ac2",
           "index": 5,
           "path": [
             "能源",
@@ -74290,7 +74290,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "5dcccc2b-4767-5164-ba68-a18e0e8a96a9",
+          "column_id": "143b81da-8865-501c-8517-2b06b050142a",
           "index": 6,
           "path": [
             "能源",
@@ -74302,7 +74302,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "cb882d31-b2bf-59d5-9c59-6a6ea5379293",
+          "column_id": "b4462152-e3ad-5b35-878b-6f2a6bf518ce",
           "index": 7,
           "path": [
             "其他",
@@ -74314,7 +74314,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "94446d7f-a8ff-597e-bdfe-5e61d45b58c8",
+          "column_id": "3cce642d-cb1d-553e-8e4d-e121212a3939",
           "index": 8,
           "path": [
             "其他",
@@ -74331,12 +74331,12 @@
       "variant": "listed",
       "section_id": "十六、营业收入与营业成本",
       "table_index": 4,
-      "table_id": "d49bce0b-7bfc-5274-a7cf-6732dbc7ad38",
+      "table_id": "35783698-58e5-5a1a-8bf7-39abce85cfd3",
       "table_name": "与剩余履约义务有关的信息",
       "header_fingerprint": "9873393e6757ecd63ec9e1d0c0ae1e12db1b4b26d07fc591c259974ddb82a4f7",
       "columns": [
         {
-          "column_id": "62849ffc-53bc-5f9b-b6d9-754212753957",
+          "column_id": "25e43796-dfaa-5c19-9099-055763e82839",
           "index": 0,
           "path": [
             "年度"
@@ -74347,7 +74347,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c62afb50-7aee-559d-a362-843fa2707259",
+          "column_id": "c0fc0b2d-93fc-5b52-81a9-09ddbbe82984",
           "index": 1,
           "path": [
             "{audit_year+1}年"
@@ -74358,7 +74358,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "2e0e79ac-c2b4-514b-9d2e-a3941ea9878a",
+          "column_id": "2c76e4d9-37d7-5bea-9fb8-7303d213017c",
           "index": 2,
           "path": [
             "{audit_year+2}年"
@@ -74369,7 +74369,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "69bf3392-7d08-5117-916d-e9c86c9857aa",
+          "column_id": "e85cc8c5-7d5a-5d90-bd0b-d991eebb25b3",
           "index": 3,
           "path": [
             "合计"
@@ -74385,12 +74385,12 @@
       "variant": "listed",
       "section_id": "十六、营业收入与营业成本",
       "table_index": 5,
-      "table_id": "c027c974-d131-5432-9586-94d74cb9dfa1",
+      "table_id": "d2db9cf0-5dc2-55d6-8e6f-8da10b9623e7",
       "table_name": "试运行销售收入",
       "header_fingerprint": "c52574ac8742838dc4fb3d893222df23f37851daa889d5fa33b731114d23e4fb",
       "columns": [
         {
-          "column_id": "f693f267-f26d-5a97-b76e-ba9f24450470",
+          "column_id": "0688c582-ff38-5556-858b-c963920df265",
           "index": 0,
           "path": [
             "项目"
@@ -74401,7 +74401,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e2435800-219a-5ae3-a4a7-97fb2b68d28d",
+          "column_id": "8b64238e-2d43-5ed6-95ae-709c31aab934",
           "index": 1,
           "path": [
             "本期发生额",
@@ -74413,7 +74413,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "ad82a8f5-8264-5fd5-85c6-a48bacff606f",
+          "column_id": "060d0981-829b-5f7f-a47e-b9ed2b759a2a",
           "index": 2,
           "path": [
             "本期发生额",
@@ -74425,7 +74425,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e25dcf13-09a2-526b-aa5a-4d92f046f8ac",
+          "column_id": "b5988ed7-75cc-5291-8eff-b8e93f3e5943",
           "index": 3,
           "path": [
             "上期发生额",
@@ -74437,7 +74437,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3cfc61f1-77d5-559e-b4ca-803dae156a5b",
+          "column_id": "7c7a88a9-ca95-5851-b53b-db80821e6a5e",
           "index": 4,
           "path": [
             "上期发生额",
@@ -80827,7 +80827,7 @@
       "table_index": 0,
       "table_id": "f311e3a9-9ab3-5a51-91f5-2ebad5ea1c92",
       "table_name": "未经抵销的递延所得税资产和递延所得税负债",
-      "header_fingerprint": "27546e65dfefd6006f58960da2003b3a55254af1dfd1ef842870218b01048083",
+      "header_fingerprint": "026c63c2b2e403932f98ca28ae43297b1a42489cc2b24d5dbcdafe705f187dfb",
       "columns": [
         {
           "column_id": "bb3b3242-67fb-5f69-a11f-bc358c73b441",
@@ -80868,7 +80868,7 @@
           "column_id": "deb1e1bc-4f9f-57a0-bbe7-779844be6333",
           "index": 3,
           "path": [
-            "期初余额",
+            "年初余额",
             "递延所得税资产/负债"
           ],
           "semantic_key": "prior|递延所得税资产/负债",
@@ -80880,7 +80880,7 @@
           "column_id": "95e55aca-b216-50e6-946c-ccfd7d0bced5",
           "index": 4,
           "path": [
-            "期初余额",
+            "年初余额",
             "可抵扣/应纳税暂时性差异"
           ],
           "semantic_key": "prior|可抵扣/应纳税暂时性差异",
@@ -80993,7 +80993,7 @@
       "table_index": 3,
       "table_id": "d3718aac-e9cd-5f8b-b1c3-4bd98ae0d2fa",
       "table_name": "未确认递延所得税资产明细",
-      "header_fingerprint": "5fdf2b68fc6fbb181fba411e86085e7d86d6f41b672bc62c547992241cb9e3cf",
+      "header_fingerprint": "a67383b17600e13d11f561f5bc26053458a2fee377e74e4f8857564bedf80d1d",
       "columns": [
         {
           "column_id": "f75554b4-ab6f-5480-9187-3d710ec91161",
@@ -81021,7 +81021,7 @@
           "column_id": "528766d1-b16d-552d-b9b5-a97e57669493",
           "index": 2,
           "path": [
-            "期初余额"
+            "年初余额"
           ],
           "semantic_key": "prior|",
           "kind": "amount",
@@ -81036,7 +81036,7 @@
       "table_index": 4,
       "table_id": "403dce2a-d25c-5e53-8d7c-69aa6ce27eb6",
       "table_name": "未确认递延所得税资产的可抵扣亏损将于以下年度到期",
-      "header_fingerprint": "b575129d4ac273b5db9143d9ee8f5315146c484c4ab24766c0563771fe3e968b",
+      "header_fingerprint": "61d83db2a472ed2bb69ffe09f03bc2da77e8b62e2637c211a497e54d76680406",
       "columns": [
         {
           "column_id": "fe53ea7e-7c16-5217-95de-29506c8c0a40",
@@ -81064,7 +81064,7 @@
           "column_id": "38256a66-9d0c-5e6a-ab2c-4c4f9ad4ca12",
           "index": 2,
           "path": [
-            "期初余额"
+            "年初余额"
           ],
           "semantic_key": "prior|",
           "kind": "amount",
@@ -91035,12 +91035,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 0,
-      "table_id": "56505fe4-aca9-59f4-bcc5-84f76838ff00",
+      "table_id": "daaf95a9-1dcd-5311-9355-fd235ec5481b",
       "table_name": "其他应收款",
       "header_fingerprint": "5fdf2b68fc6fbb181fba411e86085e7d86d6f41b672bc62c547992241cb9e3cf",
       "columns": [
         {
-          "column_id": "35959ad0-b0a0-5ed5-9b83-19a88e7d006d",
+          "column_id": "38783849-45ac-500a-b001-fe0b232dff3c",
           "index": 0,
           "path": [
             "项目"
@@ -91051,7 +91051,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "6b42fa68-1b96-5540-a004-418ceecbbebd",
+          "column_id": "ab135a02-9800-51c3-9437-948f034cfeae",
           "index": 1,
           "path": [
             "期末余额"
@@ -91062,7 +91062,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "d545758e-a211-557b-bba4-fbb0aa80c77d",
+          "column_id": "947530da-03d7-5bfb-90c9-ebd105949fe7",
           "index": 2,
           "path": [
             "期初余额"
@@ -91078,12 +91078,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 1,
-      "table_id": "7342c274-c2ab-5e84-bdfa-ce331c16bb35",
+      "table_id": "b9c25871-729e-5cc7-aca6-d851aba32fee",
       "table_name": "应收利息分类",
       "header_fingerprint": "5fdf2b68fc6fbb181fba411e86085e7d86d6f41b672bc62c547992241cb9e3cf",
       "columns": [
         {
-          "column_id": "1ea1d911-6bbe-57c9-982a-c00ecac9f254",
+          "column_id": "d825e136-f186-5c0e-9b2d-fd23c9faec36",
           "index": 0,
           "path": [
             "项目"
@@ -91094,7 +91094,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "235a19c6-e75e-545e-b483-512932a2e07b",
+          "column_id": "e028bf1e-8b1c-5996-be93-e2506db68d12",
           "index": 1,
           "path": [
             "期末余额"
@@ -91105,7 +91105,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "23ab0581-dc37-504a-9e42-37f8bfd017e6",
+          "column_id": "6d624607-844e-5632-b8f4-7bd3f0e615d4",
           "index": 2,
           "path": [
             "期初余额"
@@ -91121,12 +91121,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 2,
-      "table_id": "5ccd515c-e589-5383-a3c1-17bcb9284757",
+      "table_id": "46b5d76c-aa6f-58e2-ac69-7a7395a883e9",
       "table_name": "重要逾期利息",
       "header_fingerprint": "c35bd225daa84621b80e2b5aef9916d27ec1723987bd0e4fe97ae3662f056107",
       "columns": [
         {
-          "column_id": "e0867dc3-63c7-580a-af94-a86c9f0f0ce2",
+          "column_id": "f1d2e84e-9e53-5bb8-94d2-bc7e21fc00f2",
           "index": 0,
           "path": [
             "借款单位"
@@ -91137,7 +91137,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "63d7c314-5ff3-5288-bb7e-54f875d5d406",
+          "column_id": "a93c54c6-7927-5fc8-b9b0-1b94654fea37",
           "index": 1,
           "path": [
             "期末余额"
@@ -91148,7 +91148,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "ec6df2ad-ecd0-5e87-bf9a-36a67bdf95fa",
+          "column_id": "83789342-2566-53da-bc89-882aa642870a",
           "index": 2,
           "path": [
             "逾期时间(月)"
@@ -91159,7 +91159,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "ca534d8e-44b3-5e0c-962a-bc7abb73180e",
+          "column_id": "b642246e-34bc-5ca4-9c0e-d1e492a4a74f",
           "index": 3,
           "path": [
             "逾期原因"
@@ -91170,7 +91170,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "dbc32d59-cd9a-5b05-8f20-ec3ed548a47f",
+          "column_id": "b72c5d14-5629-56ec-9525-98213b391525",
           "index": 4,
           "path": [
             "是否发生减值及其判断依据"
@@ -91186,12 +91186,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 3,
-      "table_id": "57e698b9-9e2e-502f-a315-e623b5d582ef",
+      "table_id": "c700cda9-1d45-5f1b-ba6b-af141f4991a5",
       "table_name": "坏账准备计提情况",
       "header_fingerprint": "8a4467c0b8c52b54e12f370612d0c60dfab14dabf44654984d7f59376c560c4f",
       "columns": [
         {
-          "column_id": "768abc22-46d3-56ab-ab0e-4d5cd5dae30f",
+          "column_id": "a2d19bfe-d2d7-545a-b41c-5c7ae5a7edce",
           "index": 0,
           "path": [
             "坏账准备"
@@ -91202,7 +91202,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e92d63d1-d2dc-59dd-9c45-c012116100b7",
+          "column_id": "f8afd360-a7a1-50f5-973f-4b24eac95ed3",
           "index": 1,
           "path": [
             "第一阶段",
@@ -91214,7 +91214,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "5dfb848f-f986-5107-85df-5d9882117f30",
+          "column_id": "9ab46248-7633-592b-9422-53f1e01b0946",
           "index": 2,
           "path": [
             "第二阶段",
@@ -91226,7 +91226,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "74575589-d267-5e72-bf8f-ebbc02e95ad6",
+          "column_id": "021b644a-a7a4-5e64-b3f0-792542d8cc88",
           "index": 3,
           "path": [
             "第三阶段",
@@ -91238,7 +91238,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "a6de2da3-ee98-55ca-a35e-8d6a2f9a213c",
+          "column_id": "fdccdcfc-4440-556d-87cb-746b0841ae89",
           "index": 4,
           "path": [
             "合计"
@@ -91254,12 +91254,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 4,
-      "table_id": "58bd057c-9959-5649-9538-29cc2e2a572b",
+      "table_id": "045c0435-df05-5601-893c-48fe7d35348a",
       "table_name": "应收股利",
       "header_fingerprint": "6ec4f5722c63afcd840e375bfe959aa025392ddf7493b9f17c0fb061c1235975",
       "columns": [
         {
-          "column_id": "a01bad33-b96a-5084-8ec9-1b60b01f266a",
+          "column_id": "de5c6ed9-2528-57a8-8e72-b7c8a249dc82",
           "index": 0,
           "path": [
             "项目"
@@ -91270,7 +91270,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "054908dc-113c-5285-b58d-a7d921750d0d",
+          "column_id": "bda0de24-0822-54d0-bff7-c27e2aae5eef",
           "index": 1,
           "path": [
             "期末余额"
@@ -91281,7 +91281,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "dc08e117-bee2-5fa5-a8f8-97a5f0a4eb9f",
+          "column_id": "91f6adbd-b19d-5526-9652-4a5f3c19c9af",
           "index": 2,
           "path": [
             "期初余额"
@@ -91292,7 +91292,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c6ac6ff0-4d3f-5813-8813-ec698ef11f95",
+          "column_id": "bc1b345c-6aa4-5ff7-8aa4-14b983e6bf73",
           "index": 3,
           "path": [
             "未收回的原因"
@@ -91303,7 +91303,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "5324d6fe-7196-57d5-a53e-48e02d6f98ee",
+          "column_id": "0adf0cc1-4847-56a0-985d-696ca8d872e7",
           "index": 4,
           "path": [
             "相关款项是否发生减值"
@@ -91319,12 +91319,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 5,
-      "table_id": "6c5fe22d-a09c-5722-95c9-54b7e86f9048",
+      "table_id": "c6466a66-8b74-568c-9fea-57098161503c",
       "table_name": "按账龄披露其他应收款项",
       "header_fingerprint": "3421ff003905b65b877746442bb81b5a0d912b2e29aa53aa153b08bba007a104",
       "columns": [
         {
-          "column_id": "ebdb59a8-a6cd-526a-bc91-8fa05ab0c140",
+          "column_id": "f794984f-0795-58c8-8496-dc9ec7971d72",
           "index": 0,
           "path": [
             "账龄"
@@ -91335,7 +91335,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e6fa1e69-3e10-54a1-935a-c11244a05e83",
+          "column_id": "9e38b7f7-a304-5dc0-9e17-df762ddac021",
           "index": 1,
           "path": [
             "期末数"
@@ -91346,7 +91346,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "d7383101-8da1-51fd-88f9-bee982849ab6",
+          "column_id": "f13f3b93-2840-5d7c-a940-9c688cf5e04e",
           "index": 2,
           "path": [
             "期初数"
@@ -91362,12 +91362,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 6,
-      "table_id": "dcaa338d-1235-54f3-b8e3-ca275e691613",
+      "table_id": "b3c0695f-7586-57a3-855b-5be85887932f",
       "table_name": "按坏账准备计提方法分类披露其他应收款项",
       "header_fingerprint": "1f272454c4cafc1a15fbd785ed2ff0d3d2e3359168a17c3673081ce44b57ff88",
       "columns": [
         {
-          "column_id": "d8e52126-840a-59f0-be78-0adfee880262",
+          "column_id": "77c51dd9-879b-53b3-a44d-f4764432fded",
           "index": 0,
           "path": [
             "类别"
@@ -91378,7 +91378,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4a7f715c-7f82-5073-a289-de6e4bb8e108",
+          "column_id": "f9bfe114-4307-5634-a222-30e8d909a4bc",
           "index": 1,
           "path": [
             "账面余额",
@@ -91390,7 +91390,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "19d2009b-ec7c-54df-87ed-1d91c7b3a6dd",
+          "column_id": "754a68af-dac1-5d91-bb1b-4c1a165dea09",
           "index": 2,
           "path": [
             "账面余额",
@@ -91402,7 +91402,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "91a77abc-8b80-53ac-8d20-1fa9b42c0500",
+          "column_id": "3d783ffb-f66a-55ed-bc64-55ef03908f0c",
           "index": 3,
           "path": [
             "坏账准备",
@@ -91414,7 +91414,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "f04e7e49-68e3-570e-8322-238adf92d3ec",
+          "column_id": "02443b13-9ade-5ee9-9a58-e886a7403a04",
           "index": 4,
           "path": [
             "坏账准备",
@@ -91426,7 +91426,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "b6381bf7-2519-53e8-8b6b-063564fdd77d",
+          "column_id": "171144cf-76c1-5bf9-8e32-b65172e30039",
           "index": 5,
           "path": [
             "账面价值"
@@ -91442,12 +91442,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 7,
-      "table_id": "c3366f6b-2f13-5541-b861-fb011e645ebd",
+      "table_id": "8726f609-79c1-50e2-b97b-1d232f5b4682",
       "table_name": "按坏账准备计提方法分类披露其他应收款项（续：期初余额）",
       "header_fingerprint": "1f272454c4cafc1a15fbd785ed2ff0d3d2e3359168a17c3673081ce44b57ff88",
       "columns": [
         {
-          "column_id": "9e9e8b0c-7358-52b5-b465-a123b9fee2d4",
+          "column_id": "80653b75-3455-5d70-91c2-fdcb9095308e",
           "index": 0,
           "path": [
             "类别"
@@ -91458,7 +91458,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "a83766a9-a2fe-5f0e-91ff-f49de8a92730",
+          "column_id": "f2691753-c4fd-5d6a-a456-bafcdb50f459",
           "index": 1,
           "path": [
             "账面余额",
@@ -91470,7 +91470,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "f8e78455-fa4b-5950-af57-13afc99bca68",
+          "column_id": "506f2cbf-e6a2-546b-8feb-66d44526c577",
           "index": 2,
           "path": [
             "账面余额",
@@ -91482,7 +91482,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "282be42b-1a7d-578a-80d9-765ae8787701",
+          "column_id": "63efdaed-1e9d-5ffd-b37e-55869c2558ad",
           "index": 3,
           "path": [
             "坏账准备",
@@ -91494,7 +91494,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "6b15270f-7869-5290-8cc1-0c153f47c641",
+          "column_id": "b929935c-d1a8-5197-8ba5-572f47a1ba4f",
           "index": 4,
           "path": [
             "坏账准备",
@@ -91506,7 +91506,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "7c04f5e7-b308-5671-bc25-164ee8d5394c",
+          "column_id": "dc568950-aa1a-5baa-88fd-fde6316c2c93",
           "index": 5,
           "path": [
             "账面价值"
@@ -91522,12 +91522,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 8,
-      "table_id": "94a3543b-6c76-592d-8e4e-27bcb9fd1b3f",
+      "table_id": "3dcf3547-a095-56df-b1d4-b8d083f5cad0",
       "table_name": "单项计提坏账准备的其他应收款项",
       "header_fingerprint": "404145daa8b9b2c0807ee8586ca940472e7e4b89e18c3bced4271e37ee2d7b4c",
       "columns": [
         {
-          "column_id": "135f51bb-b0f2-53de-8289-f0be141e774d",
+          "column_id": "1c4b5a5e-6e33-5f0d-826f-4c71c1cc48e1",
           "index": 0,
           "path": [
             "债务人名称"
@@ -91538,7 +91538,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "874c9bf4-16c8-5733-8e86-7ade5a53d937",
+          "column_id": "90336290-893c-5e37-8cf5-14a6d60ba02b",
           "index": 1,
           "path": [
             "期末余额",
@@ -91550,7 +91550,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3800f4de-7815-579c-8bf2-5f0ea7fa3b86",
+          "column_id": "c58a6ac9-c48a-5121-a789-5e9381f1f196",
           "index": 2,
           "path": [
             "期末余额",
@@ -91562,7 +91562,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4ab8ac00-3816-5a0b-af91-42e5ec20ef45",
+          "column_id": "9a0d7d86-e253-5d6f-bd46-02f7a4bb66a1",
           "index": 3,
           "path": [
             "期末余额",
@@ -91574,7 +91574,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "3c3e0772-c425-5d8d-9cb7-2a354b09f3bd",
+          "column_id": "172a2908-8541-5914-9e05-eeb60f3c62d8",
           "index": 4,
           "path": [
             "期末余额",
@@ -91591,12 +91591,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 9,
-      "table_id": "6752aea8-42ea-5856-a756-86b9515a50e4",
+      "table_id": "98096a27-90eb-5d20-af2e-eecbef66632d",
       "table_name": "账龄组合",
       "header_fingerprint": "9b23d11fb101070bb3490451a583f1f67e53485a7747cfb4fc88facde1d59230",
       "columns": [
         {
-          "column_id": "daa329e6-6f95-5964-b7d5-c450ce4cd567",
+          "column_id": "3e39078b-b90e-5cf0-9bd3-1adea8f9c7cf",
           "index": 0,
           "path": [
             "账龄"
@@ -91607,7 +91607,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "739da59c-a38c-5c48-b746-3e54873b6887",
+          "column_id": "1c7e9e4a-9d51-5c4f-8876-c897a4ca8450",
           "index": 1,
           "path": [
             "期末数",
@@ -91619,7 +91619,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "451d67fe-0fcb-584b-8f82-22eac6ae0d35",
+          "column_id": "c10911a9-5b03-51de-9d53-d21ce3a29082",
           "index": 2,
           "path": [
             "期末数",
@@ -91631,7 +91631,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "1fcb5505-2646-5dbb-949a-2053460634b6",
+          "column_id": "90b64c09-a5c0-5a1f-848b-177fec4c390e",
           "index": 3,
           "path": [
             "期末数",
@@ -91643,7 +91643,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "0fc65cf6-cad0-577d-8be7-076262b813b9",
+          "column_id": "7a0b18ea-63bd-59f3-9bf6-15983507fe14",
           "index": 4,
           "path": [
             "期初数",
@@ -91655,7 +91655,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "9ad52353-5a30-5b2d-babf-67ea9d105922",
+          "column_id": "a220761e-42c9-56c8-845f-6e66ff8d5c9f",
           "index": 5,
           "path": [
             "期初数",
@@ -91667,7 +91667,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "220ee246-510b-529c-b670-e78d8d456f0d",
+          "column_id": "4badaa3a-48b3-5d6c-823f-a2dd2e7d2a46",
           "index": 6,
           "path": [
             "期初数",
@@ -91684,12 +91684,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 10,
-      "table_id": "fb8f3d60-0262-5f16-b7d1-e3c74efd9207",
+      "table_id": "6b36c82f-615b-5695-9c50-4bc40082448b",
       "table_name": "采用余额百分比法或其他组合方法计提坏账准备的其他应收款项",
       "header_fingerprint": "1408d0ffac8918fc95b08b6ce2920230401f722733b7ec6b1a9e7b11c631ca77",
       "columns": [
         {
-          "column_id": "6096350e-6549-565b-b3c7-88d478e965af",
+          "column_id": "8ed1e821-d6da-51e9-883c-ae34efa6f91a",
           "index": 0,
           "path": [
             "组合名称"
@@ -91700,7 +91700,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "d417965a-df84-5211-8587-7ac8e7f4247a",
+          "column_id": "0298da5a-11fc-5742-83d9-34b1b5bcc3c0",
           "index": 1,
           "path": [
             "期末数",
@@ -91712,7 +91712,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4ec00a73-b26a-567b-b445-1c5258c914f6",
+          "column_id": "88fc9338-0d80-5c80-a975-e1d4e4040fd7",
           "index": 2,
           "path": [
             "期末数",
@@ -91724,7 +91724,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "eb4a334a-a151-587e-a9f9-7622f0a38e65",
+          "column_id": "c381aa22-940b-55e3-b26f-24916285125f",
           "index": 3,
           "path": [
             "期末数",
@@ -91736,7 +91736,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4dd862f9-2406-57a2-843c-a5a983eba95c",
+          "column_id": "5a54856b-447c-548a-8d4f-61287f637f4e",
           "index": 4,
           "path": [
             "期初数",
@@ -91748,7 +91748,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "bc579dc6-1a29-5d34-98ac-ce9a7319bf6b",
+          "column_id": "4de5a427-2b71-5354-914e-a1a0fec45dca",
           "index": 5,
           "path": [
             "期初数",
@@ -91760,7 +91760,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "75eaa187-7923-5efd-9631-94c42e3104db",
+          "column_id": "f75c0b39-450f-5c80-aabd-76c648a201fc",
           "index": 6,
           "path": [
             "期初数",
@@ -91777,12 +91777,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 11,
-      "table_id": "63c20492-bfb5-54b3-8fe8-493e7846bd8b",
+      "table_id": "41d38d30-b69e-5bb2-87a4-b9a28b2528d0",
       "table_name": "其他应收款项坏账准备计提情况",
       "header_fingerprint": "8a4467c0b8c52b54e12f370612d0c60dfab14dabf44654984d7f59376c560c4f",
       "columns": [
         {
-          "column_id": "2912f9c2-94d9-5563-98ac-4fc09fe77096",
+          "column_id": "00d64831-19d1-5e88-a88a-6da2d20cd40d",
           "index": 0,
           "path": [
             "坏账准备"
@@ -91793,7 +91793,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "51b9a4bd-f7da-58ac-95fa-56546883510a",
+          "column_id": "680650e3-1e0d-5d47-9630-7d9dae19a575",
           "index": 1,
           "path": [
             "第一阶段",
@@ -91805,7 +91805,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "05f59928-99b2-5005-81a0-bd5bef05fe2e",
+          "column_id": "34045754-1493-5117-aaa4-d77b8cd24a9d",
           "index": 2,
           "path": [
             "第二阶段",
@@ -91817,7 +91817,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "febc72ca-0a28-591c-ae8a-bfa8afd04136",
+          "column_id": "08a2a542-ca73-5632-bea3-2d966723d11c",
           "index": 3,
           "path": [
             "第三阶段",
@@ -91829,7 +91829,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "6d7889b9-9a37-5e1f-8f32-a65fba935a7e",
+          "column_id": "8f98fee6-8803-5110-b830-99e456a5f1ac",
           "index": 4,
           "path": [
             "合计"
@@ -91845,12 +91845,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 12,
-      "table_id": "fbabd627-2b73-5687-9852-93bf69ab1240",
+      "table_id": "8374cb2d-22b8-55a9-b377-17df89916516",
       "table_name": "其他应收款项账面余额变动",
       "header_fingerprint": "00aeeed608349cb84cae2b536124c5382f1f1935592a60bdca8b871fb84046e4",
       "columns": [
         {
-          "column_id": "26a2231b-ff53-5b9e-889d-dbb852d375c5",
+          "column_id": "97478ae5-0bfb-524b-99c7-3589222bfc9c",
           "index": 0,
           "path": [
             "账面余额"
@@ -91861,7 +91861,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3988b54e-82cd-5e07-95d3-1e71e1673f31",
+          "column_id": "29658073-b54c-511b-a558-318550f0864c",
           "index": 1,
           "path": [
             "第一阶段",
@@ -91873,7 +91873,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c996ccd1-8b68-5700-b095-45f5589f223b",
+          "column_id": "28f3b703-f5f4-5279-b910-ab6227c4c87b",
           "index": 2,
           "path": [
             "第二阶段",
@@ -91885,7 +91885,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "1d45ed85-f241-568c-964d-34ac6b1cb4e6",
+          "column_id": "813485bb-47ca-5fec-8e5a-f136a9570c47",
           "index": 3,
           "path": [
             "第三阶段",
@@ -91897,7 +91897,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "7343431c-5070-5b50-bc2e-fa560d6b933d",
+          "column_id": "b15032a4-3b14-5a83-b5b4-0c78c098647a",
           "index": 4,
           "path": [
             "合计"
@@ -91913,12 +91913,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 13,
-      "table_id": "6e657ad2-8a0a-55da-aff2-8fb7e2747dc4",
+      "table_id": "8bfbc037-2bc8-5f7e-818a-309b7b70b89d",
       "table_name": "收回或转回的坏账准备",
       "header_fingerprint": "28c984ea6ba3458dc7e3161ea047f7a883e13744a898a025bf1ed7a91c1d9110",
       "columns": [
         {
-          "column_id": "4860963d-53f2-50dc-8f85-59baf1610d83",
+          "column_id": "5cfc39a5-0b73-5e5a-94d0-3c1e95fee49b",
           "index": 0,
           "path": [
             "债务人名称"
@@ -91929,7 +91929,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "7e51f6d4-1630-586a-82df-9bf144fcedb5",
+          "column_id": "0bc3e0d3-2602-5f2b-a9db-cbce6fb90146",
           "index": 1,
           "path": [
             "转回或收回金额"
@@ -91940,7 +91940,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "ca25f7d8-1db3-5a39-9656-72cd7db8a287",
+          "column_id": "2455f022-dfcb-516b-aaf1-f379ec5dab88",
           "index": 2,
           "path": [
             "转回或收回前累计已计提坏账准备金额"
@@ -91951,7 +91951,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c785a413-bc19-5088-8f6c-fe44a9e038ec",
+          "column_id": "9bae25df-ac32-5d06-a6f1-085dc160bb9a",
           "index": 3,
           "path": [
             "转回或收回原因、方式"
@@ -91967,12 +91967,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 14,
-      "table_id": "480c31c5-d2ab-5f2c-b55b-e067c2c037f1",
+      "table_id": "0767ceda-704f-52f8-8c71-3315c0b612b3",
       "table_name": "本期实际核销的其他应收款项",
       "header_fingerprint": "ace555ddf816d3d0bbfb0ae240793d98191988adbcd36d6db752d645e384ce3b",
       "columns": [
         {
-          "column_id": "683bbfd3-978c-5dd8-b224-084c9fbe7ff5",
+          "column_id": "6c2ccecf-ea6d-5438-a58f-6f69cd8eac6e",
           "index": 0,
           "path": [
             "债务人名称"
@@ -91983,7 +91983,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c9031dd6-2237-5ead-ac5b-309c73ac051a",
+          "column_id": "b70a40a9-1845-5692-8540-df12ae3964dc",
           "index": 1,
           "path": [
             "其他应收款项性质"
@@ -91994,7 +91994,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "ecfa308f-41ed-51a5-a476-846d076533a5",
+          "column_id": "152c9736-f4ba-5447-b913-e9bc77ae1253",
           "index": 2,
           "path": [
             "核销金额"
@@ -92005,7 +92005,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "7d1e6d1a-bbf1-56a3-a06b-d9da433bb40e",
+          "column_id": "967809a9-16e0-56a8-91a0-90d3a0f88265",
           "index": 3,
           "path": [
             "核销原因"
@@ -92016,7 +92016,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "14ea1863-a18a-50ff-a0f4-1a591fb9eb86",
+          "column_id": "05afc338-0ac1-55db-b770-060e06af6e38",
           "index": 4,
           "path": [
             "履行的核销程序"
@@ -92027,7 +92027,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "f0ba8334-4490-553d-bd6c-5f0236087a39",
+          "column_id": "10c7f2ec-ff5c-5bc3-aa82-dd7c77d832fd",
           "index": 5,
           "path": [
             "是否因关联交易产生"
@@ -92043,12 +92043,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 15,
-      "table_id": "8c567669-8ac2-5ca6-b4d8-eab861e36655",
+      "table_id": "7570e93f-b9a3-595f-9197-6a10eec24400",
       "table_name": "按欠款方归集的期末余额前五名的其他应收款项",
       "header_fingerprint": "37fc7a74177d905c6cebe59d1d6540ee6abac0647ee47f6ed7f19209cdd29094",
       "columns": [
         {
-          "column_id": "5b8b55d2-a8a9-562f-bf64-760591a657e0",
+          "column_id": "6bbedd5d-8674-5222-9b83-f19680d4bd97",
           "index": 0,
           "path": [
             "债务人名称"
@@ -92059,7 +92059,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "01f509b0-c96e-5300-89c6-04c1ac1d57ce",
+          "column_id": "e1853a27-8780-556a-b33e-c55a379b6387",
           "index": 1,
           "path": [
             "款项性质"
@@ -92070,7 +92070,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c8df9d31-cd67-5524-9980-54a58a7d67a7",
+          "column_id": "8a8443a2-7b18-5bee-bcac-5c3c62627937",
           "index": 2,
           "path": [
             "账面余额"
@@ -92081,7 +92081,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "55c506a3-2b40-59d9-b724-a6a70e78016c",
+          "column_id": "78bbd5bc-9ef2-5299-a62c-e2bd38726981",
           "index": 3,
           "path": [
             "账龄"
@@ -92092,7 +92092,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "43f9be81-7e37-53ea-926e-f8019b32f8d7",
+          "column_id": "5b89b745-a595-5232-a2e8-c6ddc4d61578",
           "index": 4,
           "path": [
             "占其他应收款项合计的比例(%)"
@@ -92103,7 +92103,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "045ebf82-077d-50fb-86e2-6e3c1a680b91",
+          "column_id": "81e0afee-5071-5235-9204-522cc8b8e0e5",
           "index": 5,
           "path": [
             "坏账准备"
@@ -92119,12 +92119,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 16,
-      "table_id": "ae5e6518-57d3-5391-aa28-e4b70db9c7ab",
+      "table_id": "27cd1110-41e6-5c58-adbc-bd5166f34045",
       "table_name": "由金融资产转移而终止确认的其他应收款项",
       "header_fingerprint": "3a302b5ef66f745c58f87c04f2b444d5ce2665911ac367e874c477036829d55f",
       "columns": [
         {
-          "column_id": "17f82e97-29cb-5c0c-9fb7-3d0da945c620",
+          "column_id": "263b6928-7811-52ea-a3fa-9cb177d5659f",
           "index": 0,
           "path": [
             "债务人名称"
@@ -92135,7 +92135,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "ec0eced4-5304-5278-9205-a2f5c9df811c",
+          "column_id": "d43d5dd5-85ed-558a-bfca-3ca15aca1e2b",
           "index": 1,
           "path": [
             "终止确认金额"
@@ -92146,7 +92146,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "b581ef8f-ae08-552d-a0b0-33fc5ad38b40",
+          "column_id": "9ca3de35-1392-5285-a8dd-cc475e7a2208",
           "index": 2,
           "path": [
             "与终止确认相关的利得或损失"
@@ -92162,12 +92162,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 17,
-      "table_id": "d941c43b-f8bd-5a15-ab3f-75725ad68741",
+      "table_id": "766ebe23-fc1d-5607-a286-563f35a51593",
       "table_name": "其他应收款项转移继续涉入形成的资产、负债的金额",
       "header_fingerprint": "bc6e7accbe902689631daa26864ad707632a0bb3ed7637857c1fd260b364ce16",
       "columns": [
         {
-          "column_id": "58a7e638-d33d-5a2d-a4fe-88ecb059f78c",
+          "column_id": "498dbdb9-6f54-5e57-9131-832ce612651c",
           "index": 0,
           "path": [
             "项目"
@@ -92178,7 +92178,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4d07824a-2438-5708-8ad5-5e57b5c3048c",
+          "column_id": "81a7c947-d65a-545e-b6a1-5e3a3cc8b0f1",
           "index": 1,
           "path": [
             "期末金额"
@@ -92194,12 +92194,12 @@
       "variant": "soe",
       "section_id": "十二、其他应收款",
       "table_index": 18,
-      "table_id": "e1967b19-8b3c-5919-b13b-179391117666",
+      "table_id": "41ff3581-05e7-5780-9d63-3c6505230e7a",
       "table_name": "涉及政府补助的应收款项",
       "header_fingerprint": "2b9863c1a3c6202aaa58acfdeb6a08c909a59876f380a89bd7fdf28eca6b8bae",
       "columns": [
         {
-          "column_id": "8aa3751e-d9e7-531f-a3fc-92cea5786ddf",
+          "column_id": "00b638b6-4ed9-5d06-a5fb-1aafafaf4678",
           "index": 0,
           "path": [
             "单位名称(注:政府补助的发文单位)"
@@ -92210,7 +92210,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "67bdfb79-2177-5087-922c-5df920d9760d",
+          "column_id": "b0121f82-f775-5124-a50c-b5d0b10cd3b8",
           "index": 1,
           "path": [
             "政府补助项目名称"
@@ -92221,7 +92221,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "81d34938-b8e8-5103-b43d-f3461e7a6201",
+          "column_id": "62ebda38-5b56-5a61-8c26-ec91349acb5b",
           "index": 2,
           "path": [
             "期末余额"
@@ -92232,7 +92232,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "1a0f4b55-8439-5cab-a6cb-b9e1eba7ab3e",
+          "column_id": "60d26ddd-a2d4-55bc-9708-f880ff40e157",
           "index": 3,
           "path": [
             "期末账龄"
@@ -92243,7 +92243,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e46a57e1-15e3-5691-b65f-ef3b65664262",
+          "column_id": "bc6f370b-8e01-577c-b9c7-abb551b0928f",
           "index": 4,
           "path": [
             "预计收取的时间、金额及依据"
@@ -92259,12 +92259,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 0,
-      "table_id": "d3821209-c78f-5106-8e2e-2a109863cac8",
+      "table_id": "ec276eee-60ab-5a25-bc00-48488e500816",
       "table_name": "（1）按账龄披露应收账款",
       "header_fingerprint": "7f016ce30f0e30795d22ba4f5c49413e9d58c6cd038716ab18a820aab223c6a9",
       "columns": [
         {
-          "column_id": "7462fe35-e2e5-5e79-a0ad-41f259ead0fe",
+          "column_id": "22090b7f-ca32-5e2e-ab66-eb3654d7e601",
           "index": 0,
           "path": [
             "账龄"
@@ -92275,7 +92275,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "61a37cc5-7990-594c-8437-62d6bbe4bef1",
+          "column_id": "8e98c409-b905-513d-8f41-b33cebaeb2e6",
           "index": 1,
           "path": [
             "期末数"
@@ -92286,7 +92286,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4ab25387-ceec-5a0d-bfaa-c48a45390890",
+          "column_id": "32a58f25-da05-523c-a47b-38dc1204c571",
           "index": 2,
           "path": [
             "期初数"
@@ -92302,12 +92302,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 1,
-      "table_id": "611ef5b6-7cd6-5cad-9b68-1437dedf08ef",
+      "table_id": "0a31f2c2-462f-5273-af41-9f90336812f8",
       "table_name": "（2）按坏账准备计提方法分类披露应收账款",
       "header_fingerprint": "d86935ff7c1756b3f5746032581dcddc09677d5dc94486f727785b3f353ad675",
       "columns": [
         {
-          "column_id": "ee652679-28e0-5ebc-b704-863524aad28f",
+          "column_id": "492d8ad9-c031-527c-8bcb-97f6c8f1b5c1",
           "index": 0,
           "path": [
             "类别"
@@ -92318,7 +92318,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "030d090e-06c7-5f64-b982-bd046e016969",
+          "column_id": "24c2b57b-47dc-5761-8190-af7d8363e71d",
           "index": 1,
           "path": [
             "账面余额",
@@ -92330,7 +92330,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "41c94588-07da-5741-b47e-debf7d3721b9",
+          "column_id": "eac8b95c-720c-5954-b893-c9d6f466f0eb",
           "index": 2,
           "path": [
             "账面余额",
@@ -92342,7 +92342,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "85589282-ca6b-5764-9dad-9030b8e3ae79",
+          "column_id": "ea123f6f-4aa4-537e-9d41-ba5faa6c34b2",
           "index": 3,
           "path": [
             "坏账准备",
@@ -92354,7 +92354,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "0a2933ee-4d06-5098-8b09-647924ef41b8",
+          "column_id": "fab5deea-3417-566e-944f-f6914d55237a",
           "index": 4,
           "path": [
             "坏账准备",
@@ -92366,7 +92366,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "7cde1d54-cd0b-573f-8f28-3a511112b205",
+          "column_id": "8471885a-90cb-5a37-9316-7798a8537965",
           "index": 5,
           "path": [
             "账面价值"
@@ -92382,12 +92382,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 2,
-      "table_id": "22afd10e-2707-597a-af78-2b001e2d45e8",
+      "table_id": "808d9d0a-11bf-5a40-ba06-44fda2d2880a",
       "table_name": "（2）按坏账准备计提方法分类披露应收账款（续：期初数）",
       "header_fingerprint": "d86935ff7c1756b3f5746032581dcddc09677d5dc94486f727785b3f353ad675",
       "columns": [
         {
-          "column_id": "b499141b-7cca-5e61-91c7-401ada650c23",
+          "column_id": "0b370d96-1d22-5757-9baa-a28006ce28d8",
           "index": 0,
           "path": [
             "类别"
@@ -92398,7 +92398,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "1c02b3c3-edc2-5e70-8522-541de066efcb",
+          "column_id": "c54dc0b3-0e68-50aa-8a3a-e89f0268684c",
           "index": 1,
           "path": [
             "账面余额",
@@ -92410,7 +92410,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "f8b32bcc-db3a-5b98-87c8-ce46ae1bd0da",
+          "column_id": "3bdce99f-4dc0-584f-a957-7a24bcde6a0a",
           "index": 2,
           "path": [
             "账面余额",
@@ -92422,7 +92422,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "e9666cbc-e2b0-544b-b512-70ff12ea4cab",
+          "column_id": "ef04bef4-811a-535b-aa76-b9c782dc3fc1",
           "index": 3,
           "path": [
             "坏账准备",
@@ -92434,7 +92434,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c9de4b29-a585-5e50-9137-3080f1182c33",
+          "column_id": "468a18a3-004c-5ee3-9ee1-91bafd09bec8",
           "index": 4,
           "path": [
             "坏账准备",
@@ -92446,7 +92446,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "4c44d144-1a7f-5e93-8324-ab038cec2f39",
+          "column_id": "a3a3fdf1-2590-5cf4-bbfc-356bab650077",
           "index": 5,
           "path": [
             "账面价值"
@@ -92462,12 +92462,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 3,
-      "table_id": "151d8bf1-9e0c-556d-97a7-16f02a5e3d23",
+      "table_id": "79e9eea3-0b38-558a-8922-4faa88bbe964",
       "table_name": "期末单项计提坏账准备的应收账款",
       "header_fingerprint": "2a08235b4891c901c5d0577382076cc3011d7cb49eba80e773b81ec1e7b3fe77",
       "columns": [
         {
-          "column_id": "6e3f80bb-d634-5efe-ac40-c30cfedded9a",
+          "column_id": "2927bff3-9a5c-5f3d-ba59-7c62380b0401",
           "index": 0,
           "path": [
             "债务人名称"
@@ -92478,7 +92478,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "54085242-e4c5-5d82-9da2-d1a029f060bd",
+          "column_id": "73517212-06e3-584d-8a34-9db22f3bf2c0",
           "index": 1,
           "path": [
             "账面余额"
@@ -92489,7 +92489,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "b866ea18-7330-5b37-9db7-953c00f70c6f",
+          "column_id": "dccbdd35-c173-5935-a821-aabf43fa8d1c",
           "index": 2,
           "path": [
             "坏账准备"
@@ -92500,7 +92500,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e06c966a-3ddc-55d2-a79c-b444675b0b9a",
+          "column_id": "1a8d9764-a003-59c8-bead-4bc047f62070",
           "index": 3,
           "path": [
             "账龄"
@@ -92511,7 +92511,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "165064ce-ded0-566c-8bf2-27f9f4bf89a0",
+          "column_id": "b9ffe5dc-15c2-5bf1-b623-14fab5770349",
           "index": 4,
           "path": [
             "预期信用损失率(%)"
@@ -92527,12 +92527,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 4,
-      "table_id": "b4530692-e5af-578f-beb4-5ef9825389d7",
+      "table_id": "1d8ff170-38ea-5e8a-afd4-58ecd434caa2",
       "table_name": "组合计提项目：应收中央企业客户",
       "header_fingerprint": "f1992a0163161f9cfc29fdeb75f44745e25a4b5870d2a7fca781a83f7d6f7ed2",
       "columns": [
         {
-          "column_id": "496c264b-bd22-545c-bb1d-dce55e3b2a1b",
+          "column_id": "27f96bea-4ca4-54a9-8952-dfd241ccbdb1",
           "index": 0,
           "path": [
             "账龄"
@@ -92543,7 +92543,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "b967f202-eca3-54c8-9827-251e72053c04",
+          "column_id": "05f323e0-2014-5121-9419-bf55b9409017",
           "index": 1,
           "path": [
             "账面余额",
@@ -92555,7 +92555,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "ff9cd5c2-dedc-5e63-a7a7-74eabc542754",
+          "column_id": "acdce676-f23f-5c05-a1c1-95f37c886463",
           "index": 2,
           "path": [
             "账面余额",
@@ -92567,7 +92567,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "8bc11ef2-ec97-55e9-a582-93aca905fc5b",
+          "column_id": "0c41ff5f-09e7-5939-bf00-767845f8b6bc",
           "index": 3,
           "path": [
             "坏账准备"
@@ -92583,12 +92583,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 5,
-      "table_id": "80451c16-2ab3-5e54-8380-23bb13fc0134",
+      "table_id": "4776ff2c-43a8-5c01-a1a4-d2e93f114d49",
       "table_name": "组合计提项目：应收中央企业客户（续：期初数）",
       "header_fingerprint": "f1992a0163161f9cfc29fdeb75f44745e25a4b5870d2a7fca781a83f7d6f7ed2",
       "columns": [
         {
-          "column_id": "9498dd80-d879-51eb-bd77-1a51566482e1",
+          "column_id": "1668c3c4-c7ba-5317-9247-4d59c79af616",
           "index": 0,
           "path": [
             "账龄"
@@ -92599,7 +92599,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "b465745a-a6b0-5d04-87e7-5f22ddcc49c8",
+          "column_id": "29760fa8-a89f-5cc7-8ccf-a31014680a32",
           "index": 1,
           "path": [
             "账面余额",
@@ -92611,7 +92611,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "769774e4-244f-56d7-ae11-9d80918d491e",
+          "column_id": "da55a6c2-0acd-5e07-9a1a-58af65a7b08b",
           "index": 2,
           "path": [
             "账面余额",
@@ -92623,7 +92623,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "c7c79588-598b-5f65-9e6a-201c0c12522e",
+          "column_id": "2df4a6ae-84bf-59e7-997a-69bde73c28c1",
           "index": 3,
           "path": [
             "坏账准备"
@@ -92639,12 +92639,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 6,
-      "table_id": "8298f37f-5227-5a52-8e18-1e8272040847",
+      "table_id": "38d1b338-b788-5c69-b9ca-06df4dc54670",
       "table_name": "组合计提项目：应收海外企业客户",
       "header_fingerprint": "f1992a0163161f9cfc29fdeb75f44745e25a4b5870d2a7fca781a83f7d6f7ed2",
       "columns": [
         {
-          "column_id": "63064f9c-edee-54bd-bb51-61e759b89117",
+          "column_id": "cecd5904-8743-5121-a1c2-7812679161d7",
           "index": 0,
           "path": [
             "账龄"
@@ -92655,7 +92655,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "dd902f40-85d2-51e2-853f-3555630fb6a7",
+          "column_id": "a8e45001-a0fe-542c-a26f-b38b41947500",
           "index": 1,
           "path": [
             "账面余额",
@@ -92667,7 +92667,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4215f314-a26f-5a60-89fd-8b8f5b1fc94e",
+          "column_id": "d062843f-8c8f-5e5f-ada9-00739edcf60f",
           "index": 2,
           "path": [
             "账面余额",
@@ -92679,7 +92679,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "5104c9fc-de51-5836-a2be-d0b8e4212b88",
+          "column_id": "78b6a2e4-08b2-51fc-bf95-728de937fd43",
           "index": 3,
           "path": [
             "坏账准备"
@@ -92695,12 +92695,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 7,
-      "table_id": "69877625-144f-53d7-afad-72fd3b7e0962",
+      "table_id": "c82c172e-8c55-537e-a968-a25c4cdd042c",
       "table_name": "组合计提项目：应收海外企业客户（续：期初数）",
       "header_fingerprint": "f1992a0163161f9cfc29fdeb75f44745e25a4b5870d2a7fca781a83f7d6f7ed2",
       "columns": [
         {
-          "column_id": "1b66f811-693f-5303-bba8-49ce8318d8df",
+          "column_id": "bd35f104-0793-5bcb-86f9-8f252826d8a1",
           "index": 0,
           "path": [
             "账龄"
@@ -92711,7 +92711,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "ffb34132-21ae-56b7-9d57-6aa560f74bdc",
+          "column_id": "edf0e30d-057a-56d2-a5bf-d598178ce13e",
           "index": 1,
           "path": [
             "账面余额",
@@ -92723,7 +92723,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "2344a335-6756-53fe-b3c8-c7961a4ed113",
+          "column_id": "879f86b7-7646-549d-b713-f88a6ed33d81",
           "index": 2,
           "path": [
             "账面余额",
@@ -92735,7 +92735,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "d55c434e-bcef-56ed-8fca-15b3be94a8b6",
+          "column_id": "846a04c0-a84d-5cb1-bbcc-1a41a79f7f00",
           "index": 3,
           "path": [
             "坏账准备"
@@ -92751,12 +92751,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 8,
-      "table_id": "431c512f-bbbf-59ab-b2ca-d5322ab8b2f8",
+      "table_id": "817c4687-7bce-5c0c-ade6-bd40c8f9c217",
       "table_name": "采用余额百分比或其他组合方法计提坏账准备的应收账款",
       "header_fingerprint": "9d009d4444160fcf8d36378b74293b2f38292d7593ca0cbf0f356b0ef8158542",
       "columns": [
         {
-          "column_id": "aa503012-a665-573f-94de-5315770457bf",
+          "column_id": "bff58a47-29a4-516d-ac9e-c4ddd666aae1",
           "index": 0,
           "path": [
             "组合名称"
@@ -92767,7 +92767,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "9c83127b-c666-5fec-bb5d-cb1fa8e87be1",
+          "column_id": "b1f07d4d-2190-578c-ba19-cc3aa6e9edc0",
           "index": 1,
           "path": [
             "期末数",
@@ -92779,7 +92779,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "46f39ec8-84dd-5960-8220-6cd52ba7061f",
+          "column_id": "a614e696-48ab-5abf-8dfa-d8bc87b98427",
           "index": 2,
           "path": [
             "期末数",
@@ -92791,7 +92791,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "b63165be-cd43-5645-b77b-03dca3a0cd21",
+          "column_id": "82699c6b-18bb-5be4-aff1-8791ccc20710",
           "index": 3,
           "path": [
             "期末数",
@@ -92803,7 +92803,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c17ff3cb-0ba7-545f-88da-7acef0f32612",
+          "column_id": "3dcf4de7-02d1-5e27-bde6-f549b9139ece",
           "index": 4,
           "path": [
             "期初数",
@@ -92815,7 +92815,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "0447de62-ddfc-5e6e-92b1-64a4acc634af",
+          "column_id": "774c7090-f679-5066-b0f0-23db611be7d2",
           "index": 5,
           "path": [
             "期初数",
@@ -92827,7 +92827,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "39415d8b-2f01-5455-8069-654d0b902355",
+          "column_id": "eb2d3586-5eec-589f-bc31-24adb7dc3034",
           "index": 6,
           "path": [
             "期初数",
@@ -92844,12 +92844,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 9,
-      "table_id": "040231de-a057-5bd9-bacb-1cd409496876",
+      "table_id": "b2aeef76-ff97-5ad7-b350-cdf6b8f77f7f",
       "table_name": "（3）本期计提、收回或转回的坏账准备情况",
       "header_fingerprint": "13fa5e6073631320e78117cb911370d2881fd5806d5a03167ef9702ba6672b91",
       "columns": [
         {
-          "column_id": "5432a8be-bcb8-5074-bde6-7f9bb794b4d0",
+          "column_id": "2f6d88d4-1e48-58a6-a27e-db30334d21ee",
           "index": 0,
           "path": [
             "类别"
@@ -92860,7 +92860,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "41b5c810-90ba-58a8-a573-8bbdc060cadf",
+          "column_id": "ab615c9b-6b41-575f-b502-374cd9023aca",
           "index": 1,
           "path": [
             "期初数"
@@ -92871,7 +92871,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "92a5a564-9048-5086-a7e5-a8071472aa2f",
+          "column_id": "6ab57a23-fb41-548d-af72-28d4f1b11c2a",
           "index": 2,
           "path": [
             "本期变动金额",
@@ -92883,7 +92883,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "1e48e9f9-0a46-51dd-9483-8822a4762f0d",
+          "column_id": "1442f1fe-2f2c-551a-83d8-f0f9befe7a42",
           "index": 3,
           "path": [
             "本期变动金额",
@@ -92895,7 +92895,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c5bc505d-2442-53cc-9fe3-e7bf95c12375",
+          "column_id": "cfffd7c4-bb8b-5bd9-a37f-1df3d32ae9f3",
           "index": 4,
           "path": [
             "本期变动金额",
@@ -92907,7 +92907,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "43a1ddea-0775-561c-bb4f-cacf85c5f7cc",
+          "column_id": "2da46f4d-bc74-51e0-be65-112b037c865d",
           "index": 5,
           "path": [
             "期末数"
@@ -92923,12 +92923,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 10,
-      "table_id": "58e62db9-e2ed-5364-8c6f-80cdb1976f34",
+      "table_id": "f35d7743-ec6e-5042-8c62-71d461db1277",
       "table_name": "收回或转回的坏账准备",
       "header_fingerprint": "28c984ea6ba3458dc7e3161ea047f7a883e13744a898a025bf1ed7a91c1d9110",
       "columns": [
         {
-          "column_id": "ed251bda-5549-502e-9c7e-c85029695457",
+          "column_id": "3944252f-f205-5cee-afdd-fe8846272ea3",
           "index": 0,
           "path": [
             "债务人名称"
@@ -92939,7 +92939,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "6710243a-01a3-587e-9e8c-ae21ac290400",
+          "column_id": "54a0a3d3-a4aa-56d6-a12f-d59652c41a56",
           "index": 1,
           "path": [
             "转回或收回金额"
@@ -92950,7 +92950,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "1ced7cc1-0b6d-5131-b2a0-25e642479b54",
+          "column_id": "51a8fb1b-7a8f-5213-9e40-47f1383a84a3",
           "index": 2,
           "path": [
             "转回或收回前累计已计提坏账准备金额"
@@ -92961,7 +92961,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "50b674d2-7b3b-5d52-b40d-0fb3efdd63f1",
+          "column_id": "30a38949-8605-5c1b-827e-55633426983f",
           "index": 3,
           "path": [
             "转回或收回原因、方式"
@@ -92977,12 +92977,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 11,
-      "table_id": "8f463fc0-52db-54c7-afc3-98c67250b375",
+      "table_id": "e41580be-9b37-5053-8a14-edfa155e2bc9",
       "table_name": "（4）本期实际核销的应收账款",
       "header_fingerprint": "f726e935009e940a40905756634d1f5e817d6d7900b16450ad24cfcec5563150",
       "columns": [
         {
-          "column_id": "b189eb09-cd8a-59d4-88c4-9d8cd6f90ff1",
+          "column_id": "e9411875-119e-5541-87fc-721c2e32b8cf",
           "index": 0,
           "path": [
             "债务人名称"
@@ -92993,7 +92993,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3bdcbb2e-c118-59a2-b251-d2895b81ca35",
+          "column_id": "2a9e8c96-0cbc-5d1d-a863-57f48bfe26b2",
           "index": 1,
           "path": [
             "应收账款性质"
@@ -93004,7 +93004,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "a77d7376-ddd4-5f0b-8310-909699afe5b4",
+          "column_id": "4fa5be8d-03e1-51e2-b7aa-b175b250dc55",
           "index": 2,
           "path": [
             "核销金额"
@@ -93015,7 +93015,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "33baa9fa-756d-5f57-9c5f-85ff94f0d59a",
+          "column_id": "b5c257e6-1c59-5dff-9c38-bd0173513294",
           "index": 3,
           "path": [
             "核销原因"
@@ -93026,7 +93026,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "d0dfd334-67b9-5465-9528-802513b8d68a",
+          "column_id": "9e46417c-ee05-50f5-9e68-cf513fa40753",
           "index": 4,
           "path": [
             "履行的核销程序"
@@ -93037,7 +93037,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4ad0fb43-7bf6-5b88-b836-338afeb4b0cf",
+          "column_id": "dd6978a4-8468-5bf5-986e-6d38ee8033b3",
           "index": 5,
           "path": [
             "是否因关联交易产生"
@@ -93053,12 +93053,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 12,
-      "table_id": "98617b41-d3eb-5c95-8880-a746efc9880b",
+      "table_id": "ac520e42-69dc-5ef1-9099-72760a9914da",
       "table_name": "（5）按欠款方归集的期末余额前五名的应收账款",
       "header_fingerprint": "6b53c7c5d96d65a86d5fe9f2fd5a842fd744f26fd51b0ff27508b477754da9b6",
       "columns": [
         {
-          "column_id": "76fcc294-cebd-59e4-8cf6-81bd8c75da30",
+          "column_id": "97d615a7-fc45-5db7-a2fe-1640a23a33d4",
           "index": 0,
           "path": [
             "债务人名称"
@@ -93069,7 +93069,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "deaf8262-7b48-5871-9731-89a2fe360f2d",
+          "column_id": "a7c7859c-8667-5ee7-9ac7-1a3d7feedbc3",
           "index": 1,
           "path": [
             "账面余额"
@@ -93080,7 +93080,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "f20d7095-30ff-579e-af04-70b846db87e0",
+          "column_id": "b983060e-77d9-5c37-b456-7b6329feee1a",
           "index": 2,
           "path": [
             "占应收账款合计的比例(%)"
@@ -93091,7 +93091,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "3dec4b0a-2e3c-55a8-bdfa-392aa7d89721",
+          "column_id": "ab85bdd4-4393-5ccd-bfaf-cc25901a340b",
           "index": 3,
           "path": [
             "坏账准备"
@@ -93107,12 +93107,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 13,
-      "table_id": "a537a33f-4484-5b05-8689-50d2691dc331",
+      "table_id": "3c442db7-f81b-5b69-ac90-ce0f2b16cf6f",
       "table_name": "（6）由金融资产转移而终止确认的应收账款",
       "header_fingerprint": "c7228a34afbc2b700c9c3da7a41d0cbb9ea04165693b431aecfbcdeb02cac747",
       "columns": [
         {
-          "column_id": "b9799298-3bf8-5bcd-a393-6ac83b0722a2",
+          "column_id": "b51e6066-42d3-5d16-bc8a-20a00810ea84",
           "index": 0,
           "path": [
             "债务人名称"
@@ -93123,7 +93123,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3fcd71aa-b2b0-5104-b6a8-7029db631160",
+          "column_id": "89146e03-d721-5d55-b0f4-434ae5bdd95e",
           "index": 1,
           "path": [
             "终止确认金额"
@@ -93134,7 +93134,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3577d5f6-d2c9-59f9-9963-9ec3703ce1fa",
+          "column_id": "e1f94a92-a852-5d9e-87c4-eb5895a8e80f",
           "index": 2,
           "path": [
             "与终止确认相关的利得或损失(损失以“-”填列)"
@@ -93150,12 +93150,12 @@
       "variant": "soe",
       "section_id": "十二、应收账款",
       "table_index": 14,
-      "table_id": "620f25e4-eca4-575d-abbd-689405d9a308",
+      "table_id": "a2e21603-e210-5eb8-aa83-3f91c2ae14b5",
       "table_name": "（7）应收账款转移继续涉入形成的资产、负债的金额",
       "header_fingerprint": "bc6e7accbe902689631daa26864ad707632a0bb3ed7637857c1fd260b364ce16",
       "columns": [
         {
-          "column_id": "efedebe4-a424-5af2-b748-9af97c455241",
+          "column_id": "40d04aa1-4cfe-589e-aa40-a614cac63faa",
           "index": 0,
           "path": [
             "项目"
@@ -93166,7 +93166,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c53167a5-11ac-5b83-b5ef-d213ecbd59be",
+          "column_id": "3d4a227d-4660-5b0e-9261-ebb0ce1eed2c",
           "index": 1,
           "path": [
             "期末金额"
@@ -93182,12 +93182,12 @@
       "variant": "soe",
       "section_id": "十二、投资收益",
       "table_index": 0,
-      "table_id": "3f123d92-3aaf-5736-a9ac-78f75e0679f3",
+      "table_id": "f9f65775-395b-5530-b09f-8f59754a7f18",
       "table_name": "投资收益",
       "header_fingerprint": "3dcff7695431846820abfe5ef6a1fa19d8d2c5920a9e6be7e2d7648b74ea95d5",
       "columns": [
         {
-          "column_id": "553083f5-c44e-50c2-a99a-954a39b63e72",
+          "column_id": "a25fe2d2-5f15-59ec-a389-cf8e2cb9f2e6",
           "index": 0,
           "path": [
             "产生投资收益的来源"
@@ -93198,7 +93198,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "2bd71b8e-4707-5ff1-8002-3fad7098e6d8",
+          "column_id": "1dd5d804-928a-561d-b852-2e28526463e3",
           "index": 1,
           "path": [
             "本期发生额"
@@ -93209,7 +93209,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "3e7c1f45-5fbb-58ca-beab-498ff30a2e93",
+          "column_id": "1c3c2e24-0f13-53ba-bf46-dcd706e3340c",
           "index": 2,
           "path": [
             "上期发生额"
@@ -93225,12 +93225,12 @@
       "variant": "soe",
       "section_id": "十二、现金流量表补充资料",
       "table_index": 0,
-      "table_id": "f1bf8a10-22e8-59ad-ab8f-40e3ee000091",
+      "table_id": "6572badf-49d9-50c9-9e59-a6459002ff8c",
       "table_name": "现金流量表补充资料",
       "header_fingerprint": "dea0f72cf283fdc4062579b8ed563ad1994e9cfd327ddbee7cc3542a6e5215f4",
       "columns": [
         {
-          "column_id": "e07bf6c1-7892-565e-990d-0785bcd4b07d",
+          "column_id": "f3588ec0-d90b-53c6-9c22-b6186142248e",
           "index": 0,
           "path": [
             "项目"
@@ -93241,7 +93241,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "64f5626b-8dbd-5b1b-8c6b-4a860d4246a8",
+          "column_id": "ce805dd8-c111-5f81-b04f-6287fad1a8f3",
           "index": 1,
           "path": [
             "本期发生额"
@@ -93252,7 +93252,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "61e1066e-10bc-590c-946c-b3ed7e18a816",
+          "column_id": "bb92db06-de42-52a3-a65f-79ec2f633071",
           "index": 2,
           "path": [
             "上期发生额"
@@ -93268,12 +93268,12 @@
       "variant": "soe",
       "section_id": "十二、营业收入与营业成本",
       "table_index": 0,
-      "table_id": "c2041a04-ee7b-58cd-a043-f164af23788e",
+      "table_id": "1366364a-63a1-5596-9a6a-4a795860c000",
       "table_name": "营业收入、营业成本",
       "header_fingerprint": "c52574ac8742838dc4fb3d893222df23f37851daa889d5fa33b731114d23e4fb",
       "columns": [
         {
-          "column_id": "eef8953e-6b44-5241-9936-e2df6c06d9fe",
+          "column_id": "059a3792-0e1a-58c8-bb78-8f70f1b03746",
           "index": 0,
           "path": [
             "项目"
@@ -93284,7 +93284,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "0446ec56-fca4-5c9a-823b-5cdb88b58a78",
+          "column_id": "4a1c6dbf-7976-5966-92a4-6915db1e2fa0",
           "index": 1,
           "path": [
             "本期发生额",
@@ -93296,7 +93296,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "48a483dc-9459-57dd-a1de-f1797053138e",
+          "column_id": "602232be-c9bc-5f12-951e-c20236a6a2fd",
           "index": 2,
           "path": [
             "本期发生额",
@@ -93308,7 +93308,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "ef7a3c4e-bd58-5daa-931e-3b84d02d2c8e",
+          "column_id": "8cc6d71c-7906-5d3f-81f0-b0830a1671f5",
           "index": 3,
           "path": [
             "上期发生额",
@@ -93320,7 +93320,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "2031d941-2036-5c21-9fc6-9492c2d2c3d5",
+          "column_id": "afd4227e-8e64-54f2-b73f-a1315a69a0a6",
           "index": 4,
           "path": [
             "上期发生额",
@@ -93337,12 +93337,12 @@
       "variant": "soe",
       "section_id": "十二、营业收入与营业成本",
       "table_index": 1,
-      "table_id": "b26a4e26-7fd6-51f4-b56b-950a934e4b10",
+      "table_id": "d35636b0-afa9-58d7-916f-079a81906836",
       "table_name": "按行业（或产品类型）划分",
       "header_fingerprint": "e3e4aeb177f80cb0d4271d4146013d02914e95364418f84bf03731344266057f",
       "columns": [
         {
-          "column_id": "d130e548-dd8e-5c21-b7e2-e0b665a3e7b8",
+          "column_id": "60ff67b7-faef-5d16-a4fc-841815768afc",
           "index": 0,
           "path": [
             "主要产品类型(或行业)"
@@ -93353,7 +93353,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c367dfbe-fadf-5140-a4eb-11bfa2ff4a2c",
+          "column_id": "bf01b164-a8b1-5c9c-b154-d5ff6a902d67",
           "index": 1,
           "path": [
             "本期发生额",
@@ -93365,7 +93365,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4fe13795-f9ac-5516-b835-fddedb64005c",
+          "column_id": "ee76ccfd-62c0-54cf-9bf2-2a844514fd1c",
           "index": 2,
           "path": [
             "本期发生额",
@@ -93377,7 +93377,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "b812a49e-0ac5-5365-8ebd-83f09ff118cb",
+          "column_id": "87c1b8bd-9609-53fd-819f-5a3978b623de",
           "index": 3,
           "path": [
             "上期发生额",
@@ -93389,7 +93389,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e6e7d348-b1af-5927-a527-4e7913f30837",
+          "column_id": "442f7c4f-1c91-50b4-ab73-1ea330c3aeba",
           "index": 4,
           "path": [
             "上期发生额",
@@ -93406,12 +93406,12 @@
       "variant": "soe",
       "section_id": "十二、营业收入与营业成本",
       "table_index": 2,
-      "table_id": "8569cd6c-e019-5aa9-beea-c09b3bea6850",
+      "table_id": "6e4d2f0e-f4a3-57df-be80-45d4a2028226",
       "table_name": "营业收入、营业成本按地区划分",
       "header_fingerprint": "9439b5fbf6b6422a24e05006eafcbe4a79dab685d2d6393472f5351863f81d7b",
       "columns": [
         {
-          "column_id": "bf42aaa5-b6e5-5665-9081-2fa6fad3cbb6",
+          "column_id": "d4624f9d-f50d-52e5-9b40-90a961026f75",
           "index": 0,
           "path": [
             "主要经营地区"
@@ -93422,7 +93422,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "4a15356e-1873-599c-9326-07eb98163640",
+          "column_id": "ea3fa3ad-9a5e-53e8-a973-5999ba4c49b4",
           "index": 1,
           "path": [
             "本期发生额",
@@ -93434,7 +93434,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "44d4f118-801c-588f-ba5b-cadb59590876",
+          "column_id": "aec70bad-f942-5046-9add-8e3af8b14b76",
           "index": 2,
           "path": [
             "本期发生额",
@@ -93446,7 +93446,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "002bd2cf-3bfe-5cdc-a7e1-7dfc8c91b4f6",
+          "column_id": "552a4979-b650-59a8-aeb9-f140b7184ba1",
           "index": 3,
           "path": [
             "上期发生额",
@@ -93458,7 +93458,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "54bc2892-c41b-58e6-989b-2792e85de728",
+          "column_id": "fcd98760-0ebe-5027-a64a-6a799e2a2dee",
           "index": 4,
           "path": [
             "上期发生额",
@@ -93475,12 +93475,12 @@
       "variant": "soe",
       "section_id": "十二、营业收入与营业成本",
       "table_index": 3,
-      "table_id": "aff0eacf-a745-583e-8f85-d00497a31823",
+      "table_id": "1af9f848-0819-5c64-96b6-2669fee86a30",
       "table_name": "营业收入分解信息",
       "header_fingerprint": "d7739f889c501130bac8fc6ac179153082c547768e43ce5456d8286a98df4d3f",
       "columns": [
         {
-          "column_id": "6e1248a7-00a2-518f-82ba-ae5af3d1131a",
+          "column_id": "c9c12783-1024-5009-a0ab-280ada8f7ddd",
           "index": 0,
           "path": [
             "合同分类/报告分部"
@@ -93491,7 +93491,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "de31c6b9-5ba1-5f04-8aee-e96596801b74",
+          "column_id": "1d3cb730-0764-575f-827b-7bf950918eac",
           "index": 1,
           "path": [
             "消费品",
@@ -93503,7 +93503,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "1eaa3b8a-1506-5171-9e50-a1bb9afbf778",
+          "column_id": "29f44069-9445-5aa8-ade4-fb692be5c2f6",
           "index": 2,
           "path": [
             "消费品",
@@ -93515,7 +93515,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "12cb79d4-dfe6-5483-b416-68476617b550",
+          "column_id": "41ea7905-b25f-5167-8e50-aabb8258b7c3",
           "index": 3,
           "path": [
             "汽车",
@@ -93527,7 +93527,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "822a6020-8adb-57ce-a214-8f1cb1cac4b5",
+          "column_id": "df4ea475-5811-5637-ba1f-a0d096368586",
           "index": 4,
           "path": [
             "汽车",
@@ -93539,7 +93539,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "877a1a00-f28c-51e4-97e1-a46b830b116a",
+          "column_id": "abeb2616-a548-56f1-a70b-7e2d63f52647",
           "index": 5,
           "path": [
             "能源",
@@ -93551,7 +93551,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c6120bfa-aca9-5345-ab23-a8d33f6c5eab",
+          "column_id": "c10d8143-b553-54d8-a4d2-71d1e5b46cca",
           "index": 6,
           "path": [
             "能源",
@@ -93563,7 +93563,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "51a11641-e853-54b8-860b-6e30b621feb8",
+          "column_id": "84dd2583-f51c-55cb-b103-ba4c1b02fbc1",
           "index": 7,
           "path": [
             "其他",
@@ -93575,7 +93575,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "e397f7f2-3624-5166-bf4d-e01f2e8b6adc",
+          "column_id": "ef69e6db-5698-5af0-8449-5ada059143f0",
           "index": 8,
           "path": [
             "其他",
@@ -93592,12 +93592,12 @@
       "variant": "soe",
       "section_id": "十二、营业收入与营业成本",
       "table_index": 4,
-      "table_id": "b15e3dae-c5be-54d0-98e8-e507ed449543",
+      "table_id": "4f64077c-2f02-5d8e-ae08-6dddbdb90f62",
       "table_name": "与剩余履约义务有关的信息",
       "header_fingerprint": "9873393e6757ecd63ec9e1d0c0ae1e12db1b4b26d07fc591c259974ddb82a4f7",
       "columns": [
         {
-          "column_id": "758710a9-6ff6-57b5-8ac7-559ade9cb2f9",
+          "column_id": "b78c9cf9-6edf-5746-80b5-ddde1d2502df",
           "index": 0,
           "path": [
             "年度"
@@ -93608,7 +93608,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "d95ebeb1-9ba7-58fd-88e5-a77773216493",
+          "column_id": "2b0ce2ec-180c-518b-b882-08d72c6f84bf",
           "index": 1,
           "path": [
             "{audit_year+1}年"
@@ -93619,7 +93619,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "eb4f2d8e-2e0b-5940-b3df-deb9d10c2641",
+          "column_id": "eecd8f02-ae0f-5c6a-9317-820d39d66755",
           "index": 2,
           "path": [
             "{audit_year+2}年"
@@ -93630,7 +93630,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "160707df-0951-5669-8e03-b0311f3e4f2f",
+          "column_id": "9280936f-c214-5047-a733-de8c852c11e1",
           "index": 3,
           "path": [
             "合计"
@@ -93948,12 +93948,12 @@
       "variant": "soe",
       "section_id": "四、固定资产",
       "table_index": 0,
-      "table_id": "cf28aa6a-8b06-5b22-bf2e-20ca3f801a7a",
+      "table_id": "3f123d92-3aaf-5736-a9ac-78f75e0679f3",
       "table_name": "固定资产分类及折旧政策",
       "header_fingerprint": "ddccad577d3ad6cdb89e0f9415bd45b4f96564fca0167f0f58a2b8817f844487",
       "columns": [
         {
-          "column_id": "8689a249-2800-50d5-ba36-425766180f55",
+          "column_id": "553083f5-c44e-50c2-a99a-954a39b63e72",
           "index": 0,
           "path": [
             "固定资产类别"
@@ -93964,7 +93964,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "465c9eea-2078-5aa4-af7c-0f1091956a5f",
+          "column_id": "c2019505-d83a-53c5-97ca-f2d9f658c372",
           "index": 1,
           "path": [
             "使用年限"
@@ -93975,7 +93975,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "c9712c3a-f6a3-5b52-a284-a72e4575856a",
+          "column_id": "252a74ac-9fb4-5301-a8da-387d76a91ad5",
           "index": 2,
           "path": [
             "残值率%"
@@ -93986,7 +93986,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "4f765301-d14e-5f04-bd7d-be557fb28683",
+          "column_id": "2f614497-347d-59ad-acb3-8e407f19903b",
           "index": 3,
           "path": [
             "年折旧率%"
@@ -94002,12 +94002,12 @@
       "variant": "soe",
       "section_id": "四、生物资产",
       "table_index": 0,
-      "table_id": "d579cb25-0006-5e5a-878b-a5e201f2c086",
+      "table_id": "f1bf8a10-22e8-59ad-ab8f-40e3ee000091",
       "table_name": "生产性生物资产",
       "header_fingerprint": "d3e3f42a5df68bfe424816b880ee45527194baa668773667360bcca922480f90",
       "columns": [
         {
-          "column_id": "b1e11262-c958-53dc-988a-a726c6c61d0e",
+          "column_id": "e07bf6c1-7892-565e-990d-0785bcd4b07d",
           "index": 0,
           "path": [
             "生产性生物资产类别"
@@ -94018,7 +94018,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "ba07a02f-5a8b-5ecf-b0b9-795991e3e404",
+          "column_id": "ba0ae68b-d3ef-5351-a469-b77c4ccb85f7",
           "index": 1,
           "path": [
             "使用年限(年)"
@@ -94029,7 +94029,7 @@
           "source": "header-library"
         },
         {
-          "column_id": "f200a061-4ecc-59a4-a3aa-cb7b18f0cbdb",
+          "column_id": "f1a16149-6069-547f-8409-db7a3683a5d6",
           "index": 2,
           "path": [
             "残值率%"
@@ -94040,7 +94040,7 @@
           "source": "unresolved-ratio-scale"
         },
         {
-          "column_id": "142aae5b-5441-5f51-a42a-02c624f9356f",
+          "column_id": "6d77b0e1-5774-531a-9aa1-b6377949f1f5",
           "index": 3,
           "path": [
             "年折旧率%"

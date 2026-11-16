@@ -16,6 +16,13 @@
   调用的前端模块，加上 `EXTRA_SCOPE` 手工登记的入口（store item 键动态拼接、字面量找不到的）。
 * 非标识符的字段名（逐格存储的动态键，如 `a51-audit-1.adjustment` / `D2-adj-aging-prior-aje`）按其中的标识符
   片段逐个判（片段全在 ⇒ 视为在）；`store_item_id` 为空的表（审定表一类逐格键）只判 ①。
+
+🔴 **「词干 × 后缀」拼键（L4-3 教训，spec oo-writeback-template-parity-closure R3.2 批 D）**：前端把成对列存成
+`${stem}Qty` / `${stem}Amount`，**整个键名在源码里从不逐字出现**（词干在 `const PAIR_STEMS = ['priorAje', …]`，
+后缀在 `for (const unit of ['Qty','Amount'])`，键在 `` `${stem}${unit}` `` / `row[g.stem + unit.suffix]` 里拼出来）。
+逐字比对因此把它们全判成「前端全无」——`l4.bonds_payable|L4-3-rows` 的 27 条全是这种假阴（契约 json 键与前端
+运行时键**逐字相同**，端到端往返 38/38 实证）。口径 = **按源码里真有的拼法**合成键（词干集合 × 后缀集合），
+不是「凡以 Qty/Amount 结尾就算」。三个来源缺一不可：纯标识符字符串数组、for-of 循环变量绑定、后缀字面量。
 """
 from __future__ import annotations
 
@@ -59,6 +66,8 @@ class Corpus:
     adapter_roots: dict[str, set[str]] = field(default_factory=dict)
     #: 文件里由常量拼出的键（`const ITEM_PREFIX = 'K3-3-adj'` + `` `${ITEM_PREFIX}-entries` `` ⇒ `K3-3-adj-entries`）
     derived_keys: dict[str, frozenset[str]] = field(default_factory=dict)
+    #: 文件里「词干 × 后缀」可能拼出的键（`${stem}Qty` / `${stem}${unit}` / `row[g.stem + unit.suffix]`）
+    composed_keys: dict[str, frozenset[str]] = field(default_factory=dict)
 
 
 _CONST_STR = re.compile(r"""\bconst\s+(\w+)\s*(?::\s*[\w<>\[\] |]+)?=\s*['"]([^'"\n]+)['"]""")
@@ -120,6 +129,104 @@ def _adapter_roots(prod: set[str]) -> dict[str, set[str]]:
     return roots
 
 
+_IDENT_ONLY = re.compile(r"^[A-Za-z][A-Za-z0-9]*$")
+
+
+def _close_index(text: str, start: int, open_ch: str, close_ch: str) -> int:
+    """`text[start-1]` 是 `open_ch`，返回与之配对的 `close_ch` 下标（括号配平，禁 `split`）。"""
+    depth, i = 1, start
+    while i < len(text) and depth:
+        if text[i] == open_ch:
+            depth += 1
+        elif text[i] == close_ch:
+            depth -= 1
+        i += 1
+    return i - 1
+
+
+def _string_arrays(text: str) -> dict[str, list[str]]:
+    """`const NAME = ['a', 'b'] as const` ⇒ NAME → 元素。
+
+    只收**纯标识符字符串数组**（有对象字面量 / 模板串的一律不收）：`SCALAR_COLUMNS` 那种一行一条记录的
+    数组若被当成词干池，`{ key: 'instrumentName' }` 的 `key` 会与 `Qty` 拼成 `keyQty` 这种不存在的键。
+    """
+    out: dict[str, list[str]] = {}
+    for m in re.finditer(r"\bconst\s+(\w+)[^=\n]*=\s*\[", text):
+        body = text[m.end(): _close_index(text, m.end(), "[", "]")]
+        if "{" in body or "`" in body or "(" in body:
+            continue
+        elems = [e for e in re.findall(r"'([^']*)'", body) if _IDENT_ONLY.fullmatch(e)]
+        if elems:
+            out[m.group(1)] = elems
+    return out
+
+
+def _loop_bindings(text: str, arrays: dict[str, list[str]]) -> dict[str, list[str]]:
+    """`for (const stem of L4_3_PAIR_STEMS)` / `of ['Qty','Amount']` ⇒ 循环变量 → 元素。"""
+    out: dict[str, list[str]] = {}
+    for m in re.finditer(r"for\s*\(\s*const\s+(\w+)\s+of\s+(.+?)\)\s*\{", text):
+        src = m.group(2).strip()
+        if src.startswith("["):
+            start = text.index("[", m.start(2))
+            body = text[start + 1: _close_index(text, start + 1, "[", "]")]
+            elems = [e for e in re.findall(r"'([^']*)'", body) if _IDENT_ONLY.fullmatch(e)]
+        else:
+            elems = arrays.get(src) or []
+        if elems:
+            out[m.group(1)] = elems
+    return out
+
+
+def _suffix_literals(text: str) -> set[str]:
+    """后缀字面量：`suffix: 'Qty'` 对象字段 + `for (const u of ['Qty','Amount'])` 的取值。"""
+    out = {s for s in re.findall(r"suffix\s*:\s*'(\w+)'", text) if _IDENT_ONLY.fullmatch(s)}
+    for m in re.finditer(r"for\s*\(\s*const\s+\w+\s+of\s*\[", text):
+        start = text.index("[", m.end() - 1)
+        body = text[start + 1: _close_index(text, start + 1, "[", "]")]
+        out |= {e for e in re.findall(r"'([^']*)'", body) if _IDENT_ONLY.fullmatch(e)}
+    return out
+
+
+def composed_keys(text: str) -> frozenset[str]:
+    """该文件里**真有的拼法**可能产出的键名（词干 × 后缀）。
+
+    三种写法，逐条对应真实源码形态（L4-3 实测）：
+
+    ① `` `${stem}Qty` `` —— 变量 + 字面尾（词干取自 for-of 绑定的数组）
+    ② `` `${stem}${unit}` `` —— 两个变量（词干 × 后缀集合）
+    ③ `row[g.stem + unit.suffix]` —— 属性拼（词干池来自 `Object.keys(LABELS)` 与纯字符串数组）
+
+    🔴 只认这三种：不做「凡后缀是 Qty/Amount 就合成」的泛化 —— 那会把前端根本没有的键也算进来，把缺陷判成接通。
+    """
+    arrays = _string_arrays(text)
+    bind = _loop_bindings(text, arrays)
+    suffixes = _suffix_literals(text)
+    keys: set[str] = set()
+    # ① `${stem}Qty` —— 尾是字面量
+    for m in re.finditer(r"`\$\{(\w+)\}([A-Za-z]\w*)`", text):
+        for stem in bind.get(m.group(1), ()):
+            keys.add(stem + m.group(2))
+    # ② `${stem}${unit}`
+    for m in re.finditer(r"`\$\{(\w+)\}\$\{(\w+)\}`", text):
+        right = bind.get(m.group(2)) or tuple(suffixes)
+        for stem in bind.get(m.group(1), ()):
+            for tail in right:
+                keys.add(stem + tail)
+    # ③ `row[x.stem + y.suffix]`（含 `g.stem + unit.suffix`）
+    if re.search(r"\w+\[[^\]]*\.\w+\s*\+\s*\w+\.\w+", text):
+        pools: set[str] = set()
+        for ob in re.findall(r"Object\.keys\(\s*(\w+)\s*\)", text):
+            m = re.search(rf"\bconst\s+{ob}\b[^=\n]*=\s*\{{", text)
+            if m:
+                body = text[m.end(): _close_index(text, m.end(), "{", "}")]
+                pools |= set(re.findall(r"^\s{2}'?(\w+)'?\s*:", body, re.M))
+        pools |= {e for elems in arrays.values() for e in elems}
+        for stem in pools:
+            for tail in suffixes:
+                keys.add(stem + tail)
+    return frozenset(keys)
+
+
 def load_corpus() -> Corpus:
     texts: dict[str, str] = {}
     for p in FRONTEND_SRC.rglob("*"):
@@ -141,6 +248,7 @@ def load_corpus() -> Corpus:
     corpus = Corpus(texts, tokens, imports, importers, all_tokens)
     corpus.adapter_roots = _adapter_roots(set(texts))
     corpus.derived_keys = {rel: _derived_keys(t) for rel, t in texts.items()}
+    corpus.composed_keys = {rel: composed_keys(t) for rel, t in texts.items()}
     return corpus
 
 
@@ -153,6 +261,12 @@ def name_parts(segment: str) -> tuple[str, ...]:
     if _TOKEN.fullmatch(segment):
         return (segment,)
     return tuple(t for t in re.findall(r"[A-Za-z]+", segment) if len(t) >= 2)
+
+
+def scope_composed_keys(corpus: Corpus, item: str) -> frozenset[str]:
+    """处理该 item 的代码（同 `scope_files`）里能拼出的键名并集。"""
+    return frozenset().union(*(corpus.composed_keys.get(f, frozenset())
+                              for f in scope_files(corpus, item)))
 
 
 def leaf_segments(pointer: str) -> list[str]:
@@ -217,10 +331,12 @@ def compute_misses(
     `names` 缺省取生产契约（`contract_names()`）；判据自检传构造的名单。
     """
     scope_tokens: dict[str, frozenset[str]] = {}
+    scope_composed: dict[str, frozenset[str]] = {}
     misses: dict[str, set[str]] = defaultdict(set)
     for cid, item, seg in (contract_names() if names is None else names):
         parts = name_parts(seg)
-        if not all(p in corpus.all_tokens for p in parts):
+        literal = all(p in corpus.all_tokens for p in parts)
+        if not literal and not (item and seg != item and item != PLACEHOLDER_ITEM):
             misses[f"{cid}|{item}"].add(seg)
             continue
         # 无 store item 的表（审定表逐格键）与逐格存储（字段名就是 store item 本身）只判 ①
@@ -233,6 +349,11 @@ def compute_misses(
         if item not in scope_tokens:
             files = scope_files(corpus, item)
             scope_tokens[item] = frozenset().union(*(corpus.tokens[f] for f in files if f in corpus.tokens))
-        if not all(p in scope_tokens[item] for p in parts):
-            misses[f"{cid}|{item}"].add(seg)
+            scope_composed[item] = scope_composed_keys(corpus, item)
+        # ② 本 item 不用：逐字（标识符）在 scope 里，或该键由 scope 内真有的拼法合成出来
+        if all(p in scope_tokens[item] for p in parts):
+            continue
+        if seg in scope_composed[item]:
+            continue
+        misses[f"{cid}|{item}"].add(seg)
     return dict(misses)

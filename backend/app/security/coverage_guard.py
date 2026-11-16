@@ -194,7 +194,6 @@ NONHTTP_CLASSIFICATION: dict[str, dict[str, Any]] = {
 KNOWN_DUPLICATE_REGISTRATIONS: frozenset[tuple[str, str]] = frozenset(
     {
         ("/api/aging/presets", "GET"),
-        ("/api/projects/{project_id}/a16/recommended-version", "GET"),
         ("/api/projects/{project_id}/aging/config", "GET"),
         ("/api/projects/{project_id}/aging/config", "PUT"),
         ("/api/projects/{project_id}/issue-hints", "GET"),

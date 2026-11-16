@@ -171,16 +171,19 @@ async def test_execute_template_reauthorizes_target_and_reuses_main_execute(monk
     assert_visible = AsyncMock()
     captured = {}
 
-    async def fake_execute(query_body, response, execute_db, execute_user):
+    async def fake_execute(query_body, response, execute_db, execute_user, *, origin="direct", template_id=None):
         captured.update(
-            query=query_body, response=response, db=execute_db, user=execute_user
+            query=query_body, response=response, db=execute_db, user=execute_user,
+            origin=origin, template_id=template_id,
         )
         return {"rows": [], "columns": [], "total": 0}
 
     reauthorized = AsyncMock()
     monkeypatch.setitem(vars(router_mod.template_service), "assert_executable", assert_visible)
     monkeypatch.setitem(vars(ownership_guard), "assert_target_accessible", reauthorized)
-    monkeypatch.setattr(router_mod, "execute_query", fake_execute)
+    # 补丁点 = execute 的 HTTP 层实现（AQF 把主体搬到 business_execute 后，来源标记只能走内部函数；
+    # 路由 execute_query 的签名保持原样，不接受 origin —— 否则会变成客户端可传的 query 参数）
+    monkeypatch.setattr(router_mod, "_execute_with_http_layer", fake_execute)
     response = Response()
     result = await router_mod.execute_template(
         template_id=str(template.id),
@@ -191,6 +194,9 @@ async def test_execute_template_reauthorizes_target_and_reuses_main_execute(monk
     assert result["total"] == 0
     assert_visible.assert_awaited_once_with(template, user=user, db=db)
     reauthorized.assert_awaited_once_with(user=user, project_id=str(target_project), db=db)
+    # 运行记录的来源标记必须真的传下去（AQF R1.1：模板执行 origin=template + 模板编号）
+    assert captured["origin"] == "template"
+    assert captured["template_id"] == template.id
     query = captured["query"]
     assert query.project_id == str(target_project)
     assert query.year == 2024

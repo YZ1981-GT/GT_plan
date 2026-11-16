@@ -129,7 +129,7 @@ async def sse_stream(
         """Wrap event_generator with SSE registry for graceful drain."""
         from app.core.sse_registry import sse_registry
 
-        queue = event_bus.create_sse_queue()
+        queue = await event_bus.create_sse_queue()
         # drain 时往队列放 None 立刻叫醒（原来要等下一次 30 s 心跳才看到已关闭），收尾补发 server_draining
         conn = sse_registry.register_queue(queue)
         try:

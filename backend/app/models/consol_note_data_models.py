@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import Boolean, CHAR, CheckConstraint, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -33,6 +34,9 @@ class ConsolNoteData(Base):
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
     # V172：合并推送后置真（合并数已变化，附注数据待更新）；「按公式填入」后清除
     is_stale: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # V270：待更新原因与首次置位时间；与 data 分列，避免改变用户内容 CAS 摘要。
+    stale_reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    stale_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
     # V182：持久化状态（与 formula_push 三态对等）
     cell_state: Mapped[str] = mapped_column(
         String(20), nullable=False, default="auto", server_default=text("'auto'")

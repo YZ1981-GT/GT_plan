@@ -49,7 +49,7 @@ class TestBroadcastRawToSseQueue:
     async def test_enqueue_pushes_raw_event_to_sse_queue(self):
         """订阅者可从队列拿到 _raw=True dict 事件。"""
         bus = EventBus()
-        queue = bus.create_sse_queue()
+        queue = await bus.create_sse_queue()
 
         project_id = str(uuid.uuid4())
         conflict_id = str(uuid.uuid4())
@@ -73,7 +73,7 @@ class TestBroadcastRawToSseQueue:
     async def test_raw_event_carries_required_fields(self):
         """raw event extra 字段透传给订阅者。"""
         bus = EventBus()
-        queue = bus.create_sse_queue()
+        queue = await bus.create_sse_queue()
 
         project_id = str(uuid.uuid4())
         conflict_id = str(uuid.uuid4())
@@ -98,9 +98,9 @@ class TestBroadcastRawToSseQueue:
     async def test_broadcast_raw_pushes_to_multiple_queues(self):
         """多订阅者 fan-out：每个队列各收到一份。"""
         bus = EventBus()
-        q1 = bus.create_sse_queue()
-        q2 = bus.create_sse_queue()
-        q3 = bus.create_sse_queue()
+        q1 = await bus.create_sse_queue()
+        q2 = await bus.create_sse_queue()
+        q3 = await bus.create_sse_queue()
 
         bus.broadcast_raw(
             "cross_module_conflict.enqueued",
@@ -130,7 +130,7 @@ class TestBroadcastRawToSseQueue:
     async def test_publish_raw_coexist_in_same_queue(self):
         """同一队列同时承载 EventPayload（publish）+ raw dict（broadcast_raw）。"""
         bus = EventBus(debounce_ms=0)
-        queue = bus.create_sse_queue()
+        queue = await bus.create_sse_queue()
 
         project_id = uuid.uuid4()
 
@@ -159,7 +159,7 @@ class TestBroadcastRawToSseQueue:
     async def test_qfull_zombie_queue_pruned(self):
         """队列满时清理僵尸队列，不阻断业务。"""
         bus = EventBus()
-        queue = bus.create_sse_queue()
+        queue = await bus.create_sse_queue()
         # 把队列填满（maxsize=100）
         for _ in range(100):
             queue.put_nowait({"_raw": True, "event_type": "filler"})
@@ -228,7 +228,7 @@ class TestBroadcastRawRedisStream:
     async def test_broadcast_raw_redis_unavailable_does_not_block(self):
         """Redis 不可用时降级，不阻断 SSE 队列推送。"""
         bus = EventBus()
-        queue = bus.create_sse_queue()
+        queue = await bus.create_sse_queue()
 
         async def _no_redis():
             return None
@@ -263,7 +263,7 @@ class TestEnqueueToSsePipeline:
         previous_queues = list(eb_module.event_bus._sse_queues)
         eb_module.event_bus._sse_queues.clear()
         try:
-            queue = eb_module.event_bus.create_sse_queue()
+            queue = await eb_module.event_bus.create_sse_queue()
 
             project_id = uuid.uuid4()
             conflict_id = uuid.uuid4()

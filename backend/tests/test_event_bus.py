@@ -243,7 +243,7 @@ class TestEventBus:
     async def test_sse_queue_receives_events(self):
         """SSE 队列接收事件"""
         bus = EventBus(debounce_ms=0)
-        queue = bus.create_sse_queue()
+        queue = await bus.create_sse_queue()
 
         payload = EventPayload(
             event_type=EventType.ADJUSTMENT_CREATED,
@@ -259,7 +259,7 @@ class TestEventBus:
     async def test_sse_queue_removal(self):
         """移除 SSE 队列后不再接收事件"""
         bus = EventBus()
-        queue = bus.create_sse_queue()
+        queue = await bus.create_sse_queue()
         bus.remove_sse_queue(queue)
 
         payload = EventPayload(

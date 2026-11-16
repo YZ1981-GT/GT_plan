@@ -61,7 +61,7 @@ async def test_handler_then_xadd_then_live_notify_with_same_id():
     order: list[str] = []
     redis = _Redis()
     bus = _TrackingBus(order)
-    queue = bus.create_sse_queue()
+    queue = await bus.create_sse_queue()
 
     async def handler(_payload: EventPayload) -> None:
         order.append("handler")
@@ -89,7 +89,7 @@ async def test_handler_then_xadd_then_live_notify_with_same_id():
 @pytest.mark.asyncio
 async def test_redis_unavailable_keeps_live_payload_without_fake_id():
     bus = EventBus(debounce_ms=0)
-    queue = bus.create_sse_queue()
+    queue = await bus.create_sse_queue()
     bus._get_redis = AsyncMock(return_value=None)  # type: ignore[method-assign]
     payload = _payload()
     await bus.publish_immediate(payload)
@@ -102,7 +102,7 @@ async def test_redis_unavailable_keeps_live_payload_without_fake_id():
 @pytest.mark.asyncio
 async def test_xadd_failure_is_live_fail_open_and_marks_redis_unavailable():
     bus = EventBus(debounce_ms=0)
-    queue = bus.create_sse_queue()
+    queue = await bus.create_sse_queue()
     bus._redis_available = True
     bus._get_redis = AsyncMock(return_value=_Redis(fail=True))  # type: ignore[method-assign]
     payload = _payload()

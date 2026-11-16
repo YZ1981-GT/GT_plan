@@ -2,7 +2,7 @@
  * useGlobalTableLayout 单元测试
  *
  * 验收点（task 1.2 D-5）：
- * - 切换 displayPrefs.fontSize 后，所有 .el-table 的 doLayout 被调用一次
+ * - 切换 displayPrefs.fontSize 或 density 后，所有 .el-table 的 doLayout 被调用一次
  * - 同时支持 Vue 3 (__vueParentComponent.exposed) 与 Vue 2 (__vue__) 两条路径
  * - 找不到 doLayout 的元素静默跳过，不抛异常
  */
@@ -161,6 +161,20 @@ describe('useGlobalTableLayout', () => {
 
       expect(spy1).toHaveBeenCalledTimes(1)
       expect(spy2).toHaveBeenCalledTimes(1)
+    })
+
+    it('密度切换后也应触发所有 el-table 的 doLayout', async () => {
+      const spy = vi.fn()
+      mountFakeElTableV3(spy)
+
+      withSetup(() => useGlobalTableLayout())
+      const prefs = useDisplayPrefsStore()
+
+      prefs.setDensity('compact')
+      await nextTick()
+      await nextTick()
+
+      expect(spy).toHaveBeenCalledTimes(1)
     })
 
     it('字号未变化时不应调用 doLayout', async () => {

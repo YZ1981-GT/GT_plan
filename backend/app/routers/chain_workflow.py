@@ -304,7 +304,11 @@ async def export_package(
             detail="无法确定项目审计年度，请检查项目配置或手动指定 year 参数",
         )
 
-    from app.services.export_package_service import ConsistencyCheckError, ExportPackageService
+    from app.services.export_package_service import (
+        ConsistencyCheckError,
+        ExportPackageBuildError,
+        ExportPackageService,
+    )
 
     service = ExportPackageService(db)
     try:
@@ -319,6 +323,11 @@ async def export_package(
         raise HTTPException(status_code=400, detail={"message": str(e), "checks": e.checks})
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except ExportPackageBuildError as e:
+        # 🔴 来源拿不到 / 空字节 / placeholder / 缺 policy ⇒ 409（不产出半成品）。
+        # 用 409 而非 500：这是「当前状态无法生成」的业务冲突，不是服务端 bug。
+        logger.warning("组合包构建被拒（fail closed）: %s", e)
+        raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         logger.exception("Export package failed for project %s", project_id)
         raise HTTPException(status_code=500, detail=f"Export package failed: {str(e)}")

@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import require_project_access
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/workpapers/D2",
@@ -52,7 +52,7 @@ async def business_pattern_analysis(
     project_id: UUID,
     body: BusinessPatternRequest | None = None,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("readonly")),
 ):
     """D2 业务模式分析
 
@@ -72,9 +72,18 @@ async def business_pattern_analysis(
     if not project:
         raise HTTPException(404, "项目不存在")
 
-    # Stub 实现：返回基于序时账的模拟分析结果
-    # 真实实现将查询 tb_ledger 按客户辅助核算分组统计付款周期
-    patterns = await _analyze_payment_patterns(db, project_id, body)
+    if project.audit_year is None:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "AUDIT_YEAR_REQUIRED",
+                "message": "项目未设置审计年度，无法分析业务模式",
+            },
+        )
+
+    patterns = await _analyze_payment_patterns(
+        db, project_id, body, year=project.audit_year
+    )
 
     # LLM 建议（stub）
     llm_suggestion = _generate_stub_suggestion(patterns)
@@ -89,66 +98,128 @@ async def _analyze_payment_patterns(
     db: AsyncSession,
     project_id: UUID,
     body: BusinessPatternRequest | None,
+    *,
+    year: int,
 ) -> list[CustomerPattern]:
-    """分析客户付款模式
+    """按项目年度的辅助明细账分析客户付款模式。
 
-    真实实现将：
-    1. 查询 tb_ledger 中 1122（应收账款）科目的辅助核算明细
-    2. 按客户分组，计算平均回款天数
-    3. 按回款天数分类（现销/短期/中期/长期）
-
-    当前为 stub 实现，返回示例数据。
+    客户名称来自 ``tb_aux_balance`` 的辅助余额维度，交易笔数和金额来自
+    ``tb_aux_ledger`` 的辅助明细。两张表按项目、年度、科目、辅助类型和辅助
+    编码关联，不能把辅助字段当成 ``tb_ledger`` 的列读取。
     """
+    import logging
+    from datetime import date
+
     import sqlalchemy as sa
 
+    from app.models.audit_platform_models import TbAuxBalance, TbAuxLedger
+    from app.services.dataset_query import get_active_filter
+
     try:
-        from app.models.audit_platform_models import TbLedger
-        from app.services.dataset_query import get_active_filter
-
-        # 尝试从真实数据获取客户列表
-        active_filter = await get_active_filter(db, TbLedger, project_id, None)
-        result = await db.execute(
-            sa.select(
-                TbLedger.aux_name,
-                sa.func.sum(TbLedger.debit_amount).label("total_debit"),
-                sa.func.count().label("txn_count"),
-            )
-            .where(
-                active_filter,
-                TbLedger.account_code.like("1122%"),
-                TbLedger.aux_name.isnot(None),
-                TbLedger.aux_name != "",
-            )
-            .group_by(TbLedger.aux_name)
-            .order_by(sa.desc("total_debit"))
-            .limit(10)
+        balance_filter = await get_active_filter(
+            db,
+            TbAuxBalance.__table__,
+            project_id,
+            year,
+            strict=True,
         )
-        rows = result.all()
+        ledger_filter = await get_active_filter(
+            db,
+            TbAuxLedger.__table__,
+            project_id,
+            year,
+            strict=True,
+        )
 
-        if rows:
-            patterns = []
-            for row in rows:
-                # 简化的付款周期估算（真实实现需要匹配收款记录）
-                cycle_days = max(30, min(365, int(row.txn_count * 15)))
-                category = _classify_payment_cycle(cycle_days)
-                patterns.append(CustomerPattern(
-                    customer=row.aux_name or "未知客户",
+        stmt = sa.select(
+            TbAuxBalance.aux_name,
+            TbAuxBalance.aux_code,
+            sa.func.sum(TbAuxLedger.debit_amount).label("total_debit"),
+            sa.func.count(TbAuxLedger.id).label("txn_count"),
+        ).select_from(TbAuxLedger).join(
+            TbAuxBalance,
+            sa.and_(
+                TbAuxBalance.project_id == TbAuxLedger.project_id,
+                TbAuxBalance.year == TbAuxLedger.year,
+                TbAuxBalance.account_code == TbAuxLedger.account_code,
+                TbAuxBalance.aux_type == TbAuxLedger.aux_type,
+                TbAuxBalance.aux_code == TbAuxLedger.aux_code,
+                TbAuxBalance.is_deleted == sa.false(),
+            ),
+        ).where(
+            ledger_filter,
+            balance_filter,
+            TbAuxLedger.account_code.like("1122%"),
+            TbAuxBalance.aux_type == "客户",
+            TbAuxBalance.aux_code.isnot(None),
+            TbAuxBalance.aux_name.isnot(None),
+            TbAuxBalance.aux_name != "",
+        ).group_by(
+            TbAuxBalance.account_code,
+            TbAuxBalance.aux_type,
+            TbAuxBalance.aux_code,
+            TbAuxBalance.aux_name,
+        ).order_by(sa.desc("total_debit")).limit(10)
+
+        date_range = body.date_range if body else None
+        if date_range:
+            try:
+                start_date = (
+                    date.fromisoformat(date_range.start_date)
+                    if date_range.start_date
+                    else None
+                )
+                end_date = (
+                    date.fromisoformat(date_range.end_date)
+                    if date_range.end_date
+                    else None
+                )
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "code": "INVALID_DATE_RANGE",
+                        "message": "日期范围格式必须为 YYYY-MM-DD",
+                    },
+                ) from exc
+            if start_date and end_date and start_date > end_date:
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "code": "INVALID_DATE_RANGE",
+                        "message": "开始日期不能晚于结束日期",
+                    },
+                )
+            if start_date:
+                stmt = stmt.where(TbAuxLedger.voucher_date >= start_date)
+            if end_date:
+                stmt = stmt.where(TbAuxLedger.voucher_date <= end_date)
+
+        rows = (await db.execute(stmt)).all()
+        patterns: list[CustomerPattern] = []
+        for row in rows:
+            cycle_days = max(30, min(365, int(row.txn_count * 15)))
+            patterns.append(
+                CustomerPattern(
+                    customer=str(row.aux_name),
                     payment_cycle_days=cycle_days,
-                    category=category,
-                ))
-            return patterns
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).debug("分析客户付款模式失败，回退 stub: %s", e)
-
-    # Fallback: 返回 stub 数据
-    return [
-        CustomerPattern(customer="示例客户A", payment_cycle_days=30, category="现销型"),
-        CustomerPattern(customer="示例客户B", payment_cycle_days=60, category="短期信用"),
-        CustomerPattern(customer="示例客户C", payment_cycle_days=90, category="中期信用"),
-        CustomerPattern(customer="示例客户D", payment_cycle_days=180, category="长期信用"),
-        CustomerPattern(customer="示例客户E", payment_cycle_days=45, category="短期信用"),
-    ]
+                    category=_classify_payment_cycle(cycle_days),
+                )
+            )
+        return patterns
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.getLogger(__name__).exception(
+            "分析客户付款模式失败 [project=%s year=%s]", project_id, year
+        )
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "BUSINESS_PATTERN_QUERY_FAILED",
+                "message": "业务模式分析数据查询失败，请稍后重试",
+            },
+        ) from exc
 
 
 def _classify_payment_cycle(days: int) -> str:

@@ -202,7 +202,12 @@ export function reaggregateSummary(
     ? `写入 ${written.length} 个节点（拉数 ${count('pull')} / 差额 ${count('elim')} / 汇总 ${count('aggregate')}）`
     : `更新 ${res?.sections_updated ?? 0} 个章节`]
   const notWritten = (res?.results || []).find((r) => r.status !== 'persisted')
-  if (notWritten) parts.push(`本节点未更新：${notWritten.reason || '没有可汇总的数据'}`)
+  if (notWritten) {
+    const reason = notWritten.status === 'kept_manual'
+      ? (notWritten.reason || `全部为手工格，汇总值未写入（其中 ${Number(notWritten.manual_differs_count || 0)} 格与汇总值不同）`)
+      : (notWritten.reason || '没有可汇总的数据')
+    parts.push(`本节点未更新：${reason}`)
+  }
   const pending = res?.pending_entities || []
   if (pending.length) {
     const names = pending.slice(0, 3).map((p) => p.label).join('、') + (pending.length > 3 ? ' 等' : '')
@@ -210,7 +215,7 @@ export function reaggregateSummary(
   }
   const failures = res?.failures || []
   if (failures.length) parts.push(`${failures.length} 处出错：${failures[0].error}`)
-  return { ok: !notWritten && !pending.length && !failures.length, text: `重新汇总完成：${parts.join('；')}` }
+  return { ok: !notWritten && !pending.length && !failures.length, text: `${(!notWritten && !pending.length && !failures.length) ? '重新汇总完成' : '重新汇总未完全完成'}：${parts.join('；')}` }
 }
 
 // ─── 单元格「Σ 汇总」结果 ──────────────────────────────────────────────────────

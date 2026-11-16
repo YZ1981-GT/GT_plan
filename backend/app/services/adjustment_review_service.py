@@ -17,6 +17,7 @@ from app.models.audit_platform_schemas import ReviewStatusChange
 from app.services import adjustment_hall_notify as notify
 from app.services.adjustment_service import AdjustmentService
 from app.services.adjustment_review_coordinator import AdjustmentReviewCoordinator
+from app.services.workpaper_sync.outbox import PendingPublication
 from app.services import adjustment_review_task_service as review_tasks
 
 _STATUS_LABEL = {
@@ -211,6 +212,7 @@ async def review_groups(
     coordinator = AdjustmentReviewCoordinator(db)
     done: list[dict] = []
     failed: list[dict] = []
+    publications: list[PendingPublication] = []
 
     for gid in dict.fromkeys(group_ids):
         rows = await svc._get_group_rows(project_id, gid)
@@ -239,6 +241,7 @@ async def review_groups(
                     reason=decision_reason or None,
                 )
                 info = decision.info
+                publications.extend(decision.publications)
             done.append(info)
         except Exception as exc:  # noqa: BLE001 — 每笔保存点隔离，核心失败不得批准
             failed.append({
@@ -251,7 +254,12 @@ async def review_groups(
     notified = await notify.notify_status_change(
         db, project_id, done, actor_id=actor.id, actor_name=await _actor_name(db, actor),
     )
-    return {"succeeded": done, "failed": failed, "notified": notified}
+    return {
+        "succeeded": done,
+        "failed": failed,
+        "notified": notified,
+        "_publish_handles": tuple(publications),
+    }
 
 
 async def notify_single_change(db: AsyncSession, project_id: UUID, info: dict, *, actor: Any, reason: str | None = None) -> list[dict]:

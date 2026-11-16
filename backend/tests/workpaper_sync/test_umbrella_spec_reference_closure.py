@@ -247,6 +247,57 @@ def test_archive_citation_predicate_is_falsifiable() -> None:
     assert _cites_archive_as_completion(plain) is False
 
 
+#: tasks.md 的 Phase 标题形态：`## Phase <N>：<标题>`（中文全角冒号）。
+#: 🔴 这不是排版偏好 —— 仓库里有消费方按「Phase 标题形态」定位任务所属阶段
+#: （task68/69 那批独立回归门与 AC coverage matrix 都按 Wave 6 形态解析），
+#: 把 `## Phase 0：…` 改成 `## 阶段 0：…` 会让它们**静默找不到阶段**。
+#: 0.5 要求的第二组变异就是这条：改形态必须有判据打红。
+_PHASE_HEADING = re.compile(r"^## Phase (?P<num>\d+)：(?P<title>\S.*)$", re.MULTILINE)
+
+
+def _phase_headings(text: str | None = None) -> list[tuple[int, str]]:
+    body = TASKS.read_text(encoding="utf-8") if text is None else text
+    return [(int(m.group("num")), m.group("title")) for m in _PHASE_HEADING.finditer(body)]
+
+
+def test_phase_headings_keep_the_machine_parseable_shape() -> None:
+    """Phase 标题必须保持 `## Phase <N>：<标题>` 形态，且编号从 0 连续递增。
+
+    判据不是「有几个 Phase」，而是「形态与编号连续性」—— 后者才是消费方真正依赖的。
+    分母非空断言防止这条在文档改版后变成空集恒绿。
+    """
+    headings = _phase_headings()
+    assert headings, (
+        "tasks.md 里一条 `## Phase <N>：<标题>` 都没解析出来 —— 形态已变，"
+        "按阶段定位的消费方（task68/69 独立回归门、AC coverage matrix）会静默找不到阶段"
+    )
+    numbers = [n for n, _ in headings]
+    assert numbers == list(range(len(numbers))), (
+        f"Phase 编号必须是 0..N 连续递增，实际 {numbers} —— "
+        "缺号或跳号会让「按 Phase 归类任务」的消费方算错分母"
+    )
+    assert all(title.strip() for _, title in headings), "Phase 标题不得为空"
+
+
+def test_phase_heading_predicate_is_falsifiable() -> None:
+    """形态判据两个方向都要对：合法形态命中、改掉形态后**必须**命中不到。"""
+    good = "## Phase 3：前端模式与可操作原因单一来源\n- [x] 3.1 某任务\n"
+    assert _phase_headings(good) == [(3, "前端模式与可操作原因单一来源")], (
+        "合法 Phase 形态竟解析不出"
+    )
+    # 0.5 规定的变异形态：把「Phase」改成中文「阶段」
+    mutated = good.replace("## Phase 3：", "## 阶段 3：")
+    assert _phase_headings(mutated) == [], (
+        "Phase 标题改成「阶段」后仍被解析出来 ⇒ 形态判据对这类改动不敏感"
+    )
+    # 另一个真实变体：去掉全角冒号
+    no_colon = good.replace("## Phase 3：", "## Phase 3 ")
+    assert _phase_headings(no_colon) == [], "去掉全角冒号后仍被解析出来 ⇒ 判据太松"
+    # 第三个变体：Phase 换成小写（消费方正则大小写敏感）
+    lower = good.replace("## Phase 3", "## phase 3")
+    assert _phase_headings(lower) == [], "小写 phase 仍被解析出来 ⇒ 判据太松"
+
+
 def test_completion_count_in_the_header_matches_the_checkboxes() -> None:
     """标题里的 `N/M` 必须与实际勾选数一致 —— 手改任一侧都要打红。"""
     text = TASKS.read_text(encoding="utf-8")
@@ -284,9 +335,10 @@ SPEC_NAME = "workpaper-html-onlyoffice-bidirectional-writeback-closure"
 _DOC_NAMES = ("requirements.md", "tasks.md", "design.md")
 _DISCOVERY_ROOTS = ("backend/scripts", "backend/app", "backend/tests")
 _ALLOWED_STATUS = {"ok", "retired", "registered_unreviewed"}
-#: `registered_unreviewed` 只许变少。写下它时现算 26 条；2026-11-04 test_task20 / test_task30 /
-#: 里程碑用例的判据层拆出并逐个复核（换成 3 条 ok），里程碑生成器移到 `outside_discovery` ⇒ 23。
-_UNREVIEWED_CEILING = 23
+#: `registered_unreviewed` 只许变少。轨迹：26（首建）→ 23（2026-11-04 判据层拆出 +
+#: 里程碑生成器移出）→ **12**（2026-11-15 逐条复核：11 条改判 ok、2 条移入 outside_discovery、
+#: 2 条新增发现后合计净减 11）。余下 12 条每条都写明了**断在哪份文档的哪个锚点**。
+_UNREVIEWED_CEILING = 12
 
 
 def _non_docstring_str_constants(source: str) -> set[str]:
@@ -437,22 +489,51 @@ def test_unreviewed_consumers_only_shrink(registry: dict) -> None:
     )
 
 
+#: 「按内容标记定位快照」的**等价实现形态**。两种都必须被认，否则判据会把一个正确实现
+#: 判成缺陷（2026-11-15 实测：`check_task70…gate.py` 走 `spec_doc(...)` 与
+#: `resolve_spec_dir(require_matches=…)` 是同一能力，只是入口名不同 —— 第四批把环境/路径
+#: 解析拆到 `_task70_gate_env.py` 时起的名）。
+#:
+#: 判据是「真的按内容择路」，不是「调用某个特定函数名」。所以两种形态各自要求：
+#:   ① 有内容判别参数（`require_matches=` 或 `must_contain=`）
+#:   ② 有择路调用（`resolve_spec_dir(` 或 `spec_doc(`）
+_BY_CONTENT_FORMS: tuple[tuple[str, str], ...] = (
+    ("resolve_spec_dir", "require_matches"),
+    ("spec_doc(", "must_contain"),
+)
+
+#: 显式钉死一个已知快照的实现形态（与「按内容择路」并列合法，但不能混记）。
+_HARDCODED_ARCHIVE = "hardcoded_archive_path"
+
+
+def _binds_by_content(source: str) -> bool:
+    return any(
+        call in source and kwarg in source for call, kwarg in _BY_CONTENT_FORMS
+    )
+
+
 def test_ok_frozen_consumers_bind_by_content_not_by_hardcoded_path(registry: dict) -> None:
     """判 `ok` 的 Wave 6 消费方必须按**内容标记**定位快照，不得写死 active 路径。
 
     写死 active 的那一版，报的是「tasks.md 里找不到 Task 68」这种**指错地方**的错误：
     契约没丢，它在归档快照里。
+
+    🔴 2026-11-15 口径修正：原实现只认 `resolve_spec_dir` + `require_matches` 一对字符串，
+    于是 `check_task70…gate.py`（走 `spec_doc(..., must_contain=...)`）被误判成缺陷。
+    改为认**两种等价形态**（见 `_BY_CONTENT_FORMS`），并要求每条都**真有一个内容判别参数**
+    —— 放宽的是「函数名」，收紧的是「必须真的按内容判」，不是把判据变松。
     """
     offenders: list[str] = []
     for rel, row in registry["consumers"].items():
         if row["status"] != "ok" or row["contract_kind"] != "frozen_wave6":
             continue
         source = (ROOT / rel).read_text(encoding="utf-8", errors="replace")
-        if "resolve_spec_dir" not in source or "require_matches" not in source:
+        if not _binds_by_content(source):
             offenders.append(rel)
     assert not offenders, (
         "以下 Wave 6 消费方标了 ok 却没按内容标记绑定快照：\n"
         + "\n".join(f"  {rel}" for rel in offenders)
+        + f"\n认的形态：{_BY_CONTENT_FORMS}"
     )
     ok_frozen = [
         rel
@@ -460,6 +541,59 @@ def test_ok_frozen_consumers_bind_by_content_not_by_hardcoded_path(registry: dic
         if row["status"] == "ok" and row["contract_kind"] == "frozen_wave6"
     ]
     assert len(ok_frozen) >= 6, f"ok 的 Wave 6 消费方只有 {len(ok_frozen)} 个 ⇒ 判据失锚"
+
+
+def test_by_content_forms_are_both_recognised_and_neither_is_a_free_pass() -> None:
+    """两种等价形态都要真被认，且**缺内容判别参数**时必须判否。
+
+    这是上一条的**双向自检**：只测「合法形态通过」会让判据退化成恒真。
+    """
+    resolver_form = (
+        "from _spec_dir import resolve_spec_dir\n"
+        "p = resolve_spec_dir(SPEC, require_files=['tasks.md'], "
+        "require_matches={'tasks.md': (r'^7\\.7\\.',)})\n"
+    )
+    spec_doc_form = (
+        "from _task70_gate_env import spec_doc\n"
+        "p = spec_doc(REPO, SPEC, 'tasks.md', must_contain=r'^\\s*-\\s\\[[ x~\\-]\\]\\s+70\\.')\n"
+    )
+    assert _binds_by_content(resolver_form), "resolve_spec_dir 形态竟不被认"
+    assert _binds_by_content(spec_doc_form), "spec_doc 形态竟不被认"
+
+    # 反向：只有调用、没有内容判别参数 ⇒ 那是「随便选一个目录」，不是按内容择路
+    no_predicate = "p = resolve_spec_dir(SPEC, require_files=['tasks.md'])\n"
+    assert not _binds_by_content(no_predicate), (
+        "只传 require_files 没有内容判别参数竟被判为按内容择路 —— "
+        "这正是 0.6 修的那 12 个脚本原来的缺陷形态"
+    )
+    hardcoded = "SPEC_DIR = REPO / '.kiro' / 'specs' / SPEC\nTASKS = SPEC_DIR / 'tasks.md'\n"
+    assert not _binds_by_content(hardcoded), "写死 active 路径竟被判为按内容择路"
+
+
+def test_hardcoded_archive_consumers_really_pin_the_archive(registry: dict) -> None:
+    """标 `hardcoded_archive_path` 的消费方必须**真的**指向 `_archive/`，且锚点自检通过。
+
+    这一类的合法前提是「它就是要钉死某个已知快照」（变异脚本要对着冻结靶点注入），
+    不是「懒得择路」。所以断言它的路径字面量含 `_archive/`，否则就是把缺陷记成了合法形态。
+    """
+    rows = {
+        rel: row
+        for rel, row in registry["consumers"].items()
+        if row["contract_kind"] == _HARDCODED_ARCHIVE
+    }
+    assert rows, (
+        "一条 hardcoded_archive_path 都没有 —— 若该类真的不存在，请连同这条判据一起删，"
+        "不要留一条在空集上恒绿的判据"
+    )
+    offenders = []
+    for rel in rows:
+        source = (ROOT / rel).read_text(encoding="utf-8", errors="replace")
+        if "_archive/" not in source:
+            offenders.append(rel)
+    assert not offenders, (
+        "以下消费方标了 hardcoded_archive_path 却没有 `_archive/` 路径字面量：\n"
+        + "\n".join(f"  {rel}" for rel in offenders)
+    )
 
 
 def test_frozen_contract_snapshot_really_carries_the_legacy_shape() -> None:

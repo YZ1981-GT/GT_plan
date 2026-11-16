@@ -439,6 +439,22 @@ async def restore_item(
         raise HTTPException(status_code=404, detail="记录不存在或未被删除")
     await _authorize_row(db, user, item_type, row)
 
+    if item_type == ATTACHMENT_TYPE:
+        # 永久删除服务也会锁同一附件根行。恢复先拿锁并重读状态，避免
+        # purge 已经锁住后仍把同一对象恢复，或恢复提交后被旧对象物理删除。
+        row = (
+            await db.execute(
+                select(model)
+                .where(model.id == item_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            raise HTTPException(status_code=409, detail="附件已被永久删除，请刷新回收站")
+        if not row.is_deleted:
+            raise HTTPException(status_code=409, detail="附件已被其他操作恢复，请刷新回收站")
+
     if item_type == WORKPAPER_TYPE:
         await _restore_workpaper(db, user, row)
         await db.commit()
@@ -540,11 +556,32 @@ async def permanently_delete(
     if item_type == ATTACHMENT_TYPE:
         # 归档 423 / 法定保全 423 / 仍被引用 409，对管理员同样生效（spec attachment-security-baseline 需求 4.3）
         from app.services.attachment_destructive_guard import assert_destructible
+        from app.services.attachment_permanent_delete_service import (
+            AttachmentPurgeBlocked,
+            permanently_delete_attachment,
+        )
 
         await assert_destructible(db, user, row, operation="purge")
+        try:
+            purged = await permanently_delete_attachment(db, row)
+        except AttachmentPurgeBlocked as exc:
+            raise HTTPException(status_code=409, detail={
+                "error_code": "ATTACHMENT_IN_USE",
+                "message": str(exc),
+            }) from exc
+        await db.commit()
+        cleanup = await _unlink_purged_files(db, purged.file_refs)
+        return {
+            "message": f"{label}已永久删除" + _cleanup_message(cleanup),
+            "id": str(item_id),
+            "file_cleanup": cleanup,
+        }
 
     if item_type == "project":
-        await _cascade_delete_project(db, item_id)
+        # 🔴 原写 `_cascade_delete_project(db, item_id)` 在全仓根本不存在
+        #    （只有这一处引用）⇒ 这个分支一调就 NameError。正确入口是
+        #    同文件 `_purge_project_in_current_transaction`（已在批量删除路径上使用）。
+        await _purge_project_in_current_transaction(db, user, item_id)
     elif item_type == "adjustment":
         group_id, deleted_rows = await _purge_adjustment_group(db, row)
         await db.commit()
@@ -598,7 +635,12 @@ async def batch_permanently_delete(
     for row in rows:
         await _authorize_row(db, user, item_type, row)
     if item_type == ATTACHMENT_TYPE:
-        return await _batch_purge_attachments(db, user, rows, body.ids)
+        from app.services.attachment_permanent_delete_service import batch_purge_attachments
+
+        result, file_refs = await batch_purge_attachments(db, user, rows, body.ids)
+        await db.commit()
+        result["file_cleanup"] = await _unlink_purged_files(db, file_refs)
+        return result
     if item_type == "project":
         await _lock_deleted_projects_for_purge(db, list(rows))
     if item_type == "adjustment":
@@ -627,42 +669,11 @@ async def batch_permanently_delete(
     result = await bulk_hard_delete(db, model, body.ids, filter_deleted=True)
     await db.commit()
     return result
-
-
-async def _batch_purge_attachments(db: AsyncSession, user: User, rows, ids: list[UUID]) -> dict:
-    """批量永久删除附件：归档 / 保全 / 仍被引用的跳过，回执按原因计数（需求 4.3）。"""
-    from app.services.attachment_destructive_guard import SKIP_REASONS, partition_purgeable, skipped_summary
-
-    purgeable, skipped = await partition_purgeable(db, user, rows)
-    skipped_ids = {row.id for skipped_rows in skipped.values() for row in skipped_rows}
-    from app.services.attachment_storage_resolver import StoredAttachmentRef
-
-    file_refs = [StoredAttachmentRef(row.project_id, row.storage_type, row.file_path) for row in purgeable]
-    model = _get_recyclable_tables()[ATTACHMENT_TYPE][0]
-    result = await bulk_hard_delete(db, model, [i for i in ids if i not in skipped_ids], filter_deleted=True)
-    for reason, skipped_rows in skipped.items():
-        result["failed"].extend({"id": str(row.id), "error": SKIP_REASONS[reason]} for row in skipped_rows)
-    result["fail_count"] = len(result["failed"])
-    result["total"] = len(ids)
-    result["skipped"] = skipped_summary(skipped)
-    await db.commit()
-    # 没删成的行仍引用自己的文件 ⇒ 引用检查会保留它（不必再按回执筛）
-    result["file_cleanup"] = await _unlink_purged_files(db, file_refs)
-    return result
-
-
 async def _purge_deleted_attachments(db: AsyncSession, user: User):
-    """清空附件：只删可删行，并返回带项目作用域的存储引用供提交后清理。"""
-    from app.models.attachment_models import Attachment
-    from app.services.attachment_destructive_guard import partition_purgeable, skipped_summary
-    from app.services.attachment_storage_resolver import StoredAttachmentRef
+    """清空附件服务委托；提交和物理文件清理仍由路由统一负责。"""
+    from app.services.attachment_permanent_delete_service import purge_deleted_attachments
 
-    rows = (await db.execute(select(Attachment).where(Attachment.is_deleted == True))).scalars().all()  # noqa: E712
-    purgeable, skipped = await partition_purgeable(db, user, rows)
-    if purgeable:
-        await db.execute(delete(Attachment).where(Attachment.id.in_([row.id for row in purgeable])))
-    refs = [StoredAttachmentRef(row.project_id, row.storage_type, row.file_path) for row in purgeable]
-    return len(purgeable), skipped_summary(skipped), refs
+    return await purge_deleted_attachments(db, user)
 
 
 @router.post("/empty")
@@ -761,6 +772,9 @@ async def empty_recycle_bin(
                 await _purge_adjustment_group(db, anchor)
                 deleted_count += 1
             continue
+        # 🔴 原写直接用 `savepoint` 却从未 `begin_nested()` ⇒ NameError。
+        #    按同文件 `_batch_purge_projects` 的形式补上保存点。
+        savepoint = await db.begin_nested()
         try:
             result = await db.execute(delete(model).where(model.is_deleted == True))  # noqa: E712
             count = int(result.rowcount or 0)

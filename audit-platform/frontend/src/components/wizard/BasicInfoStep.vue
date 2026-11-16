@@ -797,6 +797,12 @@ defineExpose({ validate, formRef })
 /* 业务类型参考链接 */
 .gt-category-ref-link { margin-left: 8px; font-size: 12px; }
 
+/* 下拉框文字与输入框同字号：Element Plus 的 .el-select__wrapper 写死 14px，
+   输入框则跟随全局字号（--el-font-size-base），两者并排时下拉框显得偏大 */
+.gt-basic-info-step :deep(.el-select__wrapper) {
+  font-size: var(--el-select-font-size, var(--el-font-size-base));
+}
+
 /* 上级代码 = 本企业代码时的说明 */
 .gt-self-ref-hint {
   width: 100%;

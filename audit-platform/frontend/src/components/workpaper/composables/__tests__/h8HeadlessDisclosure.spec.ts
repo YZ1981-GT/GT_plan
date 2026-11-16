@@ -67,7 +67,8 @@ describe('h8HeadlessProvider', () => {
     expect(cfg).toMatchObject({ _silent: true })
     expect(JSON.stringify(sent)).toBe(JSON.stringify((await tabPayloads('listed', ['listed_standalone']))[0]))
     const rows = Object.values(sent.sub_table_data)[0] as Array<Record<string, unknown>>
-    expect(rows.find((r) => r.label === '1.期初余额')?.buildings).toBe(800)
+    // 行键 = 列键 = 类别名本身（中文），与模板 seed 的 headers 同键
+    expect(rows.find((r) => r.label === '1.期初余额')?.['房屋及建筑物']).toBe(800)
   })
 
   it('国企：载荷与 Tab 同一快照函数 + builder 逐字节相同', async () => {

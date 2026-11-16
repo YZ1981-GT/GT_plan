@@ -33,7 +33,11 @@ class MisstatementSummaryService:
                 UnadjustedMisstatement.prior_year_status != "reversed",
                 sa.or_(Adjustment.id.is_(None), Adjustment.project_id == project_id),
             )
-            .order_by(UnadjustedMisstatement.created_at, UnadjustedMisstatement.id)
+            .order_by(
+                UnadjustedMisstatement.created_at,
+                sa.func.coalesce(UnadjustedMisstatement.misstatement_description, ""),
+                UnadjustedMisstatement.id,
+            )
         )
         return list(result.all())
 

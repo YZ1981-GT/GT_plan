@@ -32,7 +32,7 @@ def _make_stats(note_status: str, refreshed: int = 0, failed: int = 0, skipped: 
     ("persisted", "succeeded", True),
     ("partial", "partial", False),
     ("failed", "failed", False),
-    ("skipped", "succeeded", True),  # skipped = 合法无可刷目标，不降级
+    ("skipped", "skipped", True),  # 合法跳过保留 skipped，不伪装成成功
 ])
 async def test_note_status_propagates_to_step_and_all_ok(note_status, expected_step_status, expected_all_ok):
     """_push_one 消费 notes() 的结构化 note_status，正确设置步骤状态和 all_ok。"""
@@ -97,3 +97,26 @@ async def test_mutation_proof_old_logic_would_always_succeed():
     # 如果 for 循环仍用旧逻辑 `record(step, "succeeded", detail)`，
     # 那么即使 detail 包含"失败 6"和"附注状态=failed"，步骤仍标 succeeded
     # 这就是 CP-03 缺陷——状态误报
+
+
+@pytest.mark.parametrize(
+    ("reason", "expected_status"),
+    [
+        ("no_template_type", "skipped"),
+        ("no_sections", "skipped"),
+        ("no_tree", "skipped"),
+        ("context_failed", "failed"),
+    ],
+)
+def test_note_step_verdict_distinguishes_skip_reasons(reason, expected_status):
+    from app.services.consol_push_notes import note_step_verdict
+
+    status, detail = note_step_verdict({"note_status": "skipped", "skip_reason": reason})
+    assert status == expected_status
+    labels = {
+        "no_template_type": "无法确定附注模板类型",
+        "no_sections": "模板没有启用的章节",
+        "no_tree": "没有可用的企业树",
+        "context_failed": "合并计算上下文构建失败",
+    }
+    assert labels[reason] in detail

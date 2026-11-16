@@ -889,10 +889,18 @@ describe('CP05 reload, response identity and latest navigation', () => {
   it.each(['fill', 'aggregate'])('late %s persisted reload cannot notify or overwrite the new dirty view', async (operation) => {
     const w = await loaded(), pending = deferred()
     service.fillConsolNoteByFormula.mockResolvedValue({ filled: 1, kept: 0, blank: [], details: [] })
-    api.post.mockResolvedValue({ sections_updated: 1, sections_processed: 1 })
+    api.post.mockResolvedValue(operation === 'aggregate'
+      ? { accepted: true, job_id: 'job-1' }
+      : { sections_updated: 1, sections_processed: 1 })
     let oldReload = true
     api.get.mockImplementation((url: string) => {
       if (url.includes('/cell-comments/')) return Promise.resolve([])
+      if (url.includes('/platform-jobs/')) {
+        return Promise.resolve({
+          status: 'succeeded',
+          result_ref: { result: { sections_updated: 1, sections_processed: 1, nodes: [], results: [], pending_entities: [], failures: [] } },
+        })
+      }
       if (url.includes('/data/')) {
         if (oldReload) { oldReload = false; return pending.promise }
         return Promise.resolve({ content: {}, node_key: 'G:consol' })
@@ -1024,11 +1032,32 @@ describe('重新汇总 = 节点子树逐节点更新 + 自下而上汇总（spec
       if (url.includes('/data/')) return { content: { headers, rows: [['汇总后', '1']] }, node_key: 'G:consol' }
       return section('soe')
     })
-    api.post.mockResolvedValue({
-      sections_updated: 1, sections_processed: 1,
-      nodes: [node('G:consol', 'aggregate', 1), node('G:consol_elim', 'elim', 0), node('A:subsidiary', 'pull', 1)],
-      results: [{ section_id: '五-5-2', node_key: 'G:consol', action: 'aggregate', status: 'persisted', reason: null }],
-      pending_entities: [], failures: [],
+    api.post
+      .mockResolvedValueOnce({ accepted: true, job_id: 'job-2' })
+      .mockResolvedValueOnce({ accepted: true, job_id: 'job-3' })
+    api.get.mockImplementation(async (url: string) => {
+      if (url.includes('/cell-comments/')) return []
+      if (url.includes('/platform-jobs/')) {
+        const result = url.includes('job-2')
+          ? {
+              sections_updated: 1,
+              sections_processed: 1,
+              nodes: [node('G:consol', 'aggregate', 1), node('G:consol_elim', 'elim', 0), node('A:subsidiary', 'pull', 1)],
+              results: [{ section_id: '五-5-2', node_key: 'G:consol', action: 'aggregate', status: 'persisted', reason: null }],
+              pending_entities: [], failures: [],
+            }
+          : {
+              sections_updated: 0,
+              sections_processed: 1,
+              nodes: [node('G:consol', 'aggregate', 0)],
+              results: [{ section_id: '五-5-2', node_key: 'G:consol', action: 'aggregate', status: 'skipped', reason: '下级企业都没有可汇总的单体附注数据' }],
+              pending_entities: [{ node_key: 'B:subsidiary', label: '乙公司', section_count: 1, sections: ['五-5-2'], reasons: ['未确认映射'] }],
+              failures: [],
+            }
+        return { status: 'succeeded', result_ref: { result } }
+      }
+      if (url.includes('/data/')) return { content: { headers, rows: [['汇总后', '1']] }, node_key: 'G:consol' }
+      return section('soe')
     })
     expect((await exposed(w).handleReaggregate()).status).toBe('done')
     expect(api.post).toHaveBeenCalledWith(expect.stringContaining('/reaggregate'),
@@ -1036,16 +1065,9 @@ describe('重新汇总 = 节点子树逐节点更新 + 自下而上汇总（spec
     expect(message.success).toHaveBeenCalledWith('重新汇总完成：写入 2 个节点（拉数 1 / 差额 0 / 汇总 1）')
 
     message.success.mockClear()
-    api.post.mockResolvedValue({
-      sections_updated: 0, sections_processed: 1, nodes: [node('G:consol', 'aggregate', 0)],
-      results: [{ section_id: '五-5-2', node_key: 'G:consol', action: 'aggregate', status: 'skipped',
-        reason: '下级企业都没有可汇总的单体附注数据' }],
-      pending_entities: [{ node_key: 'B:subsidiary', label: '乙公司', section_count: 1, sections: ['五-5-2'], reasons: ['未确认映射'] }],
-      failures: [],
-    })
     await exposed(w).handleReaggregate()
     expect(message.success).not.toHaveBeenCalled()
-    expect(message.warning).toHaveBeenCalledWith('重新汇总完成：写入 0 个节点（拉数 0 / 差额 0 / 汇总 0）；'
+    expect(message.warning).toHaveBeenCalledWith('重新汇总未完全完成：写入 0 个节点（拉数 0 / 差额 0 / 汇总 0）；'
       + '本节点未更新：下级企业都没有可汇总的单体附注数据；1 家企业待在「📋 明细映射」确认映射（乙公司）')
   })
 })
@@ -1170,5 +1192,49 @@ describe('勾稽校验按当前节点读取（R7.5）', () => {
     const calls = checkCalls()
     expect(calls).toHaveLength(1)
     expect((calls[0] as [string, any])[1].params).toEqual({ template_type: 'soe', node_key: 'G:consol' })
+  })
+})
+
+
+describe('合并附注待更新原因标签', () => {
+  it('持久化 stale 返回原因与时间时显示标签', async () => {
+    api.get.mockImplementation(async (url: string) => {
+      if (url.includes('/cell-comments/')) return []
+      if (url.includes('/data/')) {
+        return {
+          content: {}, node_key: 'G:consol', is_stale: true,
+          stale_reason: 'consol_push', stale_reason_label: '合并推送后待按最新合并数更新',
+          stale_at: '2026-11-12T08:30:00Z',
+        }
+      }
+      return section('soe')
+    })
+    const w = await loaded()
+    const tag = w.find('[data-testid="consol-note-stale-tag"]')
+    expect(tag.exists()).toBe(true)
+    expect(tag.text()).toContain('待更新：合并推送后待按最新合并数更新')
+    expect(tag.text()).toContain('2026')
+  })
+
+  it('fresh 或未知原因按契约隐藏 / 显示历史标记', async () => {
+    api.get.mockImplementation(async (url: string) => {
+      if (url.includes('/cell-comments/')) return []
+      if (url.includes('/data/')) return { content: {}, node_key: 'G:consol', is_stale: false }
+      return section('soe')
+    })
+    const fresh = await loaded()
+    expect(fresh.find('[data-testid="consol-note-stale-tag"]').exists()).toBe(false)
+    fresh.unmount()
+
+    api.get.mockImplementation(async (url: string) => {
+      if (url.includes('/cell-comments/')) return []
+      if (url.includes('/data/')) return {
+        content: {}, node_key: 'G:consol', is_stale: true,
+        stale_reason: 'future_code', stale_reason_label: null,
+      }
+      return section('soe')
+    })
+    const unknown = await loaded()
+    expect(unknown.find('[data-testid="consol-note-stale-tag"]').text()).toContain('历史标记')
   })
 })

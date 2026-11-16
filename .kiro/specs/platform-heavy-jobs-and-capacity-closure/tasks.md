@@ -47,7 +47,7 @@
 - [x] A3 前端底稿批量下载切异步任务、展示真实进度/失败/下载，不再同步等待整包。
 - [x] A4 bulk import 先落 spool，只传路径；增加全局/用户/项目并发与内存预算。
 - [x] A5 LibreOffice 唯一 profile、communicate、排队上限/acquire timeout、Retry-After 与指标。
-- [ ] A6 流式下载提前释放 DB，会话与文件句柄在取消时及时关闭。
+- [~] A6 流式下载提前释放 DB，会话与文件句柄在取消时及时关闭。
   - 已完成：附件、底稿 ZIP、bulk SSE/下载、chain/ledger SSE、doc AI 外层 session、
     `wp_chat`（请求内 prepare_chat + 项目权限，流期纯 LLM）、`working_paper`/`wp_download`
     的单件 `FileResponse` 与打包下载、`wp_template_download`、`wp_xlsx_export`、
@@ -64,6 +64,18 @@
   - 勘误（2026-11-06 整体复核，AST 现扫，现算值禁写死）：返回 StreamingResponse / FileResponse 的路由共 213 个，
     已 function-scope 21、不取 DB 51，**仍为请求级 `Depends(get_db)` 的候选 141 个**——上条「少量历史路由」
     低估了规模，余量是跨 100+ 路由的系统性迁移，每条都要先判响应期是否仍读 DB。
+  - **2026-11-16 更新（棘轮守卫已建，`[ ]`→`[~]`）**：新建 `backend/scripts/check/check_streaming_db_scope.py`
+    + 冻结基线 `backend/data/streaming_db_scope_baseline.json`。**现算口径更新**：AST 扫 `backend/app/`
+    得 **112 个候选**（比上条 141 少 29，因为期间已有 47 个路由迁到 function-scope 或不取 DB）；
+    `--check` 现跑 **exit 0**。守卫保证三件事：①候选数**只减不增**（新增流式路由必须一开始就
+    function-scope，否则点名报出）；②基线缺失即失败（不能静默退化成「无候选」）；③基线**不得虚高**
+    （`_MAX_BASELINE_INFLATION=5`，防「改大基线蒙过关」）；`--write` 在候选增加时**拒绝写盘**。
+    **为什么冻结而不是硬修**：112 条跨 100+ 文件，每条都要先判「响应生成器是否仍读 DB」
+    （读 DB 的不能简单改 scope，否则响应期拿不到数据），属独立 spec 工作量；
+    按 memory ㉗③「规模超单轮能力时冻结棘轮而非硬修」。
+    **验证**：`test_streaming_db_scope_ratchet.py` 11 例（基线非空/字段完整/扫描器真命中/
+    `--check` 通过/基线缺失失败/候选增加失败/基线虚高失败/`--write` 拒绝上调/tasks.md 有登记）。
+    **仍未做**：逐条迁移（本批只冻结与守护）、真实大文件并发下的连接池对账。
 - [x] A7 同输入验证文件 SHA/ZIP 清单/导入摘要不变，并测并发时 health/event-loop lag。
 
 ## 批 B 耐久任务
@@ -132,8 +144,8 @@
     新增 `mutate_note_by_id` 变体 + `disclosure_engine.update_note` 切至内核（保留 pushed_row_violations
     409 / note_edit_stamp 戳章语义，135 passed = pushed_row_guard + edit_stamp + ai_fill + section_write_kernel
     + module_attr + disclosure_notes_hardening）。
-  - 🔴 未完成：`note_followup` / 合并附注写入方尚未切到新内核；真实 PG 并发 barrier 必须在专用环境里
-    跑双连接重叠章节用例验证，保持未勾。
+  - ✅ 2026-11-15 补：**`note_followup` 链已取章节级 advisory 锁**。`note_section_write_kernel` 新增只取锁入口 `acquire_section_lock`（不读不写、不 deepcopy；非 PG 返回 False 不抛），`note_workpaper_pull_service._apply_note_formulas` 在 `db.begin_nested()` 内、`execute_note_formulas` **之前**逐章节取锁 ⇒ 同 `(project, year, section)` 的并发刷新/推送串行，不同章节仍并行；SAVEPOINT 只管失败隔离、不管并发的缺口补齐。顺带修内核健壮性：原先直接访问 `db.bind.dialect`，遇无 `bind` 的 session 替身（`test_note_workpaper_pull_service._NestedDb`）整条链抛 AttributeError 并被误记成「公式执行失败」⇒ 抽 `_dialect_name(db)` 用 `getattr` 兜底，非 PG 一律 no-op。守卫 `test_note_followup_section_lock_wiring.py`（4 例，AST 判「真调用 / 在公式执行之前 / 在 sections 循环内 / 内核有只取锁入口」），磁盘变异删锁调用 **3/3 RED**、逐字节还原。选集 25 passed（锁接线 + pull service + write kernel）+ 前一轮 30 passed。
+  - 🔴 仍未完成：**真实 PG 并发 barrier**（双连接重叠章节用例）必须在专用可销毁 PG 上跑，本机无法伪造，保持未勾；合并附注（C3）的差额节点与整章批取同属该项。
   - 2026-11-06 复核：未接内核的写入链具体是 `formula_push.note_followup →
     note_workpaper_pull_service._apply_note_formulas → note_formula_generator.execute_note_formulas`，
     仍直接改 `DisclosureNote.table_data` + `flag_modified` / flush，无章节 advisory lock。
@@ -200,14 +212,27 @@
   - 🔴 需部署环境（PgBouncer 进程 + 真实后端 + RLS/SET LOCAL 验证），本机无法伪造，保持阻塞。
   - 2026-11-06 复核：仓库里没有灰度脚本；Compose 的 backend 仍直连 PG、单 worker，PgBouncer 服务存在但
     不在默认数据路径上。
-- [ ] E2 EventBus、任务、配额、进度和失效状态外置；2/4/8 worker 零丢失/零重复验证。
+- [~] E2 EventBus、任务、配额、进度和失效状态外置；2/4/8 worker 零丢失/零重复验证。
   - 🔴 platform_jobs / AI tasks 已 DB 耐久，SSE 跨标签已共享；但 EventBus、配额和失效状态仍有进程内部分，
     尚未完成跨 worker 外置和 2/4/8 worker 验证。2026-11-06 增量：接口骨架落地
     `app/services/event_bus_state_adapter.py`（`EventBusStateAdapter` ABC + `InMemoryEventBusStateAdapter`
     默认实现 + `install_event_bus_state_adapter` / `get_event_bus_state_adapter` /
     `reset_event_bus_state_adapter` 注入 hook）：debounce pending + per-project SSE quota 两面可注入；
-    内存默认实现与当前 `EventBus._pending` 行为等价。11 单测全绿。EventBus / platform_jobs 真实切到
-    adapter 以及 2/4/8 worker 验证仍待专用容量环境。
+    内存默认实现与当前 `EventBus._pending` 行为等价。11 单测全绿。
+  - **2026-11-15 更新（SSE quota 面已真实接线，`[ ]`→`[~]`）**：~~adapter 在生产代码里零调用~~ **已修**：
+    `EventBus.create_sse_queue` 改 **async** 并接 `get_event_bus_state_adapter().acquire_sse_quota`，
+    `remove_sse_queue` 用 `ensure_future` 异步释放（同步上下文不能 await，失败只记日志），
+    新增 `SSESubscriptionLimitReached` 异常与 `_sse_queue_projects` 队列→项目映射；
+    生产调用方 `routers/events.py:132` 改 `await`。**默认 `max_per_project=0` = 不限**，
+    与改造前行为 100% 等价（单 worker 部署零变化），多 worker 部署注入 Redis 实现后配额才真正跨进程生效。
+    **架构约束（如实记录）**：`EventBus._pending` 存的是 `asyncio.TimerHandle`（本进程事件循环句柄），
+    **无法序列化到 Redis** ⇒ debounce pending 侧只能保持内存实现，这一半不在可外置范围；
+    quota 只是整数计数，天然可外置，所以只接了这一面。
+    **验证**：`test_event_bus_state_adapter.py` 新增 5 例（默认零行为变化 / 配额申请与释放 / 项目间隔离 /
+    `create_sse_queue` 必须 async 的反向钉住 / 生产调用方必须 await），与 `test_event_bus.py` 合计 **44 passed**；
+    连带改 6 个测试文件的 16 处同步调用为 `await`（脚本按 AST 判断所在函数是否 async）。
+    **仍未做**：真实 2/4/8 worker 零丢失/零重复验证（需专用容量环境部署）、
+    任务/进度/失效状态外置（`platform_jobs` 已 DB 耐久，进度与失效状态仍在进程内）。
   - 2026-11-06 复核：adapter 在生产代码里零调用，`EventBus` 仍直接读写 `_pending` / `_sse_queues`；
     骨架只是可注入接口，不能算外置。
 - [x] E3 修正 Locust UUID/信封/账号池/端点；6000 阶段无样本强制 FAIL。

@@ -131,10 +131,23 @@ export function flowResultMessage(result: AdjustmentFlowResult, verb: string): {
     const head = failed.slice(0, 3).map((f) => `${f.adjustment_no || '分录'}：${f.reason}`).join('；')
     parts.push(`${failed.length} 笔未处理（${head}${failed.length > 3 ? ' 等' : ''}）`)
   }
+  const statuses = (result.succeeded || []).map((item) => String(item.tb_update_status || ''))
+  const committed = statuses.filter((status) => status === 'committed').length
+  const awaiting = statuses.filter((status) => status === 'awaiting_workpaper_publish').length
+  const unchanged = statuses.filter((status) => status === 'workpaper_publish_unchanged').length
+  if (committed || awaiting || unchanged) {
+    parts.push(`已计入试算表 ${committed} 笔、待来源底稿发布 ${awaiting} 笔、底稿发布无变化 ${unchanged} 笔`)
+  }
+  const downstream = result.downstream
+  if (downstream && downstream.published) parts.push(`已投递后台刷新事件 ${downstream.published} 条`)
+  if (downstream && downstream.failed > 0) parts.push('部分刷新事件投递失败，系统会自动重试')
   const names = [...new Set((result.notified || []).map((n) => n.name).filter(Boolean))]
   if (names.length) parts.push(`已通知 ${names.slice(0, 5).join('、')}${names.length > 5 ? ` 等 ${names.length} 人` : ''}`)
   if (result.warning) parts.push(result.warning)
-  return { type: failed.length ? (ok ? 'warning' : 'error') : 'success', message: parts.join('；') }
+  return {
+    type: failed.length || Boolean(downstream?.failed) ? (ok ? 'warning' : 'error') : 'success',
+    message: parts.join('；'),
+  }
 }
 
 export function showFlowResult(result: AdjustmentFlowResult, verb: string): void {
@@ -230,7 +243,7 @@ export function useAdjustmentHallActions(opts: {
       await confirmDangerous({
         title: rows.length === 1 ? '确认通过调整分录' : '批量通过',
         confirmText: rows.length === 1 ? '确认通过' : `通过 ${rows.length} 笔`,
-        message: `确认通过${scope}？${effects.join('；')}。相关报表与附注将在试算表更新后刷新，并通知编制人。`,
+        message: `确认通过${scope}？${effects.join('；')}。报表与附注由后台刷新，完成后各页面显示最新数，并通知编制人。`,
       })
     } catch { return false }
     return review(rows, 'approved')

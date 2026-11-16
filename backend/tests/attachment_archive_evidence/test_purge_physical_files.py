@@ -47,7 +47,7 @@ async def test_single_purge_unlinks_unreferenced_file(world):
     assert not path.exists()
 
 
-async def test_shared_file_and_version_reference_are_kept(world):
+async def test_shared_file_is_kept_and_deleted_version_file_is_cleaned(world):
     shared = _stored(world, "共用.pdf")
     versioned = _stored(world, "版本.pdf")
     a = await add_attachment(world, world.target, file_path=shared.as_posix(), is_deleted=True)
@@ -62,8 +62,9 @@ async def test_shared_file_and_version_reference_are_kept(world):
         r2 = await c.delete(f"/api/recycle-bin/attachment/{b.id}")
     assert (r1.status_code, r2.status_code) == (200, 200), (r1.text, r2.text)
     assert r1.json()["file_cleanup"]["kept_referenced"] == 1
-    assert r2.json()["file_cleanup"]["kept_referenced"] == 1
-    assert shared.exists() and versioned.exists()
+    # 版本随同一附件聚合根按服务层顺序删除，因此其唯一文件引用也可清理。
+    assert r2.json()["file_cleanup"]["deleted"] == 1
+    assert shared.exists() and not versioned.exists()
 
 
 async def test_outside_root_and_paperless_untouched(world, tmp_path):

@@ -20,6 +20,11 @@ import {
   type AiHostRef,
 } from '@/composables/useAiHostContext'
 import { readAiChatError, readAiChatErrorResponse } from '@/composables/aiChatWireError'
+import {
+  readDraftOverlayNotice,
+  type ChatDraftOverlayNotice,
+  type DraftOverlayPayload,
+} from '@/composables/aiDraftOverlay'
 
 // ---------------------------------------------------------------------------
 // Feature Flag — 旧路径保留开关（默认 false = 走新两阶段 API）
@@ -53,6 +58,14 @@ export interface ChatMessage {
   citations?: Citation[]
   runId?: string
   status?: 'completed' | 'streaming' | 'failed' | 'cancelled'
+  /**
+   * 本轮「未保存草稿」的纳入结果（需求 2.5：消息上要能区分「已保存内容」与
+   * 「未保存草稿」两种来源）。
+   *
+   * 由 `context_ready` 的 manifest 解析而来；**本轮没提交 overlay 时为 `undefined`**
+   * （连键都不写，避免每条消息都挂一个空标注）。
+   */
+  draftOverlay?: ChatDraftOverlayNotice
 }
 
 export interface UsePlatformAiChatOptions {
@@ -99,6 +112,14 @@ export interface ChatRunExtras {
   reviewMode?: boolean
   /** 复核模式的目标 sheet */
   sheetName?: string | null
+  /**
+   * 本轮要纳入的「当前未保存草稿」（spec chat-host-draft-overlay / Task 5）。
+   *
+   * 由面板在**提交那一刻**读取（不是开关切换时），用户点了开关之后又改一格也能带上。
+   * 缺省 / `null` ⇒ 请求体里**连 `draft_overlay` 键都不出现**（需求 6.1：默认关闭时
+   * 行为与现状完全一致）。
+   */
+  draftOverlay?: DraftOverlayPayload | null
 }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +261,11 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
       payload.review_mode = true
       if (extras.sheetName) payload.sheet_name = extras.sheetName
     }
+    // 需求 6.1：开关关闭 / 读不到草稿时**连键都不出现**（"没提交"与"提交空对象"
+    // 在服务端 manifest 里是两种语义，且后端 `extra="forbid"` 对空对象会按字段缺失报 422）。
+    if (extras.draftOverlay) {
+      payload.draft_overlay = extras.draftOverlay
+    }
     return payload
   }
 
@@ -297,10 +323,24 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
     let assistantText = ''
     let assistantCitations: Citation[] = []
     let assistantMessageId: string | null = null
+    /**
+     * 本轮 overlay 的裁决结果（需求 2.5 / design §5.5）。
+     *
+     * 来源是 `context_ready` 的 manifest —— 服务端把 overlay 条目按裁决分组下发
+     * （`included` / `denied` / …），顶层另有 `draft_overlay_included`。这里**不另建
+     * 通知通道**：面板本来就把 manifest 存进 store 并渲染检视器，本条只是把与
+     * 「未保存草稿」有关的那一条挂到消息上。
+     */
+    let assistantDraftOverlay: ChatDraftOverlayNotice | undefined
 
     const unsubDelta = runStore.on('delta', (event: ChatEvent) => {
       assistantText += (event.payload?.text ?? event.payload?.content ?? '')
       if (event.message_id) assistantMessageId = event.message_id
+    })
+
+    const unsubContextReady = runStore.on('context_ready', (event: ChatEvent) => {
+      const notice = readDraftOverlayNotice(event.payload?.manifest)
+      if (notice) assistantDraftOverlay = notice
     })
 
     const unsubCitation = runStore.on('citation', (event: ChatEvent) => {
@@ -323,6 +363,7 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
 
     function finalizeMessage(status: 'completed' | 'failed' | 'cancelled') {
       unsubDelta()
+      unsubContextReady()
       unsubCitation()
       unsubDone()
       unsubError()
@@ -336,6 +377,7 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
           citations: assistantCitations.length > 0 ? assistantCitations : undefined,
           runId: run_id,
           status: 'completed',
+          ...(assistantDraftOverlay ? { draftOverlay: assistantDraftOverlay } : {}),
         })
         // 防御性兜底：dispatch('done') 已清流式缓冲，这里再兜一次 ——
         // 终态 guard 下 done 事件不会二次 dispatch，双保险保证
@@ -357,6 +399,7 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
             citations: assistantCitations.length > 0 ? assistantCitations : undefined,
             runId: run_id,
             status: 'cancelled',
+            ...(assistantDraftOverlay ? { draftOverlay: assistantDraftOverlay } : {}),
           })
         }
       }
@@ -471,8 +514,9 @@ export function usePlatformAiChat(options: UsePlatformAiChatOptions) {
         // 移除刚添加的用户消息（避免重复）
         const lastUserIdx = messages.value.findLastIndex(m => m.role === 'user' && m.text === text)
         if (lastUserIdx >= 0) messages.value.splice(lastUserIdx, 1)
-        // quota 信息已由 runStore.retryAfter / quotaRemaining 持有
-        // 前端 ChatQuotaCountdown 组件将渲染中文倒计时
+        // quota 信息已由 runStore.retryAfter / quotaRemaining 持有；
+        // 旧的 ChatQuotaCountdown 组件已于 2026-11-15 随零挂载 Chat 壳一并删除，
+        // 倒计时由 PlatformAiChatPanel 自身按 runStore.quotaRemaining 渲染。
       } else if (!messages.value.find((m) => m.status === 'failed' && m.id.startsWith('err_'))) {
         messages.value.push({
           id: `err_${Date.now()}`,

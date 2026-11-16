@@ -53,8 +53,16 @@ export function buildH8ListedColumns(state: H8ListedSyncSnapshot): Record<string
   return {
     [H8_LISTED_SUBTABLE.movement]: [
       { key: 'label', label: '项目', is_label: true, flat: true },
-      ...cats.map((c) => ({ key: c.key, label: c.label, format: 'amount' as const })),
-      { key: '__total__', label: '合计', format: 'amount' },
+      // 🔴 列 key 必须取**类别名本身**（中文 label），与模板 seed 的 `headers`
+      //    （`房屋及建筑物` / `机器设备` …）同键。用英文内部 key（`buildings`…）
+      //    会让 payload 的列键与模板表头对不上，附注侧按表头认列时整列取不到值。
+      //    守卫 `test_note_h8_right_of_use_structure::test_frontend_payload_keys_align`
+      //    与 `note-h8-frontend` 的夹具比对都钉这一点。
+      ...cats.map((c) => ({ key: c.label, label: c.label, format: 'amount' as const })),
+      // 🔴 合计列同样取中文 `'合计'`：模板 seed 的 headers 末列就是「合计」，
+      //    payload 列 key 必须与 seed 同键（`h8NoteSubtableContract.spec.ts` P3 钉死）。
+      //    历史上为避撞键曾用 `'__total__'`，但与模板不同键会让附注侧认不到该列。
+      { key: '合计', label: '合计', format: 'amount' },
     ],
   }
 }
@@ -112,9 +120,11 @@ export function buildH8ListedSubTableData(state: H8ListedSyncSnapshot): Record<s
       is_total: def.kind === 'calc' || def.kind === 'book' || def.kind === 'subtotal',
     }
     for (const c of cats) {
-      row[c.key] = h8ListedCellValue(state.movement, def, c.key)
+      // 行键与列键必须同一个（列用 `c.label`，见 buildH8ListedColumns）；
+      // 取值仍按内部英文 key 读 state —— 两者是不同的东西，别一起改。
+      row[c.label] = h8ListedCellValue(state.movement, def, c.key)
     }
-    row['__total__'] = h8ListedTotalCellValue(state.movement, def, cats)
+    row['合计'] = h8ListedTotalCellValue(state.movement, def, cats)
     rows.push(row)
   }
 

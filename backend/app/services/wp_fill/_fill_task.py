@@ -19,6 +19,7 @@ from app.models.ai_models import (
     AIWorkpaperTask,
     AIWorkpaperFill,
 )
+from app.models.workpaper_models import WorkingPaper
 from app.services.ai_service import AIService
 
 logger = logging.getLogger(__name__)
@@ -364,8 +365,14 @@ class FillTaskMixin:
         limit: int = 20,
     ) -> list[AIWorkpaperTask]:
         """列出项目的填充任务"""
-        query = select(AIWorkpaperTask).where(
-            AIWorkpaperTask.project_id == project_id
+        query = (
+            select(AIWorkpaperTask)
+            .join(WorkingPaper, AIWorkpaperTask.workpaper_id == WorkingPaper.id)
+            .where(
+                WorkingPaper.project_id == project_id,
+                AIWorkpaperTask.is_deleted.is_(False),
+                WorkingPaper.is_deleted.is_(False),
+            )
         )
         if status:
             query = query.where(AIWorkpaperTask.status == status)

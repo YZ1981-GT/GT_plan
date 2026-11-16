@@ -45,7 +45,6 @@ try:  # pragma: no cover - 测试环境配置
 except Exception:  # hypothesis 未安装或版本差异时不阻断测试收集
     pass
 
-import fakeredis.aioredis  # noqa: E402
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
@@ -55,6 +54,21 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine  # noqa: E4
 from app.core.database import get_db  # noqa: E402
 from app.core.redis import get_redis  # noqa: E402
 from app.models.base import Base  # noqa: E402
+
+#: ``fakeredis`` 是**可选**测试依赖：全量 requirements 里有它，但几十个 governance
+#: job 只 `pip install pytest`（+openpyxl），装不到它。conftest 顶层硬 import 会让
+#: 这些 job 在收集阶段就 ``ModuleNotFoundError`` ⇒ 整片门禁假红（2026-11-14 实测
+#: 102/183 个 job 因此失败）。
+#:
+#: 本文件对它的唯一用法是按模块名判断「用例是否把 redis 换成了 fakeredis」
+#: （见下方 ``_is_fake_redis``），不需要真的 import 它。故这里降级为软探测：
+#: 装了就记下模块名，没装就只影响「假 redis 不写共享链路」那条守卫的可用性，
+#: 其余测试不受影响。
+try:  # pragma: no cover - 环境探测
+    import fakeredis.aioredis  # noqa: F401,E402
+    _FAKEREDIS_AVAILABLE = True
+except ModuleNotFoundError:  # pragma: no cover - 精简依赖环境
+    _FAKEREDIS_AVAILABLE = False
 
 # ─── 模型注册：自动导入 app.models 全部子模块 ────────────────────────────────────
 # 🔴 原先是 44 行显式 import 清单，漏一个模块就让 `Base.metadata.create_all` 在解析跨模块外键时
@@ -144,7 +158,6 @@ def pytest_collection_modifyitems(config, items):
     spec procedure-chain-hardening-and-java-contracts R20：PG 判定认 ``postgres://``（原先只认含 ``postgresql`` 的地址）；
     设 ``GT_REQUIRE_PG=1`` 时地址不是 PG 而收集到了 pg_only 用例 ⇒ ``UsageError``，不再静默跳过。
     """
-    from tests._perf_gate import perf_write_gate_error
     from tests._pg_url import is_pg_url, pg_requirement_error
 
     db_url = os.getenv("DATABASE_URL", "sqlite")
@@ -152,15 +165,6 @@ def pytest_collection_modifyitems(config, items):
                                  [item.nodeid for item in items if "pg_only" in item.keywords])
     if error:
         raise pytest.UsageError(error)
-    # 任务 0.3：选中「写真库的性能用例」却未声明可销毁库时整次运行失败，绝不静默写共享 PG。
-    perf_error = perf_write_gate_error(
-        db_url,
-        os.environ,
-        [item.nodeid for item in items
-         if "perf" in item.keywords and "pg_only" in item.keywords],
-    )
-    if perf_error:
-        raise pytest.UsageError(perf_error)
     skip_pg = pytest.mark.skip(reason="requires PostgreSQL")
     tag_pg = not is_pg_url(db_url)
     for item in items:
@@ -183,11 +187,26 @@ def pytest_configure(config):
 
 
 def pytest_collection_finish(session):
-    """收集阶段若有模块（直接或经辅助模块）触发了 gevent 猴子补丁，在跑任何用例之前就报错。
+    """在最终选择集上执行全局收集期安全检查。
 
-    补丁一旦打上，后续 TestClient / asyncio 用例会静默卡死（全量运行曾零输出挂起 30 分钟），
-    报错比挂起好查得多。常见来源是导入 locust（见本文件顶部 collect_ignore）。
+    ``pytest_collection_modifyitems`` 运行时，pytest 的 ``-m`` 过滤尚未必完成。
+    写性能测试闸门必须放在这里，否则 ``-m 'pg_only and not perf'`` 也会先被未选中的
+    ``perf`` 用例触发，导致 CI 的功能 PG job 在收集阶段退出码 4。
     """
+    from tests._perf_gate import perf_write_gate_error
+
+    db_url = os.getenv("DATABASE_URL", "sqlite")
+    perf_error = perf_write_gate_error(
+        db_url,
+        os.environ,
+        [item.nodeid for item in session.items
+         if "perf" in item.keywords and "pg_only" in item.keywords],
+    )
+    if perf_error:
+        raise pytest.UsageError(perf_error)
+
+    # 收集阶段若有模块（直接或经辅助模块）触发了 gevent 猴子补丁，在跑任何用例之前就报错。
+    # 补丁一旦打上，后续 TestClient / asyncio 用例会静默卡死；报错比挂起好查得多。
     import sys as _sys
 
     monkey = _sys.modules.get("gevent.monkey")
