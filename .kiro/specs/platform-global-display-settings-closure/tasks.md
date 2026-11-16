@@ -600,3 +600,79 @@
 - **V272 未落共享库**（需用户放行）。
 - 页面**未做 Playwright 浏览器实测**（本轮只跑单测 + 变异）。
 - publication 的撤回 / 升级（`withdraw_publication` / `offer_upgrade`）无前端入口。
+
+---
+
+## 十一、V265 / V272 共享库落地与真实环境验证（2026-11-16，用户已放行）
+
+### 11.1 共享库现状（现查，非推断）
+
+`SELECT version, filename, applied_at FROM schema_version ORDER BY version DESC`：
+
+| version | filename | applied_at |
+| --- | --- | --- |
+| 273 | `V273__sync_conflict_abandon_columns.sql` | 2026-11-16 02:45:06 |
+| **272** | **`V272__custom_template_publication_registry.sql`** | **2026-11-16 02:45:06** |
+| 271 | `V271__ledger_import_attempts.sql` | 2026-11-14 16:24:04 |
+| **265** | **`V265__add_export_unit_policy_columns.sql`** | **2026-11-06 14:10:01** |
+
+⇒ **两条迁移都已在共享库应用**（V272 由并发会话起服务时自动跑），无需再执行。
+表已实证存在：`custom_template_publications` / `custom_template_publication_pins` /
+`custom_workbook_unit_authorities` / `project_workbook_instance` /
+`project_workbook_sheet_entry` / `guidance_consumer_ack` / `guidance_handoff_visibility`。
+
+### 11.2 schema 一致性（逐条现查）
+
+- **索引**：`uq_custom_publication_org_key`(org, key) / `ix_custom_publication_org_state` /
+  `uq_custom_publication_pin_project`(project_id) —— 与迁移定义逐条一致。
+- **约束**：`ck_custom_publication_state`（五态枚举）/ `ck_custom_publication_*_digest`
+  （`^[0-9a-f]{64}$`）/ `ck_custom_publication_handoff_object`（`jsonb_typeof='object'`）/
+  两个 FK（pins→projects CASCADE、pins→publications RESTRICT）—— 与迁移逐条一致。
+- **ORM vs PG 漂移**：三张表 **0 项**（`custom_template_publications` 12=12 /
+  `custom_template_publication_pins` 5=5 / `custom_workbook_unit_authorities` 7=7，
+  列名 / 类型 / 可空性全一致）。
+
+### 11.3 真实 PG 端到端（写入型，事务回滚）
+
+`tmp_pg_e2e_write.py` —— 全链 7/7 PASS：
+
+1. finalize → PENDING_VISIBILITY，`runtimeDiscoverable=False`
+2. 2/4 ACK → visibility 仍 PENDING（**未提前 ACTIVE**）
+3. 4/4 ACK → ACTIVE（`guidance_consumer_ack` 4 行、`guidance_handoff_visibility` 1 行）
+4. publication → ACTIVE，`runtimeDiscoverable=True`
+5. instantiate：1 instance + 2 entries，child 共享 artifact / generation
+6. pin 落库，同项目仅 1 行
+7. 重复建册被拒（`InstantiateError`）
+
+**回滚后对账**：`pubs=0 acks=0 orphan_instance=0` —— 共享库零残留。
+
+另跑 `tmp_pg_verify_publication.py`（10/10 PASS）覆盖：不可覆盖、CHECK 拒非法
+state（`IntegrityError`）、JSONB 往返、非法状态转换被拒
+（`InvalidLifecycleTransition`）。
+
+### 11.4 真实 HTTP 端到端（连 9980 主服务 + 共享库）
+
+`tmp_http_verify_pub.py` —— 7/7 PASS：
+
+- 登录成功
+- 未登录 → 401
+- `GET /publications` 可读
+- 未知 state → 400
+- 不存在的 publication → 404
+- 未知 publication/consumer → 404/422
+- instantiate 空 sheets → 422
+
+`/api/health` 确认：`migration.complete=true`、`pending_versions=[]`、47 个启动任务
+`failed=[]`。
+
+### 11.5 守卫
+
+`test_router_modules_mounted.py` + `test_migration_v_r_pair_completeness.py`
+**5 passed**（新 router 已挂载、V/R 配对完整）。
+
+### 11.6 诚实登记（非本轮引入）
+
+- `/api/health` 报 **1 条 critical schema_drift**：`V273__sync_conflict_abandon_columns.sql`
+  应用后被编辑（登记 `c5a6e5709f34…` / 当前 `608d8ed9e65d…`）。该文件**不是本会话改动**，
+  属并发会话；处置原则是「已应用的文件一律不改」，需由其作者裁决是否登记到
+  `app/core/migration_drift_ledger.py`。
