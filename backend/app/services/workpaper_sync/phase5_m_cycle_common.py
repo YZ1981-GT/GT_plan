@@ -6,9 +6,17 @@ Properties: MB-P*
 
 ═══ M 循环与其他循环的三处形态差异（照抄 K/D 的映射必错）═══
 
-1. **store 形态是 flat_key_value**：`checklist_responses` 里的 item_id 按
-   `{ITEM_PREFIX}{sheet_code}-{field}` 逐键存，不是一个 item 存整个 JSON 数组。
-   前端 `useM{n}FormData.ts` 的 `getField(sheet, field)` 按此模式读写。
+1. **store 形态有两种并存（实测，2026-11-16 现算）**：
+   * 审定表走 **flat_key_value**：`{ITEM_PREFIX}{sheet_code}-{field}` 逐键存，
+     前端 `useM{n}FormData.ts` 的 `getField(sheet, field)` 按此模式读写；
+   * 明细表走 **整表 JSON**：`useM{n}Detail.ts` 的
+     `debouncedSave('M{n}-M{n}-2-full-data', { remark: JSON.stringify(detailRows) })`
+     —— 一条 `checklist_responses` 装整个行数组。
+
+   🔴 所以 `build_store_projection` **必须同时认得这两种形态**：只按 flat 逐键取标量时，
+   明细表的容器键会被当成一个受管标量（`M1-M1-2-full-data = '<整表 JSON>'`），
+   而它不在契约的受管字段里 ⇒ 物化时一格都写不进 OO、前端录的内容整批丢失。
+   守卫 `test_m_detail_payload_projection.py` 钉住这一点。
 
 2. **审定表几乎全是公式**：B~K 列引用明细表，只有 A 列（项目名称）和 L 列（原因分析）
    可编辑。contract 的 editable/formula 分布与 D 循环明显不同。
@@ -368,7 +376,19 @@ def build_m_provider(cfg: MEntryConfig) -> types.SimpleNamespace:
         return on_disk
 
     def _build_store_projection(store_payload: Any, *, contract: Any = None) -> Any:
-        """把 store_payload 转成 Projection 对象。M 循环空 store 返回空 Projection。"""
+        """把 store_payload 转成 Projection 对象。M 循环空 store 返回空 Projection。
+
+        🔴 必须同时认得两种形态（见模块 docstring 第 1 条）：
+
+        * **flat_key_value**（审定表）：`{item_id: value}`，item_id 形如
+          `{ITEM_PREFIX}{sheet_code}-{field}` —— 逐键取标量，键本身就是 stable_field_key；
+        * **整表 JSON**（明细表）：`{item_id: '<行数组 JSON>'}`，item_id 形如
+          `M1-M1-2-full-data` —— 这是**容器键，不是受管字段**。行数组要按契约
+          `column_key` 展开成行表指针 `{table_key}/{row_uuid}/{column_key}`。
+
+        不认第二种时，容器键会被当成一个受管标量（`M1-M1-2-full-data = '<整表 JSON>'`），
+        而它不在契约字段里 ⇒ 物化时一格都写不进 OO、前端录的内容整批丢失。
+        """
         from app.services.workpaper_sync.adapters.base import FieldValue, Projection as _Proj
         from app.services.workpaper_sync.contracts import FieldMode, ValueType
         import json as _json
@@ -391,42 +411,106 @@ def build_m_provider(cfg: MEntryConfig) -> types.SimpleNamespace:
         else:
             data = store_payload
 
-        # 从 contract 建字段索引
+        # 从 contract 建两张索引：
+        #   field_index —— stable_field_key → field（flat 形态直接用）
+        #   column_index —— (table_key, column_key) → field（整表 JSON 展开用）
         field_index: dict[str, dict] = {}
+        column_index: dict[tuple[str, str], dict] = {}
         if contract:
             cp = getattr(contract, "canonical_payload", None) or {}
             for sheet in (cp.get("sheets") or ()):
                 for table in (sheet.get("tables") or ()):
+                    tkey = table.get("table_key") or ""
                     for field in (table.get("fields") or ()):
                         sfk = field.get("stable_field_key") or ""
                         if sfk:
                             field_index[sfk] = field
+                        ckey = field.get("column_key")
+                        if tkey and ckey:
+                            column_index[(tkey, ckey)] = field
+
+        def _coerce(raw: Any, spec: dict | None) -> FieldValue:
+            mode = FieldMode(spec["mode"]) if spec else FieldMode.editable
+            vt = ValueType(spec.get("value_type", "text")) if spec else ValueType.text
+            return FieldValue(
+                stable_key="", value=raw, value_type=vt, mode=mode,
+            )
 
         values: dict[str, FieldValue] = {}
-        # JSON 数组形态 → 逐行解析
+
+        def _emit_flat(iid: str, raw: Any) -> None:
+            """flat 形态：item_id 本身就是 stable_field_key。"""
+            spec = field_index.get(iid)
+            fv = _coerce(raw, spec)
+            values[iid] = FieldValue(
+                stable_key=iid, value=fv.value, value_type=fv.value_type, mode=fv.mode,
+            )
+
+        def _emit_row_array(container_id: str, rows: Any) -> None:
+            """整表 JSON 形态：按契约 column_key 展开成行表指针。"""
+            if not isinstance(rows, list):
+                return
+            # 容器键自身若不是受管字段，就不产出（它是容器，不是一格）
+            if container_id in field_index:
+                _emit_flat(container_id, rows)
+                return
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                row_uuid = str(row.get("rowId") or row.get("row_uuid") or row.get("id") or "")
+                if not row_uuid:
+                    continue
+                for ckey, raw in row.items():
+                    # 同一 column_key 可能出现在多张表里 ⇒ 逐个匹配（当前 M 每家只有一张明细表）
+                    matched = [
+                        (tkey, spec)
+                        for (tkey, col), spec in column_index.items()
+                        if col == ckey
+                    ]
+                    if not matched:
+                        continue  # 契约没有这一列（前端多出来的列），不产出
+                    for tkey, spec in matched:
+                        key = f"{tkey}/{row_uuid}/{ckey}"
+                        fv = _coerce(raw, spec)
+                        values[key] = FieldValue(
+                            stable_key=key, value=fv.value,
+                            value_type=fv.value_type, mode=fv.mode,
+                        )
+
+        def _try_json(raw: Any) -> Any:
+            """容器键的值可能是 JSON 字符串。"""
+            if isinstance(raw, str):
+                s = raw.strip()
+                if s[:1] in ("[", "{"):
+                    try:
+                        return _json.loads(s)
+                    except (ValueError, TypeError):
+                        return raw
+            return raw
+
+        # JSON 数组形态 → 逐行解析（每条是一个 item 记录）
         if isinstance(data, list):
             for row in data:
-                if isinstance(row, dict) and "item_id" in row:
-                    iid = row["item_id"]
-                    if iid.startswith(cfg.item_prefix):
-                        spec = field_index.get(iid)
-                        mode = FieldMode(spec["mode"]) if spec else FieldMode.editable
-                        vt = ValueType(spec.get("value_type", "text")) if spec else ValueType.text
-                        val = row.get("conclusion") or row.get("remark")
-                        values[iid] = FieldValue(
-                            stable_key=iid, value=str(val) if val else None,
-                            value_type=vt, mode=mode,
-                        )
+                if not (isinstance(row, dict) and "item_id" in row):
+                    continue
+                iid = row["item_id"]
+                if not iid.startswith(cfg.item_prefix):
+                    continue
+                val = row.get("conclusion") or row.get("remark")
+                parsed = _try_json(val)
+                if isinstance(parsed, list):
+                    _emit_row_array(iid, parsed)
+                else:
+                    _emit_flat(iid, parsed)
         elif isinstance(data, dict):
             for iid, val in data.items():
-                if iid.startswith(cfg.item_prefix):
-                    spec = field_index.get(iid)
-                    mode = FieldMode(spec["mode"]) if spec else FieldMode.editable
-                    vt = ValueType(spec.get("value_type", "text")) if spec else ValueType.text
-                    values[iid] = FieldValue(
-                        stable_key=iid, value=str(val) if val else None,
-                        value_type=vt, mode=mode,
-                    )
+                if not iid.startswith(cfg.item_prefix):
+                    continue
+                parsed = _try_json(val)
+                if isinstance(parsed, list):
+                    _emit_row_array(iid, parsed)
+                else:
+                    _emit_flat(iid, parsed)
 
         return _Proj(
             contract_id=cfg.adapter_id,

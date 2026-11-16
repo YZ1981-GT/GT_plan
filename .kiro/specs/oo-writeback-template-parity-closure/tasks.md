@@ -38,11 +38,11 @@
   - [x] 8.3 变异：前端公式、前端改写录入、清单表达式、不生效例外、未覆盖清单冲突与 G13 / G14 / H2 / D5-4 四处改回旧口径，9 条全红、逐字节复原；L8-2 另 6 条变异全红
 
 - [ ] 9. 字段名接通（R3，按 design §4 裁定）
-  - [ ] 9.1 N 循环（N1~N5，含 N1 几何与 store item 前缀）
+  - [x] 9.1 N 循环（N1~N5，含 N1 几何与 store item 前缀）（子项 9.1a~9.1c 全完成；父任务此前漏勾）
     - [x] 9.1a 批 C（v1.0.31）：N1 几何 29/31→40/42，N1/N2 store item 改 `-detail-rows`，N1/N2/N3 json key 改前端名，五条 N plan 与五份 reviewed 契约落地；field-name 31/388→30/365、UNCOVERED 13→12（明细见 design §4.10 附）
     - [x] 9.1b 复盘收口：三个 provider 补 re-export PAYLOAD_COLUMN（修「声明在 sheets 但运行时仍 remark」假绿）；N2 活导入导出统一 A:Q / `N2-2-detail-rows.conclusion`、补 H=beginRje 与 M=C+G+H、复核上下文按原始行重算 P，真库两键 0 行；N1 生产纯函数 + 对拍适配器；field-name 30/365→29/364；K/N 十一 plan 表驱动（1047→1019 行）；N1 三条磁盘变异 3/3 红；push 工具安全收口（design §4.10、§4.11）
     - [x] 9.1c 语义审查收口：修 N2 跨项目读写、错误表头按位置写、Infinity JSON、国企披露归零、导入后旧快照、N 域新测试/公式数棘轮，以及 push 远端标签 fail-open / 重试竞态 / 本地旧标签基线；定向后端 25、鉴权/挂载 43、前端 643 项通过，候选相对基线新增失败 0（design §4.10、§4.11）
-  - [~] 9.2 L4-3 与 M 循环（含 `placeholder` store item）（L4-3 已闭合；M 循环现算为**形态冲突**，待裁决）
+  - [~] 9.2 L4-3 与 M 循环（含 `placeholder` store item）（L4-3 已闭合；M 循环**投影层已修**、键名层仍是形态冲突，见 design §14.1）
   ### 9.2 现算结论（2026-11-15）
 
 **L4-3 已闭合（无需改生产代码）**：契约 `sheets[].tables[].fields[]` 38 个受管字段、provider `MANAGED_FIELD_SPECS_7`、前端 `useL4FinLiabRows.ts` 运行时键**三处逐字段 0 不一致**（column_key / 列标 / json 键 / mode / value_type / header_text 六项全等）；行身份 `rowId`、store item `L4-3-rows` 三处一致；端到端 `build_store_projection` 取到 38/38、`merge_projection_into_store_rows` 回写后行键集合与前端完全相等。
@@ -56,10 +56,10 @@
 - **建议裁决方向（供用户选）**：①承认「明细表整表 JSON + 审定表 flat 键」为 M 循环既定形态，把契约 `html_store.shape` 按 sheet 分级声明（detail=row_array / determination=flat），扫描器再补「`{sheet}` 参数拼键」识别；②统一收敛到 flat_key（须重发布）。任一路径都要在真实 OO 上验双向。
 - ✅ **已落地棘轮守卫**（`backend/tests/test_m_detail_keys_match_provider.py`，8 例）：把 M1/M2 明细行「provider 有前端没有」与「前端有 provider 没有」两张差异表**冻结成只许减小的基线**（M1: 18/19 条，M2: 19/9 条），判据四条 —— ①provider-only 禁增 ②frontend-only 禁增（抓臆造键）③**基线自证**（已对齐却没删条目会红，防棘轮虚高藏进展）④总量单向棘轮。变异注入 `inventedBogusKey` **2/2 红**且精确点名该键，逐字节还原后 8 passed。这条守卫是「按表头反推英文键」这类缺陷的止损闸：实测 M1 前端 `beginBalance`/`declaredAmount`/`paidAmount`/`resolutionRef` 与 provider `aging`/`refIndex`/`priorAdjAje` 两套并存正是 M 循环形态冲突的量化证据。
 
-  - [ ] 9.3 G5-2 / G6-5 / G7 / H 循环
+  - [x] 9.3 G5-2 / G6-5 / G7 / H 循环（子项 9.3a / 9.3b 完成；G5-2 / G7 属 R2 结构差异按 design §14.2 / §14.3 保持登记；H 循环现算 misses=0，design §14.4）
     - [x] 9.3a 批 B1：G6-5 全表按前端 `FairValueItem` 改名、D 改 auto_source、前端旧数据反推只在键缺失时做（显式 0 单测）；G4-7 证券名称改名、E 总计 auto_source；G11-2 A 序号 auto_source + 幽灵行锚点改 B；H4-2 J / M auto_source；新守卫 `test_ghost_row_anchor_not_protected.py`（全仓锚点不得受保护，F3-1 种子区可伪证例外）；对拍适配器 +1、未覆盖 14 → 13、例外 4 → 1（design §4.5）。G6-5 store 门面与 `{rows, conclusion}` 载荷未接（批 B3），G5-2 / G7 / H 其余未做
     - [x] 9.3b 批 B3a：G1 / G3 / G4 / G5 / G6 多区 store 门面按 provider 绑定（`phase5_section_store_facade`，G9 的伴生门面改为薄绑定）、逐区穿线、G6-5 dict 外壳；载荷列按 provider 声明（`store_payload_columns`，回写镜像 / 出方向 / 采纳覆盖的快照 · 删除 · 回滚审计同一口径，remark 口径 SQL 逐字不变）；G4 / G6 单数 store item 改为受管的那一个，`KNOWN_UNWIRED` 15 → 13；G1 A 列「类别」改绑 investType（区归属不受管）；五份契约复核文字按实际改写；golden 门拒空投影、五家基线更新；AOS 判据改正面断言 + 合成对照；新守卫 `test_section_store_facade_and_payload_columns.py`；20 条磁盘变异全红；和平药房 2025 G1 / G3 / G4 / G6 与重药安徽 G5 待重发布（design §4.9）
-  - [ ] 9.4 E1 / F2 / D 循环零散字段
+  - [x] 9.4 E1 / F2 / D 循环零散字段（子项 9.4a~9.4g 全完成；父任务此前漏勾）
     - [x] 9.4a F2-25 / F2-26 / F2-48 / F2-57 按模板表头接前端字段，F2-48 / F2-57 dict store 走 state 合并；回写合并只合本表的键（平台，8 家串表 + G9 / L5 落错区），守卫 `test_store_merge_table_isolation.py` 与三条磁盘变异；对拍适配器 +5、未覆盖 25 → 20（design §4.1）
     - [x] 9.4b E1-2 / E1-4、D3-rp、D6-3（两区）、D7-4 贷方区按模板接前端字段（D7-4 前端补「与对方科目核对」等三列、导入导出带新列）；触类旁通修后端复算口径四处（D6-2 / D6-3 / D7-2 导入、D1 附注推送）；守卫 `test_d6_03_dual_zone_spec.py` / `test_d7_4_analysis_counter_check.py` / `test_period_end_from_prior_unadjusted_backend.py` / `d7AnalysisTemplateColumns.spec.ts`，14 条磁盘变异全红；对拍适配器 +3、未覆盖 20 → 16、例外 5 → 3（design §4.2）
     - [x] 9.4c D3-4 两区（行身份 rowKey、区② 按 R20 接 counterCheck / remark，表单与导入导出补列）、F3-4、F4-1 性质区按模板接前端字段；F3-1 两区、F4-1 账龄两区只改 json 键（store item 与区判据留批 B）；对拍生成器支持百分点列；守卫 `test_d3_4_analysis_counter_check.py` / `d3AnalysisTemplateColumns.spec.ts`；对拍适配器 +2、未覆盖 16 → 14、例外 3 → 4（新增 F3-4 计息口径，待用户裁决）（design §4.3）

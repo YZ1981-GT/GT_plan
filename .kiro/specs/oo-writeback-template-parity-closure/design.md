@@ -706,3 +706,83 @@ PG / Redis 通。项目 `4c77f3e8-3938-4628-8836-1435dda4ddea`。
 
 ⇒ 12.2 第 3 项标为**部分完成**：自动化可达的部分（真实浏览器 + 真实模板 + 真库落库）已验；
 需要人在 OO 界面上点的那一步未做，**不当作已验证**。
+
+## §14 任务 9.2 / 9.3 剩余项现算与处置（2026-11-16）
+
+### §14.1 M 循环：明细表整表 JSON 的投影已修（真缺陷，非「待裁决」）
+
+§9.2 原登记「M 循环现算为形态冲突，待裁决」把两件事混在了一起。本轮现算拆开：
+
+**已修的真缺陷**：`phase5_m_cycle_common._build_store_projection` 只认两种载荷形态
+（`[{item_id, conclusion|remark}, …]` 与 `{item_id: value}`），逐键取**标量**。而前端
+`useM1Detail.ts` / `useM2Detail.ts` 写的是 `M1-M1-2-full-data` → `{remark: JSON.stringify(rows)}`
+（整表 JSON 存在一个容器键里）。实测（`tmp_parity_mut/probe_m_projection.py`）：
+
+| 载荷 | 旧实现的产出 |
+|---|---|
+| 前端真实（整表 JSON 在容器键） | `M1-M1-2-full-data = '<整表 JSON 字符串>'` —— **一个键**，而它不在契约受管字段里 |
+| 逐行 item（旧假设） | `M1-M1-2-row-{i}-data = '<行 JSON>'` —— 同样不是受管字段 |
+| flat_key_value | `M1-m101-managed-company_code = C1` —— 正常 |
+
+⇒ 首版发布与回写两条路径都拿不到任何一格受管字段的值，**前端录的内容一格都进不了 OO**。
+这不是「前端少几个字段」，是容器键被当成受管标量。
+
+修法（只动 provider，**不动契约、不动前端、不改 canonical digest**）：`_build_store_projection`
+增加「容器键 → 整表 JSON → 按契约 `column_key` 展开成行表指针 `{table_key}/{row_uuid}/{column_key}`」的
+分支；契约里没有的列（前端多出来的列）不产出；容器键本身不是受管字段时不产出。
+flat 形态与空载荷路径逐字不变（有回归用例）。
+
+守卫 `test_m_detail_payload_projection.py`（6 例，覆盖 M1 + M2 两个 provider）：
+①前端真实载荷只产出受管键（`{row_uuid}` 占位按通配比对）②明细行落到契约行表键且值正确
+③容器键不得当受管字段 ④flat 形态回归 ⑤空载荷 4 种形态。
+**改前 4 红 / 改后 6 passed**；两条磁盘变异（退回「容器键当标量」/ 展开时不按契约列名过滤）
+各自 RED、逐字节复原后 6 passed。M 既有棘轮 `test_m_detail_keys_match_provider.py` 8 例同时通过（14 passed）。
+
+**仍未解决（如实保留在棘轮里）**：前端行模型是**驼峰**（`shareholderName` / `declaredAmount` /
+`beginBalance`），契约是**下划线**（`shareholder_name` / `increase_amount` / `prior_opening`），
+M1 18+19 条、M2 19+9 条（合计 65 条）由 `test_m_detail_keys_match_provider.py` 冻结成只许减小的基线。
+**这一层不是投影函数能修的**：要让键名一致，得改前端行模型（动 10 个宿主的读写语义 + 导入导出）
+或改契约（改 digest ⇒ 已发布 representation 脱钩、须重发布），两者都要真实 OO 往返验证。
+本轮只修了「即使键名对上了、值也进不去」的那一层。
+
+### §14.2 G5-2：契约 22 列 vs 前端 22 键，交集仅 3（R2 结构差异，未改）
+
+现算（`tmp_parity_mut/probe_g52.py`）：
+
+| 侧 | 形态 |
+|---|---|
+| 契约 `g5_2_s1r1` | `row_identity = {kind: field, json_pointer: /rows/*/id}`，22 列：`seq / debtor_name / is_related / opening_balance / opening_adj / opening_rje / opening_audited / debit_incurred / credit_incurred / closing_balance / aje / rje / audited_amount / aging_not_overdue / aging_within_1y / aging_1to2y / aging_2to3y / aging_over_3y / ecl_method / ecl_group_name / confirmation_status / subsequent_ref` |
+| 前端 `BalanceDetailRow` | 22 键：`id / seq / debtorName / businessType / contractNo / startDate / maturityDate / isWithinOneYear / contractAmount / recoveredAmount / closingBalance / debitOccurrence / creditOccurrence / isRelatedParty / unrealizedIncome / netAmount / agingPrior / agingCurrent / agingAudited / agingTotal / remark / crossSheetReceivableId` |
+| 交集 | **3 个**（`id` / `seq` / `closing_balance`↔`closingBalance`） |
+| store 形态 | 前端整表 JSON（`G5TabBalanceDetail.vue:292` `debouncedSave(ROWS_KEY, {remark: json, conclusion: json})`）；契约是行表逐行指针 |
+
+**为什么不在本 spec 改**：这不是字段改名，是**行模型不同构** —— 前端 G5-2 是
+「合同金额 − 已收回」模型（`contractAmount` / `recoveredAmount` / `netAmount`），模板是
+「期初 + 借 − 贷 + 审定」三列 + 五档账龄 + ECL 分组。要让两侧一致，必须迁移已存行数据、
+改导入导出列、改前端表单与合计行，并按纪律在真实 OO 上验双向。同 §4.3 对 F3-1 / F4-1 的处置。
+⇒ 保持登记在 `contract_field_names_frontend_exceptions.json`（13 个名字，现算 13/13 仍 miss，
+6 个前端全无、7 个只在别的循环的代码里），随任务 9.3 遗留。
+
+### §14.3 G7：`ordinal` / `rowUuid` 仍 miss（同族，未改）
+
+现算 2/2 仍 miss（G7 scope 49 个文件内 0 命中；`ordinal` 只在 L1 / AI 任务出现，
+`rowUuid` 只在 B60 面板出现）。G7 前端 `G7DisclosureRow` 用 `id` 作行身份、另有 7 键，
+与契约 `former_subsidiary_basic` 的 `rowUuid` + `ordinal` 不是一套。同族处置：登记保留。
+
+🔴 顺带记一条**扫描器口径**：`minority-fs-company_{1..5}_{current,prior}` 这 10 个键被判「已接通」，
+但逐字键名在前端**根本不存在** —— 前端 `g7SoeDisclosureModel.ts:261` 用
+`MINORITY_FS_SLOT = 'minority-fs-company'` 拼键。判「在」是因为 `name_parts()` 把含 `-`/`_` 的段
+拆成片段（`minority` / `fs` / `company` / `current`）逐片段比对，四个片段在 scope 里都有。
+这与 L4-3「词干 × 后缀」是同一类现象（扫描器已能识别后者、识别不了前者），
+**不构成本轮新缺陷**（该表本来就是拼键生成，前端与后端读的是同一套拼法），但记在此备查：
+`name_parts` 的片段口径会让「拼键」被误判成「逐字出现」，下次改扫描器时优先修它。
+
+### §14.4 H 循环：已清零（9.3 里的「H 循环」实际已完成）
+
+现算：字段名例外表里 **h 组 = 0**；12 个 H 组 / 215 个契约字段名 **misses 全为 0**。
+H3-2 成本区 18/18、H3-2 公允区 7/7、H4-2 32/32 契约字段名**全部**在前端接口里。
+
+剩下的是**结构差异**（不是字段名）：`H3-2-cost-rows` 仍在**前端公式对拍**的 `UNCOVERED_ITEMS`
+（12 条 = baseline 12），理由是前端多 `transferIn` / `transferOut` 等 25 列、模板 I~N / V~AA / AI~AN
+前端无字段；`H4-2` 已在批 B1 处置（`J` / `M` 改 `auto_source`、删两条例外，
+`PARITY_EXCEPTIONS` 1 条 = baseline 1，仅剩 F3-4 计息口径）。
