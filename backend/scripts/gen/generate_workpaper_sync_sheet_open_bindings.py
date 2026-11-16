@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -22,7 +23,13 @@ DATA = REPO / "backend" / "data"
 MANIFEST = DATA / "workpaper_sync_entry_manifest.json"
 OVERLAY = DATA / "workpaper_sync_entry_overlay.json"
 ADJUDICATION = DATA / "workpaper_sync_entry_wp_code_adjudication.json"
-OUTPUT = DATA / "workpaper_sync_sheet_open_bindings.json"
+#: 输出路径。**可被 `GT_SHEET_BINDINGS_OUT` 覆盖** —— 变异套件用它把生成结果写到
+#: 沙箱目录，从而完全不碰已跟踪的真实产物（否则 `_tracked_write_guard` 会报警，
+#: 且进程被打断时可能留下变异态产物 —— 本仓踩过这个坑）。
+OUTPUT = Path(
+    os.environ.get("GT_SHEET_BINDINGS_OUT")
+    or str(DATA / "workpaper_sync_sheet_open_bindings.json")
+)
 SCHEMA_VERSION = "sheet-open-binding:v1"
 STATUSES = {"pending", "ready", "migrated", "draining", "retired", "out_of_scope"}
 MAPPING_KINDS = {"exact", "provider", "whole_workbook", "ambiguous", "out_of_scope"}

@@ -1,6 +1,6 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：17/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.7 + 5.3 已完成；真源层 / 服务端解析层 / 前端三态 / legacy ledger / 前端契约守卫已收口）**
+> **状态：18/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.7 + 5.3 + 5.4 已完成；真源层 / 服务端解析层 / 前端三态 / legacy ledger / 前端契约守卫 / 变异套件已收口）**
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
@@ -132,7 +132,18 @@
   - 变异 7/7 全精确打红零假红。
   - 🔴 三处判据形态修正：①首版只允许 3 个合法入口 ⇒ 22 个已登记调用方全被判违规（口径错：3.7 语义是「未迁移可以存在但必须登记」，5.3 判的是「**未登记**不许有」）⇒ 直接读 ledger；②`/sync/entry-identity` 断言「至少一处」而 3.1 已让它归零（那是更好的状态）⇒ 改「必须为 0」；③「已同步」判据只扫代码行而变异写在 JSDoc 里 ⇒ 改扫全文（Requirement 4.3 明确禁止靠注释隐藏）。
   - _R: 1, 4, 6, 10_
-- [ ] 5.4 变异：删 mapping、伪造 parent fallback、candidate 冒充 current、恢复 template copy、去掉 target sheet、绕过 legacy token、让 old callback 无条件写入均必须 RED；阴性对照 GREEN。
+- [x] 5.4 变异：删 mapping、伪造 parent fallback、candidate 冒充 current、恢复 template copy、去掉 target sheet、绕过 legacy token、让 old callback 无条件写入均必须 RED；阴性对照 GREEN。
+  - `test_sheet_open_mutation_suite.py`：7 类变异 + 1 阴性对照 + 4 条元判据，**可重复运行的套件**（不是一次性脚本）。默认跳过，`GT_RUN_MUTATION_SUITE=1` 时运行（约 2 分钟）。
+  - 每条断言 `expected_test` 出现在 FAILED 列表里 —— 只断言 `rc != 0` 会漏「收集期语法错」与「红在别的用例上」两类假红。
+  - 实测 **11 passed**：7 类变异全 RED（各自红在点名用例上）+ 阴性对照 GREEN。
+  - 🔴 六轮修复（每轮都是真问题）：
+    1. 阴性对照选生成器当靶点 ⇒ 改源码必然触发 `--check`（比的是产物字节），不是「语义不变」⇒ 改到 `descriptor_view_identity.py`。
+    2. `expected_test` 正则只写 `def` 而用例是 `async def` ⇒ 恒找不到。
+    3. **02 变异存活** = 真缺口：判据只查 `entry_id` 集合，而伪造父级兜底正是通过 `effective_entry_id` 实现 ⇒ 补 `test_effective_entry_id_is_never_a_forged_parent_fallback`（三层：在 manifest 里 / 不是同一固定值 / 与 entry_id 不同时必须 `independent_entry=False`）。
+    4. 沙箱化后 `--check` 抢红 ⇒ 让 freshness 判据也认 `GT_SHEET_BINDINGS_OUT`，并加 autouse fixture 在运行期重赋 `GEN.OUTPUT`（module-level 常量 import 时求值一次，光设环境变量不够）。
+    5. `_SANDBOX` 进程级缓存 ⇒ 7 条变异共用目录、阴性对照读到上一条变异残留 ⇒ 改**每条用例独立沙箱**且跑前先 apply。
+    6. `test_generated_projection_is_tracked_by_git` 用 `relative_to(REPO)` 对沙箱路径抛 ValueError ⇒ 沙箱模式显式 `pytest.skip` 并说明原因（真实 CI 无 `GT_SHEET_BINDINGS_OUT`，照常执行）。
+  - 生成器新增 `GT_SHEET_BINDINGS_OUT` 覆盖（默认写真实路径，语义不变）。
   - _R: 1, 2, 3, 6, 10_
 - [ ] 5.5 Playwright：普通 sheet / whole workbook / 聚合 source sheet / pending fallback / drain 五条 required scenarios；记录网络、console、页面错误、数据快照与 artifact identity。
   - _R: 3, 4, 6, 9, 10_

@@ -17,9 +17,39 @@ _ALLOWED_STATUS = {"pending", "ready", "migrated", "draining", "retired", "out_o
 _ALLOWED_KIND = {"exact", "provider", "whole_workbook", "ambiguous", "out_of_scope"}
 
 
+@pytest.fixture(autouse=True)
+def _honor_output_override(monkeypatch):
+    """让 `GEN.OUTPUT` 与 `OUTPUT` 认 `GT_SHEET_BINDINGS_OUT`。
+
+    ═══ 为什么需要 ═══
+
+    变异套件（task 5.4）要在**不改真实产物**的前提下让「生成器现算」与「磁盘产物」
+    可比。`GEN.OUTPUT` 是 module-level 常量（import 时求值一次）⇒ 光设环境变量不够，
+    必须在运行期重新赋值。
+
+    ═══ 为什么用 autouse ═══
+
+    每个用例都可能读 `OUTPUT` 或 `Path(GEN.OUTPUT)`；漏一个就会读到真实路径
+    （而套件正在改写它）⇒ 随机红。autouse 保证无一遗漏。
+
+    ═══ 真实 CI 里没有影响 ═══
+
+    `GT_SHEET_BINDINGS_OUT` 未设时本 fixture 是 no-op。
+    """
+    import os as _os
+
+    override = _os.environ.get("GT_SHEET_BINDINGS_OUT")
+    if not override:
+        yield
+        return
+    monkeypatch.setattr(GEN, "OUTPUT", Path(override))
+    monkeypatch.setattr(sys.modules[__name__], "OUTPUT", Path(override))
+    yield
+
+
 @pytest.fixture(scope="module")
 def projection() -> dict:
-    return json.loads(OUTPUT.read_text(encoding="utf-8"))
+    return json.loads(Path(GEN.OUTPUT).read_text(encoding="utf-8"))
 
 
 @pytest.fixture(scope="module")
@@ -28,6 +58,16 @@ def manifest() -> dict:
 
 
 def test_generated_projection_is_current() -> None:
+    """`--check` 必须通过：生成物与生成器现算逐字节一致。
+
+    🔴 **透传 `GT_SHEET_BINDINGS_OUT`**：变异套件（task 5.4）把生成结果重定向到沙箱，
+    以免写已跟踪文件。若这里不透传，子进程会拿「变异生成器算出的字节」比「真实产物」
+    ⇒ 必不一致 ⇒ 红在本条上，抢了语义判据的红（实测：01/02 变异归因不清）。
+
+    透传后比的是「沙箱字节 vs 沙箱字节」，本条的职责（「生成物是否过期」）在真实 CI
+    里完全不变 —— 那里 `GT_SHEET_BINDINGS_OUT` 未设，比的仍是真实产物。
+    """
+    env = {**__import__("os").environ, "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.run(
         [sys.executable, str(GENERATOR), "--check"],
         cwd=ROOT.parent,
@@ -35,6 +75,7 @@ def test_generated_projection_is_current() -> None:
         text=True,
         encoding="utf-8",
         errors="replace",
+        env=env,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
@@ -72,6 +113,46 @@ def test_projection_does_not_claim_migration_without_reviewed_binding(projection
         if row["status"] in {"ready", "migrated", "draining", "retired"}
     ]
     assert claimed == []
+
+
+def test_effective_entry_id_is_never_a_forged_parent_fallback(
+    projection: dict, manifest: dict,
+) -> None:
+    """`effective_entry_id` 必须在 manifest 里，且**不得**被改成某个固定父级。
+
+    🔴 这是 task 5.4 变异 02 暴露的真缺口：原判据只查 `entry_id` 集合，
+    而「伪造 parent fallback」正是通过 `effective_entry_id` 实现的 —— 把子 entry 的
+    effective 指向父级，让它的编辑写进父级 artifact。判据不查 effective 就漏掉它。
+
+    判据三层：
+    1. `effective_entry_id` 必须在 manifest 里（不是编造的值）；
+    2. 它**不得**是同一个固定值（那说明全表被批量改成了兜底父级）；
+    3. 若与 `entry_id` 不同，必须能解释 —— 当前只允许 `parent_duplicate` 形态。
+    """
+    manifest_ids = {row["entry_id"] for row in manifest["entries"]}
+    rows = projection["bindings"]
+
+    # ① 全在 manifest 里
+    bad = [r["entry_id"] for r in rows if r["effective_entry_id"] not in manifest_ids]
+    assert not bad, f"这些 binding 的 effective_entry_id 不在 manifest 里：{bad}"
+
+    # ② 不是同一个固定值（伪造父级兜底的形态）
+    distinct = {r["effective_entry_id"] for r in rows}
+    assert len(distinct) > 1, (
+        f"所有 {len(rows)} 条 binding 的 effective_entry_id 都是 {distinct.pop()!r} —— "
+        "疑似被批量改成了固定父级兜底"
+    )
+
+    # ③ 与 entry_id 不同时必须能解释
+    mismatched = [
+        r for r in rows if r["effective_entry_id"] != r["entry_id"]
+    ]
+    for row in mismatched:
+        # `independent_entry=False` 是 parent_duplicate 的合法语义
+        assert row.get("independent_entry") is False, (
+            f"{row['entry_id']} 的 effective_entry_id={row['effective_entry_id']!r} "
+            "与自身不同，但它被标成 independent_entry=True —— 那是伪造父级兜底"
+        )
 
 
 def test_summary_is_recomputed_from_rows(projection: dict) -> None:
@@ -331,7 +412,19 @@ def test_generated_projection_is_tracked_by_git() -> None:
 
     🔴 判据用 `git ls-files` 而不是 `Path.is_file()`：后者在本地工作区永远为真，
     而 CI / 新 clone 里文件可能根本没被跟踪。
+
+    ═══ 沙箱模式下跳过（显式，不静默）═══
+
+    变异套件（task 5.4）把输出重定向到系统临时目录 —— 那里的文件**本来就不该入库**，
+    检查它没有意义。所以沙箱模式下本条跳过，但**显式**说明原因（不是静默 pass：
+    真实 CI 里 `GT_SHEET_BINDINGS_OUT` 未设，本条照常执行）。
     """
+    import os as _os
+
+    if _os.environ.get("GT_SHEET_BINDINGS_OUT"):
+        pytest.skip(
+            "沙箱模式（GT_SHEET_BINDINGS_OUT 已设）：沙箱文件不该入库，跳过 git 跟踪检查"
+        )
     proc = subprocess.run(
         ["git", "ls-files", "--error-unmatch", str(OUTPUT.relative_to(ROOT.parent))],
         cwd=ROOT.parent, capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -382,11 +475,14 @@ def test_check_mode_fails_when_a_source_digest_changes(tmp_path: Path) -> None:
     文件（会污染工作区），而是直接调生成器的 `build()` 并比较 digest。
     """
     fresh = GEN.build()
-    baseline = json.loads(OUTPUT.read_text(encoding="utf-8"))
+    # 🔴 读 `GEN.OUTPUT`（可被 `GT_SHEET_BINDINGS_OUT` 覆盖）而不是硬编码真实路径 ——
+    # 理由同上：变异套件沙箱化后，磁盘上的真实产物不是「本次生成器的输出」。
+    target = Path(GEN.OUTPUT)
+    baseline = json.loads(target.read_text(encoding="utf-8"))
     assert fresh["input_digest"] == baseline["input_digest"], (
         "生成器 build() 的 digest 与磁盘不一致 —— 生成物已过期，先跑 --apply"
     )
     # 同一份输入重跑必须字节相同（幂等，Requirement 1.4）。
-    assert GEN.render(fresh) == OUTPUT.read_bytes(), (
+    assert GEN.render(fresh) == target.read_bytes(), (
         "同一输入重跑产出不同字节 —— 生成器不幂等（时间戳/随机序进产物？）"
     )
