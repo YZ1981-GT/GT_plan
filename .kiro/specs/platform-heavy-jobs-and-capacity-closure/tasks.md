@@ -404,6 +404,26 @@
     任务/进度/失效状态外置（`platform_jobs` 已 DB 耐久，进度与失效状态仍在进程内）。
   - 2026-11-06 复核：adapter 在生产代码里零调用，`EventBus` 仍直接读写 `_pending` / `_sse_queues`；
     骨架只是可注入接口，不能算外置。
+  - **2026-11-17 补（Redis 配额实现已落地，`[~]` 保持——2/4/8 worker 实跑仍缺）**：
+    新建 `app/services/event_bus_state_redis.py`：`RedisEventBusStateAdapter` 提供**跨 worker 的
+    SSE 配额**（`INCR` + 上限判断 + `EXPIRE` 合成一段 Lua，原子；释放同样走 Lua 且 `cur <= 0`
+    即止，不会减成负数）。pending 三方法**显式抛 `NotImplementedError`** 并写明原因 ——
+    `_pending` 存的是本进程 `asyncio.TimerHandle`，无法序列化；静默返回 None 会让每个 worker
+    各自 debounce 一次（重复派发），比直接崩更难查。
+    🔴 **三处口径/健壮性决定**（都有测试钉住）：
+    · `max_per_project <= 0` 视为**不限**（生产默认值就是 0；内存实现返回 False 是「上限 0 = 拒绝一切」，
+      两者语义不同，本实现按生产语义处理，否则切 adapter 后 SSE 全挂）；
+    · 配额 key 带 **TTL**（默认 3600s）：进程崩溃不会调 `release`，没有 TTL 时计数只增不减，
+      最终把项目永久锁死；
+    · 后端故障**降级放行**（SSE 是只读通知，不是写路径，配额服务挂了不应阻断事件流）。
+    新测试 `tests/test_event_bus_state_redis.py` **12 passed**（含原子性、TTL、不限语义、
+    降级放行、幂等释放）；与既有 adapter/EventBus 测试合计 **28 passed**；**6/6 变异 RED**。
+    🔴 **两条变异教训**：①假 Redis 若「无条件按当前值 <= 0 就 no-op」，则删掉生产 Lua 的守卫
+    用例仍绿 —— 假对象必须**按脚本原文模拟**；②`if cur <= 0 then return 0 end` 在文件里出现
+    两次（模块 docstring 的示例 + 真正的 `_RELEASE_LUA`），裸靶点会改到 docstring ⇒ 靶点必须带
+    `_RELEASE_LUA = """` 前缀。
+    **仍未完成**：真实 2/4/8 worker 部署下的零丢失 / 零重复验证（需专用容量环境 + 分布式 Locust）；
+    EventBus debounce pending 与 single-flight 状态受架构约束不在可外置范围。
 - [x] E3 修正 Locust UUID/信封/账号池/端点；6000 阶段无样本强制 FAIL。
 - [ ] E4 构建可销毁大数据容量环境与分布式负载机。
   - 🔴 Docker PgBouncer transaction 配置和连接预算契约已在库；尚无独立容量 DB、种子数据和分布式 Locust 启动编排。
