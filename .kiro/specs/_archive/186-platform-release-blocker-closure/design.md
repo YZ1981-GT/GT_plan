@@ -326,14 +326,76 @@ data.hard_blockers = [ {code:"stale_source", component:"financial_report",
 2. `status=blocked` 是**业务正确行为**，不是缺陷：该【测试】项目报表 9/258 行过期（其中 7 行计算失败）、
    附注 165/199 章 `is_stale`，readiness 如实阻断出具而非假放行 —— 这正是 R5「出具权威源」要的 fail-closed。
 
-### 12.6 未覆盖（如实登记，不粉饰）
-- **复核→终态链的浏览器写入型走查**：本轮为只读走查，未写业务数据。该链的后端行为已由三重证据覆盖 ——
-  真 PG `test_workpaper_review_lifecycle_pg.py`（退回→编制完成→重提→L1/L2/L3 + EQCR 拒）、共享库 freeze 探针
-  （4 个终态全 423 / draft 放行 / 回滚零残留）、守卫 `test_workpaper_terminal_freeze_guard.py`；前端只读与
-  冻结横幅由 vitest 隔离 54 passed 覆盖。浏览器写入型留作后续真环境 UAT。
+### 12.6 复核→终态链浏览器写入型走查（2026-11-16 补做，10/10 通过）
+
+> 12.5 之前此项登记为「未覆盖」。归档后按用户「这个你也要完成」补做，已全通过，故改写本节。
+
+**方法**：方案 A —— 用 admin 走完整链（`assert_review_level_actor` 对 admin 直接放行，是设计内的应急通道），
+不做完整角色矩阵（「角色不匹配被拒」已由真 PG `test_workpaper_review_lifecycle_pg.py` 的 EQCR 被拒用例覆盖）。
+
+**环境**：共享开发环境（前端 3030 / 后端 9980），Playwright chromium 无头浏览器，真实 UI 打开底稿编辑器 +
+真实 HTTP 写 + 真实 PG 落库。目标：【测试】公式同步甲有限公司_2025（`4c77f3e8`）的 D1-1 应收票据审定表
+（`9af57e14`）。
+
+**最小数据准备**（备份后仅两项，均走查后回滚）：
+① `working_paper.reviewer` = admin（原 NULL）；② 插一条 `wp_qc_results`（`blocking_count=0` / `passed=true`）。
+未改 `review_config` / `manager_id` / `partner_id`，未启用任何停用账号。
+
+**10 步全部通过**：
+
+| # | 步骤 | 结果 |
+| --- | --- | --- |
+| 1 | 登录 | 成功 |
+| 2 | 底稿编辑器打开（真实 UI） | len=1418 |
+| 3 | 提交前状态 | `draft` / `not_submitted` |
+| 4 | **旧 `batch-status` 的 `submit_review`** | **HTTP 410**（R3.3「不得假成功」实测生效） |
+| 5 | **唯一提交入口 `working-papers/batch-submit`** | HTTP 200，`submitted=1 skipped=0` |
+| 6 | 提交后状态 | `under_review` / `pending_level1` |
+| 7 | **L1 通过**（`batch-review` action=approve） | HTTP 200 `success_count=1` → `pending_level2` |
+| 8 | **L2 通过** | HTTP 200 `success_count=1` → **`review_passed` / `level2_passed`（终态）** |
+| 9 | 🔴 **终态内容写 `PUT /api/workpapers/{wp}/checklist-responses`** | **HTTP 423**（终态冻结真实生效） |
+| 10 | 前端刷新后的提示 | 命中「复核通过」「只读」 |
+
+**端点口径（现查 openapi 纠正，供后续复用）**：
+- 提交复核：`POST /api/projects/{pid}/working-papers/batch-submit`，body `{wp_ids:[...]}`（**不是** `batch-status`，
+  后者对 `submit_review` 返回 410）。
+- 层级通过：`POST /api/projects/{pid}/batch-review`，body `{wp_ids, action:'approve'|'reject', comment}`，
+  回执判据是 **`success_count`**（不是 `approved`/`passed`）。逐张走 `WorkingPaperService.update_review_status`
+  （F8 配置驱动状态机，层级数由 `project.review_config.levels` 决定，None ⇒ 默认 2 级）。
+- ⚠️ `POST /api/workpapers/{wp}/review` 是**单底稿 AI 复核**（会写 `ai_content` 的 `review_finding` 并生成
+  `checklist_responses` 的 `D1-review-session-*` 行），**不是**状态流转端点 —— 走查时误用过一次，副作用已清理。
+- ⚠️ `POST /api/workpapers/{wp}/review-sign` 是**复核签字表**（需 `project_id` + `wp_code` + 复核模板），
+  action 取值是 `pass|reject`；该项目无复核模板 ⇒ 422「未知复核模板」，与本链无关。
+
+**回滚与对账（CLEAN）**：
+- 目标底稿逐字段零漂移：`status=draft` / `review_status=not_submitted` / `reviewer=NULL` /
+  `workflow_status=draft`（与备份 `backup_before.json` 完全一致）。
+- 备份时已知 22 份底稿状态变化 **0 份**。
+- 本走查直接触碰的表全部归零：`wp_qc_results=0` / `review_records=0` / `checklist_responses(该底稿)=0` /
+  `pending ai_content=0` / `procedure_instances(该项目)=0`。
+- 清理的自身副作用（逐项登记）：1 条 `uat-probe` checklist 行、3 条误用 `/review` 产生的 `review_finding`、
+  3 条 `D1-review-session-*` 复核会话行、76 条 `procedure_instances`（打开 A1 程序表触发的自动生成）、
+  1 份 A1 底稿（`0630aca0`）。
+- 已知环境噪声（不属本走查、未触碰）：并发会话在 11:25 新建了底稿 `cfa1edae`。
+
+**仍未覆盖（如实登记）**：
+- **完整角色矩阵**：本走查用 admin 应急通道走通，未用真实 manager/partner/qc 账号逐级验证
+  「角色不匹配被拒」（该负向路径由真 PG lifecycle 用例覆盖，浏览器层未重复）。
+- **退回→修改→重提闭环的浏览器层**：后端已由 `test_workpaper_review_lifecycle_pg.py` 覆盖，
+  本走查聚焦「提交→逐级通过→终态→423」主链。
 - **OO 在线编辑 iframe 的本 spec 视角往返**：上游 spec 174 已于 2026-11-15 独立实测通过，本 spec 不重复。
-- **`/readyz` 当前 503（范围外，非本 spec 引入）**：根因是共享库 **V273 checksum 漂移未登记**
-  （`V273__sync_conflict_abandon_columns.sql` 应用后被编辑，登记 `c5a6e5709f34…` / 当前 `608d8ed9e65d…`）。
-  V273 属 `frozen-contract-read-path-and-legacy-operation-settlement`。本 spec R6.3 的判据
-  （critical drift ⇒ 503）**本身按设计正确生效**，`/api/health` 仍 200 并如实列出 `migration.pending_versions=[]` /
-  `failures=[]`。处置交该 spec / 迁移负责人（登记到 `app/core/migration_drift_ledger.py` 或按现查真库确认效果）。
+
+### 12.7 `/readyz` 503 已修复（V273 漂移登记，2026-11-16）
+
+12.6 原记「`/readyz` 503 属范围外」。归档后已实际修复：按 `migration_drift_ledger` 的处置顺序先现查真库
+逐对象核验 V273 的编辑内容**全部已在库生效**（三列 / 外键 `convalidated=True` / CHECK
+`ck_wpsc_abandon_triplet` `convalidated=True` 且定义与文件逐字一致 / 三列注释齐备 / 数据面 392 行中 283 行
+已带 `abandoned_at`）⇒ **无需补迁移**，按 V248/V249 同型先例登记到 `app/core/migration_drift_ledger.py`，
+不改写共享 `schema_version` 的应用时 checksum。验证：`test_migration_drift_ledger.py` 62 passed、
+`test_migration_integrity_pg.py` 17 passed；**变异证明**摘掉 V273 登记后
+`test_no_unexplained_checksum_drift` 精确打红 `[('273','c5a…','608d…')]`，逐字节还原 sha256 一致
+⇒ 判据非恒绿。推送 `v1.0.281`。
+
+🔴 剩余未决（非本 spec）：`/readyz` 仍报 `pending_versions=['274']` —— 另一会话未跟踪的在途迁移
+`V274__workpaper_legacy_drain_ledger.sql`（其 SQL 中文已损坏：699 个 `?` / 0 个 CJK 字符），属
+`onlyoffice-sheet-open-via-published-artifact` Task 4.2，交该 spec 作者补齐后执行。

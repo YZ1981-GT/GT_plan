@@ -95,11 +95,17 @@
     返回六源结构 `dataset / tb / formula_push / report / notes / adjustment` 与逐源 `content_digest`，即 Task 15/16
     交付的六源统一 + 快照内容摘要在生产构建下真实生效。`status=blocked` 是**业务正确行为**（该【测试】项目
     报表 9 行过期含 7 行计算失败、附注 165/199 章 `is_stale`），如实阻断出具而非假放行。
-  - 写入型主链（复核→终态→内容写 423）此前已在用户授权后于候选代码（v1.0.139）验证，四重证据见 design §11；
-    本轮为**只读**走查，未写业务数据。
-  - 仍未覆盖（如实登记）：复核→终态链的**浏览器**写入型走查（后端已由 `test_workpaper_review_lifecycle_pg.py`
-    + 共享库 freeze 探针 + `test_workpaper_terminal_freeze_guard.py` 覆盖）；OO 在线编辑 iframe 的**本 spec 视角**
-    往返（上游 spec 174 已独立实测通过，本 spec 未重复）。
+  - 写入型主链（复核→终态→内容写 423）此前已在用户授权后于候选代码（v1.0.139）验证，四重证据见 design §11。
+  - ✅ **2026-11-16 追加：复核→终态链浏览器写入型走查已完成（10/10 通过）**（design §12.6）——
+    真实 UI + 真实 HTTP + 真实 PG：登录 → 打开底稿 → 旧 `batch-status` 的 `submit_review` **410** →
+    唯一入口 `working-papers/batch-submit` `submitted=1` → `under_review/pending_level1` →
+    L1 通过 → `pending_level2` → L2 通过 → **`review_passed`/`level2_passed`（终态）** →
+    🔴 **终态内容写 `PUT checklist-responses` = HTTP 423** → 前端显示「复核通过 / 只读」。
+    最小数据准备两项（reviewer=admin + 一条 QC 记录）已精确回滚，对账 **CLEAN**（目标底稿逐字段零漂移、
+    已知 22 份底稿零变化、5 张表全部归零）。
+  - 仍未覆盖（如实登记，见 design §12.6 末段）：完整角色矩阵（用 admin 应急通道走通，manager/partner/qc
+    逐级「角色不匹配被拒」由真 PG lifecycle 用例覆盖）；退回→修改→重提闭环的浏览器层（后端已覆盖）；
+    OO 往返的本 spec 视角（上游 spec 174 已独立实测）。
   - 终态冻结（本批核心）由真 PG `test_workpaper_review_lifecycle_pg.py` + 一次性库 `PARTIAL_STATUS_STUB=OK`
     + 守卫 `test_workpaper_terminal_freeze_guard.py`（17 passed）覆盖；前端只读 / 冻结横幅由 vitest 隔离 54 passed 覆盖。
   - ✅ 写入型主链（复核→终态→内容写 423）已在用户授权后于候选代码（v1.0.139）验证，四重证据（design §11）：
