@@ -1,6 +1,6 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：10/34（2026-11-16，Phase 0.1~0.3、1.1~1.2、2.1~2.5 已完成；产品代码仍未迁移已就绪 binding）**
+> **状态：11/34（2026-11-16，Phase 0.1~0.3、1.1~1.2、2.1~2.6 已完成；Phase 2 服务端解析层已收口，产品代码仍未迁移已就绪 binding）**
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
@@ -63,7 +63,13 @@
   - 12 例守卫；变异 9/9 全精确打红零假红。
   - 🔴 首版把 bundle digest 字段猜成 `bundle_sha256` / `sha256`（真名 `canonical_payload_sha256`）⇒ `getattr(..., "")` 恒空 ⇒ 所有读路径都报 drift。这是「未确认接口先读一次」的又一次实例。
   - _R: 2, 3, 7_
-- [ ] 2.6 为 migrated binding 停止签发旧 config / WOPI / callback；pending / out_of_scope 保留独立在线编辑并在响应标明不同步。
+- [x] 2.6 为 migrated binding 停止签发旧 config / WOPI / callback；pending / out_of_scope 保留独立在线编辑并在响应标明不同步。
+  - `_wp_onlyoffice_legacy_url_gate.py` 改两层判据：**binding 状态机优先**（`migrated`/`retired`/`draining` 拒 409；`pending`/`out_of_scope`/`ready` 放 + `sync_mode=independent`），binding 层无结论时才走 readiness 层（与 2.8 第 ① 步同口径）。
+  - 旧式 config 响应新增 `sync_mode`（值取自 verdict，非字面量）+ `binding_status`：前端据此显示「独立在线编辑（不同步）」而不是假「已同步」。
+  - `draining` 独立文案（`DRAINING_MESSAGE`）：已打开的会话还能存，与 `migrated` 的「必须换入口」分开。
+  - 生成物坏掉（`unresolved`）取中间档：放行 + 标 `binding_status=resolution_failed` + `logger.error`（不拒：会让全平台在线编辑一起挂；不静默：那是本 spec 交付物坏了）。
+  - 17 例新守卫（`test_sheet_legacy_gate_binding_states.py`）+ 既有 9 例按新分层改口径；变异 9/9 全精确打红零假红。
+  - 🔴 M8/M9 首轮存活：打桩了 `_binding_verdict` 整个函数 ⇒ 测不到它内部容错方向；`sync_mode` 无任何判据查 router 响应字段。补「调真实 `_binding_verdict` + 只打桩 resolver」与「AST 查响应字典键 + 值来源」后打红。
   - _R: 4, 6_
 
 ## Phase 3：前端宿主切换

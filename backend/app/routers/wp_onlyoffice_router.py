@@ -764,9 +764,19 @@ async def get_sheet_onlyoffice_config(
     #
     # 判据来源是 `evaluate_entry_readiness` —— 与前端展示「能不能双向回写」用的是
     # **同一个**函数（3.1/3.5 建立的单一来源），不在这里另造一套资格判定。
+    # spec `onlyoffice-sheet-open-via-published-artifact` 2.6：binding 级状态机优先
+    # （migrated/retired/draining 拒；pending/out_of_scope 放但标 independent），
+    # binding 层无结论时才走 readiness 层。verdict 并进响应供前端判同步语义。
+    legacy_verdict: dict = {}
     if not settings.ONLYOFFICE_LEGACY_URL_ISSUE:
-        await _refuse_legacy_url_when_room_ready(
-            db, wp_id=wp_id, project_id=project_id, entry_id=_room_entry_id
+        legacy_verdict = await _refuse_legacy_url_when_room_ready(
+            db,
+            wp_id=wp_id,
+            project_id=project_id,
+            entry_id=_room_entry_id,
+            source_wp_code=_sheet_wp_code,
+            sheet_name=sheet_name,
+            whole_workbook=whole_workbook,
         )
 
     doc_key = await _room_identity.resolve_room_doc_key(db, wp_id=wp_id, entry_id=_room_entry_id)
@@ -897,6 +907,10 @@ async def get_sheet_onlyoffice_config(
         "token": token,
         "mode": mode,
         "documentType": document_type,
+        # R4.2 / R6.2：`independent` = 独立在线编辑、与 HTML 不同步；`bound` = 已绑 room。
+        # 缺这个字段时前端只能猜，而「猜成已同步」正是本 spec 要消灭的假状态。
+        "sync_mode": legacy_verdict.get("sync_mode", "independent"),
+        "binding_status": legacy_verdict.get("binding_status"),
         "onlyoffice_url": settings.ONLYOFFICE_URL,
     }
 

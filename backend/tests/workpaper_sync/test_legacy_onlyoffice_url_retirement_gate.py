@@ -70,10 +70,24 @@ def _readiness(*, ready: bool, entry_id: str = "xlsx-sheet/D4-1/__whole__") -> S
     )
 
 
-def _gate(router_module: Any, readiness_obj: Any | None, *, raises: Exception | None = None):
-    """在 readiness 打桩下调用门，返回它抛的异常（没抛则 None）。"""
+def _gate(
+    router_module: Any,
+    readiness_obj: Any | None,
+    *,
+    raises: Exception | None = None,
+    binding_status: str = "no_binding",
+):
+    """在 readiness 打桩下调用门，返回它抛的异常（没抛则 None）。
+
+    🔴 2.6 起门分两层：binding 状态机优先，binding 无结论才走 readiness。本文件测的是
+    **readiness 那一层**，所以默认把 binding 层打桩成 `no_binding`；binding 层的三条臂
+    在 `test_sheet_legacy_gate_binding_states.py`。
+    """
     target = (
         "app.services.workpaper_sync.entry_readiness.evaluate_entry_readiness"
+    )
+    binding_target = (
+        "app.routers._wp_onlyoffice_legacy_url_gate._binding_verdict"
     )
 
     async def fake_evaluate(**_kwargs: Any) -> Any:
@@ -81,14 +95,25 @@ def _gate(router_module: Any, readiness_obj: Any | None, *, raises: Exception | 
             raise raises
         return readiness_obj
 
+    def fake_binding(**_kwargs: Any):
+        if binding_status == "unresolved":
+            return "unresolved", None
+        return "no_binding", None
+
     import asyncio
 
     async def run() -> None:
         await router_module._refuse_legacy_url_when_room_ready(
-            AsyncMock(), wp_id="wp", project_id="proj", entry_id="e"
+            AsyncMock(),
+            wp_id="wp",
+            project_id="proj",
+            entry_id="e",
+            source_wp_code="D4",
+            sheet_name="境外销售收入检查D4-26",
+            whole_workbook=False,
         )
 
-    with patch(target, new=fake_evaluate):
+    with patch(target, new=fake_evaluate), patch(binding_target, new=fake_binding):
         try:
             asyncio.run(run())
         except HTTPException as exc:
@@ -183,8 +208,12 @@ def test_gate_delegates_to_the_single_readiness_source() -> None:
         "门没调 evaluate_entry_readiness —— 它必须复用唯一判据，不得另造资格判定"
     )
     assert "runtime.ready" in body, "门没读 runtime.ready"
-    # 反面：门里不得出现自己的 manifest / adapter 判定
-    for forbidden in ("load_entry_manifest", "manifest_entries_by_id", "INTENT_POLICY"):
+    # 反面：门里不得**重写**一套 readiness 资格判定。
+    #
+    # 🔴 2.6 起 `load_entry_manifest` 从禁止改成允许：binding 层要按 manifest 校验
+    #    entry 是否真实存在（Requirement 1.1 的显式真源）。真正要禁的是「自己判
+    #    capability / intent policy」—— 那才是会让两处口径分叉的第二套资格判定。
+    for forbidden in ("INTENT_POLICY", "capability_of", "Capability("):
         assert forbidden not in body, (
             f"门里出现了 {forbidden} —— 那是第二套资格判定，会让两处口径分叉"
         )
