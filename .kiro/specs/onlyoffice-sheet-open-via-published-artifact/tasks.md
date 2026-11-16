@@ -1,6 +1,6 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：20/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.6 + 3.7 + 5.1 + 5.3 + 5.4 已完成；真源层 / 服务端解析层 / 前端三态与文案 / legacy ledger / 后端契约清单 / 前端契约守卫 / 变异套件已收口）**
+> **状态：21/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.6 + 3.7 + 5.1 + 5.3 + 5.4 + 5.6 已完成；全部纯代码判据已收口，余 13 项为真实环境依赖 / 治理收尾）**
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
@@ -159,7 +159,13 @@
   - _R: 1, 2, 3, 6, 10_
 - [ ] 5.5 Playwright：普通 sheet / whole workbook / 聚合 source sheet / pending fallback / drain 五条 required scenarios；记录网络、console、页面错误、数据快照与 artifact identity。
   - _R: 3, 4, 6, 9, 10_
-- [ ] 5.6 clean checkout：生成物 `--check`、后端测试、前端定向测试、构建、路由注册、行数门与 git tracked 交付物检查。
+- [x] 5.6 clean checkout：生成物 `--check`、后端测试、前端定向测试、构建、路由注册、行数门与 git tracked 交付物检查。
+  - `backend/scripts/check/check_sheet_open_clean_checkout.py`：**可重复执行的单一入口**（`--skip-tests` 只跑静态项）。7 项检查：①三个生成器 `--check` ②23 个交付物 `git ls-files` 跟踪 ③`entry-identity` 挂在**真实 `app.routes`**（不只查模块级 router —— 本仓踩过「router 存在但没注册」）④**变异残留**（11 类精确靶点 × 8 个生产文件）⑤后端守卫选集 ⑥前端定向测试 ⑦行数门。
+  - 实测 **7/7 全过**：后端 116 passed / 1 skipped，前端 37 passed。
+  - 🔴 **本轮最重要的发现**：5.3 的变异 M4 残留（`if (value !== undefined && value !== null) return 'pending'`）**从未被恢复** —— 它让 3 条前端用例一直红，而我在 3.1/3.6 期间看到「15 passed」是**误读输出**（`Select-Object -Last N` 截到了别的行）。根因：变异脚本的 `finally` 会被 Ctrl+C 绕过（本轮终端多次显示 `^C`）。
+    - 修复：删掉残留 + 把「变异残留检查」**固化进 5.6 总验**（独立于变异脚本，始终执行，不受 `--skip-tests` 影响）。
+    - 判据设计：只列「注入后**不可能**是任何人手写」的形态（如 `(lambda **k: None)(`），且**只扫生产代码**（测试文件里提到变异形态是正当的 —— 首版全扫 `DELIVERABLES` 产生 4 处误报）。
+  - 🔴 另两处修复：①路由探测的 JSON 解析被 `app.main` 导入时的 JWT 弱密钥**警告**干扰（取最后一行拿到的是警告）⇒ 改为找第一个以 `[` 开头的行；②probe 脚本放仓库根而 `app` 包在 `backend/` 下 ⇒ 显式设 `PYTHONPATH`（不靠 `cwd`）。
   - _R: 8, 10_
 - [ ] 5.7 更新 umbrella 2.8 的余项状态、INDEX、memory 与归档证据；只有完成门满足后归档本 spec。
   - _R: 10

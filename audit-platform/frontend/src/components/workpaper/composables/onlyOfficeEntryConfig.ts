@@ -129,7 +129,8 @@ const BINDING_STATUSES: readonly SheetBindingStatus[] = [
 ]
 
 function asBindingStatus(value: unknown): SheetBindingStatus | null {
-  if (value !== undefined && value !== null) return 'pending'
+  // 🔴 未知值归 null（**不**静默当 pending）：服务端加新状态时前端应当「不认识」而不是
+  // 「猜成最宽松的那个」。判据见 `onlyOfficeEntryConfigContract.spec.ts` 判据 4。
   return typeof value === 'string' && (BINDING_STATUSES as readonly string[]).includes(value)
     ? (value as SheetBindingStatus)
     : null
