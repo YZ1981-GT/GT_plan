@@ -75,7 +75,11 @@
   - [x] 34.3 前端 ReviewWorkbench：`approveCurrent` / `rejectCurrent` 改发当前级的 `levelN_passed` / `levelN_rejected`；`reviewStatusLabel` 补 L3/L4；批量通过改调 `batchReview()`；删 `api` 直调
   - [x] 34.4 前端项目设置：底稿配置 tab 加「复核层级」卡片（2/3/4 + 各级角色 + 保存），onMounted 加载 review-config，409 提示
   - [x] 34.5 测试：`test_review_state_machine.py` 19 passed（转换表 8 + 状态机集成 6 + 批量端点 5）；回归 386 passed 0 failed；_IDENTITY_ONLY_BASELINE 153→152（batch_review 从 readonly 提升到 review）；route_shadow_guard fixed case 改 /ai-batch-review
-  - [ ]* 34.6 浏览器实测：复核配置入口正常、接口端到端 3 项全通过；提交→通过→退回全流程因无 pending_level1 底稿未实测（编号原与 34.5 重复，2026-11-06 按 requirements R13.3 改为 34.6；前置条件见 R13.2）
+  - [x] 34.6 浏览器实测：复核配置入口正常、接口端到端 3 项全通过；提交→通过→退回全流程因无 pending_level1 底稿未实测（编号原与 34.5 重复，2026-11-06 按 requirements R13.3 改为 34.6；前置条件见 R13.2）
+  - 2026-11-16 现算前置已满足：`working_paper` 里 `【测试】公式同步甲有限公司_2025` 的 K10 底稿（`0ad2e502-d9cc-42e8-b30d-7085704b3988`）`review_status = pending_level1`；全库 0 个项目设过 `review_config`（默认 2 级，与 34.1 的缺省一致）。
+  - **2026-11-16 界面实测通过**：①`/projects/{pid}/review-inbox` 待复核队列出现 **1 条 K10「待一级复核」**，三栏视图显示「通过 / 退回」、AI 预审（1 项阻断：审计说明不完整 + 结论为空）、复核意见框；②「通过」按钮 `disabled`（AI 预审阻断未消除，与「AI 不产生业务 pass」一致）、「退回」可用；③**未填原因直接退回 → 400「退回时必须填写退回原因」**（R12.4 必填原因成立）；④在复核意见框填原因后退回 → `PUT /api/projects/{pid}/working-papers/{wp}/review-status` 200 `{status: "revision_required", review_status: "level1_rejected"}`（R12.4 底稿标「需修改」成立），界面提示「已退回修改」。
+  - 接口层另验：`pending_level1 → level1_passed` 自动推进 `pending_level2`；`pending_level2 → level2_passed` 底稿转 `review_passed`（R12.3）。
+  - 解除前置所做的临时改动已全部复原：K10 回到 `review_status=pending_level1` / `status=draft` / `reviewer=NULL`；临时加入项目团队的 admin `project_assignments` 行已删除（`remaining=0`）。
 - [x] 35. §8.2 另立 spec `project-pid-path-authz-coverage` 并登记 INDEX — 三件套已写（tasks 1-6），INDEX 第 7 行，Active 14
 
 ## 收尾
@@ -83,6 +87,7 @@
 - [x] 22. 回归：后端 42 个文件 488 passed / 11 failed（均 HEAD 同红：workhour_batch_approve 5、workhour_list 2、version_trail_integration 3、task9 checklist_put_allow_admin 1）/ 5 skipped（已归档 spec 的永红守卫）；前端最终合并选集 212 个文件 2929 passed / 6 failed，6 例均在 HEAD worktree 上同样失败（gCycleProcedureConsole、GtAuditSheet 行数、rawRequestAuth 的 GtA51 原生 fetch、controlledInputCommitRatchet 的 HEAD 已 1749 > 1748、hostSheetDispatchChain 的 GtH10 ×2）；单区域类型检查三组相对 HEAD 新增 0（1488→1477、24→22、0）；ESLint 0 error、warning 相对 HEAD 新增 0；行数门 99 个文件通过（ReportView 上限压低 1 的对照组打红）
 - [x] 23. 浏览器实测（127.0.0.1:3030）：报表页 /api 全 200、附注列编号、切年度写 `?year=&tab=` 并按新年度取数、console error 0；项目树标签无 warn；版本链抽屉 5 条快照、「历史版本」页签走 `/version-archives`（全库 `wp_version_archive` 0 行，空数组为真实状态）；工时预算对比；公式管理四宿主首次打开才加载；D2 能力快照 1 次请求
 - [ ]* 23a. A16 推荐标记、A18-2 导出的界面走查：只在页面内调接口验证（A16 推荐 A16-1、A18-2 检查 4 项未填、导出 17,965 字节 docx）；打开真实项目底稿会占编辑锁，未做界面层。**不单独验收**，结论引用任务 28（requirements R13.1）
+  - 2026-11-16 走查批：A18-2 检查 / 导出**已界面实测通过**（点「导出 Word」弹出 4 项未完成提示）；A16 推荐标记接口 200 但界面 badge 仍缺「含 A16 关联行的 `a-program-console` 底稿」。详见「2026-11-16 走查批」表。
 - [x] 24. 更新本 spec 证据、INDEX（第 6 行）、memory（1 行，共 300 行）；删仓库外探针目录与基线 worktree；待裁决项见 design §8
 > **2026-11-14 勘误（上一条 2026-11-11 勘误已过期，append-only，原勾选与原文均不改）**：用户「整体分析下未归档完成的 spec，逐一修复完成」时对该条逐句现算复核，**「任务 26 / 27 的产物不在当前分支」这一判断已不成立**。
 > - 三个守卫**全部在库且已被跟踪**，同一提交 `d7d7515f5`（`chore(root): 同步隔离树改动并清理临时产物`）入库：`src/__tests__/apiPathPrefixGuard.spec.ts`、`src/components/workpaper/__tests__/k10OcrContract.spec.ts`、`src/components/workpaper/composables/__tests__/iCycleDualModeHealth.spec.ts`；`GtRegulatoryLetter.requests.spec.ts` 亦在库。
@@ -98,3 +103,53 @@
 >   | A16 推荐标记 | `GtA16Bundle` 只显示存在 `A16-1`~`A16-7` 子底稿的页签 ⇒ 页签全空 | 未在本轮复核范围（属界面层，需【测试】项目里有 A16 子底稿才能验；`api-prefix-fix-recovery` 任务 5 已补「子底稿缺失时的空态」） |
 > - ⇒ **任务 26 / 27 的交付状态已具备分支级证据**（在库 + 可执行守卫 + 剔除注释后 0 处缺失前缀），原「不计入完成度」的处置不再成立。任务 28 的**代码侧**五条阻断全部消除；剩下的只是**界面走查**本身（需在【测试】项目里按平台路径生成 A16 子底稿后逐项点开），因此仍保持 `[ ]*`，但阻断原因由「产物不在分支」更正为「仅缺界面层实测与 A16 子底稿数据」。
 > - 复核方法留痕：探针 `tmp_spec_audit/probe_api_prefix_ast.py`（全仓剔注释扫描）、`tmp_spec_audit/probe_residual_task28.py`（不剔注释，用于对照假阳）、`tmp_spec_audit/probe_residual_task28_strict.py`（剔注释，出上表数据）。
+
+## 2026-11-16 走查批（任务 28 / 23a / 34.6 收口，append-only）
+
+> 触发：用户「platform-performance-residual-findings-closure 分析下这个三件套，继续完成剩余任务，如果都已完成就归档，之后推送」。
+> 环境：`127.0.0.1:3030`（前端 55816）+ 共享后端 9980（60260）；Docker `audit-postgres` / `audit-onlyoffice` / `audit-redis` 全 healthy。
+> 数据：`【测试】公式同步甲有限公司_2025`（`4c77f3e8-3938-4628-8836-1435dda4ddea`），试算表 174 行（满足 `generate-from-codes` 前置门禁）。
+
+### 前置数据（R13.2 解除）
+
+- **A16-1~7 七张子底稿**经平台路径 `POST /api/projects/{pid}/working-papers/generate-from-codes` 生成：`created=7` / `failures=[]` / `blank_codes=[]` / `header_failures=[]`；落库确认 `wp_index` 有 `A16` + `A16-1`~`A16-7` 共 8 行，`review_status` 全 `not_submitted`。
+- **A1**（`a1-dashboard`）与 **S1**（含 `a-program-console` sheet）经同一端点生成，用于定位「A16 推荐标记」的承载组件；A 循环程序目录 `POST /api/projects/{pid}/procedures/A/init` 落 76 条程序行。
+- **K10**（`0ad2e502-d9cc-42e8-b30d-7085704b3988`）原状 `review_status = pending_level1`、`reviewer = NULL`，满足 34.6 前置。
+
+### 任务 28 五项逐项结论
+
+| 项 | 结论 | 证据 |
+|---|---|---|
+| **A18-2 读写** | ✅ 界面通过 | 打开 `GtA182RegulatoryCommunication`，点「1. 舞弊 · 适用」→ 触发 `PUT /api/workpapers/19bde1db…/checklist-responses`（带 `/api`）→ 库内 `checklist_responses.a182-matter1-applicability = 'Y'`；随后经同一端点写回 `null` 复原 |
+| **A18-2 检查 / 导出** | ✅ 界面通过 | 点「导出 Word」→ 界面弹「以下 4 项议题尚未完成：舞弊（未选择适用性）…继续导出时这些内容在 Word 中会是空白」，即 `check-incomplete` 统一契约 `{complete, missing_fields}` 生效；**修复已落在用户可见的 `GtA182RegulatoryCommunication.vue`**（`export-word` 请求 1 处、`/api` 形态），2026-11-11 记录的「修在看不到的组件上」已不成立 |
+| **I 循环在线编辑切换** | ✅ 界面通过 | I1 页面 `?sheet=I1-1` 下 `hasOnlineEdit=true` + `hasStructuredView=true`，且**无「仅结构化视图」降级标签** ⇒ `fetchOnlyOfficeHealthy()` 统一探针判 OO 健康通过（原 `/workpapers/onlyoffice/health` 少 `/api` 的缺陷已消）。注：`GtI1IntangibleAssets` 的切换按钮在 `currentSheet === 'I1'`（底稿目录）时刻意隐藏，需进子表才出现，属既有设计 |
+| **H3 勾稽** | ✅ 接口 + 代码通过 | `h3TransferReconcile.ts` 两处均为 `api.get('/api/custom-query/wp-id-by-code', …)`；实测 `GET /api/custom-query/wp-id-by-code?project_id=…&wp_code=H3` → 200 `wp_id=8263e2aa…`，`H1`/`H2` 返回 404（对方底稿未生成，属正常业务分支，调用方 `_silent` + 返回 null）；H3 页面「互转审核表 H3-6」正常渲染并含勾稽文案 |
+| **K10 识别** | ✅ 接口契约通过 | `POST /api/workpapers/0ad2e502…/d4/contract-ocr`（multipart）→ 200，返回 `{ocr_text, extracted_fields{20 键}, confidence, requires_human_confirmation}`，正是前端 `res?.ocr_text` 读取的字段；K10-5 页面「OnlyOffice 就绪」正常。探针附件（`probe.png`，`83d116b1…`）已按平台路径解绑 + 软删清理 |
+| **A16 推荐标记** | 🔴 **界面不可达（预存接线错位）** | 接口 `GET /api/projects/{pid}/a16/recommended-version` → 200 `{recommended_code: "A16-2", all_versions[7 项], always_required: ["A16-7"]}`，正是 `WorkpaperWordEditor.loadRecommendedVersion` 读的字段。但推荐 badge 的实际承载是 `GtAProgramConsole`（componentType `a-program-console`）里的 A16 seq2 行，而 `isA16Seq2Row` 要求 `extractTableCode(sheetName) === 'A16'` 且该行 `linked_workpapers` 含 ≥3 个 `A16-1~6` 子码 —— **A16 底稿的 sheet 已改成 `a16-bundle`（7 个页签的 Word 编辑器），不走 `a-program-console`** ⇒ `isA16Table` 恒假 ⇒ 推荐 badge 在 A16 页面上**永远不会渲染**。`git log -S` 确认 `isA16Seq2Row`（`07ea93382` 组件拆分时抽出）与 `"A16": "a16-bundle"` 均已在 HEAD ⇒ **预存接线错位，非本 spec 引入**。`GtAProgramConsoleA16Seq2.spec.ts` 的 7 例按真实形状覆盖了 badge 逻辑本身（API 成功 / 失败 / 无 badge），但测不出「承载组件与底稿 componentType 不匹配」。建议另立 spec 裁决：把推荐 badge 接到 `GtA16Bundle` 的版本选择区（那里已有 `WorkpaperWordEditor` 的「推荐」`el-tag`），或删除 `GtAProgramConsole` 里这段不可达逻辑 |
+
+> ⇒ 任务 28 的五项**代码侧阻断全部消除**；四项界面实测通过，A16 推荐标记经现算**界面不可达**（预存接线错位：badge 逻辑在 `a-program-console`，A16 已是 `a16-bundle`），已单列在下方「本批新发现」。任务 28 按 R13.4 保持 `[ ]*`（A16 项无法通过界面走查验收），但阻断原因已从「缺数据」更正为「承载组件与底稿 componentType 不匹配（需另立 spec 裁决接线位置）」。
+
+### 本批新发现（预存缺陷，登记不改，按 R0.5 不计入本 spec）
+
+1. 🔴 **`DELETE /api/attachments/{attachment_id:uuid}` 对任何用户恒 404**（含 admin、附件已绑定本项目底稿）。逐层定位：`load_attachment` 通过 → `_ensure_project_access(edit)` 通过 → `enforce_attachment_wp_visibility` 抛 `ExternalNotFound`。根因 = 该端点传 `action="attach_read"` + `entrypoint="attachment.delete"`，而 `action_matrix._CONTENT_MUTATION_FAMILIES` 里是 `("attachment.delete", "DELETE", "attach_delete")` ⇒ gate 按 entrypoint 解析出 `attach_delete`、按 action 匹配 `attach_read`，两者对不上 ⇒ `_match_grants` 恒空 ⇒ 恒 404。
+   - **HEAD 上同样存在**（`git show HEAD:backend/app/routers/attachments.py` 逐字相同）⇒ 预存缺陷，非本 spec 引入。
+   - 影响：附件「删除」按钮从未可用（回收站路径不受影响）。建议另立 spec：把该端点改成 `action="attach_delete"`（与矩阵一致），并补端点级用例（admin / 项目成员 / 非成员三态）。
+   - 走查探针附件因此改用平台服务层清理（解绑 `attachment_working_paper` + `is_deleted=true`），已在「任务 28 五项」表内注明。
+2. 🔴 **A16 推荐 badge 界面不可达**（见上表 A16 行）：`isA16Seq2Row` 要求 `extractTableCode(sheetName) === 'A16'` 且行含 ≥3 个 `A16-1~6` 子码，而 A16 底稿的 sheet 已是 `a16-bundle` ⇒ `isA16Table` 恒假。`git log -S` 确认 `isA16Seq2Row`（`07ea93382`）与 `"A16": "a16-bundle"` 均已在 HEAD ⇒ 预存接线错位。
+3. 🟠 **复核退回 400 的错误提示未显示**：未填原因点「退回」时后端正确返回 400「退回时必须填写退回原因」，但界面 `ElMessage` 列表为空、用户看不到原因。`ReviewWorkbench.doRejectCurrent` 的 catch 走 `handleApiError(e, '操作')`，而 `updateReviewStatus` 的错误信封可能未被该函数识别。登记不改（属复核工作台可用性，非本 spec 范围）。
+
+### 任务 34.6 复核流转（界面 + 接口双通）
+
+`ReviewInboxService.get_inbox` 的过滤条件是 `review_status IN (pending_level1..4) AND reviewer == current_user`。解除前置的两步临时改动：①把 admin 加进项目团队（`POST /api/projects/{pid}/assignments`，`staff_id=ede2b9fc`，role=manager）—— 此前直接分配 reviewer 时后端返回 400「复核人不是本项目成员，请先在团队分配中加入」；②把 K10 的 `reviewer` 设为 admin。
+
+界面实测（`/projects/{pid}/review-inbox`）：
+
+1. 待复核队列出现 **1 条 K10「待一级复核」**，三栏视图含「通过 / 退回」、AI 预审（1 项阻断：审计说明不完整 + 结论为空）、复核意见框；
+2. 「通过」按钮 `disabled=true`（AI 预审阻断未消除；与「AI 不产生业务 pass」一致），「退回」可用；
+3. **未填原因直接退回 → 400「退回时必须填写退回原因」** ⇒ R12.4 必填原因成立（🔴 该 400 未在界面显示任何提示，`ElMessage` 列表为空 —— 走查发现的可用性缺陷，登记不改）；
+4. 在复核意见框填原因后退回 → `PUT /api/projects/{pid}/working-papers/{wp}/review-status` 200 `{status: "revision_required", review_status: "level1_rejected"}`，界面提示「已退回修改」⇒ R12.4 底稿标「需修改」成立。
+
+接口层另验（`PUT …/review-status` 直调）：`pending_level1 → level1_passed` 返回 `{status:"under_review", review_status:"pending_level2"}`（R12.3 非末级通过自动推进下一级）；`pending_level2 → level2_passed` 返回 `{status:"review_passed"}`（R12.3 末级通过标复核完成；全库 0 个项目设 `review_config`，走 34.1 的缺省 2 级）。
+
+复原：K10 回到 `review_status=pending_level1` / `status=draft` / `reviewer=NULL`；临时加入的 admin `project_assignments` 行已删除（`remaining=0`）。
+
