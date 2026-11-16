@@ -171,6 +171,16 @@
     **跳过判据**：`GT_BARRIER_PG=1` **且** `DATABASE_URL` 含 postgresql 才跑，否则 5 skipped
     （只看 URL 不够：本地库存在但连不上时会把「跳过」变成「连接被拒失败」）。
     **仍未完成**：合并附注差额节点（`fill_by_formula`）与叶子来源整章批取的真实 PG 对拍。
+    **2026-11-17 补（叶子来源整章批取已接线，`[ ]` 保持——差额节点纯内存化与真实 PG 对拍仍缺）**：
+    `reaggregate_subtree._Run` 新增按章节 `source_tables` 缓存：`process_section` 在逐节点后序循环前，
+    收集本章全部数据叶子 project_id，一次调用 `load_source_tables`；随后每个 `_pull` 将缓存传给
+    `apply_detail_refresh(prefetched_sources=...)`，写入仍按节点独立、章节 SAVEPOINT 与保护格语义不变。
+    `apply_detail_refresh` 只在未传预取时读取来源，避免批取后再次查询。
+    新建 `tests/test_consol_reaggregate_batch_prefetch.py`（5 passed），守卫覆盖：章节预取存在、
+    预取发生在节点循环前、`_pull` 传缓存、apply 层消费缓存、process_section 不自行重复读取。
+    完整磁盘变异因当前 Windows 共享进程占用 `_overlapped` 导致 pytest 子进程无法初始化，未虚报变异通过；
+    代码级 AST 双向守卫已通过，后续需在干净验证环境补 3 组变异。
+
   - 2026-11-06 复核：未接内核的写入链具体是 `formula_push.note_followup →
     note_workpaper_pull_service._apply_note_formulas → note_formula_generator.execute_note_formulas`，
     仍直接改 `DisclosureNote.table_data` + `flag_modified` / flush，无章节 advisory lock。

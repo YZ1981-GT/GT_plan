@@ -182,6 +182,7 @@ class _Run:
         self.bound_sections: set[str] = set()
         self.mapping: dict[tuple[str, str], str] = {}
         self.formulas: dict[str, list[Any]] = {}
+        self.source_tables: dict[str, dict[UUID, Any]] = {}
         self.records: dict[tuple[str, str | None], ConsolNoteData] = {}
         self.view: Any = None
         self.view_error: str | None = None
@@ -287,6 +288,33 @@ class _Run:
             return
         self.measures = node_measures(self.view.basis)
 
+    async def _prefetch_section_sources(self, section_id: str) -> None:
+        """按章节一次批取全部叶子来源，供本章节的逐节点 apply 复用。
+
+        ``apply_detail_refresh`` 仍按节点保存各自的 ``ConsolNoteData``，但来源读取已经
+        从「每个叶子一次 `load_source_tables`」收敛为「每个章节一次」。这补的是 C2 的
+        SQL 放大缺口，不改变映射、保护格或章节 SAVEPOINT 语义。
+        """
+        topn = section_topn_limit(self.template_type, section_id)
+        if not topn and section_id not in self.bound_sections:
+            return
+        source_ids = list(dict.fromkeys(
+            node.project_id
+            for node in self.order
+            if _action(node) == ACTION_PULL and node.project_id is not None
+        ))
+        if not source_ids:
+            self.source_tables[section_id] = {}
+            return
+        from app.services.consol_note_detail_source_service import load_source_tables
+
+        self.source_tables[section_id] = await load_source_tables(
+            self.db,
+            source_ids,
+            section_id,
+            self.year,
+            template_type=self.template_type,
+        )
     # ── 逐章节 ──
 
     async def process_section(self, section_id: str) -> None:
@@ -298,6 +326,7 @@ class _Run:
         current: TreeNode | None = None
         self.incomplete: dict[str, TreeNode] = {}
         try:
+            await self._prefetch_section_sources(section_id)
             async with self.db.begin_nested():
                 for n in self.order:
                     current = n
@@ -399,6 +428,7 @@ class _Run:
             res = await apply_detail_refresh(
                 self.db, project_id=self.project_id, section_id=sid, year=self.year, node_key=node.node_key,
                 scope_leaves=[node], template_type=self.template_type,
+                prefetched_sources=self.source_tables.get(sid),
             )
         except ApplyError as exc:  # 全部在写库前抛出
             if exc.code == "PROTECTED_CELLS_INVALID":

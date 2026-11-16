@@ -64,6 +64,7 @@ async def apply_detail_refresh(
     preview_entity_hashes: dict[str, str] | None = None,
     scope_leaves: list[Any] | None = None,
     template_type: str | None = None,
+    prefetched_sources: dict[UUID, Any] | None = None,
 ) -> dict[str, Any]:
     """按已确认映射规则，将来源行转换后写入 consol_note_data。
 
@@ -156,7 +157,7 @@ async def apply_detail_refresh(
     # ── 3. 一次读取全部来源（已确认企业 + 本节点范围内全部数据叶子） ──
     source_pids = [b.entity_project_id for b in confirmed]
     source_pids += [leaf.project_id for leaf in (scope_leaves or []) if leaf.project_id is not None]
-    sources = await load_source_tables(
+    sources = prefetched_sources if prefetched_sources is not None else await load_source_tables(
         db, source_pids, section_id, year, template_type=template_type,
     )
 
