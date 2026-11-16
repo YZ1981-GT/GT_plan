@@ -79,6 +79,34 @@ export interface M1DetailRow {
   // ─── 公式列 ───
   /** 本期变动=宣告-支付 */
   periodChange: number
+
+  // ═══ 以下 10 个键按模板补齐（spec m-cycle-key-naming-unification 任务 5）═══
+  // 模板「明细表M1-2」A~U 共 21 列，此前前端只接了 A/C/U 三列。
+  // 🔴 键名用 provider 的 `json_key` 真名（不是按中文表头反推的英文），
+  //    唯一权威是 `phase5_m1_dividends_payable.DETAIL_SHEET.fields`。
+
+  /** B 列「公司代码」 */
+  companyCode?: string
+  /** D 列「期初数」（未审数组）—— 与 beginBalance 的关系待业务裁决（R2） */
+  priorOpening?: number
+  /** H 列「账项调整」（期初调整组） */
+  priorAdjAje?: number
+  /** I 列「重分类调整」（期初调整组） */
+  priorAdjRje?: number
+  /** J 列「本期增加」（账项调整组） */
+  currentAjeIncrease?: number
+  /** K 列「本期减少」（账项调整组） */
+  currentAjeDecrease?: number
+  /** L 列「本期增加」（重分类调整组） */
+  currentRjeIncrease?: number
+  /** M 列「本期减少」（重分类调整组） */
+  currentRjeDecrease?: number
+  /** R 列「期末账龄」 */
+  aging?: string
+  /** S 列「超过1年未支付的原因」 */
+  overdueReason?: string
+  /** T 列「相关文件索引号」（🔴 与前端 resolutionRef「决议文号」不是同一列） */
+  refIndex?: string
 }
 
 /** 区段Tab类型 */

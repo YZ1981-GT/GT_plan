@@ -2,7 +2,8 @@
 
 > **状态：实施中（2026-11-16）**。Phase 0 现算完成（推翻 design §2 的三条前提）、
 > 路径已拍板（A' = 逐行 JSON 单一来源）、任务 4 已实施并通过守卫 + 变异。
-> 剩余：任务 5 棘轮逐条偿还（65 条键名对齐）+ 任务 6 收尾。
+> 剩余：任务 5.2（M1 的 12 条 R2 结构差异，需业务裁决）+ 5.3（M2 28 条）+ 任务 6 收尾。
+> 棘轮已从 65 条降到 40 条（M1 偿还 25 条）。
 > 来源：`oo-writeback-template-parity-closure` 任务 9.2 的键名层（该 spec 已归档，
 > 投影层已修完）。
 
@@ -94,9 +95,73 @@
     把我的 8 个文件临时换成 HEAD 版后 `useF5Integration.spec.ts` 同样 1 failed
     （8 文件逐字节还原确认）
 
-- [ ] 5. 棘轮逐条偿还（M1 18+19 / M2 19+9 = 65 条）
-  **本轮未动棘轮基线** —— 任务 4 解决的是「存储通路单一化」，不是键名对齐。
-  键名层（前端驼峰 vs 契约 `column_key`）是独立的一层，需要逐表读模板表头 + provider 真名
-  对照，且改任一侧都要真实 OO 往返验证。**这是本 spec 剩余的主体工作。**
+- [~] 5. 棘轮逐条偿还（原 65 条 → 现 40 条；M1 已完成、M2 未动）
+  - [x] 5.1 **M1 已偿还 25 条**（18+19 → 7+5），且发现真缺口不是「键名不一致」
+    **直读模板「明细表M1-2」（openpyxl，R12 组头 + R13 列头 + merges）确认真实结构**：
+    `A1:U` 共 **21 列**，与 provider `DETAIL_SHEET.fields` 21 条**逐列一致**：
+    | 组头（R12） | 列（R13） |
+    |---|---|
+    | （无组头） | A 股东名称 / B 公司代码 / C 股东类型 |
+    | D12:G12 未审数 | D 期初数 / E 本期增加 / F 本期减少 / G 期末数(formula) |
+    | H12:I12 期初调整 | H 账项调整 / I 重分类调整 |
+    | J12:K12 账项调整 | J 本期增加 / K 本期减少 |
+    | L12:M12 重分类调整 | L 本期增加 / M 本期减少 |
+    | N12:Q12 审定数 | N 期初数 / O 本期增加 / P 本期减少 / Q 期末数（后三 formula） |
+    | （无组头） | R 期末账龄 / S 超过1年未支付的原因 / T 相关文件索引号 / U 备注 |
+
+    **真实缺口 = 前端只接了 3 列（A/C/U），10 列完全没接**：
+    B 公司代码 / H 期初账项调整 / I 期初重分类 / J~M 四个本期调整 / R 期末账龄 /
+    S 超1年原因 / T 相关文件索引号。**不是键名拼写问题。**
+
+    偿还动作（两步，均不需业务裁决）：
+    ①`M1DetailRow` 补 10 个字段，键名用 provider `json_key` 真名（不按中文表头反推）：
+    `companyCode` / `priorAdjAje` / `priorAdjRje` / `currentAjeIncrease` /
+    `currentAjeDecrease` / `currentRjeIncrease` / `currentRjeDecrease` / `aging` /
+    `overdueReason` / `refIndex`（`priorOpening` 归到 R2，见下）
+    ⇒ **provider-only 18 → 7**；
+    ②14 个「模板无此列」的纯 UI 派生键登记进 `_UI_ONLY_KEYS` 并在 `_M1_UI_ONLY_CLAIM`
+    逐项声明：`shareholdingRatio` / `currency` / `declaredDate` / `resolutionRef` /
+    `distributionRatio` / `distributionBase` / `expectedDeclared` / `declareDiff` /
+    `paidDate` / `paymentMethod` / `withholdingTax` / `netPaidAmount` / `crossRefDiff` /
+    `periodChange` ⇒ **frontend-only 19 → 5**。
+
+    **新增 3 条可伪证断言**（防 `_UI_ONLY_KEYS` 变成「夹带私货」的后门）：
+    ①`test_m1_ui_only_claims_have_no_provider_column` —— 14 个豁免键必须**真的不在**
+    provider 声明里（若 provider 新增同名字段 = 模板补了列 ⇒ 豁免错，必须挪回对账）；
+    ②`test_m1_ui_only_claim_matches_registered_ui_only_both_ways` —— 声明与
+    `_UI_ONLY_KEYS` **双向**一致（单向会漏「多出来的豁免」）；
+    ③`test_m1_ui_only_claim_covers_every_frontend_only_key` —— 前端每个键必须有归属
+    （接真名 / UI 豁免 / 进基线），**无人管的键会静默消失**。
+
+    **变异 3/3 全 RED**：往 `_UI_ONLY_KEYS` 夹带 `priorOpening`（有模板列）⇒ RED；
+    从 `_M1_UI_ONLY_CLAIM` 删 `crossRefDiff`（漂移）⇒ RED；
+    把 `endBalance`（R2 基线键）塞进豁免 ⇒ 两道判据同时 RED（基线自证 + 方向 2）。
+    逐字节还原后 11 passed。
+
+    守卫 `test_m_detail_keys_match_provider.py` **11 passed**（8 原 + 3 新）；
+    `test_m_detail_single_storage_source.py` **11 passed**（任务 4）；
+    `m9-detail-import-refresh.spec.ts` **2 passed**（M9 未动）。
+
+  - [ ] 5.2 **M1 余 12 条是 R2 结构差异，需业务裁决**（不能用键名对齐解决）
+    provider 侧 7 条：`priorOpening`（D 期初数）/ `increaseAmount`（E 本期增加）/
+    `decreaseAmount`（F 本期减少）/ `closingBalance`（G 期末数公式）/
+    `auditedOpening`（N）/ `auditedIncrease`（O）/ `auditedDecrease`（P）/
+    `auditedClosing`（Q，↔ 前端 `endAudited`）。
+    前端侧 5 条：`beginBalance` / `declaredAmount` / `paidAmount` / `endBalance` /
+    `endAudited`。
+    **语义对照（需业务裁决）**：
+    | 模板 | 前端 | 是否同一含义？ |
+    |---|---|---|
+    | D 期初数（未审） | `beginBalance` 期初应付余额 | 很可能是 |
+    | E 本期增加（未审） | `declaredAmount` 本期宣告股利 | **不一定**（宣告≠全部增加） |
+    | F 本期减少（未审） | `paidAmount` 本期支付 | **不一定**（支付≠全部减少） |
+    | G 期末数（=D+E−F 公式） | `endBalance` 期末应付余额 | 若是 D+E−F 则等价 |
+    | Q 期末数（审定，公式） | `endAudited` 期末应付（审定数） | 很可能是 |
+    | N/O/P 审定期初/增/减 | 前端**无对应** | 前端缺 3 个审定列 |
+
+    ⇒ 这一层要么改前端行模型（宣告/支付 → 期初/增/减），要么在契约侧加字段映射。
+    两者都要动已发布 representation 或 10 个宿主的读写语义 ⇒ **需用户裁决后再做**。
+
+  - [ ] 5.3 M2 未动（19+9 = 28 条）：照 M1 的方法做（直读模板定列 → 补字段 → 豁免声明 → 变异）
 
 - [ ] 6. 收尾：干净 worktree 跑守卫、推送、登记 INDEX
