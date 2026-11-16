@@ -679,6 +679,12 @@ async function approveCurrent() {
 async function rejectCurrent() {
   const item = selectedItem.value
   if (!item || actioning.value) return
+  // 退回必填原因（后端 R12.4 也校验；这里前置拦一次，省一次注定 400 的往返，
+  // 且提示文案与后端一致 —— 2026-11-16 走查实测后端返回 400 但界面看不到原因）。
+  if (!reviewComment.value.trim()) {
+    ElMessage.warning('退回时必须填写退回原因')
+    return
+  }
   actioning.value = true
   pendingAction.value = 'reject'
   try {

@@ -518,7 +518,10 @@ export async function updateWorkpaperStatus(projectId: string, wpId: string, sta
 export async function updateReviewStatus(projectId: string, wpId: string, reviewStatus: string, reason?: string) {
   const body: Record<string, any> = { review_status: reviewStatus }
   if (reason) body.reason = reason
-  const { data } = await http.put(P_wp.reviewStatus(projectId, wpId), body)
+  // `_silent`：调用方（ReviewWorkbench）自管错误提示，统一走 handleApiError。
+  // 不加会让 http 拦截器先弹一次（400 显示后端中文原因）、catch 里 handleApiError 再弹一次，
+  // 同一次失败出现两条 toast（2026-11-16 走查实测）。
+  const { data } = await http.put(P_wp.reviewStatus(projectId, wpId), body, { _silent: true } as any)
   return data
 }
 

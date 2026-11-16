@@ -109,13 +109,17 @@ class AiRunResourceService:
             )
             if attachment.project_id != project_id:
                 raise HTTPException(status_code=404, detail="附件不存在或无权访问")
+            # entrypoint 必须是 action_matrix 登记过的名字：原先写 `ai_chat.project_attachment`
+            # 而矩阵里没有这个族 ⇒ 九维键永不命中 ⇒ 把附件挂进 AI run 的路径恒 404。
+            # 本处语义是「读该附件」（上一行 require_attachment_permission 已按 readonly 把关），
+            # 走与其它读路径同一族 attachment.read / attach_read。
             await enforce_attachment_wp_visibility(
                 self.db,
                 user,
                 attachment_id=attachment_id,
                 action="attach_read",
-                method="POST",
-                entrypoint="ai_chat.project_attachment",
+                method="GET",
+                entrypoint="attachment.read",
             )
             try:
                 asset = await self.assets.resolve_attachment_asset(

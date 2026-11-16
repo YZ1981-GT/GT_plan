@@ -831,9 +831,12 @@ async def delete_attachment(
     """
     att = await load_attachment(db, attachment_id)
     await _ensure_project_access(db, current_user, att.project_id, "edit")
+    # action 必须与 action_matrix 里该 entrypoint 登记的动作一致：矩阵的
+    # `_CONTENT_MUTATION_FAMILIES` 是 ("attachment.delete", "DELETE", "attach_delete")，
+    # 传 attach_read 会让九维键的 action 维永不命中 ⇒ 任何用户（含 admin）恒 404。
     await enforce_attachment_wp_visibility(
         db, current_user, attachment_id=attachment_id,
-        action="attach_read", method="DELETE", entrypoint="attachment.delete",
+        action="attach_delete", method="DELETE", entrypoint="attachment.delete",
     )
     await assert_linked_workpapers_writable(db, attachment_id)
     await destructive_guard.assert_destructible(db, current_user, att, operation="delete")
@@ -895,9 +898,11 @@ async def rollback_attachment_version(
     """
     att = await load_attachment(db, attachment_id)
     await _ensure_project_access(db, current_user, att.project_id, "edit")
+    # 同上：版本回滚在矩阵里登记为 ("version.restore", "POST", "version_restore")，
+    # 原先传 entrypoint="attachment.rollback" + action="attach_read"，两个维度都不存在 ⇒ 恒 404。
     await enforce_attachment_wp_visibility(
         db, current_user, attachment_id=attachment_id,
-        action="attach_read", method="POST", entrypoint="attachment.rollback",
+        action="version_restore", method="POST", entrypoint="version.restore",
     )
     await assert_linked_workpapers_writable(db, attachment_id)
     svc = _svc(db)

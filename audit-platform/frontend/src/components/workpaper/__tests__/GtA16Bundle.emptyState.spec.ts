@@ -18,6 +18,34 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push }),
 }))
 
+// A16 推荐版本走 apiProxy（api.get / api.post）
+const apiGet = vi.fn()
+const apiPost = vi.fn()
+vi.mock('@/services/apiProxy', () => ({
+  __esModule: true,
+  api: {
+    get: (...a: unknown[]) => apiGet(...a),
+    post: (...a: unknown[]) => apiPost(...a),
+  },
+}))
+
+// ElMessage：一键创建的成功 / 警告 / 失败文案要能被断言
+const msgSuccess = vi.fn()
+const msgWarning = vi.fn()
+const msgError = vi.fn()
+vi.mock('element-plus', async () => {
+  const actual = await vi.importActual<any>('element-plus')
+  return {
+    ...actual,
+    ElMessage: Object.assign(vi.fn(), {
+      success: (...a: unknown[]) => msgSuccess(...a),
+      warning: (...a: unknown[]) => msgWarning(...a),
+      error: (...a: unknown[]) => msgError(...a),
+      info: vi.fn(),
+    }),
+  }
+})
+
 // __esModule: true 让 defineAsyncComponent 正确解包 default（否则 test-utils 读取命名空间的
 // __isTeleport 触发 vitest mock 未定义导出错误 —— 同 GtC1EntityControl.spec.ts 的写法）
 vi.mock('../WorkpaperWordEditor.vue', () => ({
@@ -35,6 +63,10 @@ const stubs = {
   'el-button': { template: '<button class="el-button-stub" @click="$emit(\'click\')"><slot /></button>' },
   'el-tabs': { template: '<div class="el-tabs-stub"><slot /></div>' },
   'el-tab-pane': { props: ['label', 'name'], template: '<div class="el-tab-pane-stub" :data-name="name"><slot /></div>' },
+  'el-alert': {
+    props: ['title', 'type'],
+    template: '<div class="el-alert-stub"><span class="title"><slot name="title" /></span><slot /></div>',
+  },
 }
 
 function mountBundle() {
@@ -47,6 +79,13 @@ function mountBundle() {
 beforeEach(() => {
   getWpIndex.mockReset()
   push.mockReset()
+  apiGet.mockReset()
+  apiPost.mockReset()
+  msgSuccess.mockReset()
+  msgWarning.mockReset()
+  msgError.mockReset()
+  // 默认：推荐版本取不到 ⇒ 不显示提示（不干扰既有空态用例）
+  apiGet.mockRejectedValue(new Error('no recommendation'))
 })
 
 describe('GtA16Bundle 空态', () => {
@@ -118,5 +157,111 @@ describe('GtA16Bundle 空态', () => {
     resolve([])
     await flushPromises()
     expect(w.find('.el-empty-stub').exists()).toBe(true)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A16 推荐版本提示（缺陷修复 2026-11-16）
+//
+// 背景：这套信息原先只挂在 `GtAProgramConsole` 的 A16 seq2 行（要求 sheetCode === 'A16'
+// 且走 `a-program-console`），而 A16 底稿的 componentType 已是 `a16-bundle`
+// ⇒ 推荐标记在界面上永远不出现。这里钉住「Bundle 层能显示推荐版本」。
+// ─────────────────────────────────────────────────────────────────────────────
+describe('GtA16Bundle 推荐版本提示', () => {
+  it('推荐版本未生成：顶部提示 + 一键创建', async () => {
+    getWpIndex.mockResolvedValue([{ id: 'a1', wp_code: 'A16-1' }])
+    apiGet.mockResolvedValue({
+      recommended_code: 'A16-2',
+      recommended_label: '整合审计',
+      all_versions: [],
+      always_required: ['A16-7'],
+    })
+    const w = mountBundle()
+    await flushPromises()
+
+    const alert = w.find('.el-alert-stub')
+    expect(alert.exists(), '推荐版本缺失时必须给出提示').toBe(true)
+    expect(alert.find('.title').text()).toContain('A16-2')
+    expect(alert.find('.title').text()).toContain('整合审计')
+    expect(w.findAll('.el-button-stub').some(b => b.text().includes('一键创建'))).toBe(true)
+  })
+
+  it('推荐版本已生成：不打扰（页签已列出全部可用版本）', async () => {
+    getWpIndex.mockResolvedValue([{ id: 'a2', wp_code: 'A16-2' }, { id: 'a1', wp_code: 'A16-1' }])
+    apiGet.mockResolvedValue({ recommended_code: 'A16-2', recommended_label: '整合审计' })
+    const w = mountBundle()
+    await flushPromises()
+    expect(w.find('.el-alert-stub').exists()).toBe(false)
+    expect(w.findAll('.el-tab-pane-stub').map(n => n.attributes('data-name'))).toEqual(['A16-1', 'A16-2'])
+  })
+
+  it('推荐版本接口失败：静默降级，不影响页签与空态', async () => {
+    getWpIndex.mockResolvedValue([{ id: 'a1', wp_code: 'A16-1' }])
+    apiGet.mockRejectedValue(new Error('500'))
+    const w = mountBundle()
+    await flushPromises()
+    expect(w.find('.el-alert-stub').exists()).toBe(false)
+    expect(w.findAll('.el-tab-pane-stub').map(n => n.attributes('data-name'))).toEqual(['A16-1'])
+  })
+
+  it('一键创建：调 generate-from-codes 后刷新页签与推荐状态', async () => {
+    getWpIndex
+      .mockResolvedValueOnce([{ id: 'a1', wp_code: 'A16-1' }])
+      .mockResolvedValue([{ id: 'a1', wp_code: 'A16-1' }, { id: 'a2', wp_code: 'A16-2' }])
+    apiGet.mockResolvedValue({ recommended_code: 'A16-2', recommended_label: '整合审计' })
+    apiPost.mockResolvedValue({ created: 1, created_codes: ['A16-2'] })
+
+    const w = mountBundle()
+    await flushPromises()
+    await w.findAll('.el-button-stub').find(b => b.text().includes('一键创建'))!.trigger('click')
+    await flushPromises()
+
+    expect(apiPost).toHaveBeenCalledWith(
+      '/api/projects/p1/working-papers/generate-from-codes',
+      { wp_codes: ['A16-2'] },
+    )
+    // 刷新后 A16-2 已在项目里 ⇒ 提示消失、页签出现
+    expect(w.find('.el-alert-stub').exists()).toBe(false)
+    expect(w.findAll('.el-tab-pane-stub').map(n => n.attributes('data-name'))).toContain('A16-2')
+  })
+
+  it('一键创建遇到「在回收站」：提示去回收站恢复，不谎报已创建', async () => {
+    getWpIndex.mockResolvedValue([{ id: 'a1', wp_code: 'A16-1' }])
+    apiGet.mockResolvedValue({ recommended_code: 'A16-2', recommended_label: '整合审计' })
+    // 平台语义：软删的 wp_index 不重建，回执放进 in_recycle_codes
+    apiPost.mockResolvedValue({
+      created: 0,
+      created_codes: [],
+      in_recycle_codes: ['A16-2'],
+      existing_codes: [],
+      failures: [],
+    })
+
+    const w = mountBundle()
+    await flushPromises()
+    await w.findAll('.el-button-stub').find(b => b.text().includes('一键创建'))!.trigger('click')
+    await flushPromises()
+
+    const texts = msgWarning.mock.calls.map(c => String(c[0]))
+    expect(
+      texts.some(t => t.includes('回收站')),
+      `应提示在回收站，实际：${JSON.stringify(texts)}`,
+    ).toBe(true)
+    const successTexts = msgSuccess.mock.calls.map(c => String(c[0]))
+    expect(
+      successTexts.some(t => t.includes('已创建')),
+      '回收站场景不得谎报「已创建」',
+    ).toBe(false)
+  })
+
+  it('推荐版本请求必须带 /api 前缀（utils/http baseURL 是 /）', async () => {
+    getWpIndex.mockResolvedValue([{ id: 'a1', wp_code: 'A16-1' }])
+    apiGet.mockResolvedValue({ recommended_code: 'A16-1' })
+    mountBundle()
+    await flushPromises()
+    expect(apiGet).toHaveBeenCalled()
+    const url = String(apiGet.mock.calls[0][0])
+    expect(url.startsWith('/api/')).toBe(true)
+    expect(url).toBe('/api/projects/p1/a16/recommended-version')
   })
 })

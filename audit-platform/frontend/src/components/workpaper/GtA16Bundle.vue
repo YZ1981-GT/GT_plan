@@ -9,7 +9,9 @@
  */
 import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { getWpIndex, type WpIndexItem } from '@/services/workpaperApi'
+import { api } from '@/services/apiProxy'
 
 const WorkpaperWordEditor = defineAsyncComponent(() => import('./WorkpaperWordEditor.vue'))
 
@@ -142,8 +144,82 @@ function goWorkpaperList() {
   })
 }
 
+// ─── A16 推荐版本（R8 / 缺陷修复 2026-11-16）────────────────────────────────
+//
+// 这套信息原先只挂在 `GtAProgramConsole` 的 A16 seq2 行（要求 `sheetCode === 'A16'`
+// 且走 `a-program-console`），而 A16 底稿的 componentType 已是 `a16-bundle`
+// ⇒ `isA16Table` 恒假 ⇒ 推荐标记在界面上永远不出现（预存接线错位）。
+//
+// 这里在 Bundle 层重新接上：进页面就取推荐版本，若推荐的那张子底稿本项目还没生成，
+// 给一条提示 + 「一键创建」。已生成时不打扰（页签本身已经列出全部可用版本）。
+const recommendedCode = ref('')
+const recommendedLabel = ref('')
+const creatingRecommended = ref(false)
+
+/** 推荐版本未在项目中创建时才有值（= 需要在 Bundle 顶部提示） */
+const recommendedMissing = computed(() => {
+  if (!recommendedCode.value) return ''
+  return wpIdMap.value[recommendedCode.value] ? '' : recommendedCode.value
+})
+
+async function loadRecommendedVersion() {
+  if (!props.projectId) return
+  try {
+    const data = await api.get<any>(
+      `/api/projects/${props.projectId}/a16/recommended-version`,
+      { _silent: true } as any,
+    )
+    const payload = data?.data ?? data
+    if (typeof payload?.recommended_code === 'string') {
+      recommendedCode.value = payload.recommended_code
+      recommendedLabel.value =
+        typeof payload.recommended_label === 'string' ? payload.recommended_label : payload.recommended_code
+    }
+  } catch {
+    // 推荐版本是增强信息：取不到就不显示，不影响页签与编辑器
+  }
+}
+
+/** 一键创建推荐的子底稿，成功后刷新 wp_index 让页签出现 */
+async function createRecommendedVersion() {
+  const code = recommendedMissing.value
+  if (!code || !props.projectId || creatingRecommended.value) return
+  creatingRecommended.value = true
+  try {
+    const res = await api.post<any>(
+      `/api/projects/${props.projectId}/working-papers/generate-from-codes`,
+      { wp_codes: [code] },
+    )
+    const receipt = res?.data ?? res ?? {}
+    const created: string[] = Array.isArray(receipt.created_codes) ? receipt.created_codes : []
+    const inRecycle: string[] = Array.isArray(receipt.in_recycle_codes) ? receipt.in_recycle_codes : []
+    const failures: any[] = Array.isArray(receipt.failures) ? receipt.failures : []
+
+    if (created.includes(code)) {
+      ElMessage.success(`已创建 ${code}${recommendedLabel.value ? ` ${recommendedLabel.value}` : ''}`)
+    } else if (inRecycle.includes(code)) {
+      // 在回收站里：generate-from-codes 不会重建（平台语义，见 wp_generation_receipt）
+      ElMessage.warning(`${code} 在回收站中，请先到回收站恢复后再编辑`)
+    } else if (failures.length) {
+      ElMessage.error(`创建 ${code} 失败：${failures[0]?.reason || failures[0]?.message || '请重试'}`)
+    } else {
+      ElMessage.warning(`${code} 未创建（已有底稿或已被裁剪），请到底稿列表确认`)
+    }
+    // 无论哪种结果都刷新：创建成功要让页签出现，回收站场景要让提示文案与实际一致
+    await loadIndex()
+    await loadRecommendedVersion()
+  } catch (e: any) {
+    ElMessage.error('创建失败：' + (e?.response?.data?.detail?.message || e?.message || '请重试'))
+  } finally {
+    creatingRecommended.value = false
+  }
+}
+
 // ─── Lifecycle ───
-onMounted(loadIndex)
+onMounted(async () => {
+  await loadIndex()
+  await loadRecommendedVersion()
+})
 </script>
 
 <template>
@@ -167,6 +243,28 @@ onMounted(loadIndex)
     </el-empty>
 
     <el-tabs v-else-if="visibleTabs.length" v-model="active">
+      <!-- A16 推荐版本：推荐的那张子底稿本项目还没生成时给提示 + 一键创建。
+           原先这套信息只在 a-program-console 的 A16 seq2 行，而 A16 已是 a16-bundle
+           ⇒ 界面上永远看不到（缺陷修复 2026-11-16）。 -->
+      <el-alert
+        v-if="recommendedMissing"
+        class="gt-a16-bundle__recommend"
+        type="info"
+        show-icon
+        :closable="false"
+      >
+        <template #title>
+          推荐使用「{{ recommendedMissing }} {{ recommendedLabel }}」，该版本尚未在本项目中生成。
+        </template>
+        <el-button
+          size="small"
+          type="primary"
+          :loading="creatingRecommended"
+          @click="createRecommendedVersion"
+        >
+          一键创建
+        </el-button>
+      </el-alert>
       <el-tab-pane
         v-for="t in visibleTabs"
         :key="t.id"
@@ -182,3 +280,12 @@ onMounted(loadIndex)
     </el-tabs>
   </div>
 </template>
+
+<style scoped>
+.gt-a16-bundle__empty {
+  padding: 24px 0;
+}
+.gt-a16-bundle__recommend {
+  margin-bottom: 12px;
+}
+</style>
