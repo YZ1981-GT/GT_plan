@@ -154,21 +154,49 @@ def _route_facts() -> tuple[str, list[dict[str, Any]]]:
     一部分。前端按段拼 URL 时必须保留 `entry_id` 里的 `/`（186 条 entry_id 全部含 `/`，
     最深四段）；`encodeURIComponent` 会把它变成 `%2F`，Starlette 解出的
     `entry_id` 就不再等于原值。
+
+    ═══ 为什么有两条显式 scope 前缀 ═══
+
+    `USER_SYNC_PREFIX` 自带 `{entry_id:path}`，凡是**要先算出 entry_id** 的端点都挂不进
+    去（挂进去就变成 `…/entries/{entry_id:path}/entry-identity`，前端仍得先知道 entry_id）。
+    这类端点用 `ENTRY_IDENTITY_PREFIX`，它同样是显式 scope 段
+    （`projects/{project_id}/workpapers/{wp_id}/sync`），**不是**从 room/operation 反推归属，
+    所以 AC 10.5 的约束照样成立。
+
+    🔴 只认 `USER_SYNC_PREFIX` 的旧版会把这条兄弟前缀上的端点判成「缺 scope 段」而
+    `raise` —— 那是本 spec task 2.1 引入的真回归（生成器整体不可用），不是配置问题。
+    所以这里列出**全部**合法前缀，并把每个端点归属到它命中的那一条（投影时按端点记录，
+    前端据此拼出正确 URL，而不是自己硬编码路径）。
     """
-    prefix = str(_router_module.USER_SYNC_PREFIX)
-    if "{entry_id:path}" not in prefix:
+    scope_prefixes = (
+        str(_router_module.USER_SYNC_PREFIX),
+        str(_router_module.ENTRY_IDENTITY_PREFIX),
+    )
+    for prefix in scope_prefixes:
+        if not prefix.startswith("/api/projects/{project_id}/workpapers/{wp_id}/"):
+            raise ContractGenerationError(
+                f"scope 前缀 {prefix!r} 不以 projects/{{project_id}}/workpapers/{{wp_id}} "
+                "开头 —— 那等于让前端拼一条没有 scope 段的 URL（AC 10.5 明令禁止）"
+            )
+    primary = scope_prefixes[0]
+    if "{entry_id:path}" not in primary:
         raise ContractGenerationError(
-            f"USER_SYNC_PREFIX={prefix!r} 的 entry 段不是 `:path` 转换器 —— "
+            f"USER_SYNC_PREFIX={primary!r} 的 entry 段不是 `:path` 转换器 —— "
             "默认转换器 `[^/]+` 下每一个端点在生产上恒 404"
         )
-    prefix_template = prefix.replace("{entry_id:path}", "{entry_id}")
+    prefix_template = primary.replace("{entry_id:path}", "{entry_id}")
+    #: 兄弟前缀的模板形态（同样去掉 `:path`；它本身不含 entry 段，替换是幂等的）。
+    sibling_templates = {
+        p: p.replace("{entry_id:path}", "{entry_id}") for p in scope_prefixes[1:]
+    }
 
     routes: list[dict[str, Any]] = []
     for route in _router_module.router.routes:
         path = str(route.path)
-        if not path.startswith(prefix):
+        matched = next((p for p in scope_prefixes if path.startswith(p)), None)
+        if matched is None:
             raise ContractGenerationError(
-                f"{path!r} 不在显式 scope 前缀下 —— 缺 scope 段的端点必须从 "
+                f"{path!r} 不在任何显式 scope 前缀下 —— 缺 scope 段的端点必须从 "
                 "room/operation 反推归属（AC 10.5 明令禁止）"
             )
         methods = sorted(m for m in route.methods if m not in ("HEAD", "OPTIONS"))
@@ -185,13 +213,20 @@ def _route_facts() -> tuple[str, list[dict[str, Any]]]:
             {
                 "endpoint": route.endpoint.__name__,
                 "method": methods[0],
-                "suffix": path[len(prefix) :],
+                "suffix": path[len(matched) :],
                 # `None` = 该端点根本没声明这个 header；`False` = 声明成可选。
                 # 两者都不是「必填」，但成因不同，投影时保留原样以便反向自检。
                 "idempotency_key": (
                     "required"
                     if required is True
                     else ("optional" if required is False else "absent")
+                ),
+                # 命中哪条前缀（`"primary"` / `"sibling"`）。前端拼 URL 时据此选模板，
+                # 不再自己硬编码 `/sync/entry-identity`。
+                "prefix_kind": "primary" if matched == primary else "sibling",
+                "prefix_template": (
+                    prefix_template if matched == primary
+                    else sibling_templates[matched]
                 ),
             }
         )
@@ -236,6 +271,8 @@ def _synthetic_descriptor() -> EditorLaunchDescriptor:
             "contract": slot,
         },
         document_type="xlsx",
+        target_sheet=None,
+        document_scope="single_sheet",
         mode="edit",
         onlyoffice_config={"document": {"key": "synthetic-doc-key"}},
     )
@@ -277,6 +314,16 @@ def collect_facts() -> dict[str, Any]:
 
     facts: dict[str, Any] = {
         "prefix_template": prefix_template,
+        # 兄弟前缀模板（`ENTRY_IDENTITY_PREFIX` 之类）。取**同一批**真实前缀里非 primary 的
+        # 那一条，不在这里重抄字面量 —— 重抄就是第二真源。
+        "sibling_prefix_template": next(
+            (
+                r["prefix_template"]
+                for r in routes
+                if r["prefix_kind"] == "sibling"
+            ),
+            "",
+        ),
         "routes": routes,
         "idempotent_endpoints": sorted(
             r["endpoint"] for r in routes if r["idempotency_key"] == "required"
@@ -385,6 +432,8 @@ export interface WorkpaperSyncRouteSpec {{
   readonly method: 'GET' | 'POST'
   readonly suffix: string
   readonly idempotencyKey: 'required' | 'optional' | 'absent'
+  /** `primary` = 挂在 `USER_SYNC_PREFIX` 下；`sibling` = 挂在兄弟 scope 前缀下。 */
+  readonly prefixKind: 'primary' | 'sibling'
 }}
 
 /** 后端**真实**路由表（一路由一方法）。前端只能从这里取路径，不得再拼字面量。 */
@@ -394,9 +443,23 @@ export const WP_SYNC_ROUTES = {_ts_json([
         "method": r["method"],
         "idempotencyKey": r["idempotency_key"],
         "suffix": r["suffix"],
+        "prefixKind": r["prefix_kind"],
     }
     for r in facts["routes"]
 ])} as const satisfies readonly WorkpaperSyncRouteSpec[]
+
+/**
+ * 兄弟 scope 前缀模板（不含 `{{entry_id}}` 段）。
+ *
+ * `USER_SYNC_PREFIX` 自带 `{{entry_id:path}}`，凡是**要先算出 entry_id** 的端点都挂不进去
+ * （例如 `entry-identity`）。这类端点挂在本模板下，它同样是显式 scope 段
+ * （`projects/{{project_id}}/workpapers/{{wp_id}}/sync`），不是从 room/operation 反推归属。
+ *
+ * 🔴 前端拼这类端点时必须用本模板，不得硬编码 `/sync/entry-identity` 字面量 ——
+ * 否则前缀一改就是静默 404（`utils/http` 的 baseURL 是 `/`，少 `/api` 会拿到首页 HTML
+ * 被调用方 catch 吞掉）。
+ */
+export const WP_SYNC_SIBLING_PREFIX_TEMPLATE = {json.dumps(facts["sibling_prefix_template"])}
 
 /** 服务端**强制**携带 `Idempotency-Key` 的端点（缺 key 时复合幂等键最后一项恒空）。 */
 export const WP_SYNC_IDEMPOTENT_ENDPOINTS = {_ts_json(facts["idempotent_endpoints"])} as const

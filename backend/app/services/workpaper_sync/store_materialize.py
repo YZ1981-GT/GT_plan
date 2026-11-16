@@ -206,6 +206,8 @@ async def materialize_from_store(
     client_edit_epoch: int,
     idempotency_key: str,
     secret: str,
+    target_sheet: str | None = None,
+    document_scope: str = "single_sheet",
 ) -> StoreMaterializeResult:
     contract = registration.contract
     with _store_phase():
@@ -224,6 +226,7 @@ async def materialize_from_store(
         user_id=user_id, idempotency_key=str(idempotency_key), capability=capability,
         contract=contract, adapter=registration.adapter, adapter_id=str(registration.adapter_id),
         client_edit_epoch=int(client_edit_epoch),
+        target_sheet=target_sheet, document_scope=str(document_scope),
     )
     key = (str(wp_id), str(entry_id))
     record = STORE_FINGERPRINTS.get(key)

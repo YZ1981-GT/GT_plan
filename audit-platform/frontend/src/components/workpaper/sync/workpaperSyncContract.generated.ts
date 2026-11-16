@@ -9,7 +9,7 @@
  * spec: workpaper-html-onlyoffice-bidirectional-writeback-closure · Wave 3 Task 31
  */
 
-export const WP_SYNC_CONTRACT_DIGEST = "016df12d2f7a877a568ceeb52d32f5dd2e09424a4958ffd5fca934f692f01b8a"
+export const WP_SYNC_CONTRACT_DIGEST = "2e930739460acd8c49a814029e906a3ef7530fe8093f3dad2e67c8afd069c94a"
 
 /**
  * 用户端统一前缀模板。`{entry_id}` 是**多段**值（186 条 entry_id 全部含 `/`，最深四段），
@@ -22,6 +22,8 @@ export interface WorkpaperSyncRouteSpec {
   readonly method: 'GET' | 'POST'
   readonly suffix: string
   readonly idempotencyKey: 'required' | 'optional' | 'absent'
+  /** `primary` = 挂在 `USER_SYNC_PREFIX` 下；`sibling` = 挂在兄弟 scope 前缀下。 */
+  readonly prefixKind: 'primary' | 'sibling'
 }
 
 /** 后端**真实**路由表（一路由一方法）。前端只能从这里取路径，不得再拼字面量。 */
@@ -30,135 +32,177 @@ export const WP_SYNC_ROUTES = [
     "endpoint": "adopt_substrate",
     "idempotencyKey": "absent",
     "method": "POST",
+    "prefixKind": "primary",
     "suffix": "/adopt-substrate"
   },
   {
     "endpoint": "claim_recovery_case",
     "idempotencyKey": "required",
     "method": "POST",
+    "prefixKind": "primary",
     "suffix": "/recovery-cases/{case_id}/claim"
   },
   {
     "endpoint": "confirm_descriptor",
     "idempotencyKey": "required",
     "method": "POST",
+    "prefixKind": "primary",
     "suffix": "/rooms/{room_id}/confirm-descriptor"
   },
   {
     "endpoint": "create_close_intent",
     "idempotencyKey": "required",
     "method": "POST",
+    "prefixKind": "primary",
     "suffix": "/rooms/{room_id}/close-intents"
   },
   {
     "endpoint": "create_pending_mutation",
     "idempotencyKey": "required",
     "method": "POST",
+    "prefixKind": "primary",
     "suffix": "/pending-mutations"
   },
   {
     "endpoint": "download_recovery_artifact",
     "idempotencyKey": "absent",
     "method": "GET",
+    "prefixKind": "primary",
     "suffix": "/recovery-cases/{case_id}/download"
   },
   {
     "endpoint": "ensure_first_publication",
     "idempotencyKey": "absent",
     "method": "POST",
+    "prefixKind": "primary",
     "suffix": "/first-publication"
   },
   {
     "endpoint": "get_operation",
     "idempotencyKey": "absent",
     "method": "GET",
+    "prefixKind": "primary",
     "suffix": "/operations/{operation_id}"
   },
   {
     "endpoint": "get_operation_conflicts",
     "idempotencyKey": "absent",
     "method": "GET",
+    "prefixKind": "primary",
     "suffix": "/operations/{operation_id}/conflicts"
   },
   {
     "endpoint": "get_operation_timeline",
     "idempotencyKey": "absent",
     "method": "GET",
+    "prefixKind": "primary",
     "suffix": "/operations/{operation_id}/timeline"
   },
   {
     "endpoint": "get_recovery_case_timeline",
     "idempotencyKey": "absent",
     "method": "GET",
+    "prefixKind": "primary",
     "suffix": "/recovery-cases/{case_id}/timeline"
   },
   {
     "endpoint": "leave_room",
     "idempotencyKey": "absent",
     "method": "POST",
+    "prefixKind": "primary",
     "suffix": "/rooms/{room_id}/participants/{participant_id}/leave"
   },
   {
     "endpoint": "list_recovery_cases",
     "idempotencyKey": "absent",
     "method": "GET",
+    "prefixKind": "primary",
     "suffix": "/recovery-cases"
   },
   {
     "endpoint": "materialize",
     "idempotencyKey": "required",
     "method": "POST",
+    "prefixKind": "primary",
     "suffix": "/materialize"
   },
   {
     "endpoint": "materialize_from_store",
     "idempotencyKey": "required",
     "method": "POST",
+    "prefixKind": "primary",
     "suffix": "/materialize-from-store"
   },
   {
     "endpoint": "read_entry_readiness",
     "idempotencyKey": "absent",
     "method": "GET",
+    "prefixKind": "primary",
     "suffix": "/readiness"
   },
   {
     "endpoint": "read_store_projection",
     "idempotencyKey": "absent",
     "method": "GET",
+    "prefixKind": "primary",
     "suffix": "/store-projection"
   },
   {
     "endpoint": "request_forcesave",
     "idempotencyKey": "required",
     "method": "POST",
+    "prefixKind": "primary",
     "suffix": "/rooms/{room_id}/forcesave"
   },
   {
     "endpoint": "resolve_conflicts",
     "idempotencyKey": "required",
     "method": "POST",
+    "prefixKind": "primary",
     "suffix": "/operations/{operation_id}/resolve"
+  },
+  {
+    "endpoint": "resolve_entry_identity",
+    "idempotencyKey": "absent",
+    "method": "GET",
+    "prefixKind": "sibling",
+    "suffix": "/entry-identity"
   },
   {
     "endpoint": "retry_operation",
     "idempotencyKey": "absent",
     "method": "POST",
+    "prefixKind": "primary",
     "suffix": "/operations/{operation_id}/retry"
   },
   {
     "endpoint": "rollback_version",
     "idempotencyKey": "absent",
     "method": "POST",
+    "prefixKind": "primary",
     "suffix": "/versions/{version_id}/rollback"
   },
   {
     "endpoint": "terminate_recovery_download_only",
     "idempotencyKey": "absent",
     "method": "POST",
+    "prefixKind": "primary",
     "suffix": "/recovery-cases/{case_id}/download-only"
   }
 ] as const satisfies readonly WorkpaperSyncRouteSpec[]
+
+/**
+ * 兄弟 scope 前缀模板（不含 `{entry_id}` 段）。
+ *
+ * `USER_SYNC_PREFIX` 自带 `{entry_id:path}`，凡是**要先算出 entry_id** 的端点都挂不进去
+ * （例如 `entry-identity`）。这类端点挂在本模板下，它同样是显式 scope 段
+ * （`projects/{project_id}/workpapers/{wp_id}/sync`），不是从 room/operation 反推归属。
+ *
+ * 🔴 前端拼这类端点时必须用本模板，不得硬编码 `/sync/entry-identity` 字面量 ——
+ * 否则前缀一改就是静默 404（`utils/http` 的 baseURL 是 `/`，少 `/api` 会拿到首页 HTML
+ * 被调用方 catch 吞掉）。
+ */
+export const WP_SYNC_SIBLING_PREFIX_TEMPLATE = "/api/projects/{project_id}/workpapers/{wp_id}/sync"
 
 /** 服务端**强制**携带 `Idempotency-Key` 的端点（缺 key 时复合幂等键最后一项恒空）。 */
 export const WP_SYNC_IDEMPOTENT_ENDPOINTS = [
@@ -192,6 +236,8 @@ export const WP_SYNC_DESCRIPTOR_FIELDS = [
   "definition_bundle_sha256",
   "definition_bundle_slots",
   "document_type",
+  "target_sheet",
+  "document_scope",
   "mode",
   "onlyoffice_config"
 ] as const

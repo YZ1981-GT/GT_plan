@@ -1,6 +1,6 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：8/34（2026-11-16，Phase 0.1~0.3、1.1~1.2、2.1~2.3 已完成；产品代码仍未迁移已就绪 binding）**
+> **状态：9/34（2026-11-16，Phase 0.1~0.3、1.1~1.2、2.1~2.4 已完成；产品代码仍未迁移已就绪 binding）**
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
@@ -48,7 +48,13 @@
   - 守卫 4 例（reader）+ 4 例（endpoint，含 pending 不读 / ready 读 / target_sheet 传参）；变异 M1 门控恒假、M2 门控恒真、M3 去 target_sheet 传参**全部精确打红**。
   - 🔴 M2 首轮存活：pending 用例原先只断言「不抛」，而端点 `except Exception` 把断言吞成 pending ⇒ 改为**记录调用并断言为空**。这是「断言必须落在观测到的副作用上」的又一实例。
   - _R: 2, 7_
-- [ ] 2.4 descriptor 增加 target sheet / document scope 的冻结字段；单 sheet 使用 actionLink，whole workbook 保持完整 artifact 视图。
+- [x] 2.4 descriptor 增加 target sheet / document scope 的冻结字段；单 sheet 使用 actionLink，whole workbook 保持完整 artifact 视图。
+  - 实现 `services/workpaper_sync/descriptor_view_identity.py`（封闭域 + 归一化 + 组合约束）；`EditorLaunchDescriptor` 增 `target_sheet` / `document_scope` 两字段并纳入 `DESCRIPTOR_REQUIRED_FIELDS`；route 与 store service 均把 `resolve_launch_target_sheet` 的结果冻结进 `MaterializeRequest`。
+  - 21 例守卫（`test_sheet_descriptor_view_identity.py`）：构造期封闭域 7 例、归一化 4 例、route/service 装配 AST 7 例、阴性对照 3 例。
+  - 变异 11/11 全精确打红（含 `M1` 去 target、`M2` scope 字面量、`M3` 整册带 target、`M4` 枚举加宽、`M5a/M5b` 两处 route scope、`M6` store 丢 scope、`M7` 不转发 target、`M8` 归一化忽略 scope、`M9` 用原始 request 值、`M10` 去封闭域校验），零假红。
+  - 🔴 首轮 5/6 存活：初版判据只查**字段存在性**（`target_sheet=None` 也能构造成功）⇒ 补「构造点实参表达式」与「被调方收到什么」两层 AST 判据才承重。这是「字段存在 ≠ 值正确」「测了被调函数一层，测不到调用方传没传参」的第三、第四层。
+  - 🔴 顺带修 task 2.1 遗留的真回归：前端契约生成器只认 `USER_SYNC_PREFIX`，把兄弟前缀上的 `entry-identity` 判成「缺 scope 段」而整体 `raise` ⇒ 改为认**全部显式 scope 前缀**并投影 `prefixKind` / `WP_SYNC_SIBLING_PREFIX_TEMPLATE`；`task28` 的 6 条守卫同步（等价鉴权判据 `authorize_wp_read` 而非放宽白名单）。
+  - 行数门：抽出 `descriptor_view_identity.py` 后 `materialize_coordinator` 3508 / `wp_sync_router` 3638 / `test_task28` 1957 全部回到门内（未抬白名单）。
   - _R: 3, 8_
 - [ ] 2.5 为 target sheet 缺失、candidate、bundle drift、artifact missing、artifact digest drift 建 typed error 与中文原因。
   - _R: 2, 3, 7_

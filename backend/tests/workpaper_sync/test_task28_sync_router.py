@@ -807,6 +807,27 @@ def _user_routes() -> list[tuple[frozenset[str], str]]:
     return [(frozenset(r.methods), r.path) for r in SR.router.routes]
 
 
+#: 合法**显式 scope** 前缀全集。`USER_SYNC_PREFIX` 自带 `{entry_id:path}`，故「先算
+#: entry_id」的端点挂 `ENTRY_IDENTITY_PREFIX`（同样以 projects/{pid}/workpapers/{wid}/ 开头，
+#: AC 10.5 照常成立）。不改成「以 /api/ 开头」或端点名白名单 —— 那是加后门。
+def _explicit_scope_prefixes() -> tuple[str, ...]:
+    return (SR.USER_SYNC_PREFIX, SR.ENTRY_IDENTITY_PREFIX)
+
+
+#: 兄弟前缀端点用项目级只读门 `authorize_wp_read`（拿不到 entry scope，不能用 `_guard`）。
+_SIBLING_PREFIX_ENDPOINTS: frozenset[str] = frozenset({"resolve_entry_identity"})
+
+
+def _sibling_prefix_routes() -> list[Any]:
+    """兄弟前缀路由。🔴 `ENTRY_IDENTITY_PREFIX` 是 `USER_SYNC_PREFIX` 的**字符串前缀**，
+    裸 `startswith` 会把 22 条用户路由全算成兄弟 ⇒ 必须「排除 primary」再判。"""
+    return [
+        r for r in SR.router.routes
+        if not r.path.startswith(SR.USER_SYNC_PREFIX)
+        and r.path.startswith(SR.ENTRY_IDENTITY_PREFIX)
+    ]
+
+
 class TestRouterShape:
     def test_every_required_endpoint_exists_under_the_explicit_prefix(self) -> None:
         routes = {(m, p) for methods, p in _user_routes() for m in methods}
@@ -818,18 +839,13 @@ class TestRouterShape:
         assert not missing, f"缺端点: {missing}"
 
     def test_all_user_routes_carry_explicit_project_wp_entry(self) -> None:
-        """AC 10.6：每个用户路由**显式**携带 project/wp/entry。"""
+        """AC 10.6：每个用户路由**显式**携带 project/wp（命中任一显式 scope 前缀）。"""
+        prefixes = _explicit_scope_prefixes()
         for methods, path in _user_routes():
-            assert path.startswith(SR.USER_SYNC_PREFIX), (
-                f"{sorted(methods)} {path} 不在显式 scope 前缀下 —— "
+            assert any(path.startswith(p) for p in prefixes), (
+                f"{sorted(methods)} {path} 不在任何显式 scope 前缀下 —— "
                 "缺 scope 段的端点必须从 room/operation 反推归属，那是 AC 10.5 明令禁止的"
             )
-
-    def test_the_entry_id_segment_uses_the_path_converter(self) -> None:
-        """`entry_id` 必须是 `:path` 转换器（形态侧）。"""
-        assert "{entry_id:path}" in SR.USER_SYNC_PREFIX, (
-            f"USER_SYNC_PREFIX={SR.USER_SYNC_PREFIX!r} 的 entry 段不是 `:path` 转换器"
-        )
 
     @pytest.mark.parametrize(
         "shape",
@@ -893,8 +909,8 @@ class TestRouterShape:
             ("POST", f"/operations/{op}/retry"),
             ("POST", f"/versions/{version}/rollback"),
         ]
-        assert len(suffixes) == len(SR.router.routes), (
-            "本判据的分母必须覆盖全部路由 —— 端点增删时同步这张表"
+        assert len(suffixes) == len(SR.router.routes) - len(_SIBLING_PREFIX_ENDPOINTS), (
+            "本判据的分母必须覆盖**兄弟前缀之外**的全部路由 —— 端点增删时同步这张表"
         )
         for method, suffix in suffixes:
             scope = {
@@ -915,6 +931,7 @@ class TestRouterShape:
                 f"{method} {suffix} 解出的 entry_id={hits[0][1].get('entry_id')!r} "
                 f"≠ {entry!r} —— 贪婪 `.*` 把后缀吞进了 entry_id"
             )
+
 
     def test_no_route_uses_numeric_revision_as_a_path_parameter(self) -> None:
         """`{revision}` 之类的路径参数一律不得出现（AC 10.6 / 8.7）。"""
@@ -1042,6 +1059,9 @@ class TestGuardIsTheFirstAwaitInEveryHandler:
         ]
         checked = 0
         for name in sorted(set(handlers)):
+            if name in _SIBLING_PREFIX_ENDPOINTS:
+                # 等价判据见 `test_entry_identity_uses_project_level_read_gate`。
+                continue
             fn = _func(tree, name)
             first = _first_await_call(fn)
             assert first == "_guard", (
@@ -1049,8 +1069,7 @@ class TestGuardIsTheFirstAwaitInEveryHandler:
                 "authorization-before-resource/cache 要求 guard 先跑完"
             )
             checked += 1
-        # `+6` = `_REQUIRED_ENDPOINTS` 之外的六个端点：
-        # `GET …/recovery-cases/{case_id}/download`（Task 28）、
+        # `+6` = `_REQUIRED_ENDPOINTS` 之外的六个端点：        # `GET …/recovery-cases/{case_id}/download`（Task 28）、
         # `POST …/operations/{operation_id}/retry`（Task 28）、
         # `GET …/recovery-cases/{case_id}/timeline`（Task 29 追加）、
         # `POST …/rooms/{room_id}/participants/{participant_id}/leave`
@@ -1061,6 +1080,10 @@ class TestGuardIsTheFirstAwaitInEveryHandler:
         # （spec d2-online-edit-platform-closure R7 追加）、
         # `POST …/materialize-from-store`
         # （spec workpaper-sync-switch-performance P5 追加）。
+        # 🔴 `GET …/sync/entry-identity` **不在**本分母里：它挂在兄弟 scope 前缀
+        # （`ENTRY_IDENTITY_PREFIX`）上、不经 `_guard`，鉴权形态由
+        # `TestRouterShape::test_entry_identity_uses_project_level_read_gate` 覆盖。
+        # 上面 `continue` 已把它从循环里排除，故这里仍是 `+7` 而非 `+8`。
         assert checked == len(_REQUIRED_ENDPOINTS) + 7, (
             f"只核对了 {checked} 个 handler —— 端点数变化时本判据的分母必须同步"
         )
@@ -1235,6 +1258,10 @@ class TestRouterDoesNotReimplementServiceLogic:
         actions_of_reads: set[str] = set()
         actions_of_writes: set[str] = set()
         for r in SR.router.routes:
+            if r.endpoint.__name__ in _SIBLING_PREFIX_ENDPOINTS:
+                # 兄弟前缀端点不经过 `_guard`，因此不消耗 action 词汇表名额。
+                # 它的鉴权形态由 `test_entry_identity_uses_project_level_read_gate` 钉住。
+                continue
             fn = _func(tree, r.endpoint.__name__)
             action = _guard_action_of(fn)
             assert action is not None, f"{r.endpoint.__name__}() 没有向 _guard 传 action"

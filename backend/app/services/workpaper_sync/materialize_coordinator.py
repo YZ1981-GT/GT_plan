@@ -162,6 +162,10 @@ from app.services.workpaper_sync.content_mutation import (
     _projection_payload,  # 单一 canonicalization：见模块文档 §五
 )
 from app.services.workpaper_sync.contracts import SyncContract
+from app.services.workpaper_sync.descriptor_view_identity import (
+    DOCUMENT_SCOPES, DescriptorViewIdentityError, assert_view_identity,
+    normalize_target_sheet,
+)
 from app.services.workpaper_sync.definitions import canonical_digest
 from app.services.workpaper_sync.entry_profile import Capability
 from app.services.workpaper_sync.materialize_reuse_verdict import (
@@ -257,6 +261,7 @@ __all__ = [
     "MaterializeCoordinator",
     "PendingMutationTokenCodec",
     "DESCRIPTOR_REQUIRED_FIELDS",
+    "DOCUMENT_SCOPES",
     "MATERIALIZE_REJECTION_STATUS",
     "STALE_ON_REPLAY_MARKER",
     "STALE_ON_ROOM_OPEN_MARKER",
@@ -871,6 +876,9 @@ class MaterializeRequest:
     lease_token: str = ""
     permission_epoch: int = 0
     client_edit_epoch: int = 0
+    #: 由 route 从已批准契约解析后传入（`resolve_launch_target_sheet`）并冻结到 descriptor。
+    target_sheet: str | None = None
+    document_scope: str = "single_sheet"
 
     def __post_init__(self) -> None:
         assert_no_mutation_surface(self, label="MaterializeRequest")
@@ -973,10 +981,13 @@ DESCRIPTOR_REQUIRED_FIELDS: Final[tuple[str, ...]] = (
     "definition_bundle_id",
     "definition_bundle_sha256",
     "definition_bundle_slots",
-    "document_type",
+    "document_type", "target_sheet", "document_scope",
     "mode",
     "onlyoffice_config",
 )
+
+#: 视图身份的封闭域 / 归一化 / 校验在 `descriptor_view_identity.py`（纯判据与编排不同层，
+#: 也避免本文件继续膨胀）。`DOCUMENT_SCOPES` 已从那里 import，此处不重复定义。
 
 #: `definition_bundle_slots` 必须齐备的三个 typed slot（Requirement 2.3）。
 _REQUIRED_SLOT_KEYS: Final[tuple[str, ...]] = ("template", "instrumentation", "contract")
@@ -1019,6 +1030,10 @@ class EditorLaunchDescriptor:
     definition_bundle_sha256: str
     definition_bundle_slots: Mapping[str, Mapping[str, str]]
     document_type: str
+    #: 视图身份冻结在 descriptor（spec 2.4）：`document.url` 与 `actionLink` 是同一份
+    #: artifact 的两种视图表达，两处不同源会让用户看到 A 表、改动落 B 表。
+    target_sheet: str | None
+    document_scope: str
     mode: str
     onlyoffice_config: Mapping[str, Any]
 
@@ -1076,6 +1091,8 @@ class EditorLaunchDescriptor:
                 slot: dict(spec) for slot, spec in self.definition_bundle_slots.items()
             },
             "document_type": self.document_type,
+            "target_sheet": self.target_sheet,
+            "document_scope": self.document_scope,
             "mode": self.mode,
             "onlyoffice_config": dict(self.onlyoffice_config),
         }
@@ -1176,6 +1193,14 @@ def assert_descriptor_mountable(descriptor: Any) -> None:
             "launch descriptor 的 onlyoffice_config 为空 —— descriptor 是编辑器 config 的"
             "唯一来源，空 config 会逼组件自行再请求一次（Property 11 明令禁止）"
         )
+    # 视图身份封闭域与组合约束（spec 2.4）—— 判据在伴生模块，这里只译异常类型。
+    try:
+        assert_view_identity(
+            document_scope=descriptor.document_scope,
+            target_sheet=descriptor.target_sheet,
+        )
+    except DescriptorViewIdentityError as exc:
+        raise DescriptorFieldMissingError(str(exc)) from exc
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -2502,6 +2527,10 @@ class MaterializeCoordinator:
             definition_bundle_sha256=pre.bundle.bundle_sha256,
             definition_bundle_slots=pre.descriptor_slots(),
             document_type=str(representation.document_type),
+            target_sheet=normalize_target_sheet(
+                document_scope=str(request.document_scope), target_sheet=request.target_sheet
+            ),
+            document_scope=str(request.document_scope),
             mode="edit",
             onlyoffice_config=self._onlyoffice_config(
                 room=room,

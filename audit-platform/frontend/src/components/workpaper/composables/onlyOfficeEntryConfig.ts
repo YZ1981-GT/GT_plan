@@ -40,6 +40,10 @@
  * 真正挂载编辑器仍交给宿主组件 —— `isOoAvailable` 的语义不变。
  */
 import http from '@/utils/http'
+import {
+  WP_SYNC_SIBLING_PREFIX_TEMPLATE,
+  WP_SYNC_USER_PREFIX_TEMPLATE,
+} from '@/components/workpaper/sync/workpaperSyncContract.generated'
 
 /** 取配置的结果：走哪条协议 + 能不能切过去 + 不可切时的中文原因。 */
 export interface OnlyOfficeEntryConfigProbe {
@@ -60,9 +64,25 @@ export function legacyOnlyOfficeConfigUrl(wpId: string, sheetName: string): stri
   return `/api/workpapers/${wpId}/sheets/${encodeURIComponent(sheetName)}/onlyoffice-config`
 }
 
-/** entry 身份解析端点 —— 全仓**唯一**一处拼接。 */
+/** entry 身份解析端点 —— 全仓**唯一**一处拼接。
+ *
+ * 路径来自生成的契约（`WP_SYNC_SIBLING_PREFIX_TEMPLATE`，真源是后端的
+ * `wp_sync_router.ENTRY_IDENTITY_PREFIX`），不在这里硬编码 `/sync/entry-identity`：
+ * 该端点挂在与 `USER_SYNC_PREFIX` **并列**的 scope 前缀下（它要先算出 entry_id，
+ * 挂不进带 `{entry_id:path}` 的那条），前缀一改硬编码就是静默 404。
+ */
 export function entryIdentityUrl(projectId: string, wpId: string): string {
-  return `/api/projects/${projectId}/workpapers/${wpId}/sync/entry-identity`
+  return `${WP_SYNC_SIBLING_PREFIX_TEMPLATE}/entry-identity`
+    .replace('{project_id}', encodeURIComponent(projectId))
+    .replace('{wp_id}', encodeURIComponent(wpId))
+}
+
+/** 带 entry 段的用户端前缀（供宿主/预检拼 readiness 等路径）。 */
+export function userSyncPrefix(projectId: string, wpId: string, entryId: string): string {
+  return WP_SYNC_USER_PREFIX_TEMPLATE
+    .replace('{project_id}', encodeURIComponent(projectId))
+    .replace('{wp_id}', encodeURIComponent(wpId))
+    .replace('{entry_id}', entryId)
 }
 
 interface EntryIdentity {

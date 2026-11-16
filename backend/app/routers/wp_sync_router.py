@@ -1371,30 +1371,29 @@ async def materialize(
     )
     await _enforce_entry_edit_lock(svc, request, scope)
     coordinator = build_materialize_coordinator(svc.session, secret=_secret())
+
+    # ── 打开即定位：先解析目标 sheet，再落 mutation ──────────────────────────
+    # 一个 entry 的 artifact 可被多张受管 sheet 共享；物理名只有该 entry 的 approved 契约
+    # 知道 ⇒ `sheet_key` + 契约在此合流，一路签进 contents token 派生 activeTab 字节。
+    # 放在 `materialize` **之前**：`_registration` 要跑查询，不能在落了 mutation 之后插入。
+    # spec 2.4：解析结果同时进 `MaterializeRequest`（冻结到 descriptor）与 `_attach_launch_urls`。
+    from app.services.workpaper_sync.room_launch import resolve_launch_target_sheet
+
+    target_sheet = resolve_launch_target_sheet(
+        contract=getattr(await _registration(svc, scope), "contract", None),
+        sheet_key=str(payload.get("sheet_key") or ""),
+    )
+    # 视图语义由服务端判定：让客户端声明等于让它决定要不要隐藏其它 sheet（R3.3 禁止）。
+    document_scope = "whole_workbook" if payload.get("whole_workbook") is True else "single_sheet"
+
     mat_request = await _materialize_request(
         svc,
         scope=scope,
         payload=payload,
         idempotency_key=idempotency_key,
         pending_mutation_token=token,
-    )
-
-    # ── 打开即定位（整册 workbook）：先解析目标 sheet，再落 mutation ───────────
-    # 一个 entry 的 artifact 可被**多张受管 sheet 共享**（D4 的 13 张同一本
-    # `D/D4 收入底稿.xlsx`）。本次要定位到哪张，只有本请求的 `sheet_key` 知道；
-    # 物理名只有该 entry 的 approved 契约知道 —— 两者在此合流，随后一路签进 contents
-    # token（`sign_room_contents_token(sheet=...)`），由 contents 端点按 token 里冻结的
-    # 目标 sheet 派生 activeTab 字节。放在**这一处**而不是各组件：`_attach_launch_urls`
-    # 是全部 entry 唯一的启动 URL 装配点，改这里所有整册底稿一次受益。
-    #
-    # 位置刻意在 `coordinator.materialize` **之前**：`_registration` 要跑查询，而
-    # materialize 之后会话里已有待落的 mutation，不在那之后插入只读查询。
-    # `_materialize_request` 刚解析过同一 registration（进程级缓存已热），这里是内存命中。
-    from app.services.workpaper_sync.room_launch import resolve_launch_target_sheet
-
-    target_sheet = resolve_launch_target_sheet(
-        contract=getattr(await _registration(svc, scope), "contract", None),
-        sheet_key=mat_request.sheet_key,
+        target_sheet=target_sheet or None,
+        document_scope=document_scope,
     )
 
     try:
@@ -1473,6 +1472,9 @@ async def materialize_from_store(
 
     registration = await _registration(svc, scope)
     sheet_key = str(payload.get("sheet_key") or "")
+    # 视图身份与 `/materialize` 同源同值（spec 2.4）。
+    target_sheet = resolve_launch_target_sheet(contract=registration.contract, sheet_key=sheet_key)
+    document_scope = "whole_workbook" if payload.get("whole_workbook") is True else "single_sheet"
     try:
         with timing_scope("html_to_oo_from_store", wp=wp_id, entry=scope.entry_id):
             result = await SM.materialize_from_store(
@@ -1480,12 +1482,14 @@ async def materialize_from_store(
                 project_id=scope.project_id, wp_id=scope.wp_id, entry_id=scope.entry_id,
                 user_id=scope.user_id, sheet_key=sheet_key, idempotency_key=str(idempotency_key),
                 client_edit_epoch=int(payload.get("client_edit_epoch") or 0), secret=_secret(),
+                target_sheet=target_sheet or None, document_scope=document_scope,
             )
     except SyncDomainError as exc:
         raise _domain_error(exc, status=SM.classify_store_materialize_rejection(exc)) from exc
     body = SM.response_body(result, project_id=project_id, wp_id=wp_id, entry_id=scope.entry_id)
-    target = resolve_launch_target_sheet(contract=registration.contract, sheet_key=sheet_key)
-    return await _attach_launch_urls(body, http_request=request, svc=svc, target_sheet=target)
+    return await _attach_launch_urls(
+        body, http_request=request, svc=svc, target_sheet=target_sheet
+    )
 
 
 async def _attach_launch_urls(
@@ -1678,6 +1682,8 @@ async def _materialize_request(
     payload: Mapping[str, Any],
     idempotency_key: str,
     pending_mutation_token: str | None,
+    target_sheet: str | None = None,
+    document_scope: str = "single_sheet",
 ) -> MaterializeRequest:
     """body → :class:`MaterializeRequest`。
 
@@ -1731,6 +1737,8 @@ async def _materialize_request(
         adapter_id=str(registration.adapter_id),
         pending_mutation_token=pending_mutation_token,
         client_edit_epoch=int(payload.get("client_edit_epoch") or 0),
+        target_sheet=target_sheet,
+        document_scope=document_scope,
     )
 
 
