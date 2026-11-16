@@ -226,8 +226,6 @@ export function useM3Detail(
         remark: row.remark,
       }),
     })
-    // 同步写整包JSON（与M3TabDetail._restoreRows读取路径一致）
-    _syncFullData()
   }
 
   function _triggerSaveAll(): void {
@@ -236,28 +234,6 @@ export function useM3Detail(
     }
   }
 
-  /** 同步写整包 full-data（保证 _restoreRows 读取路径一致） */
-  function _syncFullData(): void {
-    debouncedSave('M3-M3-2-full-data', {
-      remark: JSON.stringify(detailRows.value.map(row => ({
-        key: row.key,
-        batchName: row.batchName,
-        repurchaseDate: row.repurchaseDate,
-        repurchaseShares: row.repurchaseShares,
-        price: row.price,
-        repurchaseAmount: row.repurchaseAmount,
-        cancelShares: row.cancelShares,
-        cancelAmount: row.cancelAmount,
-        beginShares: row.beginShares,
-        beginAmount: row.beginAmount,
-        purpose: row.purpose,
-        source: row.source,
-        resolutionNo: row.resolutionNo,
-        currency: row.currency,
-        remark: row.remark,
-      }))),
-    })
-  }
 
   // ─── Return ────────────────────────────────────────────────────────────
 

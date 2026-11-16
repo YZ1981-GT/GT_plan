@@ -307,6 +307,18 @@ function _restoreRows() {
       }
     } catch { /* keep empty */ }
   }
+  // 降级：从逐行 per-row keys 恢复 listed（逐行 JSON 是唯一来源后，这条是主路径）
+  if (listedRows.value.length === 0) {
+    const restored: any[] = []
+    for (const [key, resp] of formData.allResponses.value) {
+      if (key.startsWith('M2-M2-2-listed-row-') && key.endsWith('-data') && resp.remark) {
+        try {
+          restored.push(JSON.parse(resp.remark))
+        } catch { /* skip */ }
+      }
+    }
+    if (restored.length > 0) listedRows.value = restored
+  }
 
   // Restore unlisted rows
   const unlistedData = formData.allResponses.value.get('M2-M2-2-unlisted-full-data')
@@ -317,6 +329,18 @@ function _restoreRows() {
         unlistedRows.value = parsed
       }
     } catch { /* keep empty */ }
+  }
+  // 降级：从逐行 per-row keys 恢复 unlisted
+  if (unlistedRows.value.length === 0) {
+    const restored: any[] = []
+    for (const [key, resp] of formData.allResponses.value) {
+      if (key.startsWith('M2-M2-2-unlisted-row-') && key.endsWith('-data') && resp.remark) {
+        try {
+          restored.push(JSON.parse(resp.remark))
+        } catch { /* skip */ }
+      }
+    }
+    if (restored.length > 0) unlistedRows.value = restored
   }
 }
 </script>

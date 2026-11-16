@@ -38,6 +38,35 @@
 | 验证 | 同上，且重发布本身要在真实项目上验 |
 | 风险 | `html_store.shape` 是全局字段，按 sheet 分级要确认所有消费方（`store_mirror` / `store_materialize` / 前端 `debouncedSave`）都认新形态 |
 
+## §2.1 现算更正（2026-11-16，任务 1.1~1.5 完成后）
+
+原 §2 的两条路径建立在三条**已过期**的前提上，现算全部推翻：
+
+| 原前提 | 现算结果 | 影响 |
+|---|---|---|
+| 前端明细表用整表 JSON 且有存量数据 | 明细表整表 JSON **0 行**（M 组 34 行全是 `M{n}-1-tb-amount` 审定表取数） | 路径 A 的「存量迁移」成本 = **0** |
+| 10/10 张表都有 flat `getField` 并存 | 10 个 composable 里 `getField` 只有 1 处（M9） | 「两套通路并存」描述不成立 |
+| 契约 `store_item_id` 写成 `placeholder` | 10 份契约全是 `store_item_id = None`，`placeholder` 现算 0 处 | 契约侧无需「修 placeholder」 |
+
+**真实形态是三分的**：
+
+| 表 | 前端存储 | 契约 |
+|---|---|---|
+| M1 / M2 / M3 / M7 / M9 / M10 | 整表 JSON（`*-full-data`）**+** 逐行 JSON（`*-row-N-data`） | flat_key_value / template_row_key / store_item_id=None |
+| M4 / M5 / M6 / M8 | **只有**逐行 JSON（`*-row-N-data`） | 同上（完全一致） |
+
+⇒ **修正后的路径 A'（本轮采纳）**：统一到「**逐行 JSON 单一来源**」。
+
+- M4 / M5 / M6 / M8 **已经是目标形态，零改动**；
+- M1 / M2 / M3 / M7 / M9 / M10 只需**删掉 `*-full-data` 这条并行写入**，让逐行 JSON 成为唯一来源；
+- 契约侧**不动**（`store_item_id=None` 是合法的「无单一 store item」声明，逐行 JSON 走 `item_id` 前缀约定）；
+- 存量数据迁移成本 = 0（明细表从未写入）；
+- 剩下的是**键名层**：逐行 JSON 里的键（`{key, ...}`）与契约 `column_key` 的对应，
+  由棘轮（M1 18+19 / M2 19+9 = 65 条）冻结，逐条偿还。
+
+**这个修正让工作量从「改 10 个宿主的读写语义 + 迁移存量 + 重发布所有 M 表」降到
+「删 6 个文件里的并行 full-data 写入 + 逐条对键名」，且不需要重发布任何 representation。**
+
 ## §3 建议
 
 **倾向路径 A**，理由：

@@ -828,9 +828,20 @@ function _restoreRows() {
       const parsed = JSON.parse(fullData.remark)
       if (Array.isArray(parsed) && parsed.length > 0) {
         detailRows.value = parsed
+        return
       }
-    } catch { /* keep empty */ }
+    } catch { /* fall through to per-row */ }
   }
+  // 降级：从逐行 per-row keys 恢复（逐行 JSON 是唯一来源后，这条是主路径）
+  const restored: any[] = []
+  for (const [key, resp] of formData.allResponses.value) {
+    if (key.startsWith('M10-2-row-') && key.endsWith('-data') && resp.remark) {
+      try {
+        restored.push(JSON.parse(resp.remark))
+      } catch { /* skip */ }
+    }
+  }
+  if (restored.length > 0) detailRows.value = restored
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
