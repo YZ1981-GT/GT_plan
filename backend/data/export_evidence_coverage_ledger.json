@@ -28,8 +28,8 @@
   "entries": [
     {
       "id": "wp_content_version_surface_class",
-      "reason_code": "NO_PRODUCTION_WRITER",
-      "reason": "working_paper_content_version.export_surface_class 只有 ORM 与 V265 迁移声明，全仓零生产写入方；普通底稿归档因此无法声明「本内容版本属于 formal 还是 data_exchange」。",
+      "reason_code": "PARTIAL_WIRING",
+      "reason": "working_paper_content_version.export_surface_class 已经有 evidence resolver/归档消费方，但仍没有 content version writer；普通底稿归档因此无法声明「本内容版本属于 formal 还是 data_exchange」。",
       "owner": "workpaper-sync",
       "next_batch": "在 content commit hook 落库 content version 时同步写 export_surface_class（formal/data_exchange），并把该值随归档清单输出。",
       "verify": {
@@ -40,8 +40,8 @@
     },
     {
       "id": "wp_content_version_source_storage_unit",
-      "reason_code": "NO_PRODUCTION_WRITER",
-      "reason": "working_paper_content_version.source_storage_unit 同样零生产写入方；data_exchange 类底稿导出无法把「文件里的机器可读存储单位」绑定到具体内容版本。",
+      "reason_code": "PARTIAL_WIRING",
+      "reason": "working_paper_content_version.source_storage_unit 已经有归档消费方，但仍没有 content version writer；data_exchange 类底稿导出无法把「文件里的机器可读存储单位」绑定到具体内容版本。",
       "owner": "workpaper-sync",
       "next_batch": "与 export_surface_class 同批落库：data_exchange 时写 source_storage_unit=yuan，formal 时写 unit_policy_snapshot/digest 对。",
       "verify": {
