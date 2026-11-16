@@ -1,0 +1,70 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "8. 按 §5 待拍板选定的出口实现": [
+      {
+        "executionId": "aa19240d-6896-4be0-a96d-834598cefe78",
+        "chatSessionId": "sess_e28998ba-225a-4989-8f3f-c9816ac7f3a4",
+        "timestamp": 1794795604072
+      },
+      {
+        "executionId": "aa19240d-6896-4be0-a96d-834598cefe78",
+        "chatSessionId": "sess_e28998ba-225a-4989-8f3f-c9816ac7f3a4",
+        "timestamp": 1794795617195
+      },
+      {
+        "executionId": "aa19240d-6896-4be0-a96d-834598cefe78",
+        "chatSessionId": "sess_e28998ba-225a-4989-8f3f-c9816ac7f3a4",
+        "timestamp": 1794799737100
+      }
+    ],
+    "9. 结算后复核（R3.4）": [
+      {
+        "executionId": "aa19240d-6896-4be0-a96d-834598cefe78",
+        "chatSessionId": "sess_e28998ba-225a-4989-8f3f-c9816ac7f3a4",
+        "timestamp": 1794795604141
+      },
+      {
+        "executionId": "aa19240d-6896-4be0-a96d-834598cefe78",
+        "chatSessionId": "sess_e28998ba-225a-4989-8f3f-c9816ac7f3a4",
+        "timestamp": 1794799743494
+      }
+    ],
+    "10. 回归与变异": [
+      {
+        "executionId": "aa19240d-6896-4be0-a96d-834598cefe78",
+        "chatSessionId": "sess_e28998ba-225a-4989-8f3f-c9816ac7f3a4",
+        "timestamp": 1794795604184
+      },
+      {
+        "executionId": "aa19240d-6896-4be0-a96d-834598cefe78",
+        "chatSessionId": "sess_e28998ba-225a-4989-8f3f-c9816ac7f3a4",
+        "timestamp": 1794803113570
+      },
+      {
+        "executionId": "aa19240d-6896-4be0-a96d-834598cefe78",
+        "chatSessionId": "sess_e28998ba-225a-4989-8f3f-c9816ac7f3a4",
+        "timestamp": 1794807410653
+      }
+    ],
+    "11. 真库验收（只用【测试】项目）": [
+      {
+        "executionId": "aa19240d-6896-4be0-a96d-834598cefe78",
+        "chatSessionId": "sess_e28998ba-225a-4989-8f3f-c9816ac7f3a4",
+        "timestamp": 1794795604249
+      },
+      {
+        "executionId": "aa19240d-6896-4be0-a96d-834598cefe78",
+        "chatSessionId": "sess_e28998ba-225a-4989-8f3f-c9816ac7f3a4",
+        "timestamp": 1794807421010
+      }
+    ],
+    "12. 语义审查、INDEX 登记、同步远端后单提交与版本化推送": [
+      {
+        "executionId": "aa19240d-6896-4be0-a96d-834598cefe78",
+        "chatSessionId": "sess_e28998ba-225a-4989-8f3f-c9816ac7f3a4",
+        "timestamp": 1794795604321
+      }
+    ]
+  }
+}

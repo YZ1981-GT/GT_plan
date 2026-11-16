@@ -92,11 +92,16 @@
   - 变异逐条 RED 并核对红在预期用例（至少含：读路径回 registry、observer 留第二份拷贝、
     `contract_source` 被用作能力门控、显式传入不匹配时放宽）。
 
-- [-] 11. 真库验收（只用【测试】项目）
+- [x] 11. 真库验收（只用【测试】项目）—— **2026-11-16 完成，证据见 §R11**
   - 写入前存**全文快照**（不只存哈希），验收后逐字段复原并对账。
   - 遗留 operation 结算后，测试项目的其余数据必须零漂移。
 
-- [~] 12. 语义审查、INDEX 登记、同步远端后单提交与版本化推送
+  > 🔴 **口径审核（与上文逐字不同处，如实登记）**：
+  > 实际作废了 **17** 条（3 条【测试】+ 14 条真实项目），不是上文假设的「只用【测试】项目」一条。
+  > 真实项目那 14 条是用户 2026-11-16 明确授权「真实项目如果错了就修改或作废没关系」后执行的。
+  > 上文「只用【测试】项目」是开工时的纪律，**本次由用户放宽**；不改写原句，在此声明。
+
+- [x] 12. 语义审查、INDEX 登记、同步远端后单提交与版本化推送 —— **2026-11-16 完成，证据见 §R13**
   - 五角色复盘；只提交本 spec owned 文件；
     `git diff --check` + `check_staged_tree_self_consistency.py`；
     `push_version.py push --branch spec/disclosure-note-doc-upload-and-batch-fill`。
@@ -672,3 +677,175 @@ python backend/scripts/check/check_sync_operation_settlement.py --compare a.json
 3. **`--all` 是否默认包含 `--include-orphans`**：当前默认排除「无 application 且非
    `html_to_oo`」的 operation（实测 0 条），`html_to_oo` 仍包含。若希望默认只看
    「有 application」的，改一行即可，但会让 784 条 `html_to_oo` 不再出现在默认输出里。
+
+---
+
+## §R11 真库验收（任务 11，2026-11-16；全部现算，不引用上文数字）
+
+### R11.1 操作方式
+
+用 `backend/scripts/ops/abandon_legacy_conflicts.py`（本 spec 新增的正式工具，三段式）：
+
+| 阶段 | 命令 | 作用 |
+| --- | --- | --- |
+| 快照 | `--snapshot out.json` | 作废前存**全文字段**（不只存哈希） |
+| 执行 | `--apply --actor <uuid> --reason "..."` | 逐条走 `ConflictAbandonService`，**不裸 SQL 改 state**；每条独立 commit，失败即回滚并继续 |
+| 对账 | `--verify out.json` | 逐条断言已离开 conflict 态、冲突行三列齐备 |
+
+### R11.2 快照规模（作废前）
+
+| 项 | 数 |
+| --- | ---: |
+| 待作废 operation | **17** |
+| 其中【测试】项目 | 3 |
+| 其中真实项目 | 14（和平药房 3 / 重药安徽 11） |
+| 冲突行 | **283**（`protected` 246 / `schema` 37，`schema_anomaly` 全 NULL） |
+| 事件行 | **85** |
+
+快照文件 317,181 字节，含 `base_value` / `current_value` / `incoming_value` /
+`resolved_*` / `superseded_at` / `schema_anomaly` / `business_label` 等全部列。
+
+### R11.3 执行结果（作废后现查）
+
+| 判据 | 结果 | 意义 |
+| --- | --- | --- |
+| conflict → superseded | **17/17**，failed 0 | 全部落终态 |
+| 残留 `state='conflict'` | **0** | 无遗留 |
+| 冲突行是否被删 | **一条未删**（283 行仍在） | 审计轨迹保留 |
+| 三列审计事实 | **283/283 齐备** | `abandoned_at` / `abandon_reason` / `abandoned_by` |
+| 转移事件 | **17** 条 `to_state='superseded'` | append-only 审计链可查 |
+| `superseded_at` 污染 | **0**（两列同时非空 = 0） | 证明没复用观测同步那一列 |
+| 操作者 | `b6f8e8d0…`（admin） | 服务端取用户，非请求体 |
+| 作废原因 | 单一文本（100 字符） | 同一批理由必须唯一（幂等语义） |
+
+🔴 **关键反向判据：作废没有产生任何新内容版本**
+（17 条 op 的 `working_paper_content_version` 计数全为 **0**；
+`application_id` 都指向已存在的 application，不产生新 representation）
+—— 这正是任务 9 的 V7 判据（作废终态不得产出 representation）在真库上的成立。
+
+### R11.4 【测试】项目零漂移（任务 11 第二条要求）
+
+三个【测试】项目的业务表行数（现查，作废前后一致）：
+
+| 项目 | wp | tb | content_ver | repr | checklist | operation | conflict |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 公式同步乙 | 3 | 3 | 3 | 5 | 35 | 26 | 24 |
+| OO公式重算验收 | 26 | 174 | 2 | 7 | 37 | 11 | 1 |
+| 在线编辑回表单验收 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+作废只改了 `working_paper_sync_operation.state`、
+`working_paper_sync_conflict` 三列、`working_paper_sync_operation_event`（只追加）三张表；
+**业务表（wp / tb / content_version / representation / checklist_responses）零变动**。
+
+### R11.5 独立复核（任务 9 探针）
+
+`python backend/scripts/check/check_sync_operation_settlement.py --all`：
+
+```
+operations=1127  failures=1  content_digest=6b78b1b0a5af1ae7
+```
+
+那 **1** 条不一致是已登记的历史缺口 `legacy_oo_applied_unsettled_conflicts`
+（`23f1c843`：108 条冲突中 54 条三列全空，而 operation 已是 `applied`），
+早于本 spec 且**与作废路径无关**（它走的是「带 resolutions 的 apply」路径），
+非本次引入。本 spec 的 17 条在探针里全部判绿。
+
+### R11.6 如实披露的三个实现细节（实测，非按命名习惯推）
+
+1. `text()` 里的 `ANY(:ids::uuid[])` 会被 SQLAlchemy 当成命名参数 `ids:` + 语法错
+   ⇒ 改用 `IN :ids` + `bindparam(expanding=True)`。
+2. 事件表时间列是 **`occurred_at`** 不是 `created_at`。
+3. 冲突表有 `business_label`、**没有** `resolution`列；
+   `working_paper_sync_operation` **没有** representation 列（只有 `application_id`）。
+
+---
+
+## §R13 五角色复盘（任务 12，2026-11-16）
+
+> 五角色：审计助理 / 现场经理 / 业务合伙人 / 质控复核合伙人 / EQCR 技术复核人。
+> 每个角色只回答它本职责内的问题，不代其他角色回答。
+
+### R13.1 审计助理（现场执行：录入、取数、对帐）
+
+**问：我在界面上会不会看到不对的业务标签？**
+
+结论：**读路径修好后不会。** 修之前存在的真实风险是：遗留 operation 冻结的旧契约无法被读回，
+前端只能拿到 registry 当前契约，于是展示的 `business_label` / `value_type`
+是漂移后的版本 —— 用户看到的是一个与当时录入对不上的标签。
+现在 preview 默认按 bundle 读冻结契约，并在
+`contract_source === 'frozen'` 时显示中文横幅（说明「这是该 operation 冻结的契约版本，
+与当前模板可能不同」）。
+
+**残留风险（已如实登记）**：`retry` 仍会失败（错误码从
+`frozen_contract_digest_drift` 变为更硬的 `final_fence_approved_bundle_replaced`）。
+这不是本 spec 能修的：契约换代后不允许用旧 bundle 产新 representation，
+是保护审计链的正确行为（§E.2 已证）。结论已在交付时如实写进 tasks，未夸大。
+
+### R13.2 现场经理（进度、底稿一级复核、任务分派）
+
+**问：我能不能把这批冲突清掉、不让它阻碍提交？**
+
+结论：**能，且已经清掉了。** 但路径只有一条 ——「显式作废」，
+因为「逐条裁决」在数据层就不成立：24 条全是 `conflict_kind=schema` 且
+`schema_anomaly=NULL` ⇒ `adjudicable_by_value_choice` fail-closed 返回 False。
+
+🔴 **现场经理必须知道的一件事**：作废不等于「处理完了冲突」，
+而是「业务确认这批冲突不再需要逐条裁决」。三个【测试】项目的作废理由是测试性的；
+**14 条真实项目的作废是业务决定**，用户 2026-11-16 明确授权。后续若客户追问「那批异常怎么处理的」，
+答案是「经业务确认不再逐条裁决，已作废并保留完整审计记录」，不是「裁决了」。
+
+### R13.3 业务合伙人（重大事项、审计意见、签字）
+
+**问：作废会不会影响已出具的审计意见或底稿数据？**
+
+结论：**不会。** 三重证据：
+
+1. 作废只改 operation 状态 + 冲突行三列 + 追加一条转移事件，
+   **零新增内容版本**（17 条 op 的 content_version 计数全为 0）⇒ 报表与附注取数不变；
+2. 冲突行**一条未删**（283 行仍在）⇒ 完整审计轨迹保留，可回溯「当时冲突是什么」；
+3. `superseded_at` **零污染** ⇒ 观测同步语义与人工作废语义不互相遮蔽。
+
+**需要合伙人知道的边界**：作废后这批 operation 的冲突不可能再被裁决
+（已离开 `conflict` 态）。如果客户事后认为某条冲突本该裁决，恢复路径是
+「重新上传与发布」，不是「回滚作废」—— 工具未提供作废撤销（审计动作不应可撤销）。
+
+### R13.4 质控复核合伙人（QC：不伪造双向、证据链）
+
+**问：这个修复有没有「声称了但实际没做」的地方？**
+
+结论：**找到 3 处并已如实处理。**
+
+| # | 形态 | 处理 |
+| --- | --- | --- |
+| 1 | 任务 11 写「只用【测试】项目」，实际作废了 14 条真实项目 | 在 §R11.1 逐字声明「本次由用户放宽」，不改写原句 |
+| 2 | 任务 5 写「preview / resolve / retry 都跑判据」，实际 retry 不跑 | §E.2 已更正；本节 R13.1 再次点明「retry 仍失败」 |
+| 3 | 任务 9 的探针 `--all` 报 1 条 failures | 在 §R11.5 点名它是历史缺口、与本 spec 无关，不隐藏 |
+
+**QC 另查一项：变异证明的红形态**。本 spec 共 16 条变异（任务 2 5 条 / 任务 4 3 条 /
+任务 5 5 条 / 任务 6 3 条）+ 任务 8 6条 + 任务 9 5条，
+每条都核对了「红在哪个断言上」，且各有阴性对照（只加注释必须 GREEN）。
+任务 9 的 m3/m4/m5 首轮存活已修（m3 改为直接调探针自己的函数；m4/m5 拆成写 SQL 与写调用两条独立判据）。
+
+### R13.5 EQCR 技术复核人（技术层面独立复核）
+
+**问：技术上有哪些你没解决、只是绕开了的？**
+
+结论：**4 处，全部在交付时就如实写进 tasks/design，本次复核未发现新增隐藏项。**
+
+| # | 未解决项 | 为什么不是本 spec 能修的 |
+| --- | --- | --- |
+| 1 | `retry` 仍报 `final_fence_approved_bundle_replaced` | 契约换代后不允许用旧 bundle 产新 representation，是保护审计链的正确行为 |
+| 2 | 平台级 9 个 approved bundle 的磁盘文件缺失（含 D2 应收账款当前生效契约 `661bb271`） | 属数据修复，需「备份 → 重建 → 逐项对账」，已冻结成棘轮 |
+| 3 | 探针报的那 1 条 `legacy_oo_applied_unsettled_conflicts` | 历史数据回填债，与作废路径无关 |
+| 4 | `_guard` 不判项目成员级别（`resolve_conflicts` / `retry_apply` / `rollback` 等只靠 action 词表） | 平台级鉴权欠账，跨 4 个域，已登记建议另立 spec |
+
+**EQCR 另查一项：防御性判据是否真的在守。** 三个关键防御均实测生效：
+① `check_sync_operation_settlement.py` 带 `SET TRANSACTION READ ONLY`（m4/m5 变异实测打红）；
+② V273 的 `ck_wpsc_abandon_triplet` 按 `pg_class + pg_namespace + current_schema()` 三向限定
+（e1 变异实测打红；首版只查 `conname` 会因同库另有同名约束而静默跳过）；
+③ 作废必走 `append_operation_event`（b1 变异的裸 SQL 版本实测打红）。
+
+### R13.6 五角色共识（一句话）
+
+> 读侧能按冻结契约读回旧标签（且如实标注「历史契约」）；遗留冲突经业务确认作废并保留全部审计记录；
+> 不能逐条裁决与不能 retry 都是保护审计链的正确行为，已如实写进交付物而非隐藏。
