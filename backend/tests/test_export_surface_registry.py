@@ -308,8 +308,9 @@ class TestRegistryClosureRatchet:
             f"{resolved[:8]}"
         )
 
-        # 棘轮上限：只许减少
-        BASELINE = 180
+        # 棘轮上限：只许减少（2026-11-16 收口 180 → 157：去掉 17 条误报,
+        # 再改判 6 条有客观依据的分类）
+        BASELINE = 157
         assert len(registered) <= BASELINE, (
             f"缺口总数 {len(registered)} > 基线 {BASELINE} —— 新增缺口必须"
             "先修好再登记，或按业务语义调整分类（不能靠加登记蒙过去）"
@@ -498,20 +499,97 @@ class TestRegistryClosureRatchet:
             f"模块独有 {list(from_mod - from_json)[:3]}"
         )
 
-        # 分类分布
+        # 分类分布（2026-11-16 改判 6 条后：audit-logs / audit-checks /
+        # review-conversations / workhours 从 formal → non_amount，
+        # bulk-tab/export-templates/async 与 wp-templates/download-all → template）
         import collections
 
         counts = collections.Counter(c for _p, _m, c in _AUTO_SURFACES)
         assert dict(counts) == {
-            "formal": 43,
+            "formal": 37,
             "data_exchange": 128,
-            "template": 124,
+            "template": 126,
+            "non_amount": 4,
         }, f"分类分布变了: {dict(counts)}"
 
         # _counts 必须与实际一致（防手改 counts 掩盖漂移）
         assert raw["_counts"] == dict(counts), (
             f"_counts 与实际不符: 文件 {raw['_counts']} vs 实际 {dict(counts)}"
         )
+
+    def test_reclassified_entries_have_objective_basis(self) -> None:
+        """6 条改判必须有可复核的实现依据（防止被反向改回 formal）。
+
+        🔴 2026-11-16 改判：这些端点声明 formal（要求 `ExportUnitPolicy`
+        折算），但实现里**没有任何金额**，折算对它们无意义。每条都有实证：
+
+        | 端点 | 实现依据 |
+        | --- | --- |
+        | `audit-logs/export` | `audit_logger.export_csv(logs)` 纯日志 CSV |
+        | `review-conversations/{id}/export` | 对话记录 |
+        | `workhours/stats/export` | xlsx 列为「日期/项目/活动类型/**工时(h)**/描述」 |
+        | `audit-checks/export` | 检查明细：编码/名称/检查编号/来源/严重程度/类型/判定/消息 |
+        | `bulk-tab/export-templates/async` | `mode="template"` 导出模板 ZIP |
+        | `wp-templates/download-all` | 打包 `TEMPLATES_DIR` 下模板文件 |
+
+        本判据现算实现源码，要求这些端点**确实不含金额信号** ——
+        若哪天有人给它们加了金额列，判据会打红提醒重新分类。
+        """
+        import inspect
+
+        from app.main import app
+        from app.services.export_surface_registry import EXPORT_SURFACE_REGISTRY
+
+        # 端点 → (期望分类, 禁止出现的金额信号)
+        EXPECT = {
+            "/api/audit-logs/export": ("non_amount", ("amount", "金额", "balance")),
+            "/api/review-conversations/{conversation_id}/export": (
+                "non_amount",
+                ("amount", "金额", "balance"),
+            ),
+            "/api/workhours/stats/export": ("non_amount", ("amount", "金额", "balance")),
+            "/api/projects/{project_id}/audit-checks/export": (
+                "non_amount",
+                ("amount", "金额", "balance"),
+            ),
+            "/api/projects/{project_id}/bulk-tab/export-templates/async": (
+                "template",
+                ("amount", "金额"),
+            ),
+            "/api/projects/{project_id}/wp-templates/download-all": (
+                "template",
+                ("amount", "金额"),
+            ),
+        }
+
+        by_pm: dict[tuple[str, str], object] = {}
+        for r in app.routes:
+            p = getattr(r, "path", None)
+            if not p:
+                continue
+            for m in getattr(r, "methods", None) or ():
+                by_pm[(p, m)] = r
+
+        # 先确认注册表里确实是新分类
+        entries = {e.path: e for e in EXPORT_SURFACE_REGISTRY.values()}
+        for path, (want_cls, _banned) in EXPECT.items():
+            entry = entries.get(path)
+            assert entry is not None, f"{path} 不在注册表里"
+            assert entry.classification == want_cls, (
+                f"{path} 分类应为 {want_cls}，实为 {entry.classification} "
+                "（被改回 formal 会让「折算」这个要求变得无意义）"
+            )
+
+        # 再确认实现里确实没有金额信号
+        for path, (_cls, banned) in EXPECT.items():
+            cands = [(p, m) for (p, m) in by_pm if p == path]
+            assert cands, f"{path} 无真实路由"
+            src = inspect.getsource(by_pm[cands[0]].endpoint).lower()
+            hits = [b for b in banned if b in src]
+            assert not hits, (
+                f"{path} 的实现出现金额信号 {hits} —— 它现在产金额了，"
+                "应重新分类为 formal 并补 ExportUnitPolicy 折算"
+            )
 
     def test_retired_entries_really_have_no_route(self) -> None:
         """退役条目必须真的没有路由 —— 防止「删不掉就标退役」掩盖真实出口。"""

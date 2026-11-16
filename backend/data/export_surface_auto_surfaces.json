@@ -1,9 +1,10 @@
 {
  "_doc": "自动补登记的导出出口（path, method, classification）。2026-11-16 从 export_surface_registry.py 移出：300 行纯数据让模块越过 800 行门限，故与本仓库既有做法（wp_code_overrides.json 等）一致改放数据文件。运行时由 export_surface_registry 读取展开成正式注册表，语义完全等价。新增导出出口时在此追加一行（或用登记脚本），并跑 backend/tests/test_export_surface_registry.py（未登记会打红）。",
  "_counts": {
-  "formal": 43,
-  "data_exchange": 128,
-  "template": 124
+  "formal": 37,
+  "non_amount": 4,
+  "template": 126,
+  "data_exchange": 128
  },
  "surfaces": [
   {
@@ -14,7 +15,7 @@
   {
    "path": "/api/audit-logs/export",
    "method": "GET",
-   "classification": "formal"
+   "classification": "non_amount"
   },
   {
    "path": "/api/consolidation/reports/{project_id}/{year}/artifacts/{artifact_id}/download",
@@ -64,12 +65,12 @@
   {
    "path": "/api/projects/{project_id}/audit-checks/export",
    "method": "POST",
-   "classification": "formal"
+   "classification": "non_amount"
   },
   {
    "path": "/api/projects/{project_id}/bulk-tab/export-templates/async",
    "method": "POST",
-   "classification": "formal"
+   "classification": "template"
   },
   {
    "path": "/api/projects/{project_id}/bulk-tab/export/{task_id}/download",
@@ -194,7 +195,7 @@
   {
    "path": "/api/projects/{project_id}/wp-templates/download-all",
    "method": "GET",
-   "classification": "formal"
+   "classification": "template"
   },
   {
    "path": "/api/projects/{project_id}/wp-templates/{wp_code}/download",
@@ -209,12 +210,12 @@
   {
    "path": "/api/review-conversations/{conversation_id}/export",
    "method": "POST",
-   "classification": "formal"
+   "classification": "non_amount"
   },
   {
    "path": "/api/workhours/stats/export",
    "method": "GET",
-   "classification": "formal"
+   "classification": "non_amount"
   },
   {
    "path": "/api/workpapers/{wp_id}/import-export/export",
