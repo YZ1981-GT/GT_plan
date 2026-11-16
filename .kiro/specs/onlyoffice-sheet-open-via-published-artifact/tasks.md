@@ -1,6 +1,6 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：14/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 已完成；Phase 1 真源层与 Phase 2 服务端解析层已收口）**
+> **状态：15/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 已完成；Phase 1 真源层、Phase 2 服务端解析层、Phase 3.1 前端三态已收口）**
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
@@ -84,7 +84,12 @@
 
 ## Phase 3：前端宿主切换
 
-- [ ] 3.1 把 `onlyOfficeEntryConfig.ts` 改为读取真实 binding，不再把 `xlsx-sheet/*` 作为 entry 身份；保留 readiness / legacy fallback 的明确三态。
+- [x] 3.1 把 `onlyOfficeEntryConfig.ts` 改为读取真实 binding，不再把 `xlsx-sheet/*` 作为 entry 身份；保留 readiness / legacy fallback 的明确三态。
+  - `OnlyOfficeEntryConfigProbe` 增 `bindingStatus`（封闭域 6 值）与 `syncMode`（`bound` / `independent`）。三态判定：`migrated`/`ready` → room（供给不就绪时**不回退旧式**，给原因）；`pending`/`out_of_scope` → 旧式但标 `independent`（**不是**不可用）；无 binding → 旧式（与改动前一致）。
+  - 灰度期兼容：缺 `status` 时按 `room_ready` 判（否则前后端版本共存期所有已就绪入口会退回旧式）。
+  - `probeLegacy` 返回 `LegacyProbe`（含 `syncMode` / `bindingStatus`）—— 服务端把这两个字段放在**响应顶层**（与 `config` 平级），首版按 config 内层读恒 undefined。
+  - 15 例守卫（原 9 + 新 6）；变异 6/6 全精确打红零假红。
+  - 🔴 两轮假绿：① pending 用例用 `room_ready: false` 写 ⇒ pending 被误判成 bound 时也走 legacy，无法区分（M1 存活）⇒ 改 `room_ready: true`（binding 是权威判定）；② 变异脚本用 `"FAIL " in line` 检测，而 vitest 输出带 ANSI 色 ⇒ 检测器恒空，M2 被误判成存活 ⇒ 去 ANSI + 解析 `Tests N failed` 摘要行。
   - _R: 1, 4, 6_
 - [ ] 3.2 为 `WorkpaperSyncEditorHost` 增加 target sheet / whole workbook descriptor 接线；不得在业务 composable 自己调 materialize 或拼 callback URL。
   - _R: 3, 4_

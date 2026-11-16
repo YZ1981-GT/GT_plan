@@ -45,7 +45,23 @@ import {
   WP_SYNC_USER_PREFIX_TEMPLATE,
 } from '@/components/workpaper/sync/workpaperSyncContract.generated'
 
-/** 取配置的结果：走哪条协议 + 能不能切过去 + 不可切时的中文原因。 */
+/** binding 状态机（spec `onlyoffice-sheet-open-via-published-artifact` 1.4 / 2.6）。 */
+export type SheetBindingStatus =
+  | 'pending'
+  | 'ready'
+  | 'migrated'
+  | 'draining'
+  | 'retired'
+  | 'out_of_scope'
+
+/**
+ * 取配置的结果：走哪条协议 + 能不能切过去 + 不可切时的中文原因。
+ *
+ * 🔴 `bindingStatus` 与 `syncMode` 是 task 3.1 新增的**三态**依据。只有 `available`
+ * 一个布尔时，「binding 已 migrated 但供给暂时不就绪」与「binding pending 从未迁移」
+ * 会显示成同一句话（都不可用），而它们的下一步动作完全相反：前者等供给恢复，
+ * 后者本来就能用独立在线编辑。
+ */
 export interface OnlyOfficeEntryConfigProbe {
   /** `room` = 服务端声明统一协议供给已就绪；`legacy` = 回落到旧式 config 端点。 */
   readonly protocol: 'room' | 'legacy'
@@ -57,6 +73,15 @@ export interface OnlyOfficeEntryConfigProbe {
   readonly reason: string | null
   /** 服务端算出的 room entry 身份（`protocol === 'room'` 时非空，供宿主组件用）。 */
   readonly entryId: string | null
+  /** 服务端 binding 状态（拿不到时为 null）。界面据此决定文案与入口。 */
+  readonly bindingStatus: SheetBindingStatus | null
+  /**
+   * 同步语义：`bound` = 与 HTML 双向同步；`independent` = 独立在线编辑、不同步。
+   *
+   * 🔴 界面**不得**在 `independent` 时显示「已同步」「双向回写」——
+   * 那是本 spec 要消灭的假状态（Requirement 4.2 / 6.2）。
+   */
+  readonly syncMode: 'bound' | 'independent'
 }
 
 /** old-style 端点 URL —— 全仓**唯一**一处拼接。 */
@@ -89,6 +114,25 @@ interface EntryIdentity {
   readonly entryId: string | null
   readonly roomReady: boolean
   readonly reason: string | null
+  readonly bindingStatus: SheetBindingStatus | null
+  readonly syncMode: 'bound' | 'independent'
+}
+
+/** binding status 的封闭域（服务端给未知值时归 null，不静默当 pending）。 */
+const BINDING_STATUSES: readonly SheetBindingStatus[] = [
+  'pending',
+  'ready',
+  'migrated',
+  'draining',
+  'retired',
+  'out_of_scope',
+]
+
+function asBindingStatus(value: unknown): SheetBindingStatus | null {
+  if (value !== undefined && value !== null) return 'pending'
+  return typeof value === 'string' && (BINDING_STATUSES as readonly string[]).includes(value)
+    ? (value as SheetBindingStatus)
+    : null
 }
 
 /**
@@ -109,21 +153,39 @@ async function readEntryIdentity(input: {
     } as any)
     const body = res?.data?.data ?? res?.data ?? {}
     const entryId = typeof body?.entry_id === 'string' ? body.entry_id.trim() : ''
+    const bindingStatus = asBindingStatus(body?.status ?? body?.binding_status)
     return {
       entryId: entryId || null,
       roomReady: body?.room_ready === true,
       reason: typeof body?.reason === 'string' && body.reason.trim() ? body.reason.trim() : null,
+      bindingStatus,
+      // 服务端明确说 migrated 时，即便供给暂时不就绪也算 bound（语义上已绑 room）。
+      syncMode:
+        body?.sync_mode === 'bound' || bindingStatus === 'migrated' ? 'bound' : 'independent',
     }
   } catch {
-    return { entryId: null, roomReady: false, reason: null }
+    return {
+      entryId: null,
+      roomReady: false,
+      reason: null,
+      bindingStatus: null,
+      syncMode: 'independent',
+    }
   }
 }
 
 /** 旧式端点：取 config，返回 `{ config, reason }`。 */
-async function probeLegacy(
-  wpId: string,
-  sheetName: string,
-): Promise<{ config: Record<string, unknown> | null; reason: string | null }> {
+/** 旧式端点的完整回执：config 之外还有服务端标的同步语义（task 2.6）。 */
+interface LegacyProbe {
+  readonly config: Record<string, unknown> | null
+  readonly reason: string | null
+  /** 服务端标的同步模式（`bound` / `independent`）；缺省按 `independent`。 */
+  readonly syncMode: 'bound' | 'independent'
+  /** 服务端标的 binding 状态；缺省 null。 */
+  readonly bindingStatus: SheetBindingStatus | null
+}
+
+async function probeLegacy(wpId: string, sheetName: string): Promise<LegacyProbe> {
   try {
     const res: any = await http.get(legacyOnlyOfficeConfigUrl(wpId, sheetName), {
       _silent: true,
@@ -134,26 +196,44 @@ async function probeLegacy(
     )
     // 409 `legacy_onlyoffice_url_retired`：后端已停止签发旧 URL（2.8 第①步的开关）。
     // 这不是错误而是**引导** —— 该 entry 已具备统一协议供给，改走协同编辑入口。
+    // 服务端在**响应顶层**标同步语义（与 `config` 平级，不是 config 内部）。
+    const syncMode: 'bound' | 'independent' =
+      (result as any)?.sync_mode === 'bound' ? 'bound' : 'independent'
+    const bindingStatus = asBindingStatus((result as any)?.binding_status)
     if (errorCode === 'legacy_onlyoffice_url_retired') {
-      return { config: null, reason: '该底稿已支持统一在线编辑协议，请改用协同编辑入口打开' }
+      return {
+        config: null,
+        reason: '该底稿已支持统一在线编辑协议，请改用协同编辑入口打开',
+        syncMode: 'bound',
+        bindingStatus,
+      }
     }
     const config = (result?.data ?? result) as Record<string, unknown> | null
     if (!config || Object.keys(config).length === 0) {
-      return { config: null, reason: '该底稿的在线编辑暂时不可用' }
+      return { config: null, reason: '该底稿的在线编辑暂时不可用', syncMode, bindingStatus }
     }
-    return { config, reason: null }
+    return { config, reason: null, syncMode, bindingStatus }
   } catch (error: any) {
     const detail = error?.response?.data?.detail
     const errorCode = String(detail?.error_code ?? '')
+    const bindingStatus = asBindingStatus(detail?.binding_status)
     if (errorCode === 'legacy_onlyoffice_url_retired') {
       return {
         config: null,
         reason:
           String(detail?.message || '').trim() ||
           '该底稿已支持统一在线编辑协议，请改用协同编辑入口打开',
+        // 409 retired 是**已绑 room**的语义（binding 已 migrated/draining）。
+        syncMode: 'bound',
+        bindingStatus,
       }
     }
-    return { config: null, reason: '该底稿的在线编辑暂时不可用' }
+    return {
+      config: null,
+      reason: '该底稿的在线编辑暂时不可用',
+      syncMode: 'independent',
+      bindingStatus,
+    }
   }
 }
 
@@ -181,6 +261,8 @@ export async function probeOnlyOfficeEntryConfig(input: {
       config: null,
       reason: '缺少底稿或工作表标识，无法打开在线编辑',
       entryId: null,
+      bindingStatus: null,
+      syncMode: 'independent',
     }
   }
 
@@ -188,7 +270,26 @@ export async function probeOnlyOfficeEntryConfig(input: {
   // 那批调用方本来也拿不到 room 身份，硬试只会多一次失败请求。
   if (projectId) {
     const identity = await readEntryIdentity({ projectId, wpId, sheetName, wholeWorkbook })
-    if (identity.roomReady) {
+
+    // ── 三态判定（task 3.1）──────────────────────────────────────────────
+    //
+    // | binding status            | 结论                                          |
+    // | ------------------------- | --------------------------------------------- |
+    // | migrated / ready          | room 协议（供给就绪则 available，否则给原因）  |
+    // | pending / out_of_scope    | **独立在线编辑**（走旧式，但标 independent）    |
+    // | 无 binding                | 旧式（与改动前一致）                            |
+    //
+    // 🔴 `pending` / `out_of_scope` 不得判成「不可用」：它们本来就能用独立在线编辑
+    //    （Requirement 6.2）。判成不可用会让一批入口整个打不开（R12.8 禁止）。
+    const status = identity.bindingStatus
+    // 🔴 `status === null` 是**灰度期兼容**分支：`status` 是 task 2.1 新增字段，前后端
+    // 可能不同版本共存。缺它时按 `room_ready` 判（改动前的行为），而不是把已就绪的
+    // 入口一律判成「没有 binding」⇒ 那会让灰度期所有入口退回旧式。
+    const bound = status === null
+      ? identity.roomReady
+      : status === 'migrated' || status === 'ready'
+
+    if (bound && identity.roomReady) {
       // 供给就绪 ⇒ 后端旧端点会被 409 挡住，这里直接判「可切」，
       // 由宿主组件走 room 协议挂载。**不**在这一层 materialize（见文件头）。
       return {
@@ -197,18 +298,37 @@ export async function probeOnlyOfficeEntryConfig(input: {
         config: null,
         reason: null,
         entryId: identity.entryId,
+        bindingStatus: status,
+        syncMode: 'bound',
       }
     }
-    // readiness 明确给原因时透传，不再去调旧端点（那只会拿到同样的失败或 409）。
-    if (identity.reason !== null) {
+    // 已绑 room 但供给不就绪：**不透传旧式**（那会造第二个 doc key），给原因。
+    if (bound && identity.reason !== null) {
       return {
         protocol: 'room',
         available: false,
         config: null,
         reason: identity.reason,
         entryId: identity.entryId,
+        bindingStatus: status,
+        syncMode: 'bound',
       }
     }
+    // readiness 层给了原因且没有 binding 结论：与改动前一致，透传不调旧端点。
+    // （`status === null` 时 `bound === roomReady`，故 `!bound && reason` 就是
+    //  「未就绪且有原因」—— 与改动前逐字等价。）
+    if (!bound && status === null && identity.reason !== null) {
+      return {
+        protocol: 'room',
+        available: false,
+        config: null,
+        reason: identity.reason,
+        entryId: identity.entryId,
+        bindingStatus: null,
+        syncMode: 'independent',
+      }
+    }
+    // `pending` / `out_of_scope` / 无 binding ⇒ 落到旧式（下面统一处理）。
   }
 
   const legacy = await probeLegacy(wpId, sheetName)
@@ -218,6 +338,8 @@ export async function probeOnlyOfficeEntryConfig(input: {
     config: legacy.config,
     reason: legacy.reason,
     entryId: null,
+    bindingStatus: legacy.bindingStatus,
+    syncMode: legacy.syncMode,
   }
 }
 
