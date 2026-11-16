@@ -129,11 +129,25 @@ async def batch_review(
         reason = body.comment if body.action == "reject" else None
 
         try:
+            # 层级角色校验（与单笔端点 wp_review_router 同一判据）：
+            # project.review_config.level_roles 决定该层允许的角色，admin 可应急处理。
+            # 缺此校验时 manager 可越权执行 L2（partner 层），
+            # 实测于 platform-release-blocker-closure Task 22 角色矩阵走查。
+            from app.services.workpaper_review_submission_service import (
+                assert_review_level_actor,
+            )
+
+            await assert_review_level_actor(
+                db, project_id=project_id, wp_id=wp_id,
+                new_review_status=target, actor=current_user,
+            )
             await svc.update_review_status(
                 db=db, wp_id=wp_id, new_review_status=target, project_id=project_id,
                 reason=reason, rejected_by_id=current_user.id if body.action == "reject" else None,
             )
             success_count += 1
+        except PermissionError as e:
+            skipped_items.append({"wp_id": str(wp_id), "reason": str(e)})
         except ValueError as e:
             skipped_items.append({"wp_id": str(wp_id), "reason": str(e)})
 
