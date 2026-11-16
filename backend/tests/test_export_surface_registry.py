@@ -214,9 +214,130 @@ class TestRegistryClosureRatchet:
             validate_registry(app)
         except RegistryValidationError as exc:
             assert not exc.missing, f"注册表 missing 不为 0: {exc.missing}"
-            # unregistered 是既有的历史漂移（303 条，属独立工作量），
-            # 本判据只管 missing。
-            return
+
+    def test_unregistered_is_zero(self) -> None:
+        """`unregistered` 必须为 0（原 303，2026-11-16 已全部补登记）。
+
+        🔴 这条棘轮此前**刻意缺位**：注释写着「unregistered 是既有历史漂移
+        （303 条，属独立工作量），本判据只管 missing」。后果是**元数据口径改动
+        完全没有判据守护** —— 实测把 `is_metadata_only_export_path` 整个删掉
+        （让 status/history/manifest 都算导出出口）时，全部用例仍然全绿。
+
+        现在漂移已清零，闭合性必须双向：
+        - `missing` = 登记了没实现；
+        - `unregistered` = 实现了没登记（新加导出端点不登记会打红）。
+        """
+        from app.main import app
+
+        try:
+            validate_registry(app)
+        except RegistryValidationError as exc:
+            assert not exc.unregistered, (
+                "注册表 unregistered 不为 0（新增导出端点必须补登记）: "
+                f"{exc.unregistered}"
+            )
+
+    def test_registry_is_fully_closed(self) -> None:
+        """三向闭合：missing / unregistered / duplicates 全为 0。
+
+        与前两条的区别：那两条各自只看一个方向，本判据要求 `validate_registry`
+        **完全不抛**。这样「只修好 missing 就以为闭合」不再可能。
+        """
+        from app.main import app
+
+        validate_registry(app)  # 不抛即闭合
+
+    def test_auto_entries_description_matches_classification(self) -> None:
+        """自动段的 description 必须按分类取自 `_AUTO_DESCRIPTIONS`。
+
+        🔴 反向自检：实测把 `description=_AUTO_DESCRIPTIONS[_cls]` 改成固定取
+        某一类（如 `["non_amount"]`）时，全部用例仍然全绿 —— 描述看起来「只是
+        文档」，但它直接决定用户在导出面板看到的说明文案，写错等于把
+        「导入模板」标成「元数据查询」。本判据钉住这个映射。
+        """
+        from app.services.export_surface_registry import (
+            EXPORT_SURFACE_REGISTRY,
+            _AUTO_DESCRIPTIONS,
+        )
+
+        auto = {k: v for k, v in EXPORT_SURFACE_REGISTRY.items() if k.startswith("auto_")}
+        assert auto, "自动段为空 —— 判据分母为 0，无法验证"
+
+        wrong = [
+            f"{k}: classification={v.classification} description={v.description!r}"
+            for k, v in auto.items()
+            if v.description != _AUTO_DESCRIPTIONS[v.classification]
+        ]
+        assert not wrong, (
+            f"{len(wrong)} 条自动条目的 description 与分类不符（应取 _AUTO_DESCRIPTIONS[分类]）: "
+            f"{wrong[:5]}"
+        )
+
+    def test_auto_surfaces_cover_all_three_file_classes(self) -> None:
+        """自动段必须覆盖 formal / data_exchange / template 三类文件出口。
+
+        🔴 反向自检：把展开循环里的 `_cls` 写死成 `'formal'` 时，
+        `test_metadata_only_paths_are_not_export_sinks` 与闭合判据都不会红
+        （路径仍真实存在），但 124 条模板出口会被误标成「正式出具」——
+        那正是导出面板分类统计错误的来源。本判据钉住分类列真的被使用。
+        """
+        import collections
+
+        from app.services.export_surface_registry import EXPORT_SURFACE_REGISTRY
+
+        auto = {k: v for k, v in EXPORT_SURFACE_REGISTRY.items() if k.startswith("auto_")}
+        counts = collections.Counter(v.classification for v in auto.values())
+
+        # 三个文件出口分类都必须在自动段出现（否则说明分类列被压平）
+        for cls in ("formal", "data_exchange", "template"):
+            assert counts[cls] > 0, (
+                f"自动段没有任何 {cls} 条目（分类列可能被写死）: {dict(counts)}"
+            )
+        # 数量下限（防止只留 1~2 条就过）
+        assert counts["template"] >= 100, (
+            f"template 条目只有 {counts['template']} 条，应 >= 100"
+        )
+        assert counts["data_exchange"] >= 100, (
+            f"data_exchange 条目只有 {counts['data_exchange']} 条，应 >= 100"
+        )
+        assert sum(counts.values()) == len(auto)
+
+    def test_metadata_only_paths_are_not_export_sinks(self) -> None:
+        """导出任务的元数据查询不算文件 sink。
+
+        🔴 反向自检：`is_metadata_only_export_path` 若被弱化（只认 /status、
+        或整个删掉），本判据必打红 —— 这是上一条棘轮抓不到的口径回归。
+        """
+        from app.services.export_surface_registry import is_metadata_only_export_path
+
+        # 这些是**任务元数据**，不产文件字节
+        metadata_paths = [
+            "/api/export/{}/status",
+            "/api/export/{}/history",
+            "/api/exports/{}",
+            "/api/exports/{}/manifest",
+            "/api/exports/{}/integrity",
+            "/api/exports/{}/download-token",
+            "/api/projects/{project_id}/workpapers/{wp_id}/export-history",
+        ]
+        for p in metadata_paths:
+            assert is_metadata_only_export_path(p), (
+                f"{p} 应判为元数据型（不产文件），口径被弱化"
+            )
+
+        # 这些是**真实文件 sink**，不得被误判为元数据
+        sink_paths = [
+            "/api/exports/{}/download",
+            "/api/export/{}/download",
+            "/api/workpapers/{wp_id}/d1/export-data",
+            "/api/workpapers/{wp_id}/d1/export-template",
+            "/api/projects/{project_id}/notes/export-word",
+            "/api/projects/{project_id}/deliverables/package/{package_id}/download",
+        ]
+        for p in sink_paths:
+            assert not is_metadata_only_export_path(p), (
+                f"{p} 是真实文件 sink，不得被当元数据排除"
+            )
 
     def test_retired_flag_defaults_false(self) -> None:
         """`retired` 默认 False —— 否则新加条目会静默不参与闭合判定。"""
