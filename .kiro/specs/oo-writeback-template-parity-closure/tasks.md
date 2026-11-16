@@ -37,7 +37,7 @@
   - [x] 8.2 不一致项逐条记入 design §3.2 并处理：模板错 4 处并入任务 6 第三批（#29~#32）；改前端 L1-2 / L5-2 / L6-2（含两张附注取数）/ G1-2 / G9-2 / F2-6 单价，以及守卫首轮抓到的 G13 / G14 核对按分、G14 转回不改号、H2 期初调整反推只限旧行、D1-15 载入不截断、D1-9 / D5-4 日期倒挂出负数；L8-2 合计 / 派生行 / 占比按模板改（读模板逐格核出，守卫看不到跨行公式）；F3-4 口径待用户确认，其余登记 R3
   - [x] 8.3 变异：前端公式、前端改写录入、清单表达式、不生效例外、未覆盖清单冲突与 G13 / G14 / H2 / D5-4 四处改回旧口径，9 条全红、逐字节复原；L8-2 另 6 条变异全红
 
-- [ ] 9. 字段名接通（R3，按 design §4 裁定）
+- [x] 9. 字段名接通（R3，按 design §4 裁定）
   - [x] 9.1 N 循环（N1~N5，含 N1 几何与 store item 前缀）（子项 9.1a~9.1c 全完成；父任务此前漏勾）
     - [x] 9.1a 批 C（v1.0.31）：N1 几何 29/31→40/42，N1/N2 store item 改 `-detail-rows`，N1/N2/N3 json key 改前端名，五条 N plan 与五份 reviewed 契约落地；field-name 31/388→30/365、UNCOVERED 13→12（明细见 design §4.10 附）
     - [x] 9.1b 复盘收口：三个 provider 补 re-export PAYLOAD_COLUMN（修「声明在 sheets 但运行时仍 remark」假绿）；N2 活导入导出统一 A:Q / `N2-2-detail-rows.conclusion`、补 H=beginRje 与 M=C+G+H、复核上下文按原始行重算 P，真库两键 0 行；N1 生产纯函数 + 对拍适配器；field-name 30/365→29/364；K/N 十一 plan 表驱动（1047→1019 行）；N1 三条磁盘变异 3/3 红；push 工具安全收口（design §4.10、§4.11）
@@ -73,7 +73,7 @@
 
 - [x] 11. 后端测试红清零（R9）：按任务 1.1 清单逐条修，根因写入 design §9。本轮收口见 design §12.6 / §12.8：修好 6 条归档后证据路径失效 + 4 条（3 xfailed + 1 xpassed）F3 item 数过期；本 spec 触碰的 7 个测试文件 144 passed / 0 failed。全量 1759 条共存红逐类登记（归档证据缺失 / lane 锚点漂移 / 真库快照 / 并发会话 manifest 面），不归因本 spec
 
-- [ ] 12. 验收（R10）
+- [x] 12. 验收（R10）
   - [x] 12.1 前后端回归与改前 junit 逐条对比，新增失败 0（候选 vs 干净 HEAD 工作树逐节点对比：共存红 1759 / 修复 15 / 新增 10，10 条逐条归因为并发会话区域且已给对照证据；本 spec 改动面 0 新增，design §12.8）
   - [x] 12.2 浏览器实测【测试】项目：D5-2 双向改值、一张字段接通的表双向改值、公式格敲数字 → 保留服务器值 → 核对发布文件（**三项全通过**）。前两项：D5-2 期末审定 1650 = 期末未审 1500 + AJE 100 + RJE 50，刷新后不变、落库逐值一致；D6-3 期初AJE=200 时期末未审 1250（新口径）而非 1450（旧口径）。第三项（2026-11-16 真浏览器实测，D1-3 走真双向链路）：Playwright 穿透跨域 iframe（`page.frames()` 取 `frameEditor`）→ 名称框导航 `G11`（公式 `=D11+E11+F11`）→ 键盘敲 `999` 覆盖公式 → 点「结构化视图」触发 `forceSave()` → OO 回调落库 → `working_paper_sync_conflict` 精确产出 `conflict_kind=protected` / `protection_policy=read_only_formula` / `suggested_action=keep_current` / `current_value={value:0}` / `incoming_value={value:999}` → 端点裁决 `keep_current`（200 / `decision=proceed` / `revision 1→2`）→ 发布文件 gen=7 的 `G11` **仍为 `=D11+E11+F11`、缓存值 0**（未落 999），冲突行 `resolution={"kind":"keep_current"}` / `resolved_value={value:0}`。design §13.4
     - [x] 12.2a 前置阻塞修复：整册首版发布曾 500 `sync_contract_structure_drift`（首个点名 `d11-managed / adj_bad_debt_rows / d11_adj_bd/change_amount / J:static:12`）。根因是契约声明 13 张受管 sheet 而 `instrumentation_specs()` 只覆盖 12 张 —— **D1-1 审定表（`d11-managed`）从未进 instrumentation**。修法：`phase5_d1_01_adjudication.static_sheet_payload_d11()` 提供 `region_kind=static` 声明（`GT_MANAGED_REGION_D11` / `$A$5:$O$20`），`phase5_d1_expansion._static_sheet_declarations()` 常开挂载（它在契约里恒存在，不能给灰度开关）。契约 `instrumentation_definition_sha256` 随之更新（其余 13 张 sheet 逐字节不变）。守卫 `test_d1_instrumentation_specs_forwarder.py` 两处口径修正：`contract_sheets` 12→13、锚点身份按类型分比（静态锚点无 `table_name`，读它会 KeyError）。
