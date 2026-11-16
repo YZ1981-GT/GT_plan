@@ -188,8 +188,17 @@ def build() -> dict:
     }
 
 
-def render(payload: dict) -> bytes:
-    return (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+def render(payload: dict, *, newline: str = "\n") -> bytes:
+    """渲染生成物。
+
+    🔴 `newline` 必须与**目标文件当前行尾**一致：`core.autocrlf=true` 下工作树是 CRLF
+    而 `render()` 默认 LF ⇒ `--check` 读工作树字节与本函数输出恒不等 ⇒ 恒红（实测）。
+    目标文件不存在时用 LF（git 会归一，不产生 churn）。
+    """
+    text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    if newline != "\n":
+        text = text.replace("\n", newline)
+    return text.encode("utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -205,7 +214,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[FAIL] {exc}", file=sys.stderr)
         return 2
 
-    rendered = render(payload)
+    newline = "\n"
+    if OUT.is_file() and b"\r\n" in OUT.read_bytes():
+        newline = "\r\n"
+    rendered = render(payload, newline=newline)
     if args.check:
         if not OUT.is_file():
             print(f"[FAIL] 生成物不存在：{OUT}", file=sys.stderr)

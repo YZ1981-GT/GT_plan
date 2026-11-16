@@ -221,8 +221,19 @@ def build() -> dict[str, Any]:
     }
 
 
-def render(payload: dict[str, Any]) -> bytes:
-    return (json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+def render(payload: dict[str, Any], *, newline: str = "\n") -> bytes:
+    """渲染生成物。
+
+    🔴 `newline` 必须与**目标文件当前行尾**一致：`core.autocrlf=true` 下工作树是 CRLF
+    而本函数默认 LF ⇒ `--check` 读工作树字节与输出恒不等 ⇒ 恒红。
+    目标文件不存在时用 LF（git 会归一，不产生 churn）。
+
+    与 `generate_legacy_onlyoffice_caller_ledger.render` 同族 —— 两个生成器都踩过。
+    """
+    text = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    if newline != "\n":
+        text = text.replace("\n", newline)
+    return text.encode("utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -231,7 +242,11 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--apply", action="store_true")
     group.add_argument("--check", action="store_true")
     args = parser.parse_args(argv)
-    expected = render(build())
+    # 行尾与目标文件一致（见 render 的说明）。
+    newline = "\n"
+    if OUTPUT.is_file() and b"\r\n" in OUTPUT.read_bytes():
+        newline = "\r\n"
+    expected = render(build(), newline=newline)
     current = OUTPUT.read_bytes() if OUTPUT.is_file() else None
     if args.check:
         if current != expected:
