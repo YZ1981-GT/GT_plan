@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "spec": "platform-global-display-settings-closure",
+  "generated_at": "2026-11-16",
+  "note": "AC-22 正式导出证据覆盖台账。已收口的条目必须删除（守卫会检查）；未收口的每项必须有可执行的 verify 谓词。本文件不是 allowlist —— 它冻结的是「当前确认为空的写入方集合」，任何新增写入方都会让守卫打红并要求同步删除条目。",
+  "closed_chains": [
+    {
+      "id": "word_version_policy_pair",
+      "description": "Word 交付件按 version_no 绑定 file_hash + unit_policy_snapshot/digest，归档清单缺一即 MISSING",
+      "evidence": "backend/app/services/archive_inventory.py 的 _deliverable_entries + evidence 五键"
+    },
+    {
+      "id": "trial_balance_formal_export",
+      "description": "试算表正式导出按 policy.divisor 折算并写「金额单位：X」标注，不写 _GT_EXPORT_META",
+      "evidence": "backend/app/services/trial_balance_export.py"
+    },
+    {
+      "id": "export_package_fail_closed",
+      "description": "组合包任一来源/policy 失败即整包失败，不产出空 bytes 或 placeholder",
+      "evidence": "backend/app/services/export_package_service.py 的 ExportPackageBuildError"
+    },
+    {
+      "id": "data_exchange_marker",
+      "description": "合并试算/差额/附注本地导出带 _GT_EXPORT_META 机器可读 marker 与可见「非正式出具」说明",
+      "evidence": "backend/app/services/export_meta_marker.py + consol_trial.py 三条 local-export 路由"
+    }
+  ],
+  "entries": [
+    {
+      "id": "wp_content_version_surface_class",
+      "reason_code": "NO_PRODUCTION_WRITER",
+      "reason": "working_paper_content_version.export_surface_class 只有 ORM 与 V265 迁移声明，全仓零生产写入方；普通底稿归档因此无法声明「本内容版本属于 formal 还是 data_exchange」。",
+      "owner": "workpaper-sync",
+      "next_batch": "在 content commit hook 落库 content version 时同步写 export_surface_class（formal/data_exchange），并把该值随归档清单输出。",
+      "verify": {
+        "kind": "column_has_no_production_writer",
+        "target": "export_surface_class",
+        "expect": "zero_writers_outside_orm_and_registry"
+      }
+    },
+    {
+      "id": "wp_content_version_source_storage_unit",
+      "reason_code": "NO_PRODUCTION_WRITER",
+      "reason": "working_paper_content_version.source_storage_unit 同样零生产写入方；data_exchange 类底稿导出无法把「文件里的机器可读存储单位」绑定到具体内容版本。",
+      "owner": "workpaper-sync",
+      "next_batch": "与 export_surface_class 同批落库：data_exchange 时写 source_storage_unit=yuan，formal 时写 unit_policy_snapshot/digest 对。",
+      "verify": {
+        "kind": "column_has_no_production_writer",
+        "target": "source_storage_unit",
+        "expect": "zero_writers_outside_orm_and_registry"
+      }
+    },
+    {
+      "id": "wp_content_version_policy_pair",
+      "reason_code": "PARTIAL_WIRING",
+      "reason": "unit_policy_snapshot / unit_policy_digest 两列在 ORM 与 V265 里存在，但只在「内容版本写入时」才能取值；当前内容版本写入方不接收 policy 参数，故这对列实际恒为 NULL。归档侧已按「缺 pair 即阻断」判据处理（fail closed，不会漏件），但普通底稿因此目前无法通过归档。",
+      "owner": "workpaper-sync",
+      "next_batch": "内容版本写入方增加 policy 参数（由 export_unit_policy_resolver 提供），落库时写 pair；随后把本条与上面两条一起从台账删除。",
+      "verify": {
+        "kind": "symbol_has_no_production_caller",
+        "target": "unit_policy_snapshot",
+        "expect": "zero_writers_outside_orm_archive_and_pdf_engine"
+      }
+    }
+  ]
+}

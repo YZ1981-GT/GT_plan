@@ -292,11 +292,19 @@ async def test_create_export_task_defaults_new_fields_to_none():
 
 
 def test_router_passes_snapshot_to_engine():
-    """路由必须真的把快照传下去（AST 级，禁靠运行时才暴露）。"""
+    """路由必须真的把快照传下去（AST 级，禁靠运行时才暴露）。
+
+    🔴 路径必须基于 `__file__` 而不是 cwd 相对路径：原先写
+    `Path("app/routers/export.py")` 只有 cwd == `backend/` 时才成立，
+    在仓库根（CI、`pytest backend/tests/...`）跑就 `FileNotFoundError` ——
+    属「测试依赖执行目录」的脆弱写法，不是产品缺陷。
+    """
     import ast
     from pathlib import Path
 
-    source = Path("app/routers/export.py").read_text(encoding="utf-8")
+    source = (
+        Path(__file__).resolve().parents[1] / "app/routers/export.py"
+    ).read_text(encoding="utf-8")
     tree = ast.parse(source)
     found = False
     for node in ast.walk(tree):

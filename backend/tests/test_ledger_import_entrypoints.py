@@ -41,17 +41,25 @@ class TestEntrypointConstants:
         assert len(submits) == 3
 
     def test_contains_retired_entries(self) -> None:
-        """retired 必须是**具名**的两条真实退役端点。
+        """retired 必须是**具名**的三条真实退役端点。
 
-        🔴 原断言是 `len(retired) >= 3`，把 `/api/projects/{project_id}/import`
-        也算进去了 —— 但那条端点实际仍执行完整导入（`data_import.upload_and_import`），
-        在注册表里标 retired 属**错标**（本轮对真实 `app.routes` 现算才发现）。
-        改成具名断言而不是把 3 调成 2：数字松紧无法表达「哪一条不该在 retired 里」，
-        下次有人再往里塞一条仍然只是数字变化、看不出语义错误。
+        演进轨迹（保留，避免再次来回改）：
+
+        - 原断言 `len(retired) >= 3`，把 `/api/projects/{project_id}/import`
+          也算进去了，但当时那条端点实际仍执行完整导入
+          （`data_import.upload_and_import`）⇒ **错标**；
+        - 中间一轮改成具名两条（只留 account-chart / incremental apply），
+          并把 `/import` 改登为 `preview`（描述「待裁决是否退役」）；
+        - 2026-11-16 按 R8 / design §5 裁决：`/api/projects/{project_id}/import`
+          **正式退役**，函数体固定 410 `LEDGER_IMPORT_MOVED_TO_CONFIRMED_JOB`
+          且不再 import/call 任何 import service ⇒ 回到 retired，共三条。
+
+        用**具名集合**而不是数字，是因为数字无法表达「哪一条该在 / 不该在」。
         """
         retired_paths = {e.path for e in LEDGER_IMPORT_ENTRYPOINTS if e.kind == "retired"}
         assert retired_paths == {
             "/api/projects/{project_id}/account-chart/import",
+            "/api/projects/{project_id}/import",
             "/api/projects/{project_id}/ledger-data/incremental/apply",
         }
 
@@ -262,3 +270,86 @@ def test_validate_entrypoints_raises_when_retired_endpoint_runs() -> None:
         assert exc_info.value.retired_not_410 == [
             "/api/projects/{project_id}/account-chart/import"
         ]
+
+
+# ── 5. 旧同步 POST 退役：错误码字面量必须被钉住 ─────────────────────
+
+class TestRetiredSyncPostsRaise410WithExactCode:
+    """三条 retired 端点必须**真的**返回 410 且错误码逐字正确。
+
+    🔴 这是 M12 变异存活后补的：`_collect_retired_not_410` 只校验
+    「第一条语句是 raise HTTPException(status_code=410)」，**不校验 detail 里的
+    error_code**。于是把 `LEDGER_IMPORT_MOVED_TO_CONFIRMED_JOB` 改成别的字符串，
+    全部守卫仍然全绿 —— 而前端是按 error_code 分支处理的（换码等于换契约）。
+    """
+
+    def test_old_generic_import_post_is_gone_with_exact_code(self) -> None:
+        import asyncio
+        import uuid as _uuid
+
+        from fastapi import HTTPException
+
+        from app.routers import data_import
+
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(
+                data_import.upload_and_import(
+                    project_id=_uuid.UUID("22222222-3333-4444-5555-666666666666"),
+                    current_user=SimpleNamespace(id="u"),
+                )
+            )
+        assert exc.value.status_code == 410
+        assert exc.value.detail["error_code"] == "LEDGER_IMPORT_MOVED_TO_CONFIRMED_JOB"
+
+    def test_old_account_chart_import_post_has_exact_code(self) -> None:
+        """源码层断言（端点签名带 Form/File 依赖，直接调需要造一堆占位）。"""
+        from pathlib import Path
+
+        source = (
+            Path(__file__).resolve().parents[1] / "app/routers/account_chart.py"
+        ).read_text(encoding="utf-8")
+        assert '"error_code": "LEDGER_IMPORT_MOVED_TO_CONFIRMED_JOB"' in source
+
+    def test_old_incremental_apply_has_exact_code(self) -> None:
+        from pathlib import Path
+
+        source = (
+            Path(__file__).resolve().parents[1] / "app/routers/ledger_data.py"
+        ).read_text(encoding="utf-8")
+        assert '"error_code": "INCREMENTAL_APPLY_MOVED_TO_IMPORT_JOB"' in source
+        # 旧码不得残留（否则前端按旧码分支仍能命中，等于两套契约并存）
+        assert '"error_code": "INCREMENTAL_APPLY_RETIRED"' not in source
+
+    def test_retired_sync_posts_do_not_call_import_services(self) -> None:
+        """函数体不得 import/call 任何 import service 或 writer（AST 判据）。"""
+        import ast
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        forbidden = {
+            "start_import",
+            "start_import_streaming",
+            "run_account_chart_import",
+            "submit_import_job",
+        }
+        for rel, func_name in (
+            ("app/routers/data_import.py", "upload_and_import"),
+            ("app/routers/account_chart.py", "import_client_chart"),
+        ):
+            tree = ast.parse((root / rel).read_text(encoding="utf-8"))
+            func = next(
+                (
+                    n
+                    for n in ast.walk(tree)
+                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and n.name == func_name
+                ),
+                None,
+            )
+            assert func is not None, f"{rel} 找不到 {func_name}"
+            called = {
+                getattr(n.func, "id", None) or getattr(n.func, "attr", None)
+                for n in ast.walk(func)
+                if isinstance(n, ast.Call)
+            }
+            assert not (called & forbidden), f"{func_name} 仍在调用 {called & forbidden}"

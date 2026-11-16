@@ -52,7 +52,12 @@ def test_v271_is_current_unique_vr_pair_and_model_shape() -> None:
         rollbacks = [migration for migration in runner.scan_rollback_scripts() if migration.version == "271"]
         assert [migration.filename for migration in versions] == [_V271.name]
         assert [migration.filename for migration in rollbacks] == [_R271.name]
-        assert max(int(migration.version) for migration in runner.scan_migrations()) == 271
+        # 🔴 原断言是 `max(...) == 271`，它把「V271 是本 spec 的迁移」和
+        #    「V271 是仓库当前最高迁移号」两件事绑在一起 —— 后者每有新迁移就失效
+        #    （实测：并发会话引入 V273/V274 后本用例恒红，与本 spec 无关）。
+        #    真正要守的是「V271 在扫描结果里唯一且与 R271 配对」，已由上面两条断言覆盖；
+        #    这里只额外钉住「V271 之后仍存在更高号」不构成对本 spec 的破坏。
+        assert any(int(migration.version) >= 271 for migration in runner.scan_migrations())
     finally:
         # scan_migrations 不会打开连接，但释放测试引擎避免资源告警。
         import asyncio

@@ -23,6 +23,7 @@ from app.models.dataset_models import (
     ImportEventOutbox,
     ImportJob,
     LedgerDataset,
+    LedgerImportAttempt,
     DatasetStatus,
 )
 from app.services.dataset_service import DatasetService
@@ -50,6 +51,10 @@ async def db() -> AsyncSession:
         ImportArtifact.__table__,
         ActivationRecord.__table__,
         ImportEventOutbox.__table__,
+        # R8/AC-15：submit 现在会在 job 之前落 attempt 行（V271 表）。
+        # 清单缺这张表时用例报 `no such table: ledger_import_attempts` ——
+        # 属「新表进了生产代码但测试建表清单没跟上」，不是本 spec 的业务缺陷。
+        LedgerImportAttempt.__table__,
         TbBalance.__table__,
         TbLedger.__table__,
         TbAuxBalance.__table__,
@@ -321,6 +326,21 @@ async def test_incremental_detect_reports_four_month_groups(
         return {1, 2, 3}
 
     monkeypatch.setattr(ledger_data_router, "detect_existing_periods", existing)
+
+    # R8/AC-15：detect 现在还要返回当前 active 的不可变 CAS token。
+    # 实现里从模块级符号 `resolve_base_token` 取（不是函数体内 import），
+    # 这样这里替换就能生效；同时断言它拿到的是本用例的 project/year。
+    from app.services.ledger_import.base_token_resolver import BaseToken
+
+    async def fake_base_token(_db, *, project_id, year):  # noqa: ANN001
+        assert project_id == PROJECT and year == YEAR
+        return BaseToken(
+            dataset_id=uuid.UUID("11111111222233334444555566667777"),
+            unit_contract_digest="b" * 64,
+        )
+
+    monkeypatch.setattr(ledger_data_router, "resolve_base_token", fake_base_token)
+
     result = await ledger_data_router.detect_incremental(
         PROJECT,
         ledger_data_router.IncrementalDetectRequest(
@@ -335,6 +355,9 @@ async def test_incremental_detect_reports_four_month_groups(
     assert result["inherited_periods"] == inherited
     assert result["skipped_file_periods"] == skipped
     assert result["overwritten_periods"] == overwritten
+    # 两个 CAS token 必须逐值原样回显（前端只能透传，不得本地推导）
+    assert result["base_dataset_id"] == "11111111-2222-3333-4444-555566667777"
+    assert result["base_unit_contract_digest"] == "b" * 64
 
 
 @pytest.mark.asyncio
@@ -347,7 +370,7 @@ async def test_retired_incremental_apply_always_returns_410_without_db():
             None,
         )
     assert exc.value.status_code == 410
-    assert exc.value.detail["error_code"] == "INCREMENTAL_APPLY_RETIRED"
+    assert exc.value.detail["error_code"] == "INCREMENTAL_APPLY_MOVED_TO_IMPORT_JOB"
     assert _permission(ledger_data_router.get_ledger_summary) == "readonly"
     assert _permission(ledger_data_router.detect_incremental) == "readonly"
     assert _permission(ledger_data_router.apply_incremental_endpoint) == "edit"

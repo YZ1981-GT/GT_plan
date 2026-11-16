@@ -16,6 +16,7 @@ from app.models.dataset_models import JobStatus
 from app.schemas.ledger_unit_contract import UnitConfirmationInput
 from app.services.import_job_service import ImportJobService
 from app.services.import_queue_service import ImportQueueService
+from app.services.ledger_import.unit_detection_wire import build_unit_detection_payload
 from app.services.ledger_import_upload_service import LedgerImportUploadService
 from app.services.smart_import_engine import SmartImportError, smart_import_streaming, smart_parse_files
 
@@ -298,6 +299,7 @@ class LedgerImportApplicationService:
             })
         return sheets
 
+
     @staticmethod
     def _build_preview_summary(diagnostics: list[dict[str, Any]] | None) -> dict[str, int]:
         balance_est = 0
@@ -520,6 +522,12 @@ class LedgerImportApplicationService:
             "upload_token": resolved_token,
             "sheets": cls._build_preview_sheets(diagnostics),
             "active_sheet": 0,
+            # R8/AC-14：三条 preview/detect 共用同一 builder（实现见 unit_detection_wire）。
+            "unit_detection": build_unit_detection_payload(
+                diagnostics=diagnostics,
+                project_id=project_id,
+                upload_token=resolved_token,
+            ),
         }
 
     @classmethod

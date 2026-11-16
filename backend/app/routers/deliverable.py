@@ -588,6 +588,12 @@ async def render_report_body(
     dsvc = DeliverableService(db)
     rbs = ReportBodyService(db)
 
+    # AC-20：`fill_placeholders` 的 export_policy 无默认必传 ——
+    # 这里按项目当前正式单位现算（唯一入口 `resolve_export_policy`，不读 displayPrefs）。
+    from app.services.export_unit_policy_resolver import resolve_export_policy
+
+    policy = await resolve_export_policy(db, project_id)
+
     kam_err = None
     template = await rbs.load_body_template(
         body.opinion_type,
@@ -601,7 +607,9 @@ async def render_report_body(
             s for s in template["sections"] if s.get("section_name") in allowed
         ]
 
-    filled = await rbs.fill_placeholders(template, project_id, body.year)
+    filled = await rbs.fill_placeholders(
+        template, project_id, body.year, export_policy=policy
+    )
     if body.prior_period_info:
         filled = rbs.apply_prior_period_section(filled, body.prior_period_info)
     filled["is_pie"] = body.is_pie

@@ -86,12 +86,12 @@ LEDGER_IMPORT_ENTRYPOINTS: frozenset[LedgerImportEntrypoint] = frozenset(
             description="智能导入提交：共用 UnitConfirmationInput",
         ),
         # ── retired (固定 410) ──
-        # 🔴 只登记**确认**返回 410 的端点。`/api/projects/{project_id}/import` 原先也登记成
-        #    retired，但它实际仍 `POST` 并执行完整导入（`data_import.upload_and_import`，
-        #    带 data_type / on_duplicate 参数，配套 preview / batches 一整套）。
-        #    登记成 retired = 错标；本轮按现状改登为 preview（真实行为），
-        #    该旧链是否正式退役需单独裁决（见 spec 复核记录 §范围外）。
-        #    新判据 `_collect_retired_not_410` 会让这类错标在下一次立刻打红。
+        # 🔴 2026-11-16 收口：`/api/projects/{project_id}/import` 原先登记成
+        #    `kind="preview"`（注释称「仍真实执行导入，待裁决」）。
+        #    R8/design §5 已明确裁决：**退役**。该端点现固定 410
+        #    `LEDGER_IMPORT_MOVED_TO_CONFIRMED_JOB`，函数体不再 import/call
+        #    任何 import service 或 writer。`_collect_retired_not_410` 会
+        #    AST 校验它真的是「第一条语句就 raise 410」。
         LedgerImportEntrypoint(
             path="/api/projects/{project_id}/account-chart/import",
             method="POST",
@@ -101,11 +101,8 @@ LEDGER_IMPORT_ENTRYPOINTS: frozenset[LedgerImportEntrypoint] = frozenset(
         LedgerImportEntrypoint(
             path="/api/projects/{project_id}/import",
             method="POST",
-            kind="preview",
-            description=(
-                "旧通用数据导入（upload_and_import）：仍真实执行导入，"
-                "执行前需先走 /import/preview 确认；待裁决是否正式退役"
-            ),
+            kind="retired",
+            description="旧通用同步导入：固定 410 LEDGER_IMPORT_MOVED_TO_CONFIRMED_JOB",
         ),
         LedgerImportEntrypoint(
             path="/api/projects/{project_id}/ledger-data/incremental/apply",

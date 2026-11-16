@@ -169,18 +169,23 @@ class ReportBodyService:
         project_id: UUID,
         year: int,
         *,
+        export_policy: "ExportUnitPolicy",
         report_date: date | None = None,
-        export_policy: "ExportUnitPolicy | None" = None,
     ) -> dict:
         """按 Placeholder_Mapping_Registry 填充自动/财务类占位符。
 
-        ``export_policy``（spec platform-global-display-settings-closure 任务 10 / AC-21）：
-        给出时五个财务占位符按 `policy.divisor` 折算（Decimal `ROUND_HALF_UP` 到 0.01），
-        并在 `placeholders_resolved` 里记 `unit` 与 `divisor` —— **数值与标注同源**，
-        避免「按万元折算但标注写元」这类错配。
+        ``export_policy``（spec platform-global-display-settings-closure 任务 10 / AC-20）：
+        **无默认值、必传**。五个财务占位符按 `policy.divisor` 折算
+        （Decimal `ROUND_HALF_UP` 到 0.01），并在 `placeholders_resolved` 里记
+        `unit` 与 `divisor` —— **数值与标注同源**，避免「按万元折算但标注写元」
+        这类更危险的错配。
 
-        🔴 默认 `None` = **不折算、不标注**：保持既有调用方行为逐字节不变
-        （本参数是加法式扩展，不是行为变更）。
+        🔴 为什么从「可选 `None` = 不折算」改成必传（原实现是加法式扩展）：
+
+        AC-20 明文要求「`fill_placeholders` 无默认必传 policy，逐调用方删除参数
+        均失败」。可选默认值让**任何调用方忘记传参时静默按元输出**，而项目若配置
+        为万元，报告正文就会把「1234.5 万元」写成「12345000 元」且不标注 ——
+        这正是本 spec 要消灭的那类错。必传后忘记传是 `TypeError`，编译期即暴露。
         """
         registry = _load_registry()
         basic_info = await self._audit_svc._get_project_basic_info(project_id)
@@ -193,18 +198,15 @@ class ReportBodyService:
             project_id, year, registry.get("financial", {}), financial_data
         )
 
-        # 按 export_policy 折算财务值（只在给出 policy 时）
-        unit_label = ""
-        divisor = None
-        if export_policy is not None:
-            divisor = export_policy.divisor
-            # 🔴 字段名是 `unit`（Literal['yuan','qian','wan']），不是 `unit_label` ——
-            # 现读 `ExportUnitPolicy.model_fields` 实证；按命名习惯猜会 AttributeError。
-            unit_label = _UNIT_LABELS.get(str(export_policy.unit), str(export_policy.unit))
-            fin_values = {
-                key: _convert_amount_string(value, divisor)
-                for key, value in fin_values.items()
-            }
+        # 按 export_policy 折算财务值（policy 必传 ⇒ 无条件折算与标注）
+        divisor = export_policy.divisor
+        # 🔴 字段名是 `unit`（Literal['yuan','qian','wan']），不是 `unit_label` ——
+        # 现读 `ExportUnitPolicy.model_fields` 实证；按命名习惯猜会 AttributeError。
+        unit_label = _UNIT_LABELS.get(str(export_policy.unit), str(export_policy.unit))
+        fin_values = {
+            key: _convert_amount_string(value, divisor)
+            for key, value in fin_values.items()
+        }
 
         filled = json.loads(json.dumps(body, ensure_ascii=False))
         for section in filled.get("sections", []):
@@ -224,18 +226,18 @@ class ReportBodyService:
                     "value": value,
                     "source": meta.get("row_code"),
                 }
-                if divisor is not None:
-                    # 🔴 数值与标注同源：divisor 与 unit 都来自同一份 policy
-                    entry["unit"] = unit_label
-                    entry["divisor"] = str(divisor)
+                # 🔴 数值与标注同源：divisor 与 unit 都来自同一份 policy。
+                #    policy 必传（AC-20）⇒ 这两个键**恒定存在**，
+                #    下游可以无条件按 `entry["unit"]` 读，不必先判空。
+                entry["unit"] = unit_label
+                entry["divisor"] = str(divisor)
                 resolved[key] = entry
 
             section["content"] = content
             section["placeholders_resolved"] = resolved
 
-        if divisor is not None:
-            # 整份 body 级也记一份（下游按 body 读单位时不必逐 section 翻）
-            filled["export_unit"] = {"unit": unit_label, "divisor": str(divisor)}
+        # 整份 body 级也记一份（下游按 body 读单位时不必逐 section 翻）
+        filled["export_unit"] = {"unit": unit_label, "divisor": str(divisor)}
         return filled
 
     def _resolve_auto_placeholders(
@@ -294,13 +296,26 @@ class ReportBodyService:
     async def refresh_financial_placeholders(
         self, project_id: UUID, year: int
     ) -> AuditReport | None:
-        """REPORTS_UPDATED 触发：仅刷新 report_body_json 中财务类占位符"""
+        """REPORTS_UPDATED 触发：仅刷新 report_body_json 中财务类占位符
+
+        `export_policy` 必传（AC-20）：这里按**项目当前**正式单位现算，
+        因为刷新是「重新生成正文」而不是「继承某个已发布版本的 policy」。
+        已发布版本的 policy 证据由 `word_export_task_versions` 的 pair 保管，
+        与本次刷新无关。
+        """
         report = await self._audit_svc.get_report(project_id, year)
         if report is None or not report.report_body_json:
             return report
 
+        from app.services.export_unit_policy_resolver import resolve_export_policy
+
+        policy = await resolve_export_policy(self.db, project_id)
         body = await self.fill_placeholders(
-            report.report_body_json, project_id, year, report_date=report.report_date
+            report.report_body_json,
+            project_id,
+            year,
+            export_policy=policy,
+            report_date=report.report_date,
         )
         report.report_body_json = body
         await self.db.flush()

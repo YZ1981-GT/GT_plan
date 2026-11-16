@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import shutil
@@ -14,6 +15,10 @@ from app.core.config import settings
 from app.services.import_artifact_storage import ImportArtifactStorage
 
 logger = logging.getLogger(__name__)
+
+#: 旧 bundle（manifest 里没有 `sha256` 字段）在需要单位证据的路径上必须重新上传。
+#: 这条常量是「哪些键算证据」的唯一来源，避免各处自己数一遍。
+MANIFEST_HASH_KEY = "sha256"
 
 
 class LedgerImportUploadService:
@@ -101,6 +106,7 @@ class LedgerImportUploadService:
                 target_path = bundle_dir / stored_name
 
                 size = 0
+                hasher = hashlib.sha256()
                 with target_path.open("wb") as target:
                     while True:
                         chunk = await upload.read(cls.CHUNK_SIZE)
@@ -117,6 +123,7 @@ class LedgerImportUploadService:
                                     f"（最大 {settings.LEDGER_UPLOAD_MAX_TOTAL_SIZE_MB}MB）"
                                 ),
                             )
+                        hasher.update(chunk)
                         target.write(chunk)
 
                 total_size += size
@@ -124,6 +131,9 @@ class LedgerImportUploadService:
                     "filename": safe_name,
                     "stored_name": stored_name,
                     "size": size,
+                    # R8/AC-14：逐文件 SHA-256 在**流式落盘时**同时算，
+                    # 不在事后重读整个文件（大文件重读会把上传耗时翻倍）。
+                    MANIFEST_HASH_KEY: hasher.hexdigest(),
                 })
 
             if not manifest_files:
@@ -255,6 +265,98 @@ class LedgerImportUploadService:
             raise HTTPException(status_code=404, detail="上传文件已过期，请重新上传")
         return cls._files_from_manifest(bundle_dir, manifest)
 
+    # ── R8/AC-14：不可变 bundle 的单位证据 ─────────────────
+
+    @classmethod
+    def load_bundle_unit_evidence(
+        cls,
+        project_id: UUID,
+        upload_token: str,
+        *,
+        require_hashes: bool = True,
+    ) -> tuple[dict[str, tuple[str, int]], dict[str, Any]]:
+        """读取 bundle 的逐文件 SHA-256 与 manifest，并**复核磁盘文件**。
+
+        返回 `({文件名: (sha256, size)}, manifest)`。
+
+        `require_hashes=True`（默认）时：
+
+        - 任一文件缺 `sha256` → 400 `UPLOAD_BUNDLE_INTEGRITY_FAILED`
+          （旧 bundle，必须重新上传；**不得**用「文件大小相同」冒充证据）；
+        - 磁盘文件重算 hash 与 manifest 不符 → 400 同上（bundle 已被改动）。
+
+        `require_hashes=False` 只用于纯展示路径（不参与合同构造）。
+        """
+        manifest = cls.load_manifest(project_id, upload_token)
+        bundle_dir = cls._bundle_dir(project_id, upload_token)
+        return cls._bundle_evidence_from(bundle_dir, manifest, require_hashes=require_hashes)
+
+    @classmethod
+    def load_bundle_unit_evidence_from_path(
+        cls,
+        bundle_dir: Path,
+        *,
+        require_hashes: bool = True,
+    ) -> tuple[dict[str, tuple[str, int]], dict[str, Any]]:
+        """同 `load_bundle_unit_evidence`，但以 bundle 目录为入口（worker 侧使用）。"""
+        manifest_path = bundle_dir / "manifest.json"
+        if not manifest_path.exists():
+            raise HTTPException(status_code=404, detail="上传产物清单不存在，请重新上传")
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"上传清单损坏: {exc}") from exc
+        if cls._is_expired(manifest.get("created_at")):
+            raise HTTPException(status_code=404, detail="上传文件已过期，请重新上传")
+        return cls._bundle_evidence_from(bundle_dir, manifest, require_hashes=require_hashes)
+
+    @classmethod
+    def _bundle_evidence_from(
+        cls,
+        bundle_dir: Path,
+        manifest: dict[str, Any],
+        *,
+        require_hashes: bool,
+    ) -> tuple[dict[str, tuple[str, int]], dict[str, Any]]:
+        evidence: dict[str, tuple[str, int]] = {}
+        entries = [
+            item
+            for item in manifest.get("files", [])
+            if (item.get("filename") or item.get("stored_name")) and item.get("stored_name")
+        ]
+        if not entries:
+            # 「manifest 里一条可用文件都没有」与「有文件但缺 hash」是**两种**缺陷，
+            # 必须各有独立判据：合成一处会让任一被删掉时另一条兜住，变异测不出来。
+            raise HTTPException(status_code=404, detail="上传文件不存在，请重新上传")
+        for item in entries:
+            filename = item.get("filename") or item.get("stored_name")
+            stored_name = item.get("stored_name")
+            target = bundle_dir / stored_name
+            if not target.exists():
+                raise HTTPException(status_code=404, detail=f"上传文件缺失: {filename}")
+            recorded = item.get(MANIFEST_HASH_KEY)
+            if not recorded:
+                if require_hashes:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={
+                            "error_code": "UPLOAD_BUNDLE_INTEGRITY_FAILED",
+                            "message": "上传产物缺少文件校验摘要（旧版本产物），请重新上传",
+                        },
+                    )
+                continue
+            actual = _sha256_file(target)
+            if actual != recorded:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error_code": "UPLOAD_BUNDLE_INTEGRITY_FAILED",
+                        "message": f"上传产物已被改动（{filename}），请重新上传",
+                    },
+                )
+            evidence[filename] = (actual, int(item.get("size") or target.stat().st_size))
+        return evidence, manifest
+
     @staticmethod
     def _files_from_manifest(bundle_dir: Path, manifest: dict[str, Any]) -> list[tuple[str, Path]]:
         file_entries: list[tuple[str, Path]] = []
@@ -270,3 +372,15 @@ class LedgerImportUploadService:
         if not file_entries:
             raise HTTPException(status_code=404, detail="上传文件不存在，请重新上传")
         return file_entries
+
+
+def _sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
+    """流式计算文件 SHA-256（不把大文件读进内存）。"""
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(chunk_size)
+            if not chunk:
+                break
+            hasher.update(chunk)
+    return hasher.hexdigest()

@@ -13,8 +13,15 @@ interface ImportMeta {
 // ─── 候选验证实例（spec platform-global-display-settings-closure 13A / AC-25）───
 // 由 `vite.config.ts` 的 `define` 只在候选模式注入；普通模式不注入，运行时必须容忍缺失
 // （消费方用 `typeof x === 'undefined'` 判存，见 utils/candidateTreeMarker.ts）。
-declare const __GT_CANDIDATE_TREE_EXPECTED__: string | undefined
-declare const __GT_CANDIDATE_TREE_ACTUAL__: string | undefined
+//
+// 🔴 必须放在 `declare global {}` 里：本文件下方有 `import 'vue-router'`，
+// 整个文件因此是**模块**，模块顶层的 `declare const` 只在本文件可见，
+// 消费方会报 `TS2304: Cannot find name '__GT_CANDIDATE_TREE_EXPECTED__'`
+// （区域 vue-tsc 实测 4 处）。全局声明必须显式 global。
+declare global {
+  const __GT_CANDIDATE_TREE_EXPECTED__: string | undefined
+  const __GT_CANDIDATE_TREE_ACTUAL__: string | undefined
+}
 
 // ─── Route Meta 类型扩展 ───
 // @see R7.1 路由守卫统一

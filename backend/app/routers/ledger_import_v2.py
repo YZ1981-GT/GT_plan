@@ -36,6 +36,8 @@ router = APIRouter(
     tags=["ledger-import-v2"],
 )
 
+
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -203,6 +205,19 @@ async def detect_files(
     response["total_rows_estimate"] = total_rows_estimate
     response["estimated_duration_seconds"] = estimate_duration_seconds(total_rows_estimate)
     response["size_bucket"] = estimate_duration_bucket(total_rows_estimate)
+
+    # R8/AC-14：与 /account-chart/preview、/ledger/smart-preview 返回
+    # **同一份** UnitDetectionSummary（同一 builder，逐字段相同）。
+    from app.services.ledger_import.unit_detection_wire import (
+        build_unit_detection_payload,
+        detection_diagnostics,
+    )
+
+    response["unit_detection"] = build_unit_detection_payload(
+        diagnostics=detection_diagnostics(result),
+        project_id=project_id,
+        upload_token=upload_token,
+    )
 
     # 缓存 total_rows_estimate 到 bundle manifest，submit 复用避免重新 detect（优化点）
     LedgerImportUploadService.cache_detection_meta(

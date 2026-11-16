@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user, check_consol_lock, require_project_access
 from app.models.core import User
+from app.services.ledger_import.base_token_resolver import resolve_base_token
 from app.services.ledger_data_service import (
     LEDGER_TABLES,
     compute_incremental_diff,
@@ -260,11 +261,16 @@ async def detect_incremental(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ) -> dict:
-    """增量追加预检：返回期间差异。
+    """增量追加预检：返回期间差异 + 当前 active 的不可变基准 token。
 
-    前端在增量导入前调用此端点，根据 diff 结果决定：
-    - 只有 new 月份 → 直接追加
-    - 有 overlap → 提示用户"将覆盖 X 月数据"，需确认
+    R8 / design §5 / AC-15：响应必须携带
+    `base_dataset_id` 与 `base_unit_contract_digest`（当前 active 数据集的
+    canonical unit contract digest）。前端只能把这两个 token 原样随统一
+    submit 提交，**不得**自己推算或使用 `dataset.version`。
+
+    没有 active、或 active 的单位证据不可严格解析（legacy_unknown /
+    legacy_declared）时返回 409 `BASE_DATASET_UNIT_VERIFIED` 的语义 ——
+    具体码由 `resolve_base_token` 决定，这里不重复实现判据。
     """
     existing = await detect_existing_periods(
         db, project_id=project_id, year=request.year
@@ -278,6 +284,11 @@ async def detect_incremental(
         if request.overlap_strategy == "skip"
         else diff["only_existing"]
     )
+
+    # 唯一解析入口（与 submit / seal / activation 同一口径）。
+    # 模块级符号（不是函数体内 import）—— 便于守卫/测试替换同一判据。
+    base_token = await resolve_base_token(db, project_id=project_id, year=request.year)
+
     return {
         "year": request.year,
         "strategy": request.overlap_strategy,
@@ -290,6 +301,9 @@ async def detect_incremental(
         "diff": diff,
         "can_append_safely": len(diff["overlap"]) == 0,
         "requires_confirm": len(diff["overlap"]) > 0,
+        # ── 不可变 CAS token（前端原样透传，不做任何本地推导）──
+        "base_dataset_id": str(base_token.dataset_id) if base_token.dataset_id else None,
+        "base_unit_contract_digest": base_token.unit_contract_digest,
     }
 
 
@@ -311,12 +325,18 @@ async def apply_incremental_endpoint(
     current_user: User = Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
 ) -> dict:
-    """旧的 active 数据预删入口永久退役；追加只允许在 staged 内合并。"""
+    """旧的 active 数据预删入口永久退役；追加只允许在 staged 内合并。
+
+    R8 / design §5 / AC-16：错误码固定为
+    `INCREMENTAL_APPLY_MOVED_TO_IMPORT_JOB`（与入口注册表
+    `LEDGER_IMPORT_ENTRYPOINTS` 的描述逐字一致）。
+    函数体不 import/call 任何删除 service —— 守卫 AST 校验。
+    """
     raise HTTPException(
         status_code=410,
         detail={
-            "error_code": "INCREMENTAL_APPLY_RETIRED",
-            "message": "旧的增量清理入口已退役，请从导入页重新发起增量追加；现行流程不会修改当前账套。",
+            "error_code": "INCREMENTAL_APPLY_MOVED_TO_IMPORT_JOB",
+            "message": "增量覆盖已并入导入作业：请重新上传并在导入页提交，现行流程不会预删当前账套。",
         },
     )
 

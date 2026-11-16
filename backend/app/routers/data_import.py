@@ -1,16 +1,25 @@
-"""数据导入 API 路由
+"""数据导入 API 路由。
 
-Validates: Requirements 4.3, 4.4, 4.23
+R8 / AC-14：本路由的同步写入口 `POST /api/projects/{project_id}/import`
+已**永久退役**为 410 `LEDGER_IMPORT_MOVED_TO_CONFIRMED_JOB`。
+
+理由（design §5）：旧入口直接调 `import_service.start_import*` 写四表，
+**没有单位确认** —— 万元账套会被按元写进库，差一万倍。现行确认式导入必须走
+`preview → 单位确认 → submit`。
+
+保留下来的 `/preview`、`/batches`、`/{batch_id}/progress`、
+`/{batch_id}/rollback`、`/check-duplicates` 只读或回滚既有批次，
+不创建新的四表写入。
 """
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
 from app.core.config import settings
-from app.deps import get_current_user
+from app.core.database import get_db
+from app.deps import get_current_user, require_project_access
 from app.models.audit_platform_schemas import (
     ImportBatchResponse,
     ImportProgress,
@@ -21,72 +30,34 @@ from app.services import import_service
 router = APIRouter(prefix="/api/projects/{project_id}/import", tags=["import"])
 
 
-def _should_use_streaming(source_type: str, file: UploadFile) -> bool:
-    """大文件导入分流：generic 的 xlsx/csv 使用流式路径。"""
-    if source_type != "generic":
-        return False
-    if not file.filename:
-        return False
-    suffix = file.filename.lower().rsplit(".", 1)[-1] if "." in file.filename else ""
-    if suffix not in {"xlsx", "xlsm", "csv"}:
-        return False
-    size = file.size
-    if size is None and hasattr(file, "file") and hasattr(file.file, "seek") and hasattr(file.file, "tell"):
-        current = file.file.tell()
-        file.file.seek(0, 2)
-        size = file.file.tell()
-        file.file.seek(current)
-    return bool(size and size >= import_service.STREAMING_THRESHOLD_MB * 1024 * 1024)
-
-
-@router.post("", response_model=ImportBatchResponse)
+@router.post("")
 async def upload_and_import(
     project_id: UUID,
-    file: UploadFile = File(...),
-    source_type: str = Form(default="generic"),
-    data_type: str = Form(...),
-    year: int = Form(...),
-    on_duplicate: str = Form(default="skip"),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> ImportBatchResponse:
-    """Upload file and start import (multipart form).
+    current_user: User = Depends(require_project_access("edit")),
+) -> None:
+    """旧通用同步导入入口**永久退役**，固定返回 410。
 
-    on_duplicate: skip(跳过重复) / overwrite(覆盖旧数据) / error(报错中止)
+    R8 / design §5 / AC-14：本端点原先直接调
+    `import_service.start_import / start_import_streaming` 写四表，
+    **没有单位确认** —— 万元账套会被按元写进库，差一万倍。
+    现行流程必须走 `preview → 单位确认 → submit`（`/ledger-import/submit`、
+    `/account-chart/import-async` 或 `/ledger/smart-import`）。
 
-    Validates: Requirements 4.3
+    保留 `require_project_access("edit")`：退役端点不该因为 410
+    就变成未登录可达的探针（否则它不再受项目门禁约束）。
+    函数体**不得** import/call 任何 import service 或 writer ——
+    守卫 `test_ledger_import_entrypoints.py` 会 AST 校验这一点。
     """
-    # 文件大小校验
-    if file.size and file.size > settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024:
-        from fastapi import HTTPException
-        raise HTTPException(
-            status_code=413,
-            detail=f"文件大小超过限制（最大 {settings.MAX_UPLOAD_SIZE_MB}MB）",
-        )
-
-    if _should_use_streaming(source_type, file):
-        file.file.seek(0)
-        batch = await import_service.start_import_streaming(
-            project_id=project_id,
-            content=file.file,
-            data_type=data_type,
-            year=year,
-            db=db,
-            on_duplicate=on_duplicate,
-            source_type=source_type,
-            file_name=file.filename,
-        )
-    else:
-        batch = await import_service.start_import(
-            project_id=project_id,
-            file=file,
-            source_type=source_type,
-            data_type=data_type,
-            year=year,
-            db=db,
-            on_duplicate=on_duplicate,
-        )
-    return ImportBatchResponse.model_validate(batch)
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "error_code": "LEDGER_IMPORT_MOVED_TO_CONFIRMED_JOB",
+            "message": (
+                "账套导入已迁移到单位确认作业：请先预览确认金额单位，"
+                "再经确认式导入提交；现行流程不会未经单位确认就写入账套。"
+            ),
+        },
+    )
 
 
 @router.get("/{batch_id}/progress", response_model=ImportProgress)

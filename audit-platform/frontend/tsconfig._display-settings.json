@@ -1,0 +1,33 @@
+{
+  "// 用途": "spec platform-global-display-settings-closure 的单区域类型检查（阶段 A 显示偏好 + 度量 + 导出边界）。全量 vue-tsc 需 40GB 堆约 5 分钟，日常改动只跑本区域，并配变异证明（注入 TS2322 必须报错）。",
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "strict": true, "skipLibCheck": true,
+    "noEmit": true, "isolatedModules": true, "moduleDetection": "force",
+    "jsx": "preserve", "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "noFallthroughCasesInSwitch": true,
+    "paths": { "@/*": ["./src/*"] },
+    "baseUrl": "."
+  },
+  "include": [
+    "src/stores/displayPrefs.ts",
+    "src/stores/project.ts",
+    "src/services/displayPreferencesApi.ts",
+    "src/composables/useDisplayPreferencesRuntime.ts",
+    "src/composables/useGlobalTableLayout.ts",
+    "src/composables/useTableDensityMetrics.ts",
+    "src/composables/usePreferredFixedColumns.ts",
+    "src/composables/useDatasetUnitPresentation.ts",
+    "src/utils/displayPreferencesNormalizer.ts",
+    "src/utils/exportUnit.ts",
+    "src/utils/formatMeasure.ts",
+    "src/utils/treeOid.ts",
+    "src/utils/candidateTreeMarker.ts",
+    "src/types/measureKind.ts",
+    "src/views/DisplaySettingsView.vue",
+    "src/components/settings/DisplayPreferencesPanel.vue",
+    "src/components/common/GtAmountCell.vue",
+    "src/components/common/GtMeasureCell.vue",
+    "src/env.d.ts"
+  ]
+}
