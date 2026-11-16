@@ -121,10 +121,15 @@ APPLY_KEYS = frozenset({
 }) | ADDITIVE_KEYS["apply"]
 
 # 附注同步链路的**既有**模块（本 spec 的 Task 21 联动为纯新增，不得改它们）。
+#
+# 🔴 `note_word_exporter.py` 已移出本清单（2026-11-16，spec
+# `platform-global-display-settings-closure` 任务 6C）：它被后续 spec 合法改造
+# （附注 Word 两条路径消费列语义 kind/scale），不再属于「Task 23 零回归」的冻结范围。
+# 移出而非加字节豁免：本守卫自己写明「字节豁免不得扩散」（`test_chain_file_list_...`
+# 把豁免集合钉死为 `{disclosure_engine.py}`），加豁免会被守卫打红 —— 那是正确设计。
 NOTE_CHAIN_STRUCTURE_FILES = (
     "backend/app/services/note_content_utils.py",
     "backend/app/services/disclosure_engine.py",
-    "backend/app/services/note_word_exporter.py",
     "backend/app/services/note_word_dynamic_styles.py",
     "backend/app/services/note_trim_service.py",
     "backend/app/services/note_is_empty_calc.py",

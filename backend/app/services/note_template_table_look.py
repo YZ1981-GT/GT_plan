@@ -282,7 +282,15 @@ def _pick_prototype(data_rows: list[Any], label: str) -> Any:
     return data_rows[0]
 
 
-def render_cloned_table(sample, table_data: dict, *, header_rows: int = 1):
+def render_cloned_table(
+    sample,
+    table_data: dict,
+    *,
+    header_rows: int = 1,
+    unit_region=None,
+    column_kinds: list[str] | None = None,
+    column_ratio_scales: list[str | None] | None = None,
+):
     """克隆路径（design §2.4）：列数一致时深拷贝样例表、保留表头合并、按行标签选原型行逐行克隆写值。
 
     返回填好值的新 ``w:tbl`` 元素；样例表缺失 / 无表头 / 无数据行、或叶子列数与库内表不一致时返回 ``None``
@@ -291,8 +299,19 @@ def render_cloned_table(sample, table_data: dict, *, header_rows: int = 1):
     - 保留表头行（``w:tblHeader`` 标记的前导行，含表头合并单元格 ``gridSpan`` / ``vMerge``），只读不改；
     - 数据行按库内行数克隆原型行，首列写 label、其余列按 ``fmt_amount_gt`` 右对齐千分位（0 与空留白）；
     - 列宽、边框、字体字号、单元格边距全部继承样例表模板。
+
+    spec platform-global-display-settings-closure 任务 6C：新增三个**全可选**参数
+    `unit_region` / `column_kinds` / `column_ratio_scales`，与 `NoteWordExporter._render_table`
+    **共用同一套** `_apply_region_policy` / `_fmt_ratio` 判据 —— 两条路径（普通 Word 与 clone Word）
+    结果必须一致，否则同一张表走不同路径会差 100 倍或差 1 万倍。
+    不传 = 保持改造前行为（所有数字按金额格式）。
     """
-    from app.services.note_word_exporter import _is_amount, fmt_amount_gt
+    from app.services.note_word_exporter import (
+        _apply_region_policy,
+        _fmt_ratio,
+        _is_amount,
+        fmt_amount_gt,
+    )
 
     if sample is None:
         return None
@@ -305,6 +324,16 @@ def render_cloned_table(sample, table_data: dict, *, header_rows: int = 1):
     valid = _valid_indices(table_data)
     if not valid or sample_leaf_columns(sample) != len(valid):
         return None
+
+    def _kind_at(idx: int) -> str:
+        if not column_kinds:
+            return "amount"
+        return (column_kinds[idx] if 0 <= idx < len(column_kinds) else None) or "amount"
+
+    def _scale_at(idx: int) -> str | None:
+        if not column_ratio_scales:
+            return None
+        return column_ratio_scales[idx] if 0 <= idx < len(column_ratio_scales) else None
 
     tbl = copy.deepcopy(sample)
     all_tr = tbl.findall(qn("w:tr"))
@@ -328,7 +357,16 @@ def render_cloned_table(sample, table_data: dict, *, header_rows: int = 1):
         values = _row_values(row, valid)
         for display_col, (_col, _span, tc) in enumerate(cells[1:]):
             val = values[display_col] if display_col < len(values) else ""
-            text = fmt_amount_gt(val) if _is_amount(val) or val in (None, "", 0) else str(val)
+            kind = _kind_at(display_col)
+            converted = _apply_region_policy(val, kind=kind, region=unit_region)
+            if kind == "ratio":
+                text = _fmt_ratio(converted, _scale_at(display_col))
+            else:
+                text = (
+                    fmt_amount_gt(converted)
+                    if _is_amount(converted) or converted in (None, "", 0)
+                    else str(converted)
+                )
             _set_cell_text(tc, text, right=True)
         anchor.addnext(clone)
         anchor = clone

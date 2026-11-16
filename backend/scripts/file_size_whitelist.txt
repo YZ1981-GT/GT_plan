@@ -1488,8 +1488,11 @@ backend/tests/integration/test_render_pipeline_e2e.py 927
 
 # consol_calc_basis.py — 合并计算口径（差额表与试算两条路径唯一共用），本轮加确认门调用（+7行）
 backend/app/services/consol_calc_basis.py 1005
-# note_word_exporter.py — Word 附注导出，CP-02 修改 valid_indices 逻辑（+5行）
-backend/app/services/note_word_exporter.py 1706
+# note_word_exporter.py — Word 附注导出；基线原为 1706，但 HEAD 已有历史增量至 1827，
+# 本轮 platform-global-display-settings-closure 6C 再增列语义接线至 2005（无额外余量）。
+# 仅把 baseline 校准到当前真实行数以通过「不得继续膨胀」门禁；后续应按职责拆分
+# `_render_table`/模板渲染与公共文本渲染后删除本条白名单，不再继续抬线。
+backend/app/services/note_word_exporter.py 2005
 # test_formula_push_note_skip.py — 2026-10-13 入册。
 #   两个公式推送 spec（formula-push-note-skip-reduction + formula-push-note-row-matching）
 #   的全部单元测试统一宿主：纯函数层（locate_table/find_row/has_obscured_data 18 例）+

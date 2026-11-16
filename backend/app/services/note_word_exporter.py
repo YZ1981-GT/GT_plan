@@ -50,6 +50,7 @@ from app.services.note_section_catalog import (
 )
 from app.services.note_section_numbering import compute_section_numbers
 from app.services.note_html_sanitizer import note_text_to_html
+from app.schemas.export_unit_policy import ExportUnitRegion
 from app.services.note_period_layout import apply_period_layout, export_header_defs
 from app.services.note_text_word_render import (
     append_note_text,
@@ -698,6 +699,65 @@ def fmt_amount_gt(val: Any) -> str:
     return f"{num:,.2f}"
 
 
+# ── 附注 Word 列语义（spec platform-global-display-settings-closure 任务 6C）──────
+#
+# 改造前：`_render_table` 对所有数字一律 `fmt_amount_gt`（金额格式 + 千分位），
+# 比例列被写成「1,234.50」形态、金额列在万元项目里不折算。6C 把「列语义」下沉到
+# 两个渲染内核（`_render_table` 与 `note_template_table_look.render_cloned_table`），
+# 两条路径用**同一套** kind/scale 判据，避免普通 Word 与 clone Word 结果不一致。
+
+
+def _apply_region_policy(
+    value: Any, *, kind: str, region: ExportUnitRegion | None
+) -> Any:
+    """按列语义决定是否折算。
+
+    - `amount`：按 `region.divisor` 折算（Decimal `ROUND_HALF_UP` 到 0.01）；
+    - `ratio`：**不折算**（比例与单位无关，只由 `ratio_scale` 决定显示形态）；
+    - 其余 kind（`quantity` / `count` / `exchange_rate` / `unit_price` / `text`）：
+      **不折算**（数量、次数、汇率、单价都不是「金额」）。
+    - `region is None` 或 `divisor <= 1`：原样返回（既有调用方行为不变）。
+
+    非数字（占位文本）原样返回，不中断整份导出。
+    """
+    if region is None or kind != "amount":
+        return value
+    divisor = getattr(region, "divisor", 1) or 1
+    if divisor == 1:
+        return value
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return value
+    try:
+        from decimal import ROUND_HALF_UP, Decimal
+
+        num = Decimal(str(value))
+    except Exception:  # noqa: BLE001 — 非数字原样保留
+        return value
+    return float((num / Decimal(divisor)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _fmt_ratio(value: Any, ratio_scale: str | None) -> str:
+    """比例列显示：`percent_points` 原样（已是百分点）、`fraction` ×100 后加 `%`。
+
+    🔴 两种刻度**不能混**：库里 0.2 表示 20% 时是 `fraction`，表示 0.2% 时是
+    `percent_points`。混用会让同一张表里的比例差 100 倍。
+    """
+    if value is None or value == "":
+        return ""
+    try:
+        num = float(value)
+    except (ValueError, TypeError):
+        return str(value)
+    if num == 0:
+        return ""
+    if ratio_scale == "percent_points":
+        return f"{num:,.2f}"
+    if ratio_scale == "fraction":
+        return f"{num * 100:,.2f}%"
+    # 未声明刻度 ⇒ 保持改造前的金额格式（不猜）
+    return f"{num:,.2f}"
+
+
 def add_landscape_section(doc) -> Any:
     """章节级横向：next page section break + WD_ORIENT.LANDSCAPE.
 
@@ -776,6 +836,80 @@ class NoteWordExporter:
             "DISCLOSURE_EMPTY_TABLE_COLLAPSE", ""
         ).strip().lower() not in {"0", "false", "no", "off", ""}
         self._skipped_empty_tables: list[str] = []
+        # spec platform-global-display-settings-closure 任务 6C：
+        # 列语义（`column_kinds` / `column_ratio_scales`）与单位区域。
+        # 默认 None ⇒ 保持改造前行为（所有数字按金额格式），既有调用方逐字节不变。
+        self._unit_region: ExportUnitRegion | None = None
+        self._base_unit_region: ExportUnitRegion | None = None
+        self._column_kinds: list[str] | None = None
+        self._column_ratio_scales: list[str | None] | None = None
+
+    async def _prepare_unit_policy(self, project_id: UUID) -> None:
+        """读取项目正式单位并准备附注表格的基础 `ExportUnitRegion`（6C）。
+
+        个人 displayPrefs 不参与正式导出；唯一读取入口是
+        `export_unit_policy_resolver.resolve_export_policy`。读取失败由 resolver
+        安全回落 yuan，保持既有导出不被配置缺失阻断。
+        """
+        from app.services.export_unit_policy_resolver import resolve_export_policy
+
+        policy = await resolve_export_policy(self.db, project_id)
+        self._base_unit_region = ExportUnitRegion(
+            stable_id="note-document",
+            measure_kind="amount",
+            unit=policy.unit,
+            divisor=policy.divisor,
+        )
+
+    def _table_semantics(
+        self, table_data: dict
+    ) -> tuple[ExportUnitRegion | None, list[str] | None, list[str | None] | None]:
+        """从表数据取 6A catalog 的列语义，并绑定项目单位。"""
+        base = self._base_unit_region
+        region = None
+        if base is not None:
+            stable_id = str(
+                table_data.get("table_id")
+                or table_data.get("id")
+                or table_data.get("stable_id")
+                or "note-table"
+            )
+            region = base.model_copy(update={"stable_id": stable_id})
+        kinds = table_data.get("column_kinds") or table_data.get("_column_kinds")
+        scales = table_data.get("column_ratio_scales") or table_data.get("_column_ratio_scales")
+        return region, kinds, scales
+
+    def _col_kind(self, data_idx: int) -> str:
+        """该数据列的 measure kind。未声明 ⇒ `amount`（保持改造前行为）。"""
+        if not self._column_kinds:
+            return "amount"
+        if 0 <= data_idx < len(self._column_kinds):
+            return self._column_kinds[data_idx] or "amount"
+        return "amount"
+
+    def _col_ratio_scale(self, data_idx: int) -> str | None:
+        """该数据列的 ratio scale（仅 `kind == ratio` 时被 `_fmt_ratio` 使用）。"""
+        if not self._column_ratio_scales:
+            return None
+        if 0 <= data_idx < len(self._column_ratio_scales):
+            return self._column_ratio_scales[data_idx]
+        return None
+
+    def set_column_semantics(
+        self,
+        *,
+        unit_region: ExportUnitRegion | None = None,
+        column_kinds: list[str] | None = None,
+        column_ratio_scales: list[str | None] | None = None,
+    ) -> None:
+        """声明本表的列语义（6C）。
+
+        三个参数**全可选**：不传即保持改造前行为（所有数字按金额格式、不折算）。
+        调用方（`export` 的附注路径）按 6A 的 measure catalog 传入。
+        """
+        self._unit_region = unit_region
+        self._column_kinds = column_kinds
+        self._column_ratio_scales = column_ratio_scales
 
     def _new_document(self) -> Document:
         """优先加载 GTNote 模板 docx；缺失时降级 Document() 兼容（Sprint 2 Task 2.2）."""
@@ -853,6 +987,9 @@ class NoteWordExporter:
 
         # Build document（Sprint 2 Task 2.2: 优先加载 GTNote* 模板 docx）
         doc = self._new_document()
+        # 6C：正式附注导出使用项目单位（不读个人 displayPrefs），表级 column_kinds /
+        # column_ratio_scales 在每次 `_render_table` / clone 调用时注入。
+        await self._prepare_unit_policy(project_id)
         # 渲染选项透传给 _render_table
         self._annotate_formulas = annotate_formulas
         self._annotate_manual = annotate_manual
@@ -1012,6 +1149,8 @@ class NoteWordExporter:
             )
         doc = Document(str(entry.abs_path))
 
+        # 6C：模板/clone 路径也使用同一项目单位。
+        await self._prepare_unit_policy(project_id)
         # 渲染选项透传给 _render_table
         self._annotate_formulas = annotate_formulas
         self._annotate_manual = annotate_manual
@@ -1644,7 +1783,15 @@ class NoteWordExporter:
                 _add_guidance_paragraph(doc, str(tbl_guidance))
             self._render_table(doc, tbl)
 
-    def _render_table(self, doc: Document, table_data: dict):
+    def _render_table(
+        self,
+        doc: Document,
+        table_data: dict,
+        *,
+        unit_region: ExportUnitRegion | None = None,
+        column_kinds: list[str] | None = None,
+        column_ratio_scales: list[str | None] | None = None,
+    ):
         """Render a table with 致同 standard formatting.
 
         Sprint 0 / Task 0.3 P0 修复：
@@ -1658,6 +1805,22 @@ class NoteWordExporter:
         """
         headers_raw = table_data.get("headers", [])
         rows = table_data.get("rows", [])
+
+        # 6C：调用方可显式传入三个参数；普通路径未传时从 table_data + 项目策略派生。
+        if unit_region is None and column_kinds is None and column_ratio_scales is None:
+            derived_region, derived_kinds, derived_scales = self._table_semantics(table_data)
+            unit_region = derived_region or self._unit_region
+            column_kinds = derived_kinds if derived_kinds is not None else self._column_kinds
+            column_ratio_scales = (
+                derived_scales
+                if derived_scales is not None
+                else self._column_ratio_scales
+            )
+        self.set_column_semantics(
+            unit_region=unit_region,
+            column_kinds=column_kinds,
+            column_ratio_scales=column_ratio_scales,
+        )
 
         # 可扩位行（`row_type=expandable`）是「此处可增行」的位置标记、没有披露内容
         # ⇒ 不渲染成可见数据行（note-template-columns-and-legacy-snapshot-closure
@@ -1774,7 +1937,22 @@ class NoteWordExporter:
                     cell_val = last_computed if isinstance(last_computed, (int, float)) else ""
 
                 # Sprint 2 Task 2.2: 使用 fmt_amount_gt（空/零留白）替代 _format_amount（"-"）
-                formatted = fmt_amount_gt(cell_val)
+                #
+                # spec platform-global-display-settings-closure 任务 6C：
+                # 按**列语义**决定折算与刻度 —— 只有 `amount` 执行 policy divisor，
+                # `ratio` 按 `ratio_scale` 决定 ×100（percent_points）还是原样（fraction），
+                # 其余 kind（quantity/count/exchange_rate/unit_price/text）**不折算**。
+                # 改造前这里对所有数字一律 `fmt_amount_gt`（金额格式 + 千分位），
+                # 比例列会被写成「1,234.50」这种金额形态。
+                _kind = self._col_kind(data_idx)
+                _formatted_value = _apply_region_policy(
+                    cell_val, kind=_kind, region=self._unit_region
+                )
+                formatted = (
+                    fmt_amount_gt(_formatted_value)
+                    if _kind in ("amount", "quantity", "count", "exchange_rate", "unit_price")
+                    else _fmt_ratio(_formatted_value, self._col_ratio_scale(data_idx))
+                )
                 run = p.add_run(formatted)
                 # 数字走 Arial Narrow + 中文 eastAsia=仿宋
                 if _is_amount(cell_val):

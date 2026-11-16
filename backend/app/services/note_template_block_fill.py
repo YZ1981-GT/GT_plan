@@ -460,7 +460,14 @@ def _render_table_elements(doc, exporter, table: dict) -> list[Any]:
     body = doc.element.body
     has_sect = len(body) and body[-1].tag == qn("w:sectPr")
     before = len(body)
-    exporter._render_table(doc, table)
+    unit_region, column_kinds, column_ratio_scales = exporter._table_semantics(table)
+    exporter._render_table(
+        doc,
+        table,
+        unit_region=unit_region,
+        column_kinds=column_kinds,
+        column_ratio_scales=column_ratio_scales,
+    )
     added = len(body) - before
     if added <= 0:
         return []
@@ -583,7 +590,19 @@ def rebuild_block(
         """
         out: list[Any] = []
         for t in tables:
-            cloned = render_cloned_table(sample, t, header_rows=_header_rows(t)) if sample is not None else None
+            unit_region, column_kinds, column_ratio_scales = exporter._table_semantics(t)
+            cloned = (
+                render_cloned_table(
+                    sample,
+                    t,
+                    header_rows=_header_rows(t),
+                    unit_region=unit_region,
+                    column_kinds=column_kinds,
+                    column_ratio_scales=column_ratio_scales,
+                )
+                if sample is not None
+                else None
+            )
             if cloned is not None:
                 els: list[Any] = [cloned]
                 st.tables_cloned += 1
