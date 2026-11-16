@@ -212,8 +212,20 @@
     G 根汇总现金/银行/合计、来源标记 `detail_mapping` / `formula` / `subtree_aggregate`、
     子企业计数、stale 清理；另复用既有断言验证手工格保留和坏保护元数据章节 SAVEPOINT 回滚。
     **3/3 passed（36.71s）**，一次性库已 DROP，共享库未写入。
-    **仍未完成**：真实 PG 并发双连接 barrier 与 C2/C3 磁盘变异；后者此前因 Windows `_overlapped`
-    资源异常无法启动子进程，未虚报通过。
+
+  - **2026-11-17 补（C2/C3 磁盘变异已补齐，6/6 RED）**：
+    `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 可绕开本机 Windows 共享进程占用 `_overlapped` 导致的
+    pytest 插件导入失败（AST 静态守卫不需要 asyncio/anyio 插件）⇒ 磁盘变异得以真实执行。
+    6 组变异全部 RED 且红在预期用例：删章节预取调用 / 删 `prefetched_sources` 传参 /
+    apply 层无条件重查来源 / 差额节点不传 `_precomputed_cells` / `cells` 赋值改成 None
+    而旁置调用 / 删 `if _precomputed_cells is None` 的默认分支。
+    🔴 **两条守卫是变异逼出来的真缺口**（原判据是「函数里出现过这个名字」，等价于空转）：
+    · 差额节点：必须断言 `cells` 由 `note_cell_values` 的**返回值**赋值，而不是「名字出现过」
+      （v1 变异把 `cells = await note_cell_values(...)` 改成 `cells = None` 并保留一个
+      `_unused = await ...`，原判据全绿）；
+    · 公式填入：必须断言 `note_breakdown` 位于 `if _precomputed_cells is None` 的 **If 体内**
+      且不在 else（v1 变异把条件改成 `if False:`，原判据仍全绿）。
+    **仍未完成**：C2/C3 与章节锁组合的真实 PG 并发双连接 barrier。
 - [ ] C4 Ledger 导入分阶段 profiler；COPY/staging/set-based 合并把真实大项目目标压到 5 分钟内。
   - profiler 骨架 `app/services/ledger_import/profiler.py`（`StagedProfiler` + `StageRecord`）：
     PG 下 `pg_current_wal_lsn()` + `pg_wal_lsn_diff` 自动采集每阶段 WAL 增量字节，非 PG 环境

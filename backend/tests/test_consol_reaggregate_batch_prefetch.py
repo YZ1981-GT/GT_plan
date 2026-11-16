@@ -103,12 +103,27 @@ def test_batch_prefetch_is_not_per_node_source_query():
 
 
 def test_elimination_node_computes_cells_from_loaded_view_before_persist():
-    """C3：差额节点使用已装载 ViewContext 的纯内存计算，不重新走 note_breakdown。"""
+    """C3：差额节点使用已装载 ViewContext 的纯内存计算，不重新走 note_breakdown。
+
+    🔴 判据必须绑到**赋值**而不是「函数里出现过这个名字」：v1 变异把
+    `cells = await note_cell_values(...)` 改成 `cells = None` 并在旁边保留一个
+    `_unused = await note_cell_values(...)`，只查「名字出现过」会全绿 ——
+    而实际计算出的值根本没被使用。
+    """
     tree = _tree(RUNNER)
     method = _method(tree, "_elim")
-    names = _called_names(method)
-    assert "note_cell_values" in names, "差额节点没有从已加载 ViewContext 计算公式单元格"
-    assert "fill_by_formula" in names, "差额节点没有复用既有保护格/写入路径"
+
+    # cells 必须由 note_cell_values 的**返回值**赋值（不是 None / 常量）
+    cells_assigns = [
+        child for child in ast.walk(method)
+        if isinstance(child, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == "cells" for t in child.targets)
+    ]
+    assert cells_assigns, "差额节点没有给 cells 赋值"
+    cells_value = ast.unparse(cells_assigns[0].value)
+    assert "note_cell_values" in cells_value, (
+        f"cells 不是由 note_cell_values 计算的（实际：{cells_value[:80]}）"
+    )
 
     calls = [
         child for child in ast.walk(method)
@@ -124,11 +139,43 @@ def test_elimination_node_computes_cells_from_loaded_view_before_persist():
 
 
 def test_formula_fill_supports_precomputed_cells_without_note_breakdown():
-    """C3：fill_by_formula 的预计算分支必须存在，且默认调用方语义不变。"""
+    """C3：`note_breakdown` 必须只在 `_precomputed_cells is None` 分支里调用。
+
+    🔴 v1 变异把 `if _precomputed_cells is None:` 改成 `if False:` 后守卫仍全绿，
+    因为它只查「函数里出现过 note_breakdown」。真正的契约是：
+    **默认路径（未传预计算）才走 note_breakdown**，传了预计算就跳过。
+    ⇒ 判据改为「note_breakdown 调用必须位于 `if _precomputed_cells is None` 的 If 体内」。
+    """
     formula_tree = _tree(ROOT / "app" / "services" / "consol_note_formula_service.py")
     method = _method(formula_tree, "fill_by_formula")
     args = {arg.arg for arg in method.args.kwonlyargs}
     assert "_precomputed_cells" in args
     assert "_precomputed_is_root_consol" in args
-    calls = _called_names(method)
-    assert "note_breakdown" in calls, "默认路径丢失 note_breakdown，旧调用会失效"
+
+    guard_ifs = [
+        node for node in ast.walk(method)
+        if isinstance(node, ast.If)
+        and "_precomputed_cells is None" in ast.unparse(node.test)
+    ]
+    assert guard_ifs, (
+        "fill_by_formula 里没有 `if _precomputed_cells is None` 分支 ⇒ "
+        "预计算路径与默认路径无法区分"
+    )
+
+    def _calls_note_breakdown(nodes: list[ast.stmt]) -> bool:
+        for stmt in nodes:
+            for child in ast.walk(stmt):
+                if (
+                    isinstance(child, ast.Call)
+                    and isinstance(child.func, ast.Name)
+                    and child.func.id == "note_breakdown"
+                ):
+                    return True
+        return False
+
+    assert _calls_note_breakdown(guard_ifs[0].body), (
+        "`if _precomputed_cells is None` 分支里没有调用 note_breakdown ⇒ 默认路径会失效"
+    )
+    assert not _calls_note_breakdown(guard_ifs[0].orelse), (
+        "note_breakdown 出现在 else 分支（预计算路径）⇒ 仍会重复计算"
+    )
