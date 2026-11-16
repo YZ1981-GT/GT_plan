@@ -67,11 +67,12 @@ ENTRIES = [
 #: 不在本 spec 的「键名桥」范围。它们在本文件里被**显式登记为已知缺口**，
 #: 并由 `test_disjoint_models_are_registered_and_still_disjoint` 钉住——一旦有人对齐了它们，
 #: 该用例会变红并要求把它从名单里删掉（防止名单长期腐烂）。
-DISJOINT_ENTRIES = {
-    "M3": "phase5_m3_treasury_stock",
-    "M5": "phase5_m5_surplus_reserve",
-    "M7": "phase5_m7_special_reserve",
-}
+#: 2026-11-16 §R12 之后：M3 / M5 / M7 已按权威模板**重建**行模型（列与行都来自
+#: 生成文件 `mCycleDetailColumns.generated.ts`，真源 = provider），因此它们从「不可对齐」名单
+#: 移入 `BRIDGED_ENTRIES`（本棘轮按设计变红，已按要求删除条目）。
+#: 保留空 dict 而非删变量：后续若再出现不可对齐的 entry，往这里登记即可；
+#: `test_disjoint_models_are_registered_and_still_disjoint` 在空分母下不产生用例（合法空集）。
+DISJOINT_ENTRIES: dict[str, str] = {}
 
 #: 桥已经真正接通的 entry（交集非空 ⇒ 键名一致就能投影）。
 BRIDGED_ENTRIES = [e for e in ENTRIES if e[0] not in DISJOINT_ENTRIES]
@@ -84,21 +85,39 @@ def _provider(module_name: str):
 
 
 def _interface_keys(composable: str, interface: str) -> list[str]:
-    """从 composable 现读 interface 的字段名（顺序即声明顺序）。"""
+    """取该明细表行模型的键集（两种形态都支持）。
+
+    * **interface 形态**（M1/M2/M4/M6/M8/M9/M10 仍是）：从 `export interface` 现读字段名；
+    * **Record + 生成文件形态**（M3/M5/M7 §R12 重建后）：行键由生成文件提供，
+      那份文件本身已由 `test_m_cycle_detail_columns_generated.py` 与 provider 对齐
+      ⇒ 直接从生成文件取 `jsonKey`。
+
+    🔴 为什么要兼容两种：重建后 M3/M5/M7 已不存在 `export interface`。
+    只认 interface 会让守卫在**正确实现**上报「找不到 interface」—— 那是假阳。
+    """
     path = _COMPOSABLES / composable
     assert path.exists(), f"{composable} 不存在 —— 改名后必须同步本守卫"
     src = path.read_text(encoding="utf-8")
     m = re.search(rf"export interface {interface}\b[^{{]*{{(.*?)\n}}", src, re.S)
-    assert m, f"{composable} 找不到 interface {interface}"
-    keys: list[str] = []
-    for line in m.group(1).splitlines():
-        line = line.strip()
-        if not line or line.startswith(("//", "/*", "*")):
-            continue
-        hit = re.match(r"([A-Za-z_][A-Za-z0-9_]*)\??\s*:", line)
-        if hit:
-            keys.append(hit.group(1))
-    return keys
+    if m:
+        keys: list[str] = []
+        for line in m.group(1).splitlines():
+            line = line.strip()
+            if not line or line.startswith(("//", "/*", "*")):
+                continue
+            hit = re.match(r"([A-Za-z_][A-Za-z0-9_]*)\??\s*:", line)
+            if hit:
+                keys.append(hit.group(1))
+        return keys
+
+    # Record 形态：键集来自生成文件
+    label = composable.replace("use", "").replace("Detail.ts", "")
+    gen = _ROOT / "audit-platform" / "frontend" / "src" / "components" / "workpaper" / "m-cycle" / "mCycleDetailColumns.generated.ts"
+    assert gen.exists(), f"{composable} 既无 interface {interface}，又找不到生成文件"
+    gen_text = gen.read_text(encoding="utf-8")
+    block = re.search(rf"\b{label}: \{{(.*?)\n  \}},", gen_text, re.S)
+    assert block, f"生成文件里找不到 {label} 的定义"
+    return re.findall(r'"jsonKey": "([^"]+)"', block.group(1))
 
 
 def _row_identity_fields(keys: list[str]) -> set[str]:

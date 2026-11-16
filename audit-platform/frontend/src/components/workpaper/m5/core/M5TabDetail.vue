@@ -46,161 +46,24 @@
       </div>
     </div>
 
-    <!-- ═══ 区段一：法定盈余公积明细 ═══ -->
+    <!-- ═══ 明细表（模板驱动：固定 4 行 × 17 列，行标签与列均来自模板） ═══ -->
     <div class="block-section">
       <div class="block-header">
-        <h4 class="block-title">法定盈余公积明细</h4>
-        <el-button v-if="!isReadonly" size="small" type="primary" plain @click="handleAddRow('statutory')">
-          + 新增明细
-        </el-button>
+        <h4 class="block-title">盈余公积明细（法定 / 任意 / 利润归还投资 / 其他）</h4>
+        <span class="block-hint">行与列均按权威模板渲染；公式列在线编辑侧重算</span>
       </div>
-
-      <el-table :data="statutoryTableRows" border size="small" style="width: 100%" :row-class-name="getRowClassName">
-        <el-table-column prop="sourceName" label="项目" min-width="160" fixed>
-          <template #default="{ row, $index }">
-            <template v-if="isSubtotalRow(row)"><span class="total-row-label">{{ row.sourceName }}</span></template>
-            <template v-else-if="!isReadonly && isDataRow(row)">
-              <el-input :model-value="row.sourceName" size="small" placeholder="来源项目" @change="(val: string) => updateStatutoryRow($index, 'sourceName', val)" />
-            </template>
-            <template v-else>{{ row.sourceName || '—' }}</template>
-          </template>
-        </el-table-column>
-        <el-table-column label="期初" width="120" align="right">
-          <template #default="{ row, $index }">
-            <template v-if="isDataRow(row) && !isReadonly">
-              <el-input-number :model-value="row.beginning" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => updateStatutoryRow($index, 'beginning', val ?? 0)" />
-            </template>
-            <span v-else>{{ fmtAmount(row.beginning) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期计提" width="120" align="right">
-          <template #default="{ row, $index }">
-            <template v-if="isDataRow(row) && !isReadonly">
-              <el-input-number :model-value="row.accrual" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => updateStatutoryRow($index, 'accrual', val ?? 0)" />
-            </template>
-            <span v-else>{{ fmtAmount(row.accrual) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期转增资本" width="130" align="right">
-          <template #default="{ row, $index }">
-            <template v-if="isDataRow(row) && !isReadonly">
-              <el-input-number :model-value="row.capitalConversion" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => updateStatutoryRow($index, 'capitalConversion', val ?? 0)" />
-            </template>
-            <span v-else>{{ fmtAmount(row.capitalConversion) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期弥补亏损" width="130" align="right">
-          <template #default="{ row, $index }">
-            <template v-if="isDataRow(row) && !isReadonly">
-              <el-input-number :model-value="row.lossOffset" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => updateStatutoryRow($index, 'lossOffset', val ?? 0)" />
-            </template>
-            <span v-else>{{ fmtAmount(row.lossOffset) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="期末" width="130" align="right">
-          <template #header>
-            <el-tooltip content="权益类贷方: 期初 + 本期计提 − 本期转增 − 本期弥补" placement="top">
-              <span class="formula-col-header">期末</span>
-            </el-tooltip>
-          </template>
-          <template #default="{ row }">
-            <span class="formula-value">{{ fmtAmount(row.endBalance) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column v-if="!isReadonly" label="" width="60" align="center">
-          <template #default="{ row, $index }">
-            <el-button v-if="isDataRow(row)" type="danger" size="small" link @click="handleRemoveStatutoryRow($index)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div class="block-subtotal">
-        <el-tag type="info" size="small" effect="plain">法定盈余公积小计期末: {{ fmtAmount(statutorySubtotal.endBalance) }}</el-tag>
-      </div>
+      <GtMCycleDetailTable
+        entry="M5"
+        :rows="detailRows"
+        :readonly="isReadonly"
+        @update="handleCellUpdate"
+      />
     </div>
 
-    <!-- ═══ 区段二：任意盈余公积明细 ═══ -->
-    <div class="block-section">
-      <div class="block-header">
-        <h4 class="block-title">任意盈余公积明细</h4>
-        <el-button v-if="!isReadonly" size="small" type="primary" plain @click="handleAddRow('discretionary')">
-          + 新增明细
-        </el-button>
-      </div>
-
-      <el-table :data="discretionaryTableRows" border size="small" style="width: 100%" :row-class-name="getRowClassName">
-        <el-table-column prop="sourceName" label="项目" min-width="160" fixed>
-          <template #default="{ row, $index }">
-            <template v-if="isSubtotalRow(row)"><span class="total-row-label">{{ row.sourceName }}</span></template>
-            <template v-else-if="!isReadonly && isDataRow(row)">
-              <el-input :model-value="row.sourceName" size="small" placeholder="来源项目" @change="(val: string) => updateDiscretionaryRow($index, 'sourceName', val)" />
-            </template>
-            <template v-else>{{ row.sourceName || '—' }}</template>
-          </template>
-        </el-table-column>
-        <el-table-column label="期初" width="120" align="right">
-          <template #default="{ row, $index }">
-            <template v-if="isDataRow(row) && !isReadonly">
-              <el-input-number :model-value="row.beginning" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => updateDiscretionaryRow($index, 'beginning', val ?? 0)" />
-            </template>
-            <span v-else>{{ fmtAmount(row.beginning) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期计提" width="120" align="right">
-          <template #default="{ row, $index }">
-            <template v-if="isDataRow(row) && !isReadonly">
-              <el-input-number :model-value="row.accrual" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => updateDiscretionaryRow($index, 'accrual', val ?? 0)" />
-            </template>
-            <span v-else>{{ fmtAmount(row.accrual) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期转增资本" width="130" align="right">
-          <template #default="{ row, $index }">
-            <template v-if="isDataRow(row) && !isReadonly">
-              <el-input-number :model-value="row.capitalConversion" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => updateDiscretionaryRow($index, 'capitalConversion', val ?? 0)" />
-            </template>
-            <span v-else>{{ fmtAmount(row.capitalConversion) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期弥补亏损" width="130" align="right">
-          <template #default="{ row, $index }">
-            <template v-if="isDataRow(row) && !isReadonly">
-              <el-input-number :model-value="row.lossOffset" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => updateDiscretionaryRow($index, 'lossOffset', val ?? 0)" />
-            </template>
-            <span v-else>{{ fmtAmount(row.lossOffset) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="期末" width="130" align="right">
-          <template #header>
-            <el-tooltip content="权益类贷方: 期初 + 本期计提 − 本期转增 − 本期弥补" placement="top">
-              <span class="formula-col-header">期末</span>
-            </el-tooltip>
-          </template>
-          <template #default="{ row }">
-            <span class="formula-value">{{ fmtAmount(row.endBalance) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column v-if="!isReadonly" label="" width="60" align="center">
-          <template #default="{ row, $index }">
-            <el-button v-if="isDataRow(row)" type="danger" size="small" link @click="handleRemoveDiscretionaryRow($index)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div class="block-subtotal">
-        <el-tag type="info" size="small" effect="plain">任意盈余公积小计期末: {{ fmtAmount(discretionarySubtotal.endBalance) }}</el-tag>
-      </div>
-    </div>
-
-    <!-- ═══ 合计 + 交叉验证状态 ═══ -->
+    <!-- ═══ 交叉验证状态（只比审定数合计，不重算模板公式） ═══ -->
     <div class="detail-footer">
-      <el-tag type="primary" size="small" effect="dark">合计期末: {{ fmtAmount(grandTotal.endBalance) }}</el-tag>
-      <el-tag :type="crossValidation.isMatch ? 'success' : 'danger'" size="small" effect="plain">
-        与M5-1交叉验证:
-        {{ crossValidation.isMatch ? '一致 ✓' : `差异 ${fmtAmount(crossValidation.statutoryDiff + crossValidation.discretionaryDiff)}` }}
-      </el-tag>
-      <el-tag type="info" size="small" effect="plain">
-        法定小计: {{ fmtAmount(statutorySubtotal.endBalance) }} | 任意小计: {{ fmtAmount(discretionarySubtotal.endBalance) }}
+      <el-tag :type="crossValidation.isMatch ? 'success' : 'warning'" size="small" effect="plain">
+        与 M5-1 审定表对比：{{ crossValidation.hint }}
       </el-tag>
     </div>
 
@@ -237,155 +100,74 @@
 
 <script setup lang="ts">
 /**
- * M5TabDetail — M5-2 盈余公积明细表（法定+任意两区段）
- * Requirements: 3.1-3.5
- * 两区段: 法定盈余公积明细 + 任意盈余公积明细
- * 列: 项目 | 期初 | 本期计提 | 本期转增资本 | 本期弥补亏损 | 期末
- * 公式: 期末=期初+本期计提-本期转增-本期弥补（权益类贷方）
- * 12公式实时计算 + 动态行新增 + 导入导出
+ * M5TabDetail — M5-2 盈余公积明细表（**模板驱动**）
+ *
+ * spec: `m-cycle-key-naming-unification` §R12
+ *
+ * 旧实现把明细表手写成 6 列（项目/期初/本期计提/转增资本/弥补亏损/期末）并按「法定 / 任意」
+ * 两个区段拆表、各自加一行小计 —— 而模板实际是 **4 固定行 × 17 列**（未审数 6 列 + 期初调整 2 列 +
+ * 账项调整 2 列 + 重分类调整 2 列 + 审定数 4 列）+ 一行合计。两者列集合交集 = 0。
+ *
+ * 现在：列与行全部来自生成文件（真源 = provider + 权威 xlsx）；
+ * 区段、小计、前端公式重算一律不再存在（模板那一行就是合计公式）。
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, Check, ArrowDown } from '@element-plus/icons-vue'
 import { useM5FormData } from '../../composables/useM5FormData'
 import { useM5ImportExport } from '../../composables/useM5ImportExport'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
-import {
-  useM5Detail,
-  type M5DetailRow,
-  type M5DetailSegment,
-} from '../../composables/useM5Detail'
-import { eventBus } from '@/utils/eventBus'
+import { useM5Detail, createM5EmptyRows, type M5DetailRow } from '../../composables/useM5Detail'
+import GtMCycleDetailTable from '../../m-cycle/GtMCycleDetailTable.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 
-// ─── Composables ─────────────────────────────────────────────────────────────
+// ─── Composables ────────────────────────────────────────────────────────────
 const formData = useM5FormData({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 const importExport = useM5ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const aiLoading = ref('')
 
-const detailRows = ref<M5DetailRow[]>([])
+const detailRows = ref<M5DetailRow[]>(createM5EmptyRows())
+const { ensureTemplateRows, updateRow, saveAll } = useM5Detail(formData, detailRows)
 
-const {
-  computedRows,
-  statutorySubtotal,
-  discretionarySubtotal,
-  grandTotal,
-  addRow,
-  removeRow,
-  updateRow: composableUpdateRow,
-  crossValidateWithAdjudication,
-} = useM5Detail(formData, detailRows)
-
-// ─── 表格数据：按区段拆分 + 小计行 ──────────────────────────────────────────
-interface TableRow extends M5DetailRow { _rowType?: 'data' | 'subtotal' }
-
-const statutoryTableRows = computed<TableRow[]>(() => {
-  const result: TableRow[] = computedRows.value
-    .filter(r => r.segment === 'statutory')
-    .map(r => ({ ...r, _rowType: 'data' as const }))
-  result.push({
-    key: 'statutory-subtotal', segment: 'statutory', sourceName: '法定盈余公积小计',
-    beginning: statutorySubtotal.value.beginning, accrual: statutorySubtotal.value.accrual,
-    capitalConversion: statutorySubtotal.value.capitalConversion, lossOffset: statutorySubtotal.value.lossOffset,
-    endBalance: statutorySubtotal.value.endBalance, unadjBeginning: 0, unadjAccrual: 0,
-    unadjConversion: 0, unadjLossOffset: 0, unadjEnd: 0, ajeAmount: 0, rjeAmount: 0,
-    auditedEnd: statutorySubtotal.value.auditedEnd, remark: '', _rowType: 'subtotal',
-  })
-  return result
-})
-
-const discretionaryTableRows = computed<TableRow[]>(() => {
-  const result: TableRow[] = computedRows.value
-    .filter(r => r.segment === 'discretionary')
-    .map(r => ({ ...r, _rowType: 'data' as const }))
-  result.push({
-    key: 'discretionary-subtotal', segment: 'discretionary', sourceName: '任意盈余公积小计',
-    beginning: discretionarySubtotal.value.beginning, accrual: discretionarySubtotal.value.accrual,
-    capitalConversion: discretionarySubtotal.value.capitalConversion, lossOffset: discretionarySubtotal.value.lossOffset,
-    endBalance: discretionarySubtotal.value.endBalance, unadjBeginning: 0, unadjAccrual: 0,
-    unadjConversion: 0, unadjLossOffset: 0, unadjEnd: 0, ajeAmount: 0, rjeAmount: 0,
-    auditedEnd: discretionarySubtotal.value.auditedEnd, remark: '', _rowType: 'subtotal',
-  })
-  return result
-})
-
-function isDataRow(row: TableRow): boolean { return row._rowType === 'data' }
-function isSubtotalRow(row: TableRow): boolean { return row._rowType === 'subtotal' }
-function getRowClassName({ row }: { row: TableRow; rowIndex: number }): string {
-  return row._rowType === 'subtotal' ? 'subtotal-row' : ''
+/** 单元格修改（来自模板驱动表格） */
+function handleCellUpdate(payload: { index: number; jsonKey: string; value: string | number }): void {
+  updateRow(payload.index, payload.jsonKey, payload.value)
 }
 
-// ─── 行操作代理（表格索引→detailRows原始索引） ───────────────────────────────
-function getSegmentRawIndex(tableIndex: number, segment: M5DetailSegment): number {
-  const segmentRows = computedRows.value.filter(r => r.segment === segment)
-  if (tableIndex < 0 || tableIndex >= segmentRows.length) return -1
-  const targetKey = segmentRows[tableIndex].key
-  return detailRows.value.findIndex(r => r.key === targetKey)
-}
-
-function updateStatutoryRow(tableIndex: number, field: string, value: string | number): void {
-  const rawIdx = getSegmentRawIndex(tableIndex, 'statutory')
-  if (rawIdx >= 0) composableUpdateRow(rawIdx, field as keyof M5DetailRow, value)
-}
-function updateDiscretionaryRow(tableIndex: number, field: string, value: string | number): void {
-  const rawIdx = getSegmentRawIndex(tableIndex, 'discretionary')
-  if (rawIdx >= 0) composableUpdateRow(rawIdx, field as keyof M5DetailRow, value)
-}
-function handleRemoveStatutoryRow(tableIndex: number): void {
-  const rawIdx = getSegmentRawIndex(tableIndex, 'statutory')
-  if (rawIdx >= 0) removeRow(rawIdx)
-}
-function handleRemoveDiscretionaryRow(tableIndex: number): void {
-  const rawIdx = getSegmentRawIndex(tableIndex, 'discretionary')
-  if (rawIdx >= 0) removeRow(rawIdx)
-}
-
-async function handleAddRow(segment: M5DetailSegment): Promise<void> {
-  await addRow(segment)
-}
-
-// ─── 交叉验证（从formData恢复M5-1审定表合计） ────────────────────────────────
+// ─── 与 M5-1 审定表对比（只比合计，不重算模板公式） ──────────────────
 const crossValidation = computed(() => {
-  const adjStatutoryResp = formData.allResponses.value.get('M5-1-statutory-audited-total')
-  const adjDiscretionaryResp = formData.allResponses.value.get('M5-1-discretionary-audited-total')
-  const adjStatutoryTotal = Number(adjStatutoryResp?.remark) || 0
-  const adjDiscretionaryTotal = Number(adjDiscretionaryResp?.remark) || 0
-  return crossValidateWithAdjudication(adjStatutoryTotal, adjDiscretionaryTotal)
+  const resp = formData.allResponses.value.get('M5-1-total-audited')
+  const adjudicated = Number(resp?.remark) || 0
+  const local = detailRows.value.reduce((sum, r) => sum + (Number(r.auditedClosing ?? 0) || 0), 0)
+  const diff = local - adjudicated
+  const isMatch = Math.abs(diff) < 0.01
+  return {
+    isMatch,
+    hint: isMatch
+      ? '一致 ✓'
+      : `本表审定合计 ${fmtAmount(local)} vs 审定表 ${fmtAmount(adjudicated)}（差 ${fmtAmount(diff)}）`,
+  }
 })
 
-// ─── UI State ────────────────────────────────────────────────────────────────
+// ─── UI State ────────────────────────────────────────────────────────────
 const isSaving = ref(false)
 const auditNote = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 function fmtAmount(val: number): string {
-  if (val === 0 || val === undefined || val === null) return '—'
+  if (!val) return '—'
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 async function handleSave() {
   isSaving.value = true
   try {
-    for (let i = 0; i < detailRows.value.length; i++) {
-      const row = detailRows.value[i]
-      formData.debouncedSave(`M5-2-row-${i + 1}-data`, {
-        remark: JSON.stringify({
-          key: row.key, segment: row.segment, sourceName: row.sourceName,
-          beginning: row.beginning, accrual: row.accrual,
-          capitalConversion: row.capitalConversion, lossOffset: row.lossOffset,
-          unadjBeginning: row.unadjBeginning, unadjAccrual: row.unadjAccrual,
-          unadjConversion: row.unadjConversion, unadjLossOffset: row.unadjLossOffset,
-          ajeAmount: row.ajeAmount, rjeAmount: row.rjeAmount, remark: row.remark,
-        }),
-      })
-    }
-    // 保存合计（供M5-1交叉验证读取）
-    formData.debouncedSave('M5-M5-2-total-end-amount', { remark: String(grandTotal.value.endBalance) })
+    saveAll()
     ElMessage.success('明细表已保存')
     emit('save')
   } finally { isSaving.value = false }
@@ -399,98 +181,43 @@ async function handleAI(section: string) {
   if (props.isReadonly) return
   aiLoading.value = section
   try {
-    const context: Record<string, string> = {
-      科目: '4101 盈余公积（权益类贷方）',
-      法定小计期末: fmtAmount(statutorySubtotal.value.endBalance),
-      任意小计期末: fmtAmount(discretionarySubtotal.value.endBalance),
-      合计期末: fmtAmount(grandTotal.value.endBalance),
-      明细行数: String(computedRows.value.length),
-      与M5_1交叉验证: crossValidation.value.isMatch ? '一致' : '差异',
-    }
-    const text = await generateAiText({ section: `m5-detail-${section}`, context, existingContent: auditNote.value })
-    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
-    auditNote.value = text
-    saveAuditNote()
-  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
-}
-function handleReview() { openReviewDialog?.('M5-2-detail', '盈余公积明细表') }
-
-// ─── 导入导出 ────────────────────────────────────────────────────────────────
-function handleImportExport(command: string) {
-  switch (command) {
-    case 'exportTemplate':
-      importExport.exportTemplate('M5-2')
-      break
-    case 'exportData':
-      importExport.exportData('M5-2')
-      break
-    case 'importData':
-      fileInputRef.value?.click()
-      break
-  }
+    const text = await generateAiText(section, { wpId: props.wpId, projectId: props.projectId })
+    if (section === 'detailNote' && text) { auditNote.value = text; saveAuditNote() }
+  } catch { ElMessage.error('AI 辅助失败') } finally { aiLoading.value = '' }
 }
 
-async function handleFileSelected(event: Event) {
-  const input = event.target as HTMLInputElement
+function handleReview() {
+  openReviewDialog('M5-2', 'M5-2 盈余公积明细表')
+}
+
+/** M5-2 明细表在导入导出侧的 sheet 名（与 M5ImportExport 的 sheet 白名单一致） */
+const M5_IMPORT_EXPORT_SHEET = 'M5-2'
+
+async function handleImportExport(command: string): Promise<void> {
+  try {
+    if (command === 'exportTemplate') await importExport.exportTemplate(M5_IMPORT_EXPORT_SHEET)
+    else if (command === 'exportData') await importExport.exportData(M5_IMPORT_EXPORT_SHEET)
+    else if (command === 'importData') fileInputRef.value?.click()
+  } catch { ElMessage.error('操作失败') }
+}
+
+async function handleFileSelected(e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
-
-  const result = await importExport.importData('M5-2', file)
-  if (result?.success) {
-    // 重新加载数据
-    await formData.loadData()
-    _restoreRows()
-  }
-  // 清除文件选择，允许重复导入同一文件
-  input.value = ''
-}
-
-// ─── selfLoad + 数据恢复 ─────────────────────────────────────────────────────
-function _restoreRows(): void {
-  const restored: M5DetailRow[] = []
-  for (const [key, resp] of formData.allResponses.value.entries()) {
-    if (key.startsWith('M5-2-row-') && key.endsWith('-data') && resp.remark) {
-      try {
-        const d = JSON.parse(resp.remark)
-        restored.push({
-          key: d.key || `m5-det-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          segment: d.segment || 'statutory',
-          sourceName: d.sourceName || '',
-          beginning: Number(d.beginning) || 0,
-          accrual: Number(d.accrual) || 0,
-          capitalConversion: Number(d.capitalConversion) || 0,
-          lossOffset: Number(d.lossOffset) || 0,
-          endBalance: 0,
-          unadjBeginning: Number(d.unadjBeginning) || 0,
-          unadjAccrual: Number(d.unadjAccrual) || 0,
-          unadjConversion: Number(d.unadjConversion) || 0,
-          unadjLossOffset: Number(d.unadjLossOffset) || 0,
-          unadjEnd: 0,
-          ajeAmount: Number(d.ajeAmount) || 0,
-          rjeAmount: Number(d.rjeAmount) || 0,
-          auditedEnd: 0,
-          remark: d.remark || '',
-        })
-      } catch { /* skip malformed */ }
+  try {
+    const rows = await importExport.importData(M5_IMPORT_EXPORT_SHEET, file)
+    if (Array.isArray(rows) && rows.length) {
+      detailRows.value = rows as M5DetailRow[]
+      saveAll()
+      ElMessage.success('导入成功')
     }
-  }
-  if (restored.length > 0) detailRows.value = restored
+  } catch { ElMessage.error('导入失败') } finally { input.value = '' }
 }
-
-// ─── EventBus ────────────────────────────────────────────────────────────────
-function handleAdjustmentCreated() { formData.loadData() }
 
 onMounted(async () => {
   await formData.loadData()
-  _restoreRows()
-  // 恢复审计说明
-  const noteResp = formData.allResponses.value.get('M5-2-auditNote')
-  if (noteResp?.remark) auditNote.value = noteResp.remark
-  eventBus.on('adjustment:created' as any, handleAdjustmentCreated)
-})
-
-onUnmounted(() => {
-  eventBus.off('adjustment:created' as any, handleAdjustmentCreated)
+  ensureTemplateRows()
 })
 </script>
 

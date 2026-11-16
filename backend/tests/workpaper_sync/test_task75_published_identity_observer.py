@@ -96,6 +96,41 @@ PILOT_MODULES: tuple[str, ...] = tuple(
 )
 
 _SCHEMA_PREFIX = "tmp_task75_observer_"
+
+
+#: 本夹具真正会读写、且可能比 V151 多出列的表。
+#: 🔴 **刻意不走全库 `Base.metadata`**：那会把 `users.role`（PG 枚举 `userrole`）也拉进来，
+#: 而临时 schema 里没有该枚举 ⇒ `UndefinedObjectError: type "userrole" does not exist`。
+#: 枚举类型属于平台公共 schema，本夹具不负责建它（也不应手写一份。那会与真库漂移）。
+_ORM_BACKFILL_TABLES: tuple[str, ...] = ("working_paper_content_version",)
+
+
+def _backfill_orm_only_columns(sync_conn: Any) -> None:
+    """把 ORM 声明了、但本临时 schema 里尚未存在的列补建上。
+
+    只补 `_ORM_BACKFILL_TABLES` 里的表，且只补**缺失**的列（已存在的不动，不覆盖
+    真跑 V151 建出的约束与类型）。类型从 ORM 列对象渲染，不手写。
+    """
+    from sqlalchemy import inspect as sa_inspect
+    from sqlalchemy.schema import CreateColumn
+
+    from app.models.workpaper_sync_models import Base
+
+    inspector = sa_inspect(sync_conn)
+    existing_tables = set(inspector.get_table_names())
+    dialect = sync_conn.dialect
+    for name in _ORM_BACKFILL_TABLES:
+        # 按名直取（不用 `sorted_tables`：那会因循环 FK 报 SAWarning，而本处不需要排序）
+        table = Base.metadata.tables.get(name)
+        if table is None or name not in existing_tables:
+            continue
+        have = {c["name"] for c in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in have:
+                continue
+            ddl = str(CreateColumn(column).compile(dialect=dialect))
+            sync_conn.exec_driver_sql(f'ALTER TABLE "{table.name}" ADD COLUMN {ddl}')
+
 _STUB_DDL = """
 CREATE TABLE projects (
     id UUID PRIMARY KEY,
@@ -391,6 +426,12 @@ class TestObserverStructure:
             "FingerprintError",
             "ContractError",
             "ValueError",  # Transposed physical validation is re-raised as identity drift.
+            # spec frozen-contract-read-path Task 2（ADR-FC-002）：两个 definition 读法提取到
+            # `frozen_definition_blob` 后，observer 侧只剩「四类精确子类 → FrozenChildUnusableError」
+            # 这一道映射。它是**封闭枚举的子类**（FrozenDefinitionBlobMissingError /
+            # …UnreadableError / …DigestMismatchError / 基类），且必须 re-raise 成本模块 ERROR
+            # 并保留 stage —— 不是宽泛捕获，恰恰是「逐类保留诊断」。
+            "FrozenDefinitionBlobError",
         }, sorted(set(caught))
 
     def test_every_stage_carries_a_reachable_error_path(self) -> None:
@@ -1295,6 +1336,24 @@ async def _collect_real_supply() -> dict[str, Any]:  # noqa: C901, PLR0915 - 一
                     await conn.exec_driver_sql(stmt)
             except Exception as exc:  # noqa: BLE001 - 记录后由守卫断言为空
                 apply_errors.append(_err(exc))
+
+        # 🔴 从 **ORM metadata** 补建本隔离 schema 里缺失的列。
+        #
+        # 为什么需要：本夹具只真跑 `V151`，而 `working_paper_content_version` 后来又被
+        # `V265` 加了 4 列（`export_surface_class` / `unit_policy_snapshot` /
+        # `unit_policy_digest` / `source_storage_unit`），ORM 声明了全部 16 列。
+        # 列不在 ⇒ `SELECT` 该表任一行即 `UndefinedColumnError`
+        # （实测报 `column "export_surface_class" of relation
+        # "working_paper_content_version" does not exist`）⇒ 本类 14 例全部 error。
+        #
+        # 为什么不手写 DDL：手抄一份就等于「迁移写错也照样绿」，与本夹具
+        # 「真跑 V151」的初衷相反。从 ORM metadata 取列定义则保证「ORM 能读到它声明的列」
+        # 这一点成立；真实 schema 与迁移的一致性由真库守卫另行钉住。
+        # 同形先例：`test_task77_word_entry_gate_pg` / `test_task35_content_event_refresh_pg` /
+        # `test_task18_html_save_unified_revision_pg` 均用 `metadata.create_all` 补建。
+        async with engine.begin() as conn:
+            await conn.run_sync(_backfill_orm_only_columns)
+
         snap["apply_errors"] = apply_errors
 
         project, wp = uuid.uuid4(), uuid.uuid4()

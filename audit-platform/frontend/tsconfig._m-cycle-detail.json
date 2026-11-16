@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "strict": true, "skipLibCheck": true,
+    "noEmit": true, "isolatedModules": true, "moduleDetection": "force",
+    "jsx": "preserve", "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "noFallthroughCasesInSwitch": true,
+    "paths": { "@/*": ["./src/*"] },
+    "baseUrl": "."
+  },
+  "include": [
+    "src/components/workpaper/m-cycle/mCycleDetailColumns.generated.ts",
+    "src/components/workpaper/m-cycle/GtMCycleDetailTable.vue",
+    "src/components/workpaper/composables/useM3Detail.ts",
+    "src/components/workpaper/composables/useM5Detail.ts",
+    "src/components/workpaper/composables/useM7Detail.ts",
+    "src/components/workpaper/m3/core/M3TabDetail.vue",
+    "src/components/workpaper/m5/core/M5TabDetail.vue",
+    "src/components/workpaper/m7/core/M7TabDetail.vue",
+    "src/env.d.ts"
+  ]
+}

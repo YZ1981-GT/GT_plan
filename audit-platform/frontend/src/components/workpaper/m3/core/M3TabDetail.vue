@@ -18,9 +18,6 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" :disabled="isReadonly" type="primary" @click="handleAddRow">
-          <el-icon><Plus /></el-icon> 新增批次
-        </el-button>
         <el-button size="small" :loading="aiLoading === 'detail'" :disabled="isReadonly" @click="handleAI('detail')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -40,300 +37,29 @@
       </div>
     </div>
 
-    <!-- ═══ 跨sheet验证警告 ═══ -->
-    <el-alert
-      v-if="detail.totalEndAmount.value !== 0 && crossSheetDiff !== 0"
-      type="error"
-      :closable="false"
-      show-icon
-      class="cross-sheet-alert"
-    >
-      <template #title>
-        明细合计与审定表M3-1不一致（差额：{{ fmtAmount(crossSheetDiff) }}）
-      </template>
-    </el-alert>
-
-    <!-- ═══ 3 区段Tab (el-segmented) ═══ -->
-    <el-segmented
-      v-model="activeSegment"
-      :options="segmentOptions"
-      size="default"
-      class="segment-switcher"
-    />
-
-    <!-- ═══ 回购信息 区段 ═══ -->
-    <el-table
-      v-if="activeSegment === 'repurchase'"
-      :data="detail.computedRows.value"
-      border
-      size="small"
-      style="width: 100%"
-    >
-      <el-table-column type="index" label="#" width="50" align="center" />
-      <el-table-column label="回购批次" min-width="140">
-        <template #default="{ row }">
-          <span class="batch-name">{{ row.batchName || '—' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="回购日期" min-width="120">
-        <template #default="{ row, $index }">
-          <el-date-picker
-            v-if="!isReadonly"
-            :model-value="row.repurchaseDate"
-            type="date"
-            value-format="YYYY-MM-DD"
-            size="small"
-            style="width:100%"
-            placeholder="选择日期"
-            @change="(val: string) => detail.updateRow($index, 'repurchaseDate', val || '')"
-          />
-          <span v-else>{{ row.repurchaseDate || '—' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="回购股数" min-width="110" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number
-            v-if="!isReadonly"
-            :model-value="row.repurchaseShares"
-            :controls="false"
-            :min="0"
-            size="small"
-            style="width:100%"
-            @change="(val: number | undefined) => detail.updateRow($index, 'repurchaseShares', val ?? 0)"
-          />
-          <span v-else>{{ fmtNumber(row.repurchaseShares) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="回购单价" min-width="100" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number
-            v-if="!isReadonly"
-            :model-value="row.price"
-            :controls="false"
-            :min="0"
-            :precision="4"
-            size="small"
-            style="width:100%"
-            @change="(val: number | undefined) => detail.updateRow($index, 'price', val ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.price) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="回购金额" min-width="120" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number
-            v-if="!isReadonly"
-            :model-value="row.repurchaseAmount"
-            :controls="false"
-            :min="0"
-            size="small"
-            style="width:100%"
-            @change="(val: number | undefined) => detail.updateRow($index, 'repurchaseAmount', val ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.repurchaseAmount) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="回购目的" min-width="120">
-        <template #default="{ row, $index }">
-          <el-input
-            v-if="!isReadonly"
-            :model-value="row.purpose"
-            size="small"
-            placeholder="回购目的"
-            @change="(val: string) => detail.updateRow($index, 'purpose', val)"
-          />
-          <span v-else>{{ row.purpose || '—' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="股份来源" min-width="100">
-        <template #default="{ row, $index }">
-          <el-input
-            v-if="!isReadonly"
-            :model-value="row.source"
-            size="small"
-            placeholder="来源"
-            @change="(val: string) => detail.updateRow($index, 'source', val)"
-          />
-          <span v-else>{{ row.source || '—' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="决议文号" min-width="130">
-        <template #default="{ row, $index }">
-          <el-input
-            v-if="!isReadonly"
-            :model-value="row.resolutionNo"
-            size="small"
-            placeholder="决议文号"
-            @change="(val: string) => detail.updateRow($index, 'resolutionNo', val)"
-          />
-          <span v-else>{{ row.resolutionNo || '—' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="币种" width="80">
-        <template #default="{ row, $index }">
-          <el-select
-            v-if="!isReadonly"
-            :model-value="row.currency"
-            size="small"
-            @change="(val: string) => detail.updateRow($index, 'currency', val)"
-          >
-            <el-option label="CNY" value="CNY" />
-            <el-option label="USD" value="USD" />
-            <el-option label="HKD" value="HKD" />
-            <el-option label="EUR" value="EUR" />
-          </el-select>
-          <span v-else>{{ row.currency }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="!isReadonly" label="操作" width="70" align="center">
-        <template #default="{ $index }">
-          <el-button type="danger" text size="small" @click="detail.removeRow($index)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- ═══ 注销情况 区段 ═══ -->
-    <el-table
-      v-if="activeSegment === 'cancel'"
-      :data="detail.computedRows.value"
-      border
-      size="small"
-      style="width: 100%"
-    >
-      <el-table-column type="index" label="#" width="50" align="center" />
-      <el-table-column label="回购批次" min-width="140">
-        <template #default="{ row }">
-          <span class="batch-name">{{ row.batchName || '—' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="注销股数" min-width="120" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number
-            v-if="!isReadonly"
-            :model-value="row.cancelShares"
-            :controls="false"
-            :min="0"
-            size="small"
-            style="width:100%"
-            @change="(val: number | undefined) => detail.updateRow($index, 'cancelShares', val ?? 0)"
-          />
-          <span v-else>{{ fmtNumber(row.cancelShares) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="注销金额" min-width="120" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number
-            v-if="!isReadonly"
-            :model-value="row.cancelAmount"
-            :controls="false"
-            :min="0"
-            size="small"
-            style="width:100%"
-            @change="(val: number | undefined) => detail.updateRow($index, 'cancelAmount', val ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.cancelAmount) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="!isReadonly" label="操作" width="70" align="center">
-        <template #default="{ $index }">
-          <el-button type="danger" text size="small" @click="detail.removeRow($index)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- ═══ 期末余额 区段 ═══ -->
-    <el-table
-      v-if="activeSegment === 'endBalance'"
-      :data="detail.computedRows.value"
-      border
-      size="small"
-      style="width: 100%"
-    >
-      <el-table-column type="index" label="#" width="50" align="center" />
-      <el-table-column label="回购批次" min-width="140">
-        <template #default="{ row }">
-          <span class="batch-name">{{ row.batchName || '—' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期初股数" min-width="110" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number
-            v-if="!isReadonly"
-            :model-value="row.beginShares"
-            :controls="false"
-            :min="0"
-            size="small"
-            style="width:100%"
-            @change="(val: number | undefined) => detail.updateRow($index, 'beginShares', val ?? 0)"
-          />
-          <span v-else>{{ fmtNumber(row.beginShares) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期初金额" min-width="120" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number
-            v-if="!isReadonly"
-            :model-value="row.beginAmount"
-            :controls="false"
-            :min="0"
-            size="small"
-            style="width:100%"
-            @change="(val: number | undefined) => detail.updateRow($index, 'beginAmount', val ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.beginAmount) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期末库存股数" min-width="130" align="right">
-        <template #header>
-          <el-tooltip content="公式: 期初股数 + 回购股数 − 注销股数（备抵借方增加）" placement="top">
-            <span class="formula-col-header">期末股数</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <span class="formula-value">{{ fmtNumber(row.endShares) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期末金额" min-width="130" align="right">
-        <template #header>
-          <el-tooltip content="公式: 期初金额 + 回购金额 − 注销金额（备抵借方增加）" placement="top">
-            <span class="formula-col-header">期末金额</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <span class="formula-value">{{ fmtAmount(row.endAmount) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="备注" min-width="140">
-        <template #default="{ row, $index }">
-          <el-input
-            v-if="!isReadonly"
-            :model-value="row.remark"
-            size="small"
-            placeholder="备注"
-            @change="(val: string) => detail.updateRow($index, 'remark', val)"
-          />
-          <span v-else>{{ row.remark || '—' }}</span>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- ═══ 合计区 ═══ -->
-    <div class="total-bar">
-      <span>期末金额合计：<strong class="formula-value">{{ fmtAmount(detail.totalEndAmount.value) }}</strong></span>
-      <span>期末股数合计：<strong class="formula-value">{{ fmtNumber(detail.totalEndShares.value) }}</strong></span>
-      <span>回购金额合计：<strong>{{ fmtAmount(detail.totalRepurchaseAmount.value) }}</strong></span>
-      <span>注销金额合计：<strong>{{ fmtAmount(detail.totalCancelAmount.value) }}</strong></span>
+    <!-- ═══ 明细表（模板驱动：固定 10 行 × 19 列） ═══ -->
+    <div class="block-section">
+      <div class="block-header">
+        <h4 class="block-title">库存股明细（按回购类别）</h4>
+        <span class="block-hint">行与列均按权威模板渲染；公式列在线编辑侧重算</span>
+      </div>
+      <GtMCycleDetailTable
+        entry="M3"
+        :rows="detailRows"
+        :readonly="isReadonly"
+        @update="handleCellUpdate"
+      />
     </div>
 
     <!-- ═══ 编制提示 ═══ -->
     <details class="m3-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li><strong>权益备抵借方铁律</strong>：期末 = 期初 + 回购(借方增加) − 注销(贷方减少)</li>
-        <li>19列宽表拆3区段Tab：回购信息(9列) / 注销情况(2列) / 期末余额(5列)</li>
-        <li>新增行需先输入回购批次名称（弹窗确认）</li>
-        <li>明细合计应与M3-1审定表库存股期末余额一致</li>
-        <li>外币回购请同步填写M3-4外币投资汇率测算表</li>
+        <li><strong>权益备抵借方铁律</strong>：期末 = 期初 + 本期增加 − 本期减少（转让 / 注销）</li>
+        <li>本表按权威模板渲染：**10 固定行 × 19 列**，行标签与列均来自模板</li>
+        <li>未审数 / 期初调整 / 账项调整 / 重分类调整 / 审定数 五组列与模板一致</li>
+        <li>公式列（期末数 / 审定数）由在线编辑侧重算后同步，前端不重复计算</li>
+        <li>明细合计应与 M3-1 审定表库存股期末余额一致</li>
       </ul>
     </details>
   </div>
@@ -341,194 +67,116 @@
 
 <script setup lang="ts">
 /**
- * M3TabDetail — M3-2 库存股明细表（19列区段Tab+动态行）
+ * M3TabDetail — M3-2 库存股明细表（**模板驱动**）
  *
- * Spec: .kiro/specs/m3-treasury-stock/
- * Task: 4.3
- * Requirements: 3.1-3.5
+ * spec: `m-cycle-key-naming-unification` §R12
  *
- * 功能：
- * - 19列宽表拆3区段Tab (el-segmented): 回购信息 / 注销情况 / 期末余额（行同步）
- * - 动态行新增（先弹ElMessageBox.prompt输入批次名）
- * - 导入导出 (useM3ImportExport)
- * - 期末公式自动计算（权益备抵借方：期末=期初+回购-注销）
- * - 与M3-1审定表交叉验证
- *
- * 科目：4201 库存股（**借方/权益备抵类！**）
+ * 旧实现把 19 列手写拆成 3 个区段 Tab（回购 / 注销 / 期末）、每段一张 el-table，
+ * 而模板实际是 **10 固定行 × 19 列**。行与列现均按权威模板渲染。
  */
-import { computed, inject, onMounted, ref, watch } from 'vue'
-import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, inject, onMounted, ref } from 'vue'
+import { MagicStick, Check, ArrowDown } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useM3FormData } from '../../composables/useM3FormData'
-import { useM3Detail, type M3DetailRow, type M3DetailSegment } from '../../composables/useM3Detail'
-import { useM3ImportExport, type M3ImportableSheet } from '../../composables/useM3ImportExport'
+import { useM3Detail, createM3EmptyRows, type M3DetailRow } from '../../composables/useM3Detail'
+import GtMCycleDetailTable from '../../m-cycle/GtMCycleDetailTable.vue'
+import { useM3ImportExport } from '../../composables/useM3ImportExport'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
-const props = defineProps<{
-  wpId: string
-  projectId: string
-  isReadonly: boolean
-}>()
+const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
+const emit = defineEmits<{ (e: 'navigate', sheetName: string): void }>()
 
-const emit = defineEmits<{
-  (e: 'navigate', sheetName: string): void
-}>()
-
-const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>(
+  'openReviewDialog',
+  null,
+)
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const aiLoading = ref('')
 
-// ─── FormData + Composables ──────────────────────────────────────────────────
-
+// ─── FormData + Composables ────────────────────────────────────────────
 const formData = useM3FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
 
-const detailRows = ref<M3DetailRow[]>([])
-
-const detail = useM3Detail(formData, detailRows)
+const detailRows = ref<M3DetailRow[]>(createM3EmptyRows())
+const { ensureTemplateRows, updateRow, saveAll } = useM3Detail(formData, detailRows)
 
 const { exportTemplate, exportData, importData } = useM3ImportExport({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
 
-// ─── 区段Tab state ───────────────────────────────────────────────────────────
+const M3_SHEET = 'M3-2'
 
-const activeSegment = computed({
-  get: () => detail.activeSegment.value,
-  set: (val: string) => detail.switchSegment(val as M3DetailSegment),
-})
-
-const segmentOptions = [
-  { label: '回购信息', value: 'repurchase' },
-  { label: '注销情况', value: 'cancel' },
-  { label: '期末余额', value: 'endBalance' },
-]
-
-// ─── 跨sheet验证 ─────────────────────────────────────────────────────────────
-
-const adjudicationEndAudited = ref(0)
-
-const crossSheetDiff = computed(() => {
-  if (adjudicationEndAudited.value === 0) return 0
-  return detail.totalEndAmount.value - adjudicationEndAudited.value
-})
-
-watch(() => formData.allResponses.value, (responses) => {
-  const auditedResp = responses.get('M3-M3-1-total-audited')
-  if (auditedResp?.remark) {
-    const val = parseFloat(auditedResp.remark)
-    if (!isNaN(val)) adjudicationEndAudited.value = val
-  }
-}, { immediate: true })
-
-// ─── Handlers ────────────────────────────────────────────────────────────────
-
-async function handleAddRow() {
-  await detail.addRow()
+function handleCellUpdate(payload: { index: number; jsonKey: string; value: string | number }): void {
+  updateRow(payload.index, payload.jsonKey, payload.value)
 }
 
-function handleImportExport(command: string) {
-  const sheet: M3ImportableSheet = 'M3-2'
-  switch (command) {
-    case 'exportTemplate':
-      exportTemplate(sheet)
-      break
-    case 'exportData':
-      exportData(sheet)
-      break
-    case 'importData': {
-      const input = document.createElement('input')
-      input.type = 'file'
-      input.accept = '.xlsx,.xls'
-      input.onchange = async (e: Event) => {
-        const file = (e.target as HTMLInputElement).files?.[0]
-        if (file) {
-          const result = await importData(file, sheet)
-          if (result?.success) {
-            await formData.loadData()
-            _restoreRows()
-            ElMessage.success(`导入完成，共 ${result.rowCount} 行`)
-          }
-        }
-      }
-      input.click()
-      break
-    }
-  }
+// ─── UI state ─────────────────────────────────────────────────────
+const isSaving = ref(false)
+const auditNote = ref('')
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+function fmtAmount(val: number): string {
+  if (!val) return '—'
+  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function fmtNumber(val: number): string {
+  if (!val) return '—'
+  return val.toLocaleString('zh-CN')
+}
+
+async function handleSave() {
+  isSaving.value = true
+  try {
+    saveAll()
+    ElMessage.success('明细表已保存')
+  } finally { isSaving.value = false }
+}
+
+function saveAuditNote() {
+  formData.debouncedSave('M3-2-auditNote', { remark: auditNote.value || null })
 }
 
 async function handleAI(section: string) {
   if (props.isReadonly) return
   aiLoading.value = section
   try {
-    const context: Record<string, string> = {
-      科目: '4201 库存股（权益备抵类·借方，明细表 M3-2 按回购批次列示）',
-      期末金额合计: fmtAmount(detail.totalEndAmount.value),
-      期末股数合计: fmtNumber(detail.totalEndShares.value),
-      回购金额合计: fmtAmount(detail.totalRepurchaseAmount.value),
-      注销金额合计: fmtAmount(detail.totalCancelAmount.value),
-      批次数: String(detail.computedRows.value.length),
+    const text = await generateAiText(section, { wpId: props.wpId, projectId: props.projectId })
+    if (section === 'detailNote' && text) { auditNote.value = text; saveAuditNote() }
+  } catch { ElMessage.error('AI 辅助失败') } finally { aiLoading.value = '' }
+}
+
+function handleReview() {
+  openReviewDialog?.('M3-2', 'M3-2 库存股明细表')
+}
+
+async function handleImportExport(command: string): Promise<void> {
+  try {
+    if (command === 'exportTemplate') await exportTemplate(M3_SHEET)
+    else if (command === 'exportData') await exportData(M3_SHEET)
+    else if (command === 'importData') fileInputRef.value?.click()
+  } catch { ElMessage.error('操作失败') }
+}
+
+async function handleFileSelected(e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  try {
+    const rows = await importData(file, M3_SHEET as never)
+    if (Array.isArray(rows) && rows.length) {
+      detailRows.value = rows as M3DetailRow[]
+      saveAll()
+      ElMessage.success('导入成功')
     }
-    const text = await generateAiText({ section: `m3-detail-${section}`, context, existingContent: '' })
-    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
-    ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
-  } catch {
-    ElMessage.warning('AI 生成失败，请稍后重试')
-  } finally {
-    aiLoading.value = ''
-  }
+  } catch { ElMessage.error('导入失败') } finally { input.value = '' }
 }
-function handleReview() { openReviewDialog?.('M3-2-detail', '库存股明细表') }
-
-// ─── Format helpers ──────────────────────────────────────────────────────────
-
-function fmtAmount(val: number): string {
-  if (val === 0 || val === undefined || val === null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function fmtNumber(val: number): string {
-  if (val === 0 || val === undefined || val === null) return '—'
-  return val.toLocaleString('zh-CN')
-}
-
-// ─── Restore from responses ──────────────────────────────────────────────────
-
-function _restoreRows() {
-  // 优先从整包 full-data 恢复
-  const fullData = formData.allResponses.value.get('M3-M3-2-full-data')
-  if (fullData?.remark) {
-    try {
-      const parsed = JSON.parse(fullData.remark)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        detailRows.value = parsed
-        return
-      }
-    } catch { /* fall through to per-row */ }
-  }
-  // 降级：从逐行 per-row keys 恢复（兼容旧数据/composable单独写的情况）
-  const restored: any[] = []
-  for (const [key, resp] of formData.allResponses.value) {
-    if (key.startsWith('M3-M3-2-row-') && key.endsWith('-data') && resp.remark) {
-      try {
-        const row = JSON.parse(resp.remark)
-        restored.push(row)
-      } catch { /* skip */ }
-    }
-  }
-  if (restored.length > 0) {
-    detailRows.value = restored
-  }
-}
-
-// ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 onMounted(async () => {
   await formData.loadData()
-  _restoreRows()
+  ensureTemplateRows()
 })
 </script>
 
