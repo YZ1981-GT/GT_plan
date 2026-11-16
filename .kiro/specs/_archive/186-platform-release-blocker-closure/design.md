@@ -379,11 +379,66 @@ data.hard_blockers = [ {code:"stale_source", component:"financial_report",
 - 已知环境噪声（不属本走查、未触碰）：并发会话在 11:25 新建了底稿 `cfa1edae`。
 
 **仍未覆盖（如实登记）**：
-- **完整角色矩阵**：本走查用 admin 应急通道走通，未用真实 manager/partner/qc 账号逐级验证
-  「角色不匹配被拒」（该负向路径由真 PG lifecycle 用例覆盖，浏览器层未重复）。
-- **退回→修改→重提闭环的浏览器层**：后端已由 `test_workpaper_review_lifecycle_pg.py` 覆盖，
-  本走查聚焦「提交→逐级通过→终态→423」主链。
+- ~~**完整角色矩阵**~~ → **2026-11-16 已补做完成（13/13 通过），并抓到 1 个真实缺陷，见 §12.8**。
+- **退回→修改→重提闭环的浏览器层**：**2026-11-16 已补做完成（两阶段各 10/10），见 §12.9**。
 - **OO 在线编辑 iframe 的本 spec 视角往返**：上游 spec 174 已于 2026-11-15 独立实测通过，本 spec 不重复。
+
+### 12.8 完整角色矩阵走查（2026-11-16 补做，13/13 通过；抓到并修复 1 个越权缺陷）
+
+> 12.6 原把「完整角色矩阵」登记为未覆盖。归档后按用户「未覆盖的继续」补做完成。
+
+**方法**：用**真实 manager 账号**（`uat_adj_reviewer_mwh7fkrs`，口令已知）登录，不是 admin 单点；
+最小准备：启用该账号 + 项目 `review_config={levels:2, level_roles:{L1:manager, L2:partner}}` +
+`manager_id` + 底稿 `reviewer` + 一条 QC 记录。
+
+**🔴 抓到的真实缺陷（越权）**：`routers/batch_review.py` **完全没有调用** `assert_review_level_actor` ——
+只依赖 `require_project_access("review")`，而 manager 的项目级别是 `edit`（edit ≥ review ⇒ 放行），
+于是 **manager 能直接执行 `level2_passed`（L2 = partner 层）**。
+
+| 时点 | manager 对 pending_level2 底稿 approve | 结果 |
+| --- | --- | --- |
+| 修复前 | HTTP 200 **skipped=0 success=1** | 底稿推进到 `level2_passed`（越权成功） |
+| 修复后 | HTTP 200 **skipped=1 success=0**<br>`reason="当前为 L2 复核，仅允许项目合伙人角色处理"` | 状态不推进 |
+
+根因：同一业务动作有**两个入口**，单笔端点 `wp_review_router` 有该校验、批量端点漏了 —— 判据不一致。
+`grep assert_review_level_actor` 全仓只有「定义 + 单笔端点」两处调用，批量端点确实从未调用。
+
+**修复**（commit `6152de71e`，v1.0.284）：`batch_review` 在 `update_review_status` 之前调用
+`assert_review_level_actor`（与单笔端点**同一函数**），并捕获 `PermissionError` 转成逐项 skip + 原因
+（不冒泡成 500）。admin 仍可应急处理（该函数内 admin 直接放行，设计如此）。
+
+**13 步全部通过**：
+
+| # | 步骤 | 结果 |
+| --- | --- | --- |
+| 1-2 | manager 登录 + 身份确认 | `role=manager` |
+| 3 | manager 提交复核 | HTTP 200 `submitted=1 skipped=0` |
+| 4 | 提交后进入待复核 | 回执为准（manager 对底稿详情 404，见下） |
+| 5 | **manager 执行 L1 通过（有权）** | HTTP 200 `success=1` |
+| 6 | L1 后进入待 L2 | 回执为准 |
+| 7 | 🔴 **manager 执行 L2 被拒** | HTTP 200 `skipped=1` `reason="仅允许项目合伙人角色处理"` |
+| 8 | 被拒后未推进 | `skipped=1 && success=0` |
+| 9 | auditor 负向（跳过，理由登记） | 共享库无可用口令的 auditor 账号 |
+| 10-11 | **admin 应急通道完成 L2** | HTTP 200 `success=1` → **`review_passed`** |
+| 12 | 终态 `review_passed` | `file_status=review_passed` |
+| 13 | 终态内容写 423（复验） | **HTTP 423** |
+
+**守卫**：`backend/tests/test_batch_review_level_role_guard.py`（4 例，纯 AST，不连库）
+—— ①`batch_review` 必须调用该函数（AST Call 节点，不看注释/docstring）②该名字必须真被 import
+③单笔与批量必须共用同一校验函数 ④`PermissionError` 必须被捕获为 skip。
+**变异证明**：摘掉该调用后 `test_batch_review_calls_level_role_guard` 精确打红，逐字节还原 sha256 一致
+⇒ 判据非恒绿。回归：`test_workpaper_review_submission_service` + `test_workpaper_terminal_freeze_guard`
+**31 passed**。
+
+**回滚对账（CLEAN，零漂移）**：底稿逐字段（`draft`/`not_submitted`/`reviewer=NULL`/`workflow_status=draft`）、
+项目 `review_config`/`manager_id`（均回 `None`）、账号 `is_active`（回 `False`，首次观察到的原始值）、
+`wp_qc_results`（回 0）全部复原。
+
+**如实登记的两点**：
+- **auditor 负向用例未做**：共享库 40 个活跃 auditor 账号中没有一个口令是已知值，无法登录；
+  该路径（角色不符 / 非成员被拒）已由真 PG `test_workpaper_review_lifecycle_pg.py` 的 EQCR 被拒用例覆盖。
+- **manager 读不到底稿明细状态**：`GET /working-papers/{id}` 返回 404、`review-status` 只给 `is_reviewed`
+  布尔，故走查的状态判据改用「端点回执 + DB 侧核实」双口径（`verify_states.py` 直接读库确认每一步真实状态）。
 
 ### 12.7 `/readyz` 503 已修复（V273 漂移登记，2026-11-16）
 
@@ -399,3 +454,49 @@ data.hard_blockers = [ {code:"stale_source", component:"financial_report",
 🔴 剩余未决（非本 spec）：`/readyz` 仍报 `pending_versions=['274']` —— 另一会话未跟踪的在途迁移
 `V274__workpaper_legacy_drain_ledger.sql`（其 SQL 中文已损坏：699 个 `?` / 0 个 CJK 字符），属
 `onlyoffice-sheet-open-via-published-artifact` Task 4.2，交该 spec 作者补齐后执行。
+
+### 12.9 退回→修改→重提闭环浏览器走查（2026-11-16 补做，两阶段各 10/10）
+
+> 12.6 原把此项登记为未覆盖（「后端已由真 PG 覆盖」）。归档后按用户「未覆盖的继续」补做完成。
+
+**两阶段编排的原因**：重提前必须先**回复并解决**退回意见（平台门禁 `_blocking_reasons` 的第 4 条
+「N 条复核意见未回复（状态仍为 open）」），而该 `review_records.id` 在底稿详情与 `review-inbox`
+两个 admin 可见的读端点里都取不到 ⇒ 走查在第一阶段末暂停、由编排脚本查库拿 id 后经
+`GT_UAT_REVIEW_ID` + `GT_UAT_RESUME=reply` 续跑。
+
+**阶段一（10/10 通过）**：
+
+| # | 步骤 | 结果 |
+| --- | --- | --- |
+| 1-2 | admin 登录 + 底稿编辑器打开（真实 UI） | len=1450 |
+| 3 | 起点 | `draft` / `not_submitted` |
+| 4 | 提交复核 | `submitted=1` |
+| 5 | 进入待 L1 | `under_review` / `pending_level1` |
+| 6 | **L1 退回** | HTTP 200 `success=1` |
+| 7 | **退回后** | **`revision_required` / `level1_rejected`** |
+| 8 | **编制人标记完成** | HTTP 200 → `review_status=not_submitted`（状态机归一，不被 rejected 卡死） |
+| 9 | 可重提状态 | `revision_required` / `not_submitted` |
+| 10 | 暂停待注入 review_id | 已到退回态 |
+
+**阶段二（10/10 通过）**：
+
+| # | 步骤 | 结果 |
+| --- | --- | --- |
+| 1-3 | 续跑（跳过提交/退回）+ 回复并解决退回意见 | `reply=200 resolve=200` |
+| 4 | 🔴 **重新提交成功（闭环成立）** | HTTP 200 **`submitted=1 skipped=0`** |
+| 5 | 重提后回到待 L1 | `under_review` / `pending_level1` |
+| 6-7 | L1 / L2 通过 | 各 `success=1` |
+| 8 | 终态 | **`review_passed` / `level2_passed`** |
+| 9 | 终态内容写 | **HTTP 423** |
+
+**回滚对账（CLEAN，零漂移）**：底稿逐字段（`draft`/`not_submitted`/`reviewer=NULL`/`workflow_status=draft`/
+`rejection_reason=NULL`）、`review_records=0`、`wp_qc_results=0`、`checklist_responses=0` 全部归位。
+
+**顺带确认的平台门禁（正确行为，非缺陷）**：
+- 重提被 `open` 的复核意见阻断是**设计意图**（编制人必须先把意见回复并解决）；
+- `PUT .../review-status` 从 `level1_rejected` 归一 `not_submitted` 时返回 200 且保留
+  `status=revision_required`（编制状态与复核状态解耦，符合「退回后重开编辑」的设计）。
+
+**仍未覆盖（本 spec 唯一剩余项）**：**OO 在线编辑 iframe 的本 spec 视角往返** —— 上游
+`_archive/174-wp-sync-conflict-adjudication-and-d4-32-modeling` 已于 2026-11-15 完成 OO iframe 完整往返实测
+（三方一致 / 冲突 0 / A 列序号保留），本 spec 不重复该走查。
