@@ -1,6 +1,6 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：16/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.7 已完成；真源层 / 服务端解析层 / 前端三态 / legacy 调用面 ledger 已收口）**
+> **状态：17/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.7 + 5.3 已完成；真源层 / 服务端解析层 / 前端三态 / legacy ledger / 前端契约守卫已收口）**
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
@@ -127,7 +127,10 @@
   - _R: 1, 2, 7_
 - [ ] 5.2 后端 PG：真实 `WorkpaperContentRepresentation`、bundle、artifact 读取与项目隔离；只读验证先独立事务，写入验收只用【测试】项目并可恢复。
   - _R: 2, 7, 9_
-- [ ] 5.3 前端 unit / AST：唯一 URL、唯一 binding resolver、migrated 旧调用为 0、pending 文案与模式集合封闭。
+- [x] 5.3 前端 unit / AST：唯一 URL、唯一 binding resolver、migrated 旧调用为 0、pending 文案与模式集合封闭。
+  - `onlyOfficeEntryConfigContract.spec.ts` 10 例，四条判据：①**唯一 URL**（`/sync/entry-identity` 字面量在前端必须为 **0** —— 3.1 起从生成契约 `WP_SYNC_SIBLING_PREFIX_TEMPLATE` 取；`onlyoffice-config` 只允许出现在 3 个合法入口或 **3.7 ledger 已登记**的文件里，白名单直接读 ledger 不重抄）②**唯一 binding resolver**（`binding_status` / `bindingStatus` / `BINDING_STATUSES` 只允许在唯一入口出现）③**pending 文案**（`syncMode` 两值封闭；扫**含注释**的全文找「已同步」/「双向回写」肯定式表述）④**模式集合封闭**（与后端 bindings 里出现的状态逐值相等 + 恰好 6 个成员）。
+  - 变异 7/7 全精确打红零假红。
+  - 🔴 三处判据形态修正：①首版只允许 3 个合法入口 ⇒ 22 个已登记调用方全被判违规（口径错：3.7 语义是「未迁移可以存在但必须登记」，5.3 判的是「**未登记**不许有」）⇒ 直接读 ledger；②`/sync/entry-identity` 断言「至少一处」而 3.1 已让它归零（那是更好的状态）⇒ 改「必须为 0」；③「已同步」判据只扫代码行而变异写在 JSDoc 里 ⇒ 改扫全文（Requirement 4.3 明确禁止靠注释隐藏）。
   - _R: 1, 4, 6, 10_
 - [ ] 5.4 变异：删 mapping、伪造 parent fallback、candidate 冒充 current、恢复 template copy、去掉 target sheet、绕过 legacy token、让 old callback 无条件写入均必须 RED；阴性对照 GREEN。
   - _R: 1, 2, 3, 6, 10_
