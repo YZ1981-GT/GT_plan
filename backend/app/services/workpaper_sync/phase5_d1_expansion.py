@@ -142,8 +142,37 @@ def _instrumentation_of(spec: Any) -> ExcelInstrumentationSpec:
 def _static_sheet_declarations() -> tuple[dict[str, Any], ...]:
     """静态受管区寄生声明（`region_kind=static`：只写 definedName，不建 Table、不注 UUID 列）。
 
-    当前唯一项：D1-4 第三区（票据种类小计 R23-24，在 footer R22 之下）。
+    当前两项：
+
+    * D1-4 第三区（票据种类小计 R23-24，在 footer R22 之下），受 `_INCLUDE_D104_NOTETYPE_STATIC` 控；
+    * **D1-1 审定表**（三区 fixed_rows，`d11-managed`）—— 见 :func:`_adjudication_static_d11`。
+
+    🔴 D1-1 之前**从未在本函数里**（契约声明了 `d11-managed` 而 instrumentation 只覆盖 12 张
+       sheet），导致整册首版发布必然 `sync_contract_structure_drift`。详见
+       `phase5_d1_01_adjudication.static_sheet_payload_d11` 的 docstring。
     """
+    declarations: list[dict[str, Any]] = []
+    declarations.extend(_static_d104_notetype())
+    declarations.extend(_static_d101_adjudication())
+    return tuple(declarations)
+
+
+def _static_d101_adjudication() -> tuple[dict[str, Any], ...]:
+    """D1-1 审定表静态区声明（`d11-managed`，三张 fixed_rows 表）。
+
+    常开：它在契约里**恒存在**（`_adjudication_sheet_payload_d11()` 无条件进
+    `build_contract_payload()["sheets"]`），没有灰度开关 —— 若给它一个开关，关掉时契约
+    仍有 13 张 sheet 而 instrumentation 退回 12 张，正是本次修掉的那个漂移。
+    """
+    from app.services.workpaper_sync.phase5_d1_01_adjudication import (
+        static_sheet_payload_d11,
+    )
+
+    return (static_sheet_payload_d11(),)
+
+
+def _static_d104_notetype() -> tuple[dict[str, Any], ...]:
+    """D1-4 第三区（票据种类小计 R23-24）静态区声明，受 `_INCLUDE_D104_NOTETYPE_STATIC` 控。"""
     if not _INCLUDE_D104_NOTETYPE_STATIC:
         return ()
     from app.services.workpaper_sync import phase5_d1_04_bad_debt as _d104

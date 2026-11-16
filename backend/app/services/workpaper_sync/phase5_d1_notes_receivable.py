@@ -671,6 +671,17 @@ def load_contract_from_disk() -> SyncContract:
     return load_contract(ADAPTER_ID)
 
 
+#: 与 `pilot_d2_large_json.load_pilot_contract` 同名的兼容别名。
+#:
+#: 🔴 框架层 `projection_first_publication.stage_instrumented_substrate` 在 `contract=None`
+#:    时**硬调** `provider.load_pilot_contract()`。本 provider 一直只暴露
+#:    `load_contract_from_disk`（四个 pilot 用的是另一个名字）⇒ 首版发布在进入
+#:    instrumentation 之前就 `AttributeError`，表现为 entry 永远发不出首版。
+#:    补这个别名而不是改框架层：框架层那条 `getattr` 探测是隐式的，改它要同时核对
+#:    四个 pilot 的既有入口；别名是一行、语义等价、且保留了原名给既有调用方。
+load_pilot_contract = load_contract_from_disk
+
+
 def assert_contract_file_matches_source() -> SyncContract:
     """磁盘契约 ↔ 本模块现算 payload **双向**锁死。"""
     expected = build_contract_payload()

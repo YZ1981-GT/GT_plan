@@ -195,8 +195,24 @@ def test_frozen_request_time_anchors_cover_every_managed_sheet() -> None:
         f"请求时刻 {len(frozen)} 组锚点 vs 发布时刻 {len(publish_time)} 组 —— "
         "BP-30：两个时刻必须同源，否则 structure_hash 不可比"
     )
-    assert [a["table_name"] for a in frozen] == [a["table_name"] for a in publish_time]
     assert [a["sheet_key"] for a in frozen] == [a["sheet_key"] for a in publish_time]
+    # 🔴 两类锚点的身份键不同，**按锚点类型分别比**：
+    #   动态/转置表 → `table_name` + `uuid_column_letter`（Excel Table + 隐藏 UUID 列）
+    #   静态受管区   → `defined_name`（workbook-scope definedName；无 Table、无 UUID 列）
+    # 用统一的 `[a["table_name"] ...]` 会在静态锚点上 `KeyError` —— 那不是「不同源」，
+    # 是拿动态形态的键去读静态锚点（D1-1 审定表进 static_sheets 后必现）。
+    def _identity(anchor: Mapping[str, Any]) -> tuple[str, ...]:
+        if str(anchor.get("anchor") or "") == "defined_name_ref":
+            return ("static", str(anchor.get("defined_name") or ""))
+        return (
+            "table",
+            str(anchor.get("table_name") or ""),
+            str(anchor.get("uuid_column_letter") or ""),
+        )
+
+    assert [_identity(a) for a in frozen] == [_identity(a) for a in publish_time], (
+        "请求时刻与发布时刻的锚点身份不一致 —— BP-30 的两个时刻必须逐组同值"
+    )
 
 
 def test_singular_payload_would_lose_all_but_primary_sheet() -> None:
@@ -254,5 +270,9 @@ def test_contract_and_specs_agree_on_managed_surface(contract, staged_tables) ->
         f"  specs 独有 = {sorted(spec_sheets - contract_sheets)}"
     )
     assert spec_tables <= staged_tables
-    assert len(contract_sheets) == 12
+    # 🔴 13 = 12 张动态受管 sheet + D1-1 审定表（`d11-managed`，静态 fixed_rows 三区）。
+    #    D1-1 一直在契约里（`_adjudication_sheet_payload_d11()` 无条件进 sheets[]），
+    #    但 instrumentation 侧此前只有 12 张 ⇒ 整册首版发布必 `sync_contract_structure_drift`。
+    #    这条数字钉死「契约与 instrumentation 覆盖同一批 sheet」，两边同改才绿。
+    assert len(contract_sheets) == 13
     assert len(spec_tables) == 18

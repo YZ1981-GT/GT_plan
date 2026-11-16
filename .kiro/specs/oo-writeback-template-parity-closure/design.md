@@ -683,29 +683,76 @@ PG / Redis 通。项目 `4c77f3e8-3938-4628-8836-1435dda4ddea`。
 🔴 这一格**只有把期初AJE 填成非 0** 才能区分两种口径（先填 0 时两者同值 1250，区分不出来 ——
 首轮就踩了这个，补填 200 后才有决定性证据）。落库 `endUnadjusted: 1250` / `endAudited: 1250` 逐值一致。
 
-### §13.4 公式格敲数字 → 裁决保留服务器值 → 核对发布文件（**未完成，环境限制**）
+### §13.4 公式格敲数字 → 裁决保留服务器值 → 核对发布文件（**2026-11-16 真浏览器实测通过**）
+
+#### 首版（2026-11-15）的阻塞与当时的替代证据
 
 - D5-2 / D6-3 / F3-4 的 `working_paper_sync_entry_state` **无任何行** ⇒ 这三张表没有已发布在线编辑产物，
   页面上「在线编辑」段显示「两侧数据未互通 / 该底稿尚未完成双向能力裁决（BP-1, BP-3, BP-4, BP-5）」
   ⇒ **D5-2 上做不了这一项**。
-- 改用 D1-2（entry `xlsx/gt-d1-notes-receivable`，manifest 中 capability 已是 `bidirectional`）：
-  已真实打开在线编辑 —— OnlyOffice 编辑器加载了 D1-2 模板（截图确认表头含「期末未审数 / 账项调整 /
-  重分类调整 / 期末审定数」），首次打开即发布版本。
-- **阻塞点**：OO 编辑器在 `http://localhost:8080/...` 的 iframe 里，与主页面
-  `http://127.0.0.1:3030` **跨域**（`contentDocument` 抛 cross-origin），无法脚本化点击单元格；
-  而「保存」只能由 DocServer 自己 POST `onlyoffice-callback`（带独立签名的 callback route token，
-  不接受用户 Bearer）。⇒ 用自动化完成「在 OO 里把公式格敲成数字 → 保存 → 裁决 → 核对发布文件」
-  需要人工在 OO 界面操作，或另建 OO 侧的自动化通道。
+- 当时改用 D1-2（entry `xlsx/gt-d1-notes-receivable`）：已真实打开在线编辑，但 D1-2 走的是 legacy
+  `GtOnlyOfficeSheet`（模板直通，无 room / entry_state / 首版发布）⇒ **测不出真双向**。
+- 当时的替代证据：R4 的还原逻辑由 `test_tamper_keep_current_restores_formula.py` 在真 D4 world 上端到端覆盖
+  （`N13` 共享公式从属格换 999 → 判受保护冲突 → 保留服务器值 → `materialize` 写出 → 逐格读回
+  `=SUM(B13:M13)` 且缓存值 100；三条磁盘变异全 RED，§12.3）。
 
-**已做到的替代证据（不是同一件事，如实标注）**：R4 的还原逻辑由
-`test_tamper_keep_current_restores_formula.py` 在**真 D4 world**（40 binding、真模板字节）上端到端覆盖 ——
-`N13` 共享公式从属格被换成纯数字 999 → 生产 `adapter.extract` + `merge_projections` 判受保护冲突 →
-保留服务器值 → `adapter.materialize(substrate=incoming)` 写出文件 → **逐格读回 `=SUM(B13:M13)` 且缓存值 100**；
-同列其他行共享公式与输入格不受影响；物化反读逐字段等于合并结果。三条磁盘变异（去掉还原 / 还原到错行 /
-去掉 keep_current 禁令）全部 RED（§12.3）。
+#### 收口（2026-11-16）：改用 D1-3 走真双向链路，全链实测通过
 
-⇒ 12.2 第 3 项标为**部分完成**：自动化可达的部分（真实浏览器 + 真实模板 + 真库落库）已验；
-需要人在 OO 界面上点的那一步未做，**不当作已验证**。
+**为什么换 D1-3**：`GtD1NotesReceivable.vue:792` 的 `isD1DetailSheet = currentSheet === 'D1-3'` ——
+只有 D1-3 挂 `WorkpaperSyncEditorHost`（真 room / entry_state / 首版发布），D1-2 是 legacy 直通。
+
+**前置阻塞（已修，§12.2a）**：整册首版发布 500 `sync_contract_structure_drift`，首个点名
+`sheet='d11-managed' table='adj_bad_debt_rows' field='d11_adj_bd/change_amount' locator='J:static:12'`。
+根因链三层，前两层是环境：
+
+1. `adapter_stale`（契约 digest 与冻结 bundle 不符）→ `fix_task76_provision_projection_definitions.py --apply`；
+2. `AttributeError: phase5_d1_notes_receivable has no attribute 'load_pilot_contract'` →
+   框架层 `stage_instrumented_substrate` 在 `contract=None` 时硬调该名，本 provider 只暴露
+   `load_contract_from_disk` ⇒ 补一行别名（不改框架层：那条 `getattr` 探测是隐式的，改它要同时核对四个 pilot）；
+3. **真缺陷**：契约 `sheets[]` 声明 **13** 张受管 sheet（含 `d11-managed`，由
+   `_adjudication_sheet_payload_d11()` 无条件生成），而 `instrumentation_specs()` 只覆盖 **12** 张 ——
+   D1-1 审定表**从未进 instrumentation** ⇒ 注入后的 workbook 没有 `GT_MANAGED_REGION_D11` ⇒
+   观测器拿不到 `d11-managed` 的 `physical_sheet_by_key` 条目 ⇒ `observe_structure_inventory` 对
+   该 sheet 三张表**一个字段都不产出** ⇒ `assert_no_structure_drift` 判漂移，整册首版发布在结构上
+   从来不可能成功。
+
+**修法**：`phase5_d1_01_adjudication.static_sheet_payload_d11()` 给 `region_kind=static` 声明
+（`GT_MANAGED_REGION_D11` / `$A$5:$O$20` / 三个 `table_key`），`phase5_d1_expansion._static_sheet_declarations()`
+**常开**挂载（不给灰度开关 —— 它在契约里恒存在，关掉就退回本次修掉的漂移）。
+`managed_tables_of` 的静态分支返回本 sheet **全部**静态表，故一个 binding 覆盖三张。
+契约重生成后 `instrumentation_definition_sha256` 单行变化，13 张 sheet 内容逐字节不变。
+
+> 🔴 **同病三处**：D5 / D6 / D7 的 `static_sheet_declarations()` 写的是**契约形态**
+> （`locator` + `tables[]` + `footer`），而 `ExcelInstrumentationSpec.static_sheets` 要
+> **instrumentation 形态**（`region_boundary_locator` + `tables[0].table_key` + `excel_name`），
+> 且那三个函数**没有任何调用方**（现算 grep 命中 0）⇒ 它们的审定表同样从未进 instrumentation。
+> 本条按 D2-1 / D4-13 / D1-4 的已验证形态写，不复用那三个死函数；那三处属各自 spec 的范围。
+
+**实测链路（Playwright + 真 OO + 真库，console error 0）**：
+
+| 步 | 动作 | 观测 |
+| --- | --- | --- |
+| 1 | `page.frames()` 取 `frameEditor`（跨域 iframe 可脚本化） | `window.Asc` 在，`#ce-cell-name` / `#ce-cell-content` 可读 |
+| 2 | 名称框填 `G11` + Enter | 名称框 `G11`，公式栏 `=D11+E11+F11` |
+| 3 | 点网格后键盘 `type('999')` + Enter | 名称框 `G11`，公式栏 `999` |
+| 4 | 点「结构化视图」段（触发 `forceSave()`） | `202 POST .../sync/entries/...`（forcesave 受理） |
+| 5 | OO 回调落库 | `working_paper_sync_conflict` 新增 1 行 |
+| 6 | 读冲突详情 | `conflict_kind=protected` / `protection_policy=read_only_formula` / `suggested_action=keep_current` / `current_value={"value":0,"present":true}` / `incoming_value={"value":999,"present":true}` |
+| 7 | `POST .../operations/{op}/resolve` + `Idempotency-Key`，`choice=keep_current` | `200` / `decision=proceed` / `fence_reason=ok` / `resolutions_applied=1` / `revision 1→2` |
+| 8 | 读冲突行 | `resolution={"kind":"keep_current"}` / `resolved_value={"value":0,"present":true}` / `resolved_at` 已写 |
+| 9 | openpyxl 读**发布文件** `gen=7` 的 `G11` | **`=D11+E11+F11`**（公式视图）/ **`0`**（缓存值视图）—— 未落 999 |
+
+**操作要点（复跑用）**：
+
+- `Ctrl+S` **不触发** OO 回调（客户端本地保存）；必须用平台的 forcesave 入口 —— 切「结构化视图」
+  或宿主暴露的 `forceSave()`。OO 工具栏的保存按钮是 SVG `<symbol id="btn-save">`，不可点击。
+- 每次进 OO 前先释放 `editing_locks` 里该 wp 的未释放行（`released_at IS NULL`）；同一 wp 只允许
+  一个活跃 OO 会话，残留锁会让「在线编辑」段 `disabled` 或 iframe 永不出现（`409 Conflict`）。
+- 编辑器主对象 `window.editor` 是 `undefined`（在模块作用域），**不要依赖 Asc API** ——
+  名称框 / 公式栏的 `#ce-cell-name` / `#ce-cell-content` 读 `value`（不是 `textContent`）。
+- `resolve` 的八项乐观锁必须**全部显式携带**（缺项 422 `resolve_fence_field_missing`，
+  不按默认值补齐）；`conflicts` 端点的返回体里除 `application_effective_request_sequence`
+  需取 `incoming_sequence` 补，其余逐字段照抄。
 
 ## §14 任务 9.2 / 9.3 剩余项现算与处置（2026-11-16）
 

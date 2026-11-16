@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "5d079845690ccccfebd782bb7a56b12cf64906b26d1dd0e0ea11ad7489364c5b",
+  "instrumentation_definition_sha256": "cfffe8104fe9485e8ba3441a7e38a99446f2b36e016b2f79f8ebf2c1e04b16fa",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d1-notes-receivable",

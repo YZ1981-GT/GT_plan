@@ -37,11 +37,28 @@ from app.services.workpaper_sync.phase5_adjudication_sheet import (
     AdjudicationValueSource,
 )
 
-__all__ = ["SPEC_D101", "MANAGED_SHEET_D101"]
+__all__ = [
+    "SPEC_D101",
+    "MANAGED_SHEET_D101",
+    "SHEET_KEY_D101",
+    "GT_MANAGED_REGION_D11",
+    "static_sheet_payload_d11",
+]
 
 MANAGED_SHEET_D101: Final[str] = "审定表D1-1"
 TEMPLATE_ID_D101: Final[str] = "D11"
 SHEET_KEY_D101: Final[str] = f"{TEMPLATE_ID_D101.lower()}-managed"
+
+#: 静态受管区的 workbook-scope defined name（照 D2-1 / D4-8 / D4-13 / D1-4 范式）。
+#: instrumentation 注入只写这一个 definedName（`region_kind=static`），不注入 Excel Table /
+#: UUID 列 / 隐藏 identity_row —— D1-1 是三区 `fixed_rows` 审定表，没有任何动态行载体。
+GT_MANAGED_REGION_D11: Final[str] = f"GT_MANAGED_REGION_{TEMPLATE_ID_D101}"
+
+#: D1-1 的受管矩形（A5:O20）：表头 R5-R6 + 三区数据/小计 R7-R18 + footer R19-R20。
+#: 🔴 起点取**表头行**而非数据行：`_sheet_extent` 只校验「字段坐标不超出物理外延」，
+#:    但表头行在矩形内能让 definedName 锚点覆盖整块受管面（含 footer 的 TB 数格 E19/I19，
+#:    它们是 `manual` 可编辑格）。
+_STATIC_REGION_RANGE_D11: Final[str] = "$A$5:$O$20"
 
 #: per-cell 锚点键的前缀（前端 `D1_ADJ_PREFIX = 'D1-adj-'`）。
 D1_ADJ_PREFIX: Final[str] = "D1-adj-"
@@ -185,3 +202,49 @@ SPEC_D101: Final[AdjudicationSheetSpec] = AdjudicationSheetSpec(
     value_sources=_VALUE_SOURCES,
     html_only_item_ids=(),
 )
+
+
+def static_sheet_payload_d11() -> dict:
+    """D1-1 静态区寄生声明（挂到 D1-3 主 spec 的 `static_sheets`）。
+
+    ═══ 为什么必须有它（2026-11-16 实测的整册首版发布阻塞）═══
+
+    契约 `d1.notes_receivable_detail.json` 的 `sheets[]` 声明 **13** 张受管 sheet，其中
+    `d11-managed` 由 :func:`phase5_adjudication_sheet.static_sheet_payload_for_adjudication`
+    生成（`_adjudication_sheet_payload_d11()`）。但 instrumentation 侧只有 **12** 张 ——
+    本审定表从来没有进过 `static_sheets` ⇒ 注入后的 workbook 里没有
+    `GT_MANAGED_REGION_D11` 这个 definedName ⇒ 观测器
+    (`published_identity_observer._sheet_anchors`) 拿不到 `d11-managed` 的
+    `physical_sheet_by_key` 条目 ⇒ `observe_structure_inventory` 对整张 sheet 的三张表
+    **一个字段都不产出** ⇒ `assert_no_structure_drift` 报
+    `sync_contract_structure_drift`，首个点名位置
+    `sheet='d11-managed' table='adj_bad_debt_rows' field='d11_adj_bd/change_amount'
+    locator='J:static:12'`，整册首版发布 500。
+
+    🔴 与 D5 / D6 / D7 三处 `static_sheet_declarations()` 同病：那三处写的是**契约形态**
+       （`locator` + `tables[]` + `footer`），而 `ExcelInstrumentationSpec.static_sheets`
+       要的是 **instrumentation 形态**（`region_boundary_locator` + `tables[0].table_key`
+       + `excel_name`），且那三处的函数**没有任何调用方**（现算 grep 命中 0）⇒ 它们的
+       审定表同样从未进入 instrumentation。本条按 D2-1 / D4-13 / D1-4 的**已验证形态**写，
+       不复用那三个死函数。
+
+    三张表（`adj_gross_rows` anchor=A7 / `adj_bad_debt_rows` anchor=A11 /
+    `adj_net_rows` anchor=A15）在契约里 `row_identity=None` ⇒ 都是静态表
+    （`TableSpec.has_dynamic_rows == False`）。`managed_tables_of` 的静态分支返回本 sheet
+    **全部**静态表，故一个 binding（`tables[0].table_key`）即可覆盖三张。
+    """
+    return {
+        "sheet_key": SHEET_KEY_D101,
+        "excel_name": MANAGED_SHEET_D101,
+        "template_id": TEMPLATE_ID_D101,
+        "region_boundary_locator": {
+            "anchor": "defined_name_ref",
+            "defined_name": GT_MANAGED_REGION_D11,
+            "range": _STATIC_REGION_RANGE_D11,
+            "region_kind": "static",
+        },
+        "tables": [
+            {"table_key": section.table_key}
+            for section in SPEC_D101.sections
+        ],
+    }
