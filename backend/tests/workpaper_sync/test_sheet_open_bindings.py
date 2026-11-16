@@ -106,13 +106,213 @@ def test_each_binding_has_closed_status_and_real_effective_entry(
             assert row["target_sheet"] and len(row["sheet_literals"]) == 1
 
 
-def test_projection_does_not_claim_migration_without_reviewed_binding(projection: dict) -> None:
-    """首版生成物只能表达 pending/out_of_scope，不得凭 manifest 自动伪造 ready/migrated。"""
-    claimed = [
-        row for row in projection["bindings"]
-        if row["status"] in {"ready", "migrated", "draining", "retired"}
-    ]
-    assert claimed == []
+def test_projection_does_not_claim_migration_without_reviewed_binding(
+    projection: dict,
+) -> None:
+    """**只有**人工审核记录里的 entry 才允许 claim ready/migrated/draining/retired。
+
+    🔴 原判据是首版临时形态（`claimed == []`），那时 reviewed overlay 还没实现。
+    spec design §3.2 第 1 步明文要求生成器「读取 manifest、reviewed overlay、provider」——
+    实现之后必须把判据升级成**该规则的真语义**，两个方向都断言：
+
+    ① 正向：claim 高级状态的每一条，`status` 与 `reviewed.decision` 相同，
+       且它的 `entry_id` 在 reviewed 文件里（不是生成器自己算出来的）；
+    ② 反向：reviewed 文件里**没有**的 entry，状态必须仍是 pending / out_of_scope。
+
+    只做 ① 会让「reviewed 有记录但生成器没生效」静默通过；只做 ② 会让
+    「生成器凭 manifest 自己伪造 migrated」静默通过。
+    """
+    # `source.reviewed` 是**相对仓库根**的路径（生成器用 REPO.relative_to），
+    # 而本文件的 `ROOT` 是 `backend/` ⇒ 仓库根是 `ROOT.parent`。
+    repo_root = ROOT.parent
+    reviewed = projection["source"].get("reviewed")
+    assert reviewed, "生成物必须记录 reviewed 文件路径 —— 否则无法反查审核来源"
+
+    reviews_by_entry = {
+        str(item["entry_id"]): item
+        for item in json.loads(
+            (repo_root / reviewed).read_text(encoding="utf-8")
+        ).get("reviews", [])
+    }
+
+    advanced = {"ready", "migrated", "draining", "retired"}
+
+    # ① 正向：claim 了就必须有记录，且决策一致
+    for row in projection["bindings"]:
+        if row["status"] not in advanced:
+            continue
+        entry_id = row["entry_id"]
+        assert entry_id in reviews_by_entry, (
+            f"{entry_id} 被标记为 {row['status']} 但不在 reviewed 文件里 —— "
+            "生成器不得凭 manifest 自动伪造迁移状态"
+        )
+        expected = str(reviews_by_entry[entry_id]["decision"])
+        assert row["status"] == expected, (
+            f"{entry_id} 的 status={row['status']} 与 review.decision={expected} 不一致"
+        )
+        assert row["reason"] is None, (
+            f"{entry_id} 已审核通过却仍带 pending reason={row['reason']!r}"
+        )
+        assert row["reviewed"], f"{entry_id} 缺 reviewed 快照（无法追溯审核依据）"
+
+    # ② 反向：没记录的必须仍是 pending / out_of_scope
+    for row in projection["bindings"]:
+        if row["entry_id"] in reviews_by_entry:
+            continue
+        assert row["status"] in {"pending", "out_of_scope"}, (
+            f"{row['entry_id']} 不在 reviewed 文件里却拿到了 status={row['status']}"
+        )
+        assert row["reviewed"] is None, (
+            f"{row['entry_id']} 不在 reviewed 文件里却有 reviewed 快照"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# reviewed overlay（spec design §3.2 第 1 步）
+#
+# 🔴 这组判据的存在理由：`migrated` 此前恒为 0（生成器硬编码 pending），
+# 于是 3.3 / 4.1~4.4 / 5.2 全部无对象可验。加 reviewed 输入解开死锁的同时，
+# 必须把「谁能晋级」「怎么晋级」「错记录会怎样」都钉住 —— 否则解锁等于放开手改。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _review_payload(entry_id: str, *, decision: str = "migrated", **over: object) -> dict:
+    item = {
+        "entry_id": entry_id,
+        "effective_entry_id": entry_id,
+        "decision": decision,
+        "decision_basis": "test fixture",
+        "reviewed_by": "test",
+        "reviewed_at": "2026-11-16",
+    }
+    item.update(over)
+    return {
+        "schema_version": "sheet-open-reviewed-binding:v1",
+        "reviews": [item],
+    }
+
+
+def _run_generator(tmp_path: Path, reviewed: dict | None) -> dict:
+    """在沙箱里跑生成器，返回它产出的 payload。
+
+    🔴 三个隔离点缺一不可：
+      · `GT_SHEET_BINDINGS_OUT` → 不碰已跟踪产物；
+      · `GEN.REVIEWED` → 不读真实审核记录（否则测试结果依赖仓库状态）；
+      · `GEN.DATA` 不动 → manifest / overlay 仍是真实输入（那是要测的东西）。
+    """
+    import os as _os
+    import json as _json
+
+    reviewed_path = tmp_path / "reviewed.json"
+    if reviewed is not None:
+        reviewed_path.write_text(_json.dumps(reviewed, ensure_ascii=False), encoding="utf-8")
+    out = tmp_path / "bindings.json"
+
+    env = dict(_os.environ)
+    env["GT_SHEET_BINDINGS_OUT"] = str(out)
+    env["PYTHONIOENCODING"] = "utf-8"
+    # 把 reviewed 路径也做成可覆盖的（生成器读 `GEN.REVIEWED` 常量）。
+    env["GT_SHEET_REVIEWED_IN"] = str(reviewed_path)
+
+    import subprocess as _sp
+
+    proc = _sp.run(
+        [sys.executable, str(GENERATOR), "--apply"],
+        capture_output=True, env=env, cwd=str(ROOT.parent),
+    )
+    if proc.returncode != 0:
+        raise AssertionError(
+            f"生成器失败 rc={proc.returncode}: "
+            f"{(proc.stdout + proc.stderr).decode('utf-8', 'replace')[-800:]}"
+        )
+    return _json.loads(out.read_text(encoding="utf-8"))
+
+
+def _generator_failure_message(tmp_path: Path, reviewed: dict) -> str:
+    """跑生成器并要求它**失败**，返回 stdout+stderr 文本。
+
+    🔴 为什么不写 `pytest.raises`：`_run_generator` 会把「rc≠0」包装成
+    `AssertionError(带 stderr)`，但那样**看不出**是生成器自己拒了还是包装层拒了。
+    负向判据要的是「生成器给出的那条中文理由」，所以直查退出码 + 文本。
+    """
+    import os as _os
+    import subprocess as _sp
+
+    reviewed_path = tmp_path / "reviewed-negative.json"
+    reviewed_path.write_text(json.dumps(reviewed, ensure_ascii=False), encoding="utf-8")
+    out = tmp_path / "bindings-negative.json"
+
+    env = dict(_os.environ)
+    env["GT_SHEET_BINDINGS_OUT"] = str(out)
+    env["GT_SHEET_REVIEWED_IN"] = str(reviewed_path)
+    env["PYTHONIOENCODING"] = "utf-8"
+
+    proc = _sp.run(
+        [sys.executable, str(GENERATOR), "--apply"],
+        capture_output=True, env=env, cwd=str(ROOT.parent),
+    )
+    message = (proc.stdout + proc.stderr).decode("utf-8", "replace")
+    assert proc.returncode != 0, (
+        f"生成器本应拒绝这份 reviewed 输入，却成功了 rc=0。输出：{message[-600:]}"
+    )
+    return message
+
+
+def test_reviewed_decision_is_applied(tmp_path: Path) -> None:
+    """正向：reviewed 里 decision=migrated 的 entry，生成物必须是 migrated 且 reason 清空。"""
+    entry = "xlsx/b60/gt-b60-bundle"
+    payload = _run_generator(tmp_path, _review_payload(entry))
+    row = next(r for r in payload["bindings"] if r["entry_id"] == entry)
+    assert row["status"] == "migrated", row["status"]
+    assert row["reason"] is None
+    assert row["reviewed"] and row["reviewed"]["decision"] == "migrated"
+    assert row["owner"], "reviewed_by 必须落进 owner，否则无从追溯谁审的"
+
+
+def test_without_reviewed_file_nothing_is_advanced(tmp_path: Path) -> None:
+    """反向：**没有** reviewed 文件 ⇒ 一条 advanced 都不许有（spec 1.4 的核心）。"""
+    payload = _run_generator(tmp_path, None)
+    advanced = {"ready", "migrated", "draining", "retired"}
+    claimed = [r["entry_id"] for r in payload["bindings"] if r["status"] in advanced]
+    assert claimed == [], f"没有 reviewed 文件却 claim 了：{claimed}"
+    assert all(r["reviewed"] is None for r in payload["bindings"])
+
+
+def test_reviewed_decision_must_be_in_closed_set(tmp_path: Path) -> None:
+    """封闭性：decision=pending 必须被拒（它不是可裁决值，撤回应该删记录）。"""
+    payload = _review_payload("xlsx/b60/gt-b60-bundle", decision="pending")
+    message = _generator_failure_message(tmp_path, payload)
+    assert "不在" in message and "decision" in message, message
+
+
+def test_reviewed_entry_must_exist_in_manifest(tmp_path: Path) -> None:
+    """拼错检测：entry_id 不在 manifest 必须报错，不能静默无效。"""
+    payload = _review_payload("xlsx/does-not-exist/typo")
+    message = _generator_failure_message(tmp_path, payload)
+    assert "不在 manifest" in message, message
+
+
+def test_reviewed_duplicate_entry_is_rejected(tmp_path: Path) -> None:
+    """重复检测：同一 entry 两条记录必须报错（后者覆盖前者会让审核静默失效）。"""
+    payload = _review_payload("xlsx/b60/gt-b60-bundle")
+    payload["reviews"].append(dict(payload["reviews"][0]))
+    message = _generator_failure_message(tmp_path, payload)
+    assert "重复" in message, message
+
+
+def test_out_of_scope_cannot_be_promoted(tmp_path: Path) -> None:
+    """Requirement 2.7：`document_type` 不适用的 entry 不许被审核晋级。
+
+    取一条真实的 out_of_scope 行做靶子 —— 用生成的投影反查，不写死 entry_id
+    （manifest 变了不该让本用例失锚）。
+    """
+    projection = json.loads(OUTPUT.read_text(encoding="utf-8"))
+    oos = [r for r in projection["bindings"] if r["status"] == "out_of_scope"]
+    assert oos, "当前投影里没有 out_of_scope 行 —— 本判据失去靶子"
+    target = oos[0]["entry_id"]
+    payload = _review_payload(target)
+    message = _generator_failure_message(tmp_path, payload)
+    assert "不适用本迁移" in message, message
 
 
 def test_effective_entry_id_is_never_a_forged_parent_fallback(

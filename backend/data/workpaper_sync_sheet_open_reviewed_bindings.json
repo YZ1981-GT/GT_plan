@@ -1,0 +1,50 @@
+{
+  "schema_version": "sheet-open-reviewed-binding:v1",
+  "_doc": [
+    "人工审核记录：**只有**这里列出的 entry 才允许生成器把 status 晋级为 migrated/ready/draining/retired。",
+    "生成器读本文件；没有记录的 entry 一律保持 pending / out_of_scope（spec 1.4）。",
+    "decision 必须在封闭集合 {ready, migrated, draining, retired} 内，且只有本文件能给出。",
+    "entry_id / effective_entry_id 必须逐字等于 manifest 里的值 —— 拼错会让记录静默无效（守卫钉住）。",
+    "改本文件会改变生成物的 input_digest，因此必须重跑 --apply，再由 --check 打红发现遗漏。"
+  ],
+  "reviews": [
+    {
+      "entry_id": "xlsx/b60/gt-b60-bundle",
+      "effective_entry_id": "xlsx/b60/gt-b60-bundle",
+      "decision": "migrated",
+      "decision_basis": "唯一 exact 候选：单个 sheet_literal（B60）+ 单个 wp_code（B60-1），无运行时 sheet 表达式，无多 wp_code 歧义",
+      "published_artifact_evidence": {
+        "representation_rows": 7,
+        "artifact_state": "published",
+        "bundle_state": "approved",
+        "artifact_sha256_matches_row": true,
+        "artifact_file_present": true,
+        "storage_base": "backend/",
+        "sample_wp_id": "afb9201a-5989-4c3f-b79f-e1a950e53be9",
+        "sample_project": "重药控股安徽有限公司_2025",
+        "probed_at": "2026-11-16",
+        "probe": "tmp_probe_b60_final.py（只读，READ COMMITTED 独立事务）"
+      },
+      "reviewed_by": "用户（2026-11-16 指令「按建议来」：授权把 gt-b60-bundle 审核为 migrated）",
+      "reviewed_at": "2026-11-16",
+      "open_items": [
+        "task 3.3 的四项取证（old URL / descriptor / target sheet / HTML 回读）尚未做",
+        "🔴 端点实测 `GET /sync/entry-identity?sheet_name=B60` 返回 `error_code=current_representation_missing` —— binding 解析链已通（binding_id / entry_id / target_sheet 全部命中），但 `working_paper_sync_entry_state` 里没有 B60 的行 ⇒ room 打开仍不可用。representation 表有 7 行历史数据（artifact published / 文件在盘），但没有任何一行被 entry_state 指向。",
+        "要真正打开还需要「在结构化视图里保存一次以发布首版」（这正是端点 reason 文案给用户的下一步）—— 那属于真实用户操作，不是审核能代替的"
+      ],
+      "probe_results": {
+        "endpoint": "GET /api/projects/{pid}/workpapers/{wp_id}/sync/entry-identity?sheet_name=B60",
+        "http_status": 200,
+        "binding_matched": true,
+        "binding_id": "sha256:7e95a48dfa45ab6fc36030b2c2980fa3211e475559a58ac86a87bec551e8a285",
+        "entry_id": "xlsx/b60/gt-b60-bundle",
+        "target_sheet": "B60",
+        "downstream_error_code": "current_representation_missing",
+        "downstream_reason": "该底稿还没有已发布的在线编辑版本 —— 请先在结构化视图里保存一次以发布首版",
+        "entry_state_rows_for_entry": 0,
+        "representation_rows_for_entry": 7,
+        "probed_at": "2026-11-16"
+      }
+    }
+  ]
+}

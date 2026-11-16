@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Iterable
 from typing import Any, Mapping
 
 from app.services.workpaper_sync.entry_profile import manifest_entries_by_id
@@ -71,12 +72,27 @@ class SheetOpenBindingResolver:
         sheet_name: str,
         whole_workbook: bool,
         manifest: Mapping[str, Any],
+        source_wp_codes: Iterable[str] | None = None,
     ) -> SheetOpenBindingResolution:
+        """按 `(wp_code, sheet_name)` 在生成物里找 binding。
+
+        🔴 `source_wp_codes` 是**候选集合**，不是第二套判定：
+        调用方先用 `resolve_sheet_wp_code`（`_wp_sheet_code_resolution.py`，单一实现）
+        算出实际使用的码，再把它与底稿原码**一起**传进来。生成器写的是 manifest 的
+        `wp_code_patterns[0]`（如 `B60-1`），运行时算出的可能是父码（如 `B60`，当
+        父码有自己的模板时）—— 两者都要能命中，否则「迁移了却打不开」。
+
+        实测反例（未加候选集之前）：真实库 B60 的 binding 已是 `migrated`，而
+        `GET /sync/entry-identity?sheet_name=B60` 恒返回 `sheet_binding_not_found`。
+        """
+        declared = {str(c or "").strip() for c in (source_wp_codes or ()) if str(c or "").strip()}
         code = str(source_wp_code or "").strip()
+        if code:
+            declared.add(code)
         sheet = str(sheet_name or "").strip()
         rows = [
             row for row in self._load()
-            if row.get("source_wp_code") == code
+            if row.get("source_wp_code") in declared
             and row.get("document_type") == "xlsx"
             and row.get("status") != "out_of_scope"
         ]

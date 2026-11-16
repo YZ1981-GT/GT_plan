@@ -1101,6 +1101,11 @@ async def resolve_entry_identity(
     )
     resolution = SheetOpenBindingResolver().resolve(
         source_wp_code=sheet_code,
+        # 候选集 = 运行时算出的码 + 底稿原码。生成器写的是 manifest 的
+        # wp_code_patterns[0]（如 B60-1），而 resolve_sheet_wp_code 可能算出父码
+        # （如 B60，当父码有自己的模板时）—— 只按一个匹配会让「已迁移」的 binding
+        # 在运行时命中不到（实测 B60 恒 sheet_binding_not_found）。
+        source_wp_codes=(sheet_code, wp_code),
         sheet_name=sheet_name,
         whole_workbook=whole_workbook,
         manifest=load_entry_manifest(),

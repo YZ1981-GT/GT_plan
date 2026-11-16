@@ -1,14 +1,31 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：22/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.2 + 3.6 + 3.7 + 5.1 + 5.3 + 5.4 + 5.6 已完成；全部纯代码判据已收口）**
+> **状态：23/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.2 + 3.6 + 3.7 + 5.1 + 5.3 + 5.4 + 5.6 已完成）
 >
-> **余 12 项的真实阻断（现算，不凭记忆）** —— 三类，全部已写明 owner / 证据 / 下一步：
-> - **治理前置（binding 审核）8 项**：3.3 / 3.4 / 3.5 / 4.1 / 4.2 / 4.3 / 4.4 / 5.2。根因 = `workpaper_sync_sheet_open_bindings.json` 197 条里 **`migrated` = 0**（pending 190 / out_of_scope 7）⇒ **无可迁对象**。这些任务的代码侧判据全部已就绪（gate 状态机 17 例 / artifact reader 12 例 / 父级兜底断言 / ledger 22 文件 27 处），缺的是「人工把某条 binding 审核成 `migrated`」这个治理动作。
-> - **治理收尾 2 项**：4.5（`GtOnlyOfficeSheet` 仍是 197 条未迁移 binding 的唯一载体，删不得）/ 5.7（完成门未满足，归档会让「还有 12 项没做」失去可见性）。
-> - **真环境 2 项**：5.5（Playwright 五场景，4 个要 migrated binding）/ 0.4（五角色签字，需人）。
+> **本轮解开了 migrated=0 的死锁**（2026-11-16，用户指令「按建议来」）：
+> - **新增 reviewed overlay 机制**：`backend/data/workpaper_sync_sheet_open_reviewed_bindings.json`
+>   —— 生成器此前**硬编码**全部 status 为 pending/out_of_scope，spec design §3.2 第 1 步
+>   要求的 "reviewed overlay" 从未实现。现已实现：只有该文件里列出的 entry 才允许晋级到
+>   `migrated`/`ready`/`draining`/`retired`；无记录的一律保持 pending（spec 1.4 语义不变）。
+> - **首个 migrated binding**：`xlsx/b60/gt-b60-bundle`（唯一 exact 候选）。现算 `migrated: 1`。
+> - **顺带修一个真缺陷**：`SheetOpenBindingResolver` 按单值 `source_wp_code` 等值匹配，
+>   而运行时 `resolve_sheet_wp_code` 会把底稿码换成父码（`B60-1` → `B60`，父码有模板时）
+>   ⇒ **已 migrated 的 binding 命中不到**（真实库实测：端点恒 `sheet_binding_not_found`）。
+>   修法 = 调用方传**候选码集合**（判定仍只有 `resolve_sheet_wp_code` 一份，不造第二套）。
+>
+> **余 11 项的真实阻断（现算）**：
+> - **真环境 3 项**：3.3 / 3.4 / 3.5 —— 三项 canary 都要真实 OO 容器 + 浏览器取证。
+>   B60 的 binding 解析链**已通**（端点返回 binding_id / entry_id / target_sheet=B60），
+>   但下游 `current_representation_missing`：`working_paper_sync_entry_state` 里没有 B60 的行
+>   （representation 表有 7 行历史数据，但无 entry_state 指向）⇒ 打开仍不可用。
+>   要打开需**真实用户操作**「在结构化视图里保存一次以发布首版」，不是审核能代替的。
+> - **治理前置 5 项**：4.1 / 4.2 / 4.3 / 4.4 / 5.2 —— 都有 1 条 migrated 了，但仍需真实
+>   drain 周期观测（4.4 的「连续为 0」）与真实 published artifact 端到端（5.2）。
+> - **治理收尾 2 项**：4.5（`GtOnlyOfficeSheet` 仍是 189 条未迁移 binding 的唯一载体）/
+>   5.7（完成门未满足）。
+> - **人的裁决 1 项**：0.4 五角色签字。
+> - **真环境 1 项**：5.5 Playwright 五场景。
 > - 环境侧**不是**阻断：`audit-onlyoffice` / `audit-postgres` / `audit-redis` 均 healthy。
->
-> 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
 ## Phase 0：事实冻结与范围裁决
 
@@ -55,6 +72,59 @@
 
 ## Phase 2：服务端解析与 Published Artifact 读取
 
+- [x] 1.6 实现 reviewed overlay：`workpaper_sync_sheet_open_reviewed_bindings.json` + 生成器读取，解 `migrated` 恒为 0 的死锁。
+  - **现算缺口（本轮实测）**：生成器 `binding_for()` **硬编码** status 为 `pending` / `out_of_scope`，
+    **没有任何「已审核」输入** ⇒ `migrated` 恒为 0 ⇒ 3.3 / 3.4 / 3.5 / 4.1~4.4 / 5.2 全部无对象可验。
+    而 spec design §3.2 第 1 步明文要求生成器「读取 manifest、**reviewed overlay**、provider」——
+    该输入从未实现。
+  - **为什么不复用 `workpaper_sync_entry_overlay.json`**：那是**组件级默认值**文件，180 条 entry
+    共用（改一项会同时翻转全部 `GtOnlyOfficeSheet` entry 的 capability）。「审核某一条 binding
+    可以迁移」与「改组件默认值」是两件事。
+  - 新增文件 schema `sheet-open-reviewed-binding:v1`，`decision` 封闭集
+    `{ready, migrated, draining, retired}`（**不含** pending —— 撤回审核应删记录，不是留
+    `decision=pending`，否则无法区分「没审过」与「审过但决定不迁」）。
+  - 生成器改动：`load_reviewed()` + `binding_for(reviewed=...)` + `input_material["reviewed_digest"]`
+    （改审阅记录必须让 `input_digest` 变，否则「改了审阅却没重跑」`--check` 发现不了）。
+  - **三条现算防御**（都配守卫）：①`decision` 不在封闭集 ⇒ 报错；②`entry_id` 不在 manifest ⇒
+    报错（拼错会让审核静默失效）；③`entry_id` 重复 ⇒ 报错；④`out_of_scope` 不许晋级
+    （Requirement 2.7：Word / custom 不进 room 协议）。
+  - **首个 migrated binding**：`xlsx/b60/gt-b60-bundle`（唯一 exact）。现算
+    `summary.status_counts = {migrated: 1, out_of_scope: 7, pending: 189}`。
+  - 守卫升级：`test_projection_does_not_claim_migration_without_reviewed_binding` 原是首版
+    临时形态（`claimed == []`），现升级为**双向**判据 —— ①claim 高级状态的每一条必须在
+    reviewed 文件里且决策一致；②没有记录的必须仍是 pending/out_of_scope。只做单向会让
+    「reviewed 有记录但生成器没生效」静默通过。
+  - 新增 6 条 reviewed 守卫（正向 / 反向 / 封闭集 / 拼错 / 重复 / out_of_scope），
+    `test_sheet_open_bindings.py` **28 passed**。
+  - 变异 **6/6 全打红**（逐字节恢复一致）。🔴 M2 是**组合变异**：`decision` 封闭集在
+    loader 与 `binding_for` 各有一道校验，只变异一道会被另一道兜住 ⇒ 变异存活（假存活）。
+    M1 去覆盖 / M2 同时去两道 / M3 去 manifest 校验 / M4 去重复校验 / M5 放开 out_of_scope /
+    M6 无 reviewed 也伪造 migrated。
+  - _R: 1, 8_
+- [x] 1.7 修 `SheetOpenBindingResolver` 的单值 wp_code 匹配缺陷（已 migrated 的 binding 命中不到）。
+  - **真缺陷（2026-11-16 真库实测）**：`resolve_entry_identity` 先算
+    `sheet_code = resolve_sheet_wp_code(wp_code, sheet_name, wb)` —— 对 B60 得 `B60`
+    （底稿码 `B60-1`，但父码 `B60` 有自己的模板 ⇒ 换码），而 binding 的 `source_wp_code`
+    是 manifest 的 `wp_code_patterns[0]` = `B60-1` ⇒ **单值等值匹配恒不命中**。
+    表现：`GET /sync/entry-identity?sheet_name=B60` 返回
+    `status=pending, reason=sheet_binding_not_found`，**而 binding 已是 migrated**
+    —— 这正是本 spec 要消灭的「假迁移」。
+  - 影响面现算：全表 197 条中只有 1 条（B60）走到这条路径（其余 `out_of_scope` 或缺
+    code/target 被跳过），但它就是唯一的 canary ⇒ 必须修。
+  - **修法选择**：不在 resolver 里再跑一次 `resolve_sheet_wp_code`（那会造**第二套**
+    「哪个码是对的」判定，与 `_wp_sheet_code_resolution.py` 的「必须只有一份」直接冲突 ——
+    历史事故就是两侧协商出不同 wp_code）。改为调用方传**候选码集合** `source_wp_codes=`，
+    判定仍只有一份。
+  - 守卫 4 条：①按真实端点方式传候选集 ⇒ 命中；②只传底稿原码 ⇒ 也命中（向后兼容）；
+    ③候选集里没有的码 ⇒ **不许**命中（不能见谁都放行）；④**AST 检查端点真的传了**
+    `source_wp_codes=`（文本匹配会被注释骗过，memory ㉖）。
+  - 另加 1 条**fail-closed 反向判据**：只给单个码、不给候选集 ⇒ 必须不命中。它钉的是
+    「resolver 不许自己猜还有哪些码可能对」—— 将来若有人为让用例过而加猜测，这条打红。
+  - 修复后真库实测：端点返回 200 且
+    `binding_id` / `entry_id=xlsx/b60/gt-b60-bundle` / `target_sheet=B60` /
+    `mapping_kind=exact` / `source_wp_code=B60-1` **全部命中**（此前全为 null）。
+    下游 `error_code=current_representation_missing` 是真实业务状态（见 3.3）。
+  - _R: 1, 3_
 - [x] 2.1 重构 `/sync/entry-identity`：由 `SheetOpenBindingResolver` 返回真实 manifest `entry_id`，删除对不存在的 `xlsx-sheet/*` entry 的直接假设。
   - 兼容旧响应字段，但新字段必须含 mapping status、target sheet、representation identity；route 级测试覆盖 pending provider mapping 不伪造 entry。
   - _R: 1, 3_
@@ -110,11 +180,23 @@
   - 🔴 **顺带修三处 2.1/2.4 遗留**（都是「后端改了、前端没跟」的同一类）：①`workpaperSyncDto.spec.ts` / `task69IndependentRegression.spec.ts` / `workpaperSyncApi.spec.ts` 的 descriptor fixture 缺 `target_sheet` / `document_scope`（2.4 把它们加进后端 `DESCRIPTOR_REQUIRED_FIELDS`，前端只跑了后端选集）⇒ 17 条红；②`resolve_entry_identity` 是 `prefixKind: 'sibling'`（`WP_SYNC_SIBLING_PREFIX_TEMPLATE`，**不含** entry_id）而 `buildSyncEndpointUrl` 只用 entry 前缀 ⇒ 该端点**从未有前端 client method**（「每条路由恰一个 client method」21 vs 22 红）—— 这正是 2.1 要解决的问题（「前端仍得先知道 entry_id」），端点建好却调不了等于没解决 ⇒ 补 `buildSyncSiblingPrefix` + `resolveEntryIdentity` + 登记；③通用 URL 判据原断言「每条路由都以 entry 前缀开头且含 entry_id」对 sibling 不成立 —— **判据本来就写错了**（sibling 存在的意义就是不含 entry_id）⇒ 按 `prefixKind` 分派，两种路由各有各的严格判据。
   - _R: 3, 4_
 - [ ]* 3.3 迁移一个普通 single-sheet canary，从 `GtOnlyOfficeSheet` 切到 room host；记录 old URL、descriptor、target sheet 与 HTML 回读证据。
-  - **阻断类别：治理前置（binding 审核）**。现算：`migrated` binding = **0 条**（197 条里 pending 190 / out_of_scope 7）⇒ **无可迁对象**。
-  - 为什么不能硬做：canary 的定义是「把一个已审核的 binding 从旧路径切到 room host」。把一条 `pending` 直接当 canary 就是**伪造迁移完成** —— 而 `test_projection_does_not_claim_migration_without_reviewed_binding` 正是钉住这一点的守卫。
-  - 候选已备好（审核后即可做）：`xlsx/b60/gt-b60-bundle`（`mapping_kind=exact`，唯一 exact 候选，reason=`exact_candidate_requires_published_artifact_review`）—— 它是最省审核成本的一条（目标唯一、无运行时表达式）。次选 `xlsx/j1/inspection/j1-tab-general-check`（ambiguous，需先裁决多候选）。
+  - **阻断类别：真环境（浏览器取证）+ 真实用户操作**。canary 已选定并**已 migrated**：
+    `xlsx/b60/gt-b60-bundle`（唯一 `exact`；`wp_code=B60-1`、`target_sheet=B60`；
+    底稿 = 重药控股安徽有限公司_2025 / B60-1「审计项目工时预算与控制表」/ wp_id `afb9201a`）。
+  - **服务端解析链已通（2026-11-16 真库实测）**：
+    `GET /api/projects/{pid}/workpapers/{wp_id}/sync/entry-identity?sheet_name=B60` 返回 200
+    且 `binding_id` / `entry_id=xlsx/b60/gt-b60-bundle` / `target_sheet=B60` /
+    `mapping_kind=exact` / `source_wp_code=B60-1` **全部命中**。
+  - **下一步阻断点（不是本次缺陷，是真业务状态）**：同响应的
+    `error_code=current_representation_missing`，reason 文案「该底稿还没有已发布的在线编辑版本
+    —— 请先在结构化视图里保存一次以发布首版」。根因现算：
+    `working_paper_sync_entry_state` 里 **B60 有 0 行**（该表 85 行全有 rep），
+    而 `working_paper_content_representation` 有 7 行历史数据（artifact `published` /
+    bundle `approved` / sha 一致 / 文件在盘 23450 bytes）—— 但**没有任何 entry_state 指向它们**。
+  - 为什么不能由我代做：「发布首版」是用户在结构化视图里保存一次产生的 entry_state，
+    我伪造一条 entry_state 就是伪造「canary 已跑通」。
+  - 四项取证（old URL / descriptor / target sheet / HTML 回读）**待 entry_state 就绪后**做。
   - 环境已就绪：`audit-onlyoffice` healthy / `audit-postgres` healthy。
-  - 下一步：①用户裁决 `gt-b60-bundle` 是否可 `migrated`（改 `workpaper_sync_sheet_open_bindings.json` 的 status + 补 reviewed 字段，经生成器 `--check`）；②再做 canary 的 old URL / descriptor / target sheet / HTML 回读四项取证。
   - _R: 3, 9, 10_
 - [ ]* 3.4 迁移一个 whole-workbook canary；验证所有 sheet 可见、target sheet 正确、切回 HTML 不丢写。
   - **阻断类别：治理前置（binding 审核）**。现算：`whole_workbook` 10 条**全为 pending**，reason 全是 `whole_workbook_target_requires_reviewed_binding`（设计如此：整册映射必须人工确认 target 语义，不能由生成器自认）。
@@ -145,26 +227,26 @@
 ## Phase 4：Legacy Drain 与旧路径删除
 
 - [ ]* 4.1 将全局 legacy 开关收敛为 binding 级状态机：pending → ready → migrated → draining → retired。
-  - **阻断类别：治理前置（binding 审核）**。状态机**代码已就绪**：`backend/app/routers/_wp_onlyoffice_legacy_url_gate.py` 按 binding 级判定，`test_sheet_legacy_gate_binding_states.py` 17 例覆盖五态 + 非法跃迁。
-  - 为什么不能标完成：后三态（`migrated → draining → retired`）需要真实有 binding 走过才能证明。现算 `migrated` = **0 条** ⇒ 后三态在生产上从未被触达（空分母恒真，正是本 spec 反复拒绝的假绿形态）。
+  - **阻断类别：治理前置（真实 drain 周期）**。已有 1 条 `migrated`（B60），状态机**代码已就绪**：`backend/app/routers/_wp_onlyoffice_legacy_url_gate.py` 按 binding 级判定，`test_sheet_legacy_gate_binding_states.py` 17 例覆盖五态 + 非法跃迁。
+  - 为什么不能标完成：后三态（`migrated → draining → retired`）需要真实有 binding 走过才能证明。现算 `migrated` = **1 条**（B60，仅单 sheet）⇒ 后三态在生产上仍从未被真实触达（空分母恒真）。
   - 下一步：随 3.3（首条 binding 进 `migrated` 后，draining / retired 才有对象可验）。
   - _R: 6, 8_
 - [ ]* 4.2 新增旧 doc key / callback drain ledger：记录签发时间、TTL、binding、entry、generation、终结状态。
   - **阻断类别：治理前置**。ledger **读取侧已就绪**（gate 按 binding 状态判定；`workpaper_sync_legacy_onlyoffice_callers.json` 记录 22 文件 / 27 处调用逐条 owner+reason）。
-  - 缺**写入侧有数据**：没有 `migrated` binding 就永远没有「旧 doc key 已签发待 drain」记录 ⇒ ledger 恒空，TTL / 终结状态无法验证。
+  - 缺**写入侧有数据**：B60 虽已 migrated 但从未签发过旧 doc key（entry_state 缺失，打开都没发生）⇒ 「旧 doc key 已签发待 drain」记录仍恒空。
   - 下一步：随 3.3。
   - _R: 6, 7, 8_
 - [ ]* 4.3 migrated binding 的新请求不得签旧 URL；draining 只接受已签发且 scope / token / generation 全匹配的 callback。
   - **阻断类别：治理前置**。「不得签旧 URL」判据已就绪（`test_sheet_legacy_gate_binding_states.py` 的 `migrated` 分支 + 3.7 ledger 双向相等）；`draining` 的 scope / token / generation 三匹配也已在 gate 实现。
-  - 缺的仍是**真实 migrated binding**（同 4.1 / 4.2）。
+  - 缺的仍是**真实 drain 过程**（B60 打开都要先补 entry_state，见 3.3）。
   - 下一步：随 3.3。
   - _R: 6, 7_
 - [ ]* 4.4 旧 direct-write 分支按 binding 逐个删除；删除前守卫要求旧签发数、callback in-flight、drain timeout 连续为 0。
-  - **阻断类别：治理前置 + 时间**。「连续为 0」需要**真实运行一段时间的观测数据**；当前 0 条 migrated ⇒ 三个计数天然为 0 但**没有观测意义**（空分母恒真）。
+  - **阻断类别：治理前置 + 时间**。「连续为 0」需要**真实运行一段时间的观测数据**；当前 1 条 migrated 但从未打开过 ⇒ 三个计数天然为 0 但**没有观测意义**（空分母恒真）。
   - 下一步：3.3 完成 → 观察一个完整 drain 周期 → 才能按 binding 逐个删。
   - _R: 2, 6, 10_
 - [ ]* 4.5 删除无调用方的 `GtOnlyOfficeSheet` 兼容代码前，完成 grep 0 调用、测试全绿、独立提交与回滚标签；single/custom/Word 豁免必须有真实条件断言。
-  - **阻断类别：治理前置**。现算 `GtOnlyOfficeSheet` **仍有调用方**：它是 `pending` / `out_of_scope` / custom / Word / single_onlyoffice 的**唯一载体**（197 条 binding 里 0 条 migrated）⇒ 现在删会让全部未迁移入口失去在线编辑能力。
+  - **阻断类别：治理前置**。现算 `GtOnlyOfficeSheet` **仍有调用方**（196 条未迁移 entry 都靠它）：它是 `pending` / `out_of_scope` / custom / Word / single_onlyoffice 的**唯一载体**（197 条 binding 里仅 1 条 migrated）⇒ 现在删会让全部未迁移入口失去在线编辑能力。
   - 这正是 3.6 加「独立在线编辑（不同步）」提示条的原因：它现在是**有正当职责**的组件，不是遗留垃圾。
   - 下一步：等 4.4 逐 binding 删完后，调用方才会自然降到 0。
   - _R: 4, 5, 6_
@@ -181,7 +263,7 @@
     3. `_fake_rows` 的 artifact **没有 `project_id`** 字段 ⇒ `getattr(..., project_id)` 回落到请求值 ⇒ 语义等价 ⇒ M2 存活 ⇒ 给 artifact 加一个**不同的** `project_id`。
   - _R: 1, 2, 7_
 - [ ]* 5.2 后端 PG：真实 `WorkpaperContentRepresentation`、bundle、artifact 读取与项目隔离；只读验证先独立事务，写入验收只用【测试】项目并可恢复。
-  - **阻断类别：治理前置**。`audit-postgres` healthy（环境可用），但读真实 representation 的前提是**有 migrated binding 指向的 published artifact** —— 当前 0 条。
+  - **阻断类别：治理前置**。`audit-postgres` healthy（环境可用）。B60 有 7 行 representation（artifact published / 文件在盘），但**无 entry_state 指向** ⇒ 端到端读取仍会在 `current_representation_missing` 停下。
   - 代码侧已就绪：`read_current_published_sheet_artifact`（11 条 `PUBLISHED_SHEET_ARTIFACT_REASONS`）+ 12 例守卫；项目隔离在 gate 层。
   - unit / contract 层已用合成夹具覆盖同一批判据（`test_sheet_published_artifact.py` 12 例）；PG 层要验的是**真实 schema / 真实 bundle 形状**，两者不能互相替代。
   - 下一步：随 3.3。
