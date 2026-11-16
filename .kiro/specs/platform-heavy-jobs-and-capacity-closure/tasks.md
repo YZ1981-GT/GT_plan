@@ -264,6 +264,40 @@
   - 🔴 需部署环境（PgBouncer 进程 + 真实后端 + RLS/SET LOCAL 验证），本机无法伪造，保持阻塞。
   - 2026-11-06 复核：仓库里没有灰度脚本；Compose 的 backend 仍直连 PG、单 worker，PgBouncer 服务存在但
     不在默认数据路径上。
+  - **2026-11-16 补（transaction 模式契约已本机实测，`[ ]*` 保持——灰度脚本与按副本连接预算仍缺）**：
+    新建 `backend/tests/test_pgbouncer_transaction_contract_pg.py`（**9 例：7 需 bouncer + 2 纯静态**）。
+    本机起 `edoburu/pgbouncer:1.22.1-p0`（`POOL_MODE=transaction`，独立容器 `gt-pgbouncer-e1`，
+    指向一次性库 `gt_e1_bouncer`），把「切 PgBouncer 前必须证明的四件事」全部实测：
+    ①**transaction 模式确实生效**（同一事务内两条语句 `pg_backend_pid()` 相同）；
+    ②**`SET LOCAL` 不跨事务泄漏**（事务 A 设 `app.gt_probe`，事务 B 读到空 —— 泄漏即跨项目数据泄露）；
+    ③**RLS 仍隔离且 fail-closed**（临时 schema + `FORCE ROW LEVEL SECURITY` + 策略；
+    项目 A 只见自己的行、项目 B 只见自己的、**未设上下文读到 0 行**）；
+    ④**取消能穿透 bouncer**，且**取消后必须 `rollback()` 才能复用连接**。
+    🔴 **三条只有真实环境才暴露的发现**：
+    · **superuser 永远绕过 RLS**（`FORCE ROW LEVEL SECURITY` 只对表 owner 起作用）⇒ 用
+      `postgres` 测 RLS 会得到「看到全部行」的假结论（第一版就踩了：项目 A 读到 `[1, 2]`）。
+      修法：临时建 `NOSUPERUSER` 角色 + `SET LOCAL ROLE` 才测得到真实策略行为。
+    · **`statement_cache_size` 必须为 0，且这是实锤不是理论**：开启服务端语句缓存后
+      **第一次查询**（`SELECT CAST(:n AS int) * 2`）就撞
+      `DuplicatePreparedStatementError`，PG 的 HINT 原文写着
+      「pgbouncer with pool_mode set to "transaction" does not support prepared statements
+      properly … set statement_cache_size to 0」。平台 `app/core/database.py` 已在
+      `_pgbouncer_connect_args` 里设 0，本文件加**静态守卫**钉住它（含「经 `connect_args`
+      指向模块级字典」的追踪 —— 只看 keyword 会漏，第一版就漏了）。
+    · **取消后连接进入 `PendingRollbackError`**：`Can't reconnect until invalid transaction is
+      rolled back`。这是 SQLAlchemy 语义（直连同样如此），不是 bouncer 造成 ⇒
+      **平台契约 = 取消路径必须 `rollback()`**，否则带着 invalid 事务还给池会毒到下一个客户端。
+    **变异 6/6 RED**（`SET LOCAL`→会话级 SET / RLS 上下文换项目 / fail-closed 改成设 A /
+    默认开语句缓存 / 取消后不 rollback / 生产库模块改成 100），逐字节还原。
+    🔴 **变异设计教训**：第一版 5 条里 4 条「存活」，逐条查明**全是等价变异**——
+    放宽断言（`== [1]` 改 `>= 1`）在基线本来就正确时不改变结果；改 `pytest.raises` 为
+    `try/except` 后 `task.cancelled()` 仍为 True。⇒ **变异必须改「被测行为」而不是「断言的松紧」**，
+    且存活项要逐条证明是等价变异而非缺口（本轮 `task.cancelled()` 那条确认冗余后直接删掉，
+    并在注释里写明原因，不留无用断言）。
+    **跳过判据**：`GT_PGBOUNCER_URL` + `GT_PGBOUNCER_DISPOSABLE_DB=1` 才跑 7 条真连库用例；
+    另 2 条纯静态判据（默认值 + 生产模块）**任何环境都跑**，无 bouncer 时 2 passed / 7 skipped。
+    **仍未做**：2%→25%→100% 灰度脚本、按副本数计算连接预算（需部署环境）、
+    真实后端经 bouncer 的端到端压测。
 - [~] E2 EventBus、任务、配额、进度和失效状态外置；2/4/8 worker 零丢失/零重复验证。
   - 🔴 platform_jobs / AI tasks 已 DB 耐久，SSE 跨标签已共享；但 EventBus、配额和失效状态仍有进程内部分，
     尚未完成跨 worker 外置和 2/4/8 worker 验证。2026-11-06 增量：接口骨架落地
