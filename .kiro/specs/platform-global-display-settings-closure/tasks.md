@@ -552,3 +552,51 @@
 - 端点未做 Playwright 浏览器实测。
 - `run_finalize_saga` 本身仍未被生产调用（`commit-visibility` 直接用
   `DurableAckLedger` 走同一条 `resolve` 判据，但完整 saga 编排尚未接线到端点）。
+
+---
+
+## 十、publication 前端管理页（2026-11-15 本轮）
+
+### 10.1 交付内容
+
+| 文件 | 说明 |
+| --- | --- |
+| `src/composables/useTemplatePublications.ts` | list / commit-visibility / instantiate 三段接线 + `REQUIRED_FINALIZE_CONSUMERS` 常量 |
+| `src/views/extension/CustomTemplatePublications.vue` | 列表 + 推进可见性 + 实例化弹窗（含逐 sheet 映射录入） |
+| `src/router/domains/extension.ts` | 新增路由 `extension/custom-templates/publications`（name `CustomTemplatePublications`） |
+| `tests/.../useTemplatePublications.spec.ts` | 12 例 |
+| `tests/.../customTemplatePublicationsRoute.spec.ts` | 3 例 |
+
+### 10.2 关键判据
+
+- **`pinned` ≠ 已实例化**：服务端 `instantiated: false` 或回执缺
+  `workbookInstanceId` 一律按失败处理，写 `lastError` 并返回 `null`。
+  这条防的是「用户以为建册成功、后续找不到 workbook」。
+- **`runtimeDiscoverable` 只取服务端值**：前端不按 `state` 自己推。
+- **consumer 名单与后端逐值一致**：`guidance` / `renderer` / `public_shell` /
+  `entry_namespace`（已现算后端 `REQUIRED_FINALIZE_CONSUMERS` 确认）。
+  名单漂移会导致 ACK 永远收不齐。
+- **全部请求带 `_silent`**：避免 `utils/http` 全局 toast 与本页错误提示重复弹。
+- **推进 / 实例化后自动刷新列表**。
+- **路由守卫解析真 router + 真实 import 组件**（不 grep 字符串）——
+  与 ingest 页同一教训：Task 12 曾勾 `[x]` 而路由压根没注册。
+
+### 10.3 验证
+
+- 新增 **15 passed**（composable 12 + 路由 3）。
+- **变异 11/11 RED**：pinned 当已实例化 / 缺 workbookInstanceId 仍算成功 /
+  空 sheet 列表放行 / 三处 `_silent` 缺失 / state 过滤不透传 /
+  consumer 名单漂移 / commit 后不刷新 / 路由删除 / 路由 name 写错。
+- 前端回归 `src/composables/__tests__/` + `src/router/__tests__/` 全量
+  2683 例中 9 failed，逐个归因为**既有预存失败**（`dSalesCycleLabelGuard` /
+  `useAiCapabilities` / `useAiHostContext` / `useCControlTestData` /
+  `useG6EclFormulaEngine.pbt` 偶发），与本轮改动零关联。
+- 行数门通过。
+
+### 10.4 仍未完成（不得据此标完成）
+
+- **逐 amount region 确认 UI**：实例化弹窗目前要用户手填 sheetUid，
+  没有从 preflight 报告拉取候选 sheet 的下拉。
+- **V272 未落共享库**（需用户放行）。
+- 页面**未做 Playwright 浏览器实测**（本轮只跑单测 + 变异）。
+- publication 的撤回 / 升级（`withdraw_publication` / `offer_upgrade`）无前端入口。

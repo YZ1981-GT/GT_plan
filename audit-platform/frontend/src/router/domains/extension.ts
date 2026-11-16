@@ -24,6 +24,13 @@ export const extensionRoutes: RouteRecordRaw[] = [
           component: () => import('@/views/extension/CustomIngestionWizard.vue'),
         },
 {
+          // spec: custom-workpaper-template-ingestion-and-sync-closure Task 16/20
+          // publication 列表 / 推进可见性 / 实例化。
+          path: 'extension/custom-templates/publications',
+          name: 'CustomTemplatePublications',
+          component: () => import('@/views/extension/CustomTemplatePublications.vue'),
+        },
+{
           path: 'extension/custom-templates/:id/edit',
           name: 'CustomTemplateEdit',
           component: () => import('@/views/extension/CustomTemplateEditor.vue'),
