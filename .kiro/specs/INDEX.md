@@ -549,6 +549,7 @@
 | [`workpaper-html-onlyoffice-bidirectional-writeback-closure`](workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md) | **46/50**（余 4） | **底稿 HTML 与 OnlyOffice 双向回写总纲**：同步解析、写回、冲突、锁和真实验收。 |
 | [`workpaper-writeback-data-loss-and-mirror-consistency-closure`](workpaper-writeback-data-loss-and-mirror-consistency-closure/tasks.md) | **51/59**（余 8） | **底稿回写保存安全与镜像一致性**：CAS、pending writes、过渡屏障和 OO/HTML 镜像。 |
 | [`frozen-contract-read-path-and-legacy-operation-settlement`](frozen-contract-read-path-and-legacy-operation-settlement/tasks.md) | **0/12**（三件套已交付，产品代码未实施） | 冻结契约的读侧重建 + 遗留 operation 结算：按 bundle 的 `contract_slot_ref` 把冻结的旧契约读回来（复用 `parse_contract` 与既有 definition blob 读取，消除第二真源），读侧入口默认取冻结契约并在响应里如实标注来源，使冻结旧契约的 operation 可被正式结算；承接 `_archive/174-wp-sync-conflict-adjudication-and-d4-32-modeling` 的范围外项 12.f |
+| [`onlyoffice-sheet-open-via-published-artifact`](onlyoffice-sheet-open-via-published-artifact/tasks.md) | **0/34**（三件套已交付，产品代码未实施） | **Sheet 级 OnlyOffice 改走 Published Representation**：建立显式 sheet→entry 映射，让单 sheet / 整册入口打开同一条 published artifact；目标 sheet 用 descriptor/actionLink 表达，不再复制模板、隐藏 sheet 或按 sheet 名猜父级；按 binding 状态逐入口 drain 旧 config/WOPI/callback。 |
 
 ### 一.1 已完成 / 已归档的历史行（append-only，不回填改写）
 
