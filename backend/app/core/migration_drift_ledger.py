@@ -248,6 +248,18 @@ KNOWN_CHECKSUM_DRIFTS: tuple[KnownChecksumDrift, ...] = (
         " idx_note_formula_run_project_year_section 索引均存在且定义与当前文件一致，效果已在库中生效。"
         "无需补迁移，未改写共享 schema_version 的应用时 checksum。",
     ),
+    KnownChecksumDrift(
+        "273",
+        "c5a6e5709f34f39b95962bbd9742830802dc1f754e5f25ce397c5e8fc7998f1b",
+        "608d8ed9e65d50c2426aa3a57457e22aed0e9cbb643d29bc901046726eaf266b",
+        "应用后被编辑（冲突集显式作废三列，spec frozen-contract-read-path-and-legacy-operation-"
+        "settlement 任务 8）；2026-11-16 只读逐对象核验 public.working_paper_sync_conflict："
+        "abandoned_at(timestamptz) / abandon_reason(text) / abandoned_by(uuid) 三列均存在且可空、"
+        "外键 working_paper_sync_conflict_abandoned_by_fkey → users(id) ON DELETE RESTRICT "
+        "convalidated=True、CHECK ck_wpsc_abandon_triplet convalidated=True 且定义与当前文件逐字一致、"
+        "三列注释齐备；数据面 392 行中 283 行已带 abandoned_at（真实作废数据）。"
+        "编辑效果全部已在库中生效，无需补迁移，未改写共享 schema_version 的应用时 checksum。",
+    ),
 )
 
 
