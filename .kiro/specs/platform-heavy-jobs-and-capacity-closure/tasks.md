@@ -316,6 +316,15 @@
     另 2 条纯静态判据（默认值 + 生产模块）**任何环境都跑**，无 bouncer 时 2 passed / 7 skipped。
     **仍未做**：2%→25%→100% 灰度脚本、按副本数计算连接预算（需部署环境）、
     真实后端经 bouncer 的端到端压测。
+    **2026-11-17 补（灰度计划纯函数 + dry-run 已实现，`[ ]*` 保持——真实切流仍需部署系统）**：
+    新建 `backend/scripts/ops/pgbouncer_canary_plan.py`，固定生成 **2% → 25% → 100%** 三阶段
+    计划，不调用 Docker/Kubernetes/API，只输出机器可读 JSON；每阶段复用
+    `connection_budget.compute_bouncer_budget` 同时校验 bouncer 客户端侧与 PG 服务端侧预算。
+    任一阶段预算不可行时 dry-run 仍输出完整计划但退出码 **2**，杜绝「先切流、后发现连接不够」。
+    每阶段计划门包含 RLS/SET LOCAL、statement_cache_size=0、取消后 rollback、pool wait/lag/错误率
+    与观察窗口五项门禁。新测试 `tests/test_pgbouncer_canary_plan.py` **5 passed**；
+    **5/5 变异 RED**（阶段比例、客户端预算、可行状态、不可行退出码、部署动作均改坏验证）。
+    **仍未做**：真实 bouncer/后端按 2%→25%→100% 执行切流、每阶段观察窗口与自动回滚。
     **2026-11-16 追加（连接预算已实现，`[ ]*` 保持——灰度脚本与端到端压测仍缺）**：
     新建 `backend/app/core/connection_budget.py` + `backend/tests/test_connection_budget.py`
     （**14 例**）。纯计算模块（不连库），三层收窄：
