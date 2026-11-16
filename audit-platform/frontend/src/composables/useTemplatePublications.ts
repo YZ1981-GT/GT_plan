@@ -68,6 +68,33 @@ export interface SheetMappingInput {
   manifestVersion?: string | null
 }
 
+/** preflight 报告里的单个 sheet（来自 `GET /artifacts/{id}` 的 manifest.preflight）。 */
+export interface PreflightSheet {
+  sheetUid: string
+  sheetName: string
+  order: number
+  state: string
+  /** 服务端推荐 mode，可作为前端默认值；用户仍可改。 */
+  projectionRecommendation?: string
+}
+
+/** `projection_recommendation` → 我们的 `ProjectionMode` 取值。 */
+export function toProjectionMode(recommendation: string | undefined): string {
+  // 后端 ProjectionMode = editable_grid / read_only_html / onlyoffice_only
+  // preflight 的 projectionRecommendation 是 ProjectionRecommendation 枚举，
+  // 这里做保守映射：不认识的一律 editable_grid（可编辑网格最通用）。
+  switch ((recommendation || '').toLowerCase()) {
+    case 'read_only_html':
+    case 'readonly_html':
+      return 'read_only_html'
+    case 'onlyoffice_only':
+    case 'onlyoffice':
+      return 'onlyoffice_only'
+    default:
+      return 'editable_grid'
+  }
+}
+
 /** 后端必需 consumer（与 finalize_saga.REQUIRED_FINALIZE_CONSUMERS 逐值一致）。 */
 export const REQUIRED_FINALIZE_CONSUMERS = [
   'guidance',
@@ -159,6 +186,41 @@ export function useTemplatePublications() {
     )
   }
 
+  /** 拉取该 artifact 的 preflight sheet 候选列表（供实例化弹窗做下拉）。 */
+  async function loadPreflightSheets(artifactId: string): Promise<PreflightSheet[]> {
+    lastError.value = null
+    try {
+      const response = await api.get<{ artifact: Record<string, unknown> }>(
+        `${BASE}/artifacts/${artifactId}`,
+        { _silent: true },
+      )
+      const artifact = response?.artifact ?? {}
+      const preflight = artifact.preflight as Record<string, unknown> | undefined
+      const workbook = preflight?.workbook as Record<string, unknown> | undefined
+      const raw = workbook?.sheets
+      if (!Array.isArray(raw)) {
+        lastError.value = '该产物没有 preflight sheet 报告，请先跑预检'
+        return []
+      }
+      return raw
+        .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object')
+        .map((s) => ({
+          sheetUid: String(s.sheetUid ?? s.sheet_uid ?? ''),
+          sheetName: String(s.sheetName ?? s.sheet_name ?? ''),
+          order: Number(s.order ?? 0),
+          state: String(s.state ?? ''),
+          projectionRecommendation: s.projectionRecommendation
+            ? String(s.projectionRecommendation)
+            : undefined,
+        }))
+        .filter((s) => s.sheetUid)
+        .sort((a, b) => a.order - b.order)
+    } catch (error) {
+      lastError.value = apiErrorMessage(error, '加载 preflight sheet 列表失败')
+      return []
+    }
+  }
+
   /** 实例化：需要调用方给出 sheet 映射（服务端按 preflight 报告校验白名单）。 */
   async function instantiate(
     publicationKey: string,
@@ -200,6 +262,7 @@ export function useTemplatePublications() {
     load,
     commitVisibility,
     acceptAllConsumers,
+    loadPreflightSheets,
     instantiate,
   }
 }

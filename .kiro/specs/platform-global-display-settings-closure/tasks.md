@@ -741,3 +741,53 @@ qc / auditor / readonly 不可（**语义分离：批准发布 ≠ 技术推进*
 且当时未核对**该角色在实际数据里是否存在**（partner/qc 为 0）。这类缺陷单测抓不到
 （测试里我造了 partner 用户），**只有浏览器用真实账号才暴露** —— 正是 memory
 铁律「改动后必 Playwright 实测」的价值。
+
+---
+
+## 十三、逐 region 确认 UI：实例化弹窗改 preflight 候选下拉（2026-11-16）
+
+### 13.1 交付内容
+
+| 文件 | 说明 |
+| --- | --- |
+| `useTemplatePublications.ts` | 新增 `loadPreflightSheets(artifactId)` + `toProjectionMode()` + `PreflightSheet` 类型 |
+| `CustomTemplatePublications.vue` | 实例化弹窗把「手填 sheetUid」换成 **el-select 下拉**（数据源 = preflight 报告） |
+| `views/extension/__tests__/CustomTemplatePublications.spec.ts` | **新增** 4 例视图层测试 |
+
+数据来源：`GET /api/custom-template-ingestion/artifacts/{artifactId}` 的
+`manifest.preflight.workbook.sheets`（`publication.candidateId` 即 artifactId）。
+
+### 13.2 关键判据
+
+- **下拉是唯一来源**：手填的 `sheetUid` 服务端会 422；前端也不再给自由输入框。
+- **隐藏页不列出**（`state != visible` 服务端也会拒）。
+- **已被其它行选中的 sheet 不出现在该行候选**（避免重复选 → 服务端 422）。
+- **选中后带出推荐 `projectionMode`**（`toProjectionMode` 保守映射，不认识的一律
+  `editable_grid`）。
+- **没有 preflight 报告时「确认实例化」按钮禁用**。
+- **wpCode / componentType 仍需人工填** —— 没有可靠来源推业务编码，**不猜**。
+- 提交前前端先自查 uid 是否都在候选里（服务端仍会校验，双重保险）。
+
+### 13.3 验证
+
+- composable **19 passed**（12 原有 + 7 新增：候选解析 / snake_case 兼容 /
+  缺报告报错 / 空 uid 过滤 / 排序 / 请求失败）+ view **4 passed** + 路由 3 = **26 passed**。
+- **变异 10/10 RED**。
+
+### 13.4 变异复盘（两条曾假存活）
+
+1. **三条 view 层变异首轮全部存活** —— 因为此前**没有任何测试覆盖 .vue**，
+   composable 测试看不到「页面打开时不拉候选 / 按钮不禁用 / 隐藏页也列出」。
+   ⇒ 补 `views/extension/__tests__/CustomTemplatePublications.spec.ts`（挂真组件）。
+2. **`view allows submit without preflight` 补测后仍存活** —— 因为按钮的
+   `:disabled="!preflightSheets.length"` 与 `submitInstantiate` 里的
+   `if (!preflightSheets.value.length) return` **两处并存互相兜底**，删任何一处
+   另一处仍然挡住。按「同一判据合成一处」删掉函数内那道检查，变异靶点改为
+   按钮 `:disabled` 后才 RED。
+
+### 13.5 仍未完成（不得据此标完成）
+
+- 逐 **amount region**（金额区间）的确认 UI 尚未做 —— 当前只到 sheet 粒度，
+  没有「这个 region 用什么单位 / 什么比例」的逐项确认。
+- 未做浏览器实测（本轮只有单测 + 变异）。
+- publication 的撤回 / 升级无前端入口。

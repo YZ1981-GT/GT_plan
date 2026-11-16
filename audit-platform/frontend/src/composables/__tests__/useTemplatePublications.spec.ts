@@ -28,6 +28,7 @@ vi.mock('@/services/apiProxy', () => ({
 
 import {
   REQUIRED_FINALIZE_CONSUMERS,
+  toProjectionMode,
   useTemplatePublications,
 } from '@/composables/useTemplatePublications'
 
@@ -238,5 +239,78 @@ describe('consumer 名单与后端一致', () => {
       'public_shell',
       'entry_namespace',
     ])
+  })
+})
+
+describe('loadPreflightSheets', () => {
+  const ARTIFACT = 'art-1'
+
+  function artifactWith(sheets: unknown[]) {
+    return { artifact: { state: 'PREFLIGHT_READY', preflight: { workbook: { sheets } } } }
+  }
+
+  it('从 manifest.preflight.workbook.sheets 取候选并按 order 排序', async () => {
+    get.mockResolvedValueOnce(artifactWith([
+      { sheetUid: 'sheet-1-b', sheetName: '乙', order: 1, state: 'visible' },
+      { sheetUid: 'sheet-0-a', sheetName: '甲', order: 0, state: 'visible' },
+    ]))
+    const p = useTemplatePublications()
+    const sheets = await p.loadPreflightSheets(ARTIFACT)
+
+    expect(get.mock.calls[0][0]).toBe(`${BASE}/artifacts/${ARTIFACT}`)
+    expect(get.mock.calls[0][1]?._silent).toBe(true)
+    expect(sheets.map((s) => s.sheetUid)).toEqual(['sheet-0-a', 'sheet-1-b'])
+    expect(sheets[0].sheetName).toBe('甲')
+  })
+
+  it('snake_case 字段也能读（后端两种写法都出现过）', async () => {
+    get.mockResolvedValueOnce(artifactWith([
+      { sheet_uid: 'sheet-0-a', sheet_name: '甲', order: 0, state: 'visible' },
+    ]))
+    const p = useTemplatePublications()
+    const sheets = await p.loadPreflightSheets(ARTIFACT)
+    expect(sheets[0].sheetUid).toBe('sheet-0-a')
+    expect(sheets[0].sheetName).toBe('甲')
+  })
+
+  it('🔴 没有 preflight 报告时返回空并写 lastError（不得静默返回空）', async () => {
+    get.mockResolvedValueOnce({ artifact: { state: 'QUARANTINED' } })
+    const p = useTemplatePublications()
+    const sheets = await p.loadPreflightSheets(ARTIFACT)
+    expect(sheets).toEqual([])
+    expect(p.lastError.value).toContain('没有 preflight sheet 报告')
+  })
+
+  it('空 sheetUid 被过滤（脏数据不得进下拉）', async () => {
+    get.mockResolvedValueOnce(artifactWith([
+      { sheetUid: '', sheetName: '空', order: 0, state: 'visible' },
+      { sheetUid: 'sheet-0-a', sheetName: '甲', order: 0, state: 'visible' },
+    ]))
+    const p = useTemplatePublications()
+    const sheets = await p.loadPreflightSheets(ARTIFACT)
+    expect(sheets).toHaveLength(1)
+    expect(sheets[0].sheetUid).toBe('sheet-0-a')
+  })
+
+  it('请求失败写 lastError 并返回空', async () => {
+    get.mockRejectedValueOnce({ response: { data: { detail: '隔离产物不存在' } } })
+    const p = useTemplatePublications()
+    const sheets = await p.loadPreflightSheets(ARTIFACT)
+    expect(sheets).toEqual([])
+    expect(p.lastError.value).toBe('隔离产物不存在')
+  })
+})
+
+describe('toProjectionMode', () => {
+  it('认识 read_only_html / onlyoffice_only', () => {
+    expect(toProjectionMode('read_only_html')).toBe('read_only_html')
+    expect(toProjectionMode('onlyoffice_only')).toBe('onlyoffice_only')
+    expect(toProjectionMode('ONLYOFFICE')).toBe('onlyoffice_only')
+  })
+
+  it('未知 / undefined 一律回退 editable_grid', () => {
+    expect(toProjectionMode(undefined)).toBe('editable_grid')
+    expect(toProjectionMode('')).toBe('editable_grid')
+    expect(toProjectionMode('some_new_mode')).toBe('editable_grid')
   })
 })

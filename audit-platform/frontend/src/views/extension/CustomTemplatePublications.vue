@@ -15,7 +15,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   PUBLICATION_STATE_LABELS,
   REQUIRED_FINALIZE_CONSUMERS,
+  toProjectionMode,
   useTemplatePublications,
+  type PreflightSheet,
   type TemplatePublication,
 } from '@/composables/useTemplatePublications'
 
@@ -28,6 +30,9 @@ const instantiateTarget = ref<TemplatePublication | null>(null)
 const workingPaperId = ref('')
 const sheetRows = ref<{ sheetUid: string; wpCode: string; componentType: string; projectionMode: string }[]>([])
 const instantiateResult = ref<string | null>(null)
+/** preflight 候选 sheet（下拉数据源；为空时禁用「确认实例化」并提示先跑预检）。 */
+const preflightSheets = ref<PreflightSheet[]>([])
+const preflightLoading = ref(false)
 
 const stateLabel = (state: string) => PUBLICATION_STATE_LABELS[state] ?? state
 const shortKey = (key: string) => (key.length > 34 ? `${key.slice(0, 34)}…` : key)
@@ -66,12 +71,59 @@ async function onCommit(pub: TemplatePublication) {
   }
 }
 
-function openInstantiate(pub: TemplatePublication) {
+async function openInstantiate(pub: TemplatePublication) {
   instantiateTarget.value = pub
   instantiateResult.value = null
   workingPaperId.value = ''
+  preflightSheets.value = []
   sheetRows.value = [{ sheetUid: '', wpCode: '', componentType: 'audit-sheet', projectionMode: 'editable_grid' }]
   instantiateOpen.value = true
+
+  // 从 publication 的 candidateId（= artifactId）拉 preflight 报告里的真实 sheet 列表。
+  // 下拉是**唯一**可选来源 —— 手填的 sheetUid 服务端会 422。
+  preflightLoading.value = true
+  try {
+    const sheets = await pubs.loadPreflightSheets(pub.candidateId)
+    preflightSheets.value = sheets
+    if (!sheets.length) {
+      ElMessage.warning(pubs.lastError.value ?? '该产物没有 preflight sheet 报告，请先跑预检')
+    }
+  } finally {
+    preflightLoading.value = false
+  }
+}
+
+/** 可纳入的候选（隐藏页服务端会拒，这里直接不给选）。 */
+const selectableSheets = computed(() =>
+  preflightSheets.value.filter((s) => !s.state || s.state === 'visible'),
+)
+
+/** 已被其它行占用的 sheetUid（避免重复选）。 */
+function takenSheetUids(exceptIndex: number): Set<string> {
+  return new Set(
+    sheetRows.value
+      .filter((_, i) => i !== exceptIndex)
+      .map((r) => r.sheetUid)
+      .filter(Boolean),
+  )
+}
+
+function optionsForRow(index: number): PreflightSheet[] {
+  const taken = takenSheetUids(index)
+  return selectableSheets.value.filter((s) => !taken.has(s.sheetUid))
+}
+
+/** 选中 sheet 后带出推荐 mode 与 wpCode 默认值（wpCode 仍可改）。 */
+function onSheetPicked(index: number, sheetUid: string) {
+  const sheet = preflightSheets.value.find((s) => s.sheetUid === sheetUid)
+  if (!sheet) return
+  const row = sheetRows.value[index]
+  if (!row) return
+  row.projectionMode = toProjectionMode(sheet.projectionRecommendation)
+  if (!row.wpCode.trim()) {
+    // 没有可靠来源推 wpCode，留空让用户填；不猜业务编码。
+    row.wpCode = ''
+  }
 }
 
 function addSheetRow() {
@@ -89,6 +141,9 @@ async function submitInstantiate() {
     ElMessage.warning('请填写目标底稿 ID')
     return
   }
+  // 🔴 不在这里再查 preflightSheets.length：按钮已用 :disabled 挡住
+  // （见模板 :disabled="!preflightSheets.length"）。两处并存会互相兜底，
+  // 把任何一处的变异掩盖掉（已实测：删掉本检查时用例仍绿）。
   const sheets = sheetRows.value
     .filter((r) => r.sheetUid.trim() && r.wpCode.trim())
     .map((r) => ({
@@ -98,7 +153,14 @@ async function submitInstantiate() {
       projectionMode: r.projectionMode.trim() || 'editable_grid',
     }))
   if (!sheets.length) {
-    ElMessage.warning('至少填写一行 sheet 映射（sheetUid + wpCode）')
+    ElMessage.warning('至少选择一行 sheet 并填写 wpCode')
+    return
+  }
+  // 前端先自查一遍：选的 uid 必须都在候选里（服务端仍会校验）
+  const known = new Set(preflightSheets.value.map((s) => s.sheetUid))
+  const unknown = sheets.filter((s) => !known.has(s.sheetUid))
+  if (unknown.length) {
+    ElMessage.warning(`sheetUid 不在 preflight 报告中：${unknown.map((u) => u.sheetUid).join(', ')}`)
     return
   }
 
@@ -218,7 +280,22 @@ async function submitInstantiate() {
         <el-form-item label="Sheet 映射">
           <div class="gt-pubs__sheets">
             <div v-for="(row, i) in sheetRows" :key="i" class="gt-pubs__sheet-row">
-              <el-input v-model="row.sheetUid" placeholder="sheetUid（须在 preflight 报告里）" />
+              <el-select
+                v-model="row.sheetUid"
+                :loading="preflightLoading"
+                filterable
+                clearable
+                placeholder="选择 sheet（来自 preflight 报告）"
+                :data-testid="`sheet-select-${i}`"
+                @change="(v: string) => onSheetPicked(i, v)"
+              >
+                <el-option
+                  v-for="s in optionsForRow(i)"
+                  :key="s.sheetUid"
+                  :label="`${s.order}. ${s.sheetName || s.sheetUid}`"
+                  :value="s.sheetUid"
+                />
+              </el-select>
               <el-input v-model="row.wpCode" placeholder="wpCode" />
               <el-input v-model="row.componentType" placeholder="componentType" />
               <el-input v-model="row.projectionMode" placeholder="projectionMode" />
@@ -229,13 +306,15 @@ async function submitInstantiate() {
         </el-form-item>
       </el-form>
       <p class="gt-pubs__hint">
-        sheetUid 必须是该 artifact preflight 报告里真实存在的；凭空填会被服务端拒绝（422）。
+        可选 sheet 来自该产物的 preflight 报告（共 {{ selectableSheets.length }} 个可见页）；
+        隐藏页不列出。wpCode / componentType 仍需人工填写，不猜业务编码。
       </p>
       <template #footer>
         <el-button @click="instantiateOpen = false">取消</el-button>
         <el-button
           type="primary"
           :loading="!!busyKey"
+          :disabled="!preflightSheets.length"
           data-testid="instantiate-submit"
           @click="submitInstantiate"
         >
