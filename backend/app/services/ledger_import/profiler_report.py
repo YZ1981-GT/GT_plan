@@ -36,12 +36,17 @@ def _build_profiler_report(
     *,
     staging_rows: int = 0,
     rebuild_rows: int = 0,
+    write_stage_wal_bytes: int | None = None,
 ) -> dict[str, Any] | None:
     """把 pipeline 的 ``_perf`` 字典翻译成 ``StagedProfiler`` 报告结构。
 
     pipeline 原有 ``_mark()`` 已经把每个阶段结束时点写进 ``_perf``；本函数
     不发任何新调用、不改任何业务路径，只做一次 dict → dict 的平移。``_perf``
     为空时返回 None（调用方 pipeline_result.profiler_report 保持 None）。
+
+    ``write_stage_wal_bytes``：pipeline 在**写阶段自己的** ``async_session()``
+    边界内读到的 WAL 增量（``pg_wal_lsn_diff``）。只贴到写阶段那一条记录上；
+    传 ``None`` 表示读不到（非 PG / 无权限 / replica），保持「读不到 ≠ 0」。
     """
     from app.services.ledger_import.profiler import StagedProfiler
 
@@ -52,6 +57,8 @@ def _build_profiler_report(
         "staging_rows": max(0, int(staging_rows)),
         "rebuild_rows": max(0, int(rebuild_rows)),
     }
+    # 只有「写阶段」这一条带真实 WAL 增量；其余阶段没有各自的 session 边界探针。
+    wal_map = {"parse_write_streaming_done": write_stage_wal_bytes}
     phase_items = list(perf.items())
     # _mark("start") 没有「上一个时点」，用 pipeline 起点 perf_start_ts。
     prev_t = perf_start_ts
@@ -59,6 +66,11 @@ def _build_profiler_report(
         duration = max(0.0, t - prev_t)
         rows_key = _PHASE_ROWS_SOURCE.get(name)
         rows = rows_map.get(rows_key, 0) if rows_key else 0
-        profiler.record_stage_manual(name, duration_s=duration, rows=rows)
+        profiler.record_stage_manual(
+            name,
+            duration_s=duration,
+            rows=rows,
+            wal_bytes=wal_map.get(name),
+        )
         prev_t = t
     return profiler.to_dict()

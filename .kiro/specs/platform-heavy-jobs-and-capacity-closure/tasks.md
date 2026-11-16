@@ -134,6 +134,16 @@
   - 守卫位置（2026-11-06 复核）：`tests/formula_runtime/test_workpaper_adapter.py::
     test_apply_many_statement_count_is_constant_for_existing_rows`；完整 `FormulaPushEngine` run 的
     statement count 与真 PG 基线仍缺。
+  - **2026-11-16 补（引擎级 statement 计数守卫已建，`[ ]*` 保持——余真 PG 基线）**：新建
+    `backend/tests/test_formula_push_statement_count.py`（2 例）。在**真 SQLite engine** 上挂
+    `before_cursor_execute` 统计真发出的 SQL，跑完整 `FormulaPushEngine.run_and_commit`
+    （项目年度校验 → 有效规则 → 找底稿 → binding 取数 → CAS → 状态 upsert → 运行记录）。
+    **实测（现算，禁写死）**：目标单元 1 / 10 / 50 时 SQL 条数均 **14 条**、`changed_items` 分别
+    1 / 10 / 50 ⇒ 引擎全链路的写回是**常数级**，R4.1「SQL 数不得随单元格数线性增长」在引擎层成立
+    （此前只验过 adapter 一层）。棘轮 `_MAX_STATEMENTS_PER_RUN = 20`（只降不升）。
+    变异：在 `adapter.apply_many(mutations)` 前逐条目插 `SELECT 1` ⇒ 变 15 / 24 / 64 条，2 例全 RED；
+    `engine.py` 逐字节还原、`git diff` 干净。
+    **仍未做**：真 PG + 10000 公式单元的实际基线与耗时（需专用可销毁库 + 真实项目数据）。
 - [ ] C2 目标底稿批取、mutation 批量 CAS、附注按章节一次锁写；逐项结果对拍。
   - 已完成：目标底稿单次批取、同底稿 mutation 一次锁读 + 批量 CAS；`test_formula_push_engine_locate` /
     batch-c-note / batch-c-k-cycle / reaggregate 选集 53 passed。统一写入内核骨架
@@ -146,6 +156,21 @@
     + module_attr + disclosure_notes_hardening）。
   - ✅ 2026-11-15 补：**`note_followup` 链已取章节级 advisory 锁**。`note_section_write_kernel` 新增只取锁入口 `acquire_section_lock`（不读不写、不 deepcopy；非 PG 返回 False 不抛），`note_workpaper_pull_service._apply_note_formulas` 在 `db.begin_nested()` 内、`execute_note_formulas` **之前**逐章节取锁 ⇒ 同 `(project, year, section)` 的并发刷新/推送串行，不同章节仍并行；SAVEPOINT 只管失败隔离、不管并发的缺口补齐。顺带修内核健壮性：原先直接访问 `db.bind.dialect`，遇无 `bind` 的 session 替身（`test_note_workpaper_pull_service._NestedDb`）整条链抛 AttributeError 并被误记成「公式执行失败」⇒ 抽 `_dialect_name(db)` 用 `getattr` 兜底，非 PG 一律 no-op。守卫 `test_note_followup_section_lock_wiring.py`（4 例，AST 判「真调用 / 在公式执行之前 / 在 sections 循环内 / 内核有只取锁入口」），磁盘变异删锁调用 **3/3 RED**、逐字节还原。选集 25 passed（锁接线 + pull service + write kernel）+ 前一轮 30 passed。
   - 🔴 仍未完成：**真实 PG 并发 barrier**（双连接重叠章节用例）必须在专用可销毁 PG 上跑，本机无法伪造，保持未勾；合并附注（C3）的差额节点与整章批取同属该项。
+  - **2026-11-16 补：真实 PG 并发 barrier 已跑通（`[ ]` 保持——差额节点与整章批取仍缺）**。
+    新建 `backend/tests/test_note_section_lock_concurrency_pg.py`（**5 passed**，一次性库
+    `gt_heavy_jobs_barrier` 上 60 秒）。隔离用**提交型临时 schema**（复用
+    `level_backfill_world` 既有做法）：`CREATE SCHEMA note_lock_<rand>` + 世界引擎
+    `NullPool` + asyncpg `server_settings={"search_path": "<schema>,public"}`，
+    结束 `DROP SCHEMA ... CASCADE` 并现查已不存在；`DATABASE_URL` 含 `audit_platform` 时
+    **直接拒绝**（不碰共享库）。判据四条：①同章节互斥（A 持锁期间 B 在 0.6 s 内**不**完成，
+    A commit 后 B 拿到）②跨章节不阻塞（锁粒度不是项目级）③`commit` 与 `rollback` 都释放
+    （事务级锁不需要手工解）④两个连接并发 `mutate_note_section` 各追加一行后**两行都在**
+    （不丢更新 —— 只有串行而没有「读到别人的写入」一样会丢）。
+    **变异 2/2 RED 且形态正确**：锁改 no-op → 同章节 + 两种释放三例红；锁 key 去掉 section
+    改成项目级 → 只有「跨章节不阻塞」红。内核逐字节还原、`git diff` 干净。
+    **跳过判据**：`GT_BARRIER_PG=1` **且** `DATABASE_URL` 含 postgresql 才跑，否则 5 skipped
+    （只看 URL 不够：本地库存在但连不上时会把「跳过」变成「连接被拒失败」）。
+    **仍未完成**：合并附注差额节点（`fill_by_formula`）与叶子来源整章批取的真实 PG 对拍。
   - 2026-11-06 复核：未接内核的写入链具体是 `formula_push.note_followup →
     note_workpaper_pull_service._apply_note_formulas → note_formula_generator.execute_note_formulas`，
     仍直接改 `DisclosureNote.table_data` + `flag_modified` / flush，无章节 advisory lock。
@@ -157,6 +182,10 @@
     C2 的统一写入内核骨架同时可服务合并附注章节级写入（见上条）。
   - 🔴 未完成：差额节点仍经 `fill_by_formula(...)`，不能把它写成不存在的 `_compute_elimination`
     “纯内存内核”；叶子来源整章批取与真实 PG 并发对拍仍需专门收口。
+  - 2026-11-16 复核：章节级写入内核的并发语义已由 `test_note_section_lock_concurrency_pg.py`
+    在真实 PG 上验证（同章节串行 / 跨章节并行 / commit+rollback 释放 / 并发不丢更新，
+    5 passed + 2 组变异 RED，详见 C2 条）。本条余项仍是**合并附注特有**的两件：
+    差额节点走 `fill_by_formula` 而非纯内存内核、叶子来源整章批取。
 - [ ] C4 Ledger 导入分阶段 profiler；COPY/staging/set-based 合并把真实大项目目标压到 5 分钟内。
   - profiler 骨架 `app/services/ledger_import/profiler.py`（`StagedProfiler` + `StageRecord`）：
     PG 下 `pg_current_wal_lsn()` + `pg_wal_lsn_diff` 自动采集每阶段 WAL 增量字节，非 PG 环境
@@ -171,6 +200,29 @@
     PG + 真实大项目数据上跑，本机无法伪造，保持阻塞。
   - 勘误（2026-11-06 整体复核）：上条「由 worker 塞进 `ImportJob.metadata`」不实——现扫 worker /
     ImportJob 均无 `profiler_report` 消费方，报告只存在于 `PipelineResult`；WAL 在 pipeline 里恒 None。
+  - **2026-11-16 补（两处缺口都已修，`[ ]` 保持——真实基线仍需专用环境）**：
+    ①**WAL 探针已接线**：`profiler.WalStageProbe`（`start()` / `stop()` 各自新开短 session 读
+    `pg_current_wal_lsn()`，`stop()` 用 `pg_wal_lsn_diff` 算增量）；`pipeline.execute_pipeline` 在
+    **写阶段自己的** session 边界内 `start()` → 写阶段 → `stop()`，结果经
+    `_build_profiler_report(..., write_stage_wal_bytes=...)` **只贴到写阶段那一条记录**。
+    🔴 为什么必须抽成类：`pipeline.py` 在行数白名单上（见下条），探针逻辑塞进去会把主文件再推高；
+    `WalStageProbe` 在伴生 `profiler.py` 里，pipeline 只 +7 行。
+    读不到（非 PG / 无权限 / replica）保持 `None` —— **读不到 ≠ 0 字节**，守卫反向钉住。
+    ②**消费方已补**：`import_job_runner` 的 `result_payload` 新增 `"profiler": result.profiler_report`
+    （随 `JobStatus.completed` 的 `result_summary` 落库，API 可直接读分阶段 rows/s 与 WAL）。
+    验证：`tests/test_ledger_import_profiler.py` 10 → **18 passed**（新增：WAL 只贴写阶段 /
+    探针不可用时保持 None / `record_wal_bytes` 已知 stage 补记与未知 stage no-op /
+    探针在非 PG 与无 session 时降级 None / pipeline 必须 start-before-stop /
+    探针自己用 session_factory 开 session / pipeline 必须传 `write_stage_wal_bytes` /
+    runner 必须落 `profiler: result.profiler_report`）。**7 组磁盘变异全 RED** 且形态正确
+    （不 start / 不 stop / 漏传参 / stop 用外部 session / WAL 贴所有阶段 / runner 不落库 /
+    读不到写 0），逐字节还原。
+    **仍未做**：真 PG + 真实大项目上的 rows/s、WAL、COPY 与 staging/index/activation 实际基线。
+  - 行数门欠账（2026-11-16 现算，如实登记）：`backend/app/services/ledger_import/pipeline.py`
+    在 HEAD 已是 **916 行**（`01394c4a7`，2026-11-15 并发会话「pipeline/runner 接 attempt 三次 CAS
+    状态流转」把 836 → 916，**当时未更新白名单** ⇒ 该提交起行数门对本文件一直红）。
+    本 spec 的 C4 只加 7 行且探针主体已抽出。白名单基线按「必须填当前真实行数、不得虚高」
+    从 804 改为 **923** 并在条目里写明上述来源与该欠账归属（拆分责任归 attempt CAS 那条 lane）。
 - [ ]* C5 知识词法/向量路径真实 EXPLAIN 与量级基准；按证据实施索引/pgvector。
   - 🔴 需真实文档量级（万级分块）+ 专用 PG 做 EXPLAIN 对比，本机无法伪造，保持阻塞。
   - V263 向量扩展 + HNSW 索引已建；tsvector/GIN 路径代码已有；量级基准与索引选择待证据。
@@ -240,6 +292,18 @@
   - 🔴 Docker PgBouncer transaction 配置和连接预算契约已在库；尚无独立容量 DB、种子数据和分布式 Locust 启动编排。
   - 分布式负载机落地时须把各 worker 的 `stage_stats.json` 按阶段 / 端点 / 桶计数相加后再判定（格式已按
     可相加设计，合并步骤未实现）；E6 六类安全计数也要在这里建外部不变量探针。
+  - **2026-11-16 补（合并步骤已实现，`[ ]` 保持——环境与编排仍缺）**：
+    `tests/load/load_stage_stats.py` 新增 `merge_stage_payloads` + `load_worker_stage_stats`：
+    逐阶段按位置**逐桶相加**（`requests` / `failures` / `histogram`），端点按 `(type, name)` 对齐
+    后累加；`user_count_min` 取各 worker **最小**、`user_count_max` 取**最大**（不是求和）；
+    `covered_seconds` 取**最小**（有 worker 中途掉线时稳态实际只覆盖到最短那份，按最长自报等于虚增）。
+    `run_final.py` 新增 `--worker-stats-dir` 并串到 `parse_csv_results`；分布式分支 fail-closed
+    （目录缺失 / 无 worker 文件 / 文件损坏 / 阶段数不一致 / 用户数不一致 / schema 不符一律
+    `stage_stats_error`，**绝不退回单 worker 口径**——那会让样本量只有 1/N 而判定看起来更好）。
+    验证：新建 `tests/load/test_stage_stats_worker_merge.py`（**18 例**，含「一个快 worker +
+    一个慢 worker 合并后 p95 必须落在慢桶」这种「只取第一份就假绿」的反向对照，以及
+    run_final 接线判据）；**8 组变异全 RED** 且逐字节还原；`tests/load` 全套 **130 passed**。
+    **仍未做**：独立容量 DB、种子数据、分布式 Locust 启动编排、E6 六类安全计数的生产者。
 - [ ]* E5 100→1000→3000→6000 VU，6000 稳态 30 分钟；提交原始 CSV/JSON/摘要。
   - 2026-11-06 工具对齐（测量与门禁纠偏批，未在容量环境实跑，不改勾选）：梯度单一来源
     `tests/load/load_contract.py`，删掉 500 VU 正式阶段，6000 VU 稳态 300→1800 秒，Locust 形状与稳态窗口共用
@@ -299,3 +363,10 @@
 - [x] F3 更新 INDEX/memory；只提交本任务 owned 文件。
   - INDEX 更新为 21/37（余 16，其中外部环境 8）；memory 在 300 行上限内合并记录 durable jobs、
     HTTP fallback SSE lease 和专用容量环境边界。
+  - 2026-11-16 复核：INDEX 行改为 **21/37 + 2 进行中（余 14，其中 `[ ]*` 8）**并写清余项构成
+    （6000 VU 实跑 / PgBouncer 灰度 / 2·4·8 worker / TB 虚拟化 / 知识检索 EXPLAIN）。
+    本轮新增的三条守卫（C1 引擎级 statement 计数、C2/C3 真实 PG 并发 barrier、E4 分布式
+    stage_stats 合并）与 C4 的两处补齐（WAL 探针 + profiler 落库）均已登记进对应任务项，
+    **不勾选它们的主项**（C2/C3 余差额节点与整章批取、C4 余真实大项目基线）。
+    **本 spec 不归档**：余 14 项中 8 项需专用环境、6 项需独立 spec 工作量
+    （D1/D3 虚拟化交互契约、E4 容量环境与编排、C2/C3/C4 的合并附注与真实基线）。

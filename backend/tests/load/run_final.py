@@ -27,7 +27,13 @@ from tests.load.load_evaluation import (
     load_safety_evidence,
 )
 from tests.load.load_report import generate_final_report
-from tests.load.load_stage_stats import STAGE_STATS_ENV, STAGE_STATS_FILE_NAME, load_stage_stats
+from tests.load.load_stage_stats import (
+    STAGE_STATS_ENV,
+    STAGE_STATS_FILE_NAME,
+    WORKER_STATS_GLOB,
+    load_stage_stats,
+    load_worker_stage_stats,
+)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 LOCUSTFILE = SCRIPT_DIR / "locustfile.py"
@@ -50,11 +56,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--baseline", default=None, help="上一轮 run_final summary.json")
     parser.add_argument("--safety-evidence", default=None, help="E6 六类零值证据 JSON")
     parser.add_argument("--evidence-dir", default=None, help="CSV/JSON/资源样本目录")
+    parser.add_argument(
+        "--worker-stats-dir",
+        default=None,
+        help="分布式运行：master 侧汇总目录，内含各 worker 的 stage_stats_worker*.json（E4）",
+    )
     parser.add_argument("--resource-sample-interval", type=float, default=15.0)
     return parser.parse_args()
 
-def run_locust_full_shape(host: str, evidence_dir: Path, *, sample_interval: float = 15.0) -> dict[str, Any]:
-    """运行单个 Locust 进程并周期采集资源；E4 会把它换成 master/worker 编排。"""
+def run_locust_full_shape(
+    host: str,
+    evidence_dir: Path,
+    *,
+    sample_interval: float = 15.0,
+    worker_stats_dir: Path | None = None,
+) -> dict[str, Any]:
+    """运行单个 Locust 进程并周期采集资源。
+
+    分布式（master/worker 编排）时由外部把各 worker 的 ``stage_stats_worker*.json``
+    收进 ``worker_stats_dir``；本函数只按该目录做逐桶相加，不再自己起 worker。
+    """
     evidence_dir.mkdir(parents=True, exist_ok=True)
     csv_prefix = evidence_dir / "locust"
     resource_path = evidence_dir / "resource_samples.json"
@@ -102,7 +123,7 @@ def run_locust_full_shape(host: str, evidence_dir: Path, *, sample_interval: flo
     finally:
         sampler.stop()
 
-    stats = parse_csv_results(csv_prefix, stage_stats_path)
+    stats = parse_csv_results(csv_prefix, stage_stats_path, worker_stats_dir=worker_stats_dir)
     stats.update({
         "evidence_dir": str(evidence_dir),
         "resource_samples_file": resource_path.name,
@@ -137,11 +158,21 @@ def _parse_stats_row(row: dict[str, str]) -> dict[str, Any]:
     }
 
 
-def parse_csv_results(csv_prefix: Path, stage_stats_path: Path | None = None) -> dict[str, Any]:
+def parse_csv_results(
+    csv_prefix: Path,
+    stage_stats_path: Path | None = None,
+    *,
+    worker_stats_dir: Path | None = None,
+) -> dict[str, Any]:
     """全程聚合与端点取 ``_stats.csv``；阶段只取 recorder 的稳态窗口直方图。
 
     ``_stats_history.csv`` 只作原始曲线归档：其分位列是 10 秒滚动窗口、计数列是全程累计，
     任何一行都代表不了某个阶段的稳态分布，故不参与判定。
+
+    ``worker_stats_dir``：分布式运行时传 master 侧汇总目录，里面每个 Locust worker
+    各写一份 ``stage_stats_worker*.json``。此时阶段统计取**全部 worker 逐桶相加**后
+    的结果；缺失或损坏一律记进 ``stage_stats_error``（fail-closed，绝不退回单 worker
+    口径 —— 那会让样本量只有 1/N 而判定看起来更好）。
     """
     results: dict[str, Any] = {
         "total": {}, "endpoints": [], "stages": [],
@@ -156,6 +187,18 @@ def parse_csv_results(csv_prefix: Path, stage_stats_path: Path | None = None) ->
                     results["total"] = item
                 else:
                     results["endpoints"].append(item)
+
+    if worker_stats_dir is not None:
+        try:
+            stages, worker_files = load_worker_stage_stats(Path(worker_stats_dir))
+            results["stages"] = stages
+            results["stage_stats_file"] = WORKER_STATS_GLOB
+            results["worker_stats_files"] = worker_files
+            results["worker_count"] = len(worker_files)
+        except ValueError as exc:
+            results["stage_stats_error"] = str(exc)
+        return results
+
     stage_path = stage_stats_path or csv_prefix.parent / STAGE_STATS_FILE_NAME
     try:
         results["stages"] = load_stage_stats(stage_path)
@@ -247,6 +290,7 @@ def main() -> int:
         args.host,
         evidence_dir,
         sample_interval=args.resource_sample_interval,
+        worker_stats_dir=Path(args.worker_stats_dir) if args.worker_stats_dir else None,
     )
     stats["safety"] = safety
     comparison = compare_to_baseline(stats, baseline)

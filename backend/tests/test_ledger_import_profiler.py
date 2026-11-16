@@ -165,3 +165,232 @@ def test_build_profiler_report_empty_perf_returns_none():
     from app.services.ledger_import.profiler_report import _build_profiler_report
 
     assert _build_profiler_report({}, 123.0) is None
+
+
+# ---------------------------------------------------------------------------
+# C4：WAL 探针接线（pipeline 在写阶段自己的 session 边界内读 LSN）
+# ---------------------------------------------------------------------------
+
+
+def test_build_profiler_report_attaches_write_stage_wal_bytes_only():
+    """WAL 增量只贴到写阶段那一条；其他阶段保持 None（没有各自探针）。"""
+    from app.services.ledger_import.profiler_report import _build_profiler_report
+
+    perf = {
+        "start": 100.0,
+        "create_staged_done": 101.0,
+        "parse_write_streaming_done": 103.5,
+        "rebuild_aux_summary_done": 104.4,
+    }
+    report = _build_profiler_report(
+        perf, 100.0, staging_rows=1_000, rebuild_rows=10,
+        write_stage_wal_bytes=8_388_608,
+    )
+    assert report is not None
+    stages = report["stages"]
+    assert stages["parse_write_streaming_done"]["wal_bytes"] == 8_388_608
+    for phase in ("start", "create_staged_done", "rebuild_aux_summary_done"):
+        assert stages[phase]["wal_bytes"] is None, (
+            f"{phase} 没有自己的 session 探针，wal_bytes 必须是 None 而不是 0"
+        )
+
+
+def test_build_profiler_report_keeps_none_when_wal_probe_unavailable():
+    """探针读不到（非 PG / 无权限）时必须保持 None —— 读不到 ≠ 0 字节。"""
+    from app.services.ledger_import.profiler_report import _build_profiler_report
+
+    perf = {"start": 100.0, "parse_write_streaming_done": 102.0}
+    report = _build_profiler_report(
+        perf, 100.0, staging_rows=500, write_stage_wal_bytes=None,
+    )
+    assert report is not None
+    assert report["stages"]["parse_write_streaming_done"]["wal_bytes"] is None
+
+
+def test_record_wal_bytes_updates_existing_stage_and_ignores_unknown():
+    """record_wal_bytes：已知 stage 补记，未知 stage 是 no-op（不凭空建记录）。"""
+    from app.services.ledger_import.profiler import StagedProfiler
+
+    profiler = StagedProfiler()
+    profiler.record_stage_manual("write", duration_s=1.0, rows=100)
+    assert profiler.stages["write"].wal_bytes is None
+
+    profiler.record_wal_bytes("write", 4_096)
+    assert profiler.stages["write"].wal_bytes == 4_096
+    # 其余字段不被破坏
+    assert profiler.stages["write"].rows == 100
+    assert profiler.stages["write"].rows_per_sec == pytest.approx(100.0)
+
+    profiler.record_wal_bytes("absent_stage", 99)
+    assert "absent_stage" not in profiler.stages
+
+
+@pytest.mark.asyncio
+async def test_read_wal_lsn_and_diff_degrade_to_none_without_pg():
+    """公开探针在非 PG / 无 session 时返回 None，不抛异常、不写 0。"""
+    from app.services.ledger_import.profiler import read_wal_lsn, wal_bytes_between
+
+    assert await read_wal_lsn(None) is None
+    assert await wal_bytes_between(None, "0/1", "0/2") is None
+    # 缺任一端同样 None
+    assert await wal_bytes_between(None, None, "0/2") is None
+
+
+def test_pipeline_source_reads_lsn_inside_write_stage_session_boundary():
+    """接线判据：pipeline 必须在写阶段前后各取一次 LSN，且探针自己管 session 边界。
+
+    这条用源码文本断言而不是跑真 pipeline —— 真 pipeline 需要完整项目数据与
+    真实 PG；而「探针是否接在正确位置」正是过去漏掉的形态（骨架写好了但零调用）。
+
+    实现形态：探针细节抽到 `profiler.WalStageProbe`（pipeline 在行数白名单上，
+    不能塞逻辑），pipeline 只负责 `start()` / `stop()` 与传参。因此判据改为：
+    ① import 了 WalStageProbe ② start/stop 都真的调用 ③ 值传进报告。
+    """
+    import ast
+    from pathlib import Path
+
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "app" / "services" / "ledger_import" / "pipeline.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    # 1. 必须 import 探针
+    imported = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and (node.module or "").endswith("profiler")
+        for alias in node.names
+    }
+    assert "WalStageProbe" in imported, (
+        f"pipeline 没有 import WalStageProbe（实际 import: {imported}）"
+    )
+
+    # 2. start 与 stop 都必须真的调用
+    def _attr_calls(root: ast.AST, attr: str) -> list[int]:
+        return [
+            node.lineno
+            for node in ast.walk(root)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == attr
+        ]
+
+    starts = _attr_calls(tree, "start")
+    stops = _attr_calls(tree, "stop")
+    assert starts, "pipeline 没有调用探针 start()"
+    assert stops, "pipeline 没有调用探针 stop()"
+
+    # 3. start 必须在 stop 之前（顺序反了等于没测）
+    assert min(starts) < min(stops), (
+        f"探针 stop 在 start 之前（start@{starts} / stop@{stops}）"
+    )
+
+
+def test_wal_stage_probe_owns_session_boundary():
+    """探针自己开 session 读 LSN —— 这是「阶段内读」的唯一实现方式。
+
+    若把 LSN 读取挪到 pipeline 末尾（事务已提交），读到的位置与本次写入无关；
+    这条钉住「探针内部用 session_factory 新开 session」。
+    """
+    import ast
+    from pathlib import Path
+
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "app" / "services" / "ledger_import" / "profiler.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    probe = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef) and node.name == "WalStageProbe"
+    )
+    methods = {node.name: node for node in probe.body if isinstance(node, ast.AsyncFunctionDef)}
+    assert "start" in methods and "stop" in methods, "探针缺 start/stop"
+
+    for name in ("start", "stop"):
+        body = ast.dump(methods[name])
+        assert "_session_factory" in body, (
+            f"WalStageProbe.{name} 没有用 session_factory 开新 session ⇒ "
+            "LSN 会读在错误的连接上"
+        )
+        assert "_get_wal_lsn" in body or "_wal_diff" in body, (
+            f"WalStageProbe.{name} 没有真正读 LSN"
+        )
+
+    # wal_bytes 必须在未 stop 时返回 None（不能把「还没测」写成 0）
+    prop = next(
+        node for node in probe.body
+        if isinstance(node, ast.FunctionDef) and node.name == "wal_bytes"
+    )
+    assert "None" in ast.dump(prop), "wal_bytes 未 stop 时没有返回 None 的分支"
+
+
+def test_pipeline_passes_wal_into_profiler_report_call():
+    """接线判据：pipeline 调 _build_profiler_report 时必须传 write_stage_wal_bytes。
+
+    漏传会让 profiler_report 里 WAL 恒 None（静默退化成「探针没接」）。
+    """
+    import ast
+    from pathlib import Path
+
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "app" / "services" / "ledger_import" / "pipeline.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    report_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_build_profiler_report"
+    ]
+    assert report_calls, "pipeline 没有调用 _build_profiler_report"
+    keywords = {kw.arg for kw in report_calls[0].keywords}
+    assert "write_stage_wal_bytes" in keywords, (
+        "_build_profiler_report 调用漏了 write_stage_wal_bytes ⇒ WAL 恒 None"
+    )
+
+
+def test_import_job_runner_persists_profiler_report():
+    """消费方判据：runner 必须把 profiler_report 落进 result_summary。
+
+    历史上「骨架写好了但零消费方」正是 C4 的登记勘误；这条钉住落库点。
+    """
+    import ast
+    from pathlib import Path
+
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "app" / "services" / "import_job_runner.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    # 找 result_payload = {...} 字典字面量，断言有 "profiler" 键且取值来自
+    # result.profiler_report
+    found = False
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(t, ast.Name) and t.id == "result_payload" for t in node.targets):
+            continue
+        if not isinstance(node.value, ast.Dict):
+            continue
+        keys = [
+            k.value for k in node.value.keys
+            if isinstance(k, ast.Constant) and isinstance(k.value, str)
+        ]
+        if "profiler" not in keys:
+            continue
+        index = keys.index("profiler")
+        value = node.value.values[index]
+        found = (
+            isinstance(value, ast.Attribute)
+            and value.attr == "profiler_report"
+        )
+    assert found, (
+        "result_payload 里没有 profiler: result.profiler_report ⇒ 报告从未落库"
+    )

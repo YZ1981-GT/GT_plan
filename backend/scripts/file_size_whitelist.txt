@@ -1393,7 +1393,14 @@ backend/tests/test_formula_push_engine.py 934
 #     `_mark` / observe_phase_duration 链路），PipelineResult 增 profiler_report 字段，HEAD
 #     800 → 804。拆分方向：parse_write_streaming 的内部循环（~250 行）抽到
 #     `pipeline_streaming.py`，pipeline.py 只保留 execute_pipeline 编排骨架。
-backend/app/services/ledger_import/pipeline.py 804
+#     2026-11-16 基线上调 804 → 923（**不是本 spec 的增量**）：
+#       ① `01394c4a7`（2026-11-15，并发会话「pipeline/runner 接 attempt 三次 CAS 状态流转」）
+#          把 836 → 916（+80），当时未更新本表 ⇒ 该提交起行数门对本文件一直是红的；
+#       ② 本 spec 的 C4 WAL 探针**只加 7 行**（起点 4 / 终点 2 / 传参 1），且探针主体
+#          `WalStageProbe` 已抽到伴生 `profiler.py`，没有塞进本文件。
+#       ⇒ 按「baseline 必须填当前真实行数、不得虚高」把基线改为 923，并把 ① 的欠账如实登记
+#       在这里（拆分责任归 attempt CAS 那条 lane）。本 spec 交付后本文件不得再涨。
+backend/app/services/ledger_import/pipeline.py 923
 #   ConsolidationIndex.vue —— 2026-10-23 汇总提交（用户要求推送并发会话的在制改动）：合并首页左侧常驻企业树面板
 #     （U-1：搜索 / 收起 / 点击复用原节点逻辑）+ 样式，HEAD 2206 → 2368。2026-11-05 `platform-heavy-jobs-and-capacity-closure` B4/B5
 #     把合并附注重新汇总改走 durable job：新增 PlatformJobProgress 嵌入、`reaggregateJobId`、`onReaggregateCompleted`/`onReaggregateFailed`
@@ -1822,7 +1829,16 @@ backend/tests/workpaper_sync/test_n_cycle_foundation_canary.py  1065
 # 本轮只加 options 透传 / active 科目版本过滤 / staged 合并接线，并把主要逻辑放新模块；
 # 拆分方向：mapping_service 按建议/确认拆，runner 按 legacy/v2 拆，smart engine 按解析/写入拆，v2 router 按 detect/submit/jobs 拆。
 backend/app/services/mapping_service.py  1013
-backend/app/services/import_job_runner.py  1054
+#   2026-11-16 基线上调 1054 → 1136（**不是本 spec 的增量**）：
+#     ① `372750954`（2026-10-29，真增量合并）把 1055 → 1097；
+#     ② `01394c4a7` / `10c2bbc69`（2026-11-15，并发会话 attempt CAS 与 activation-only 恢复判定）
+#        把 1097 → 1110 → 1134；
+#     以上三次都**未更新本表** ⇒ 自 `372750954` 起行数门对本文件一直是红的。
+#     ③ 本 spec 的 C4 只加 **2 行**（`result_payload` 里 `"profiler": result.profiler_report`）。
+#   ⇒ 按「baseline 必须填当前真实行数、不得虚高」改为 1136，并把 ①② 的欠账如实登记
+#     （拆分责任归 ledger 增量合并 / attempt CAS 那两条 lane）。
+#     拆分方向（原）：runner 按 legacy / v2 拆。
+backend/app/services/import_job_runner.py  1136
 backend/app/services/smart_import_engine.py  3154
 backend/app/routers/ledger_import_v2.py  817
 # import_queue_service.py —— HEAD 已有 932 行。本轮仅把完整导入的 Redis 分布式锁和 active_set

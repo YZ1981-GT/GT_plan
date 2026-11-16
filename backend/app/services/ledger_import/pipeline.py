@@ -437,6 +437,11 @@ async def execute_pipeline(
     logger.info("Pipeline %s created staged dataset %s", job_id, staging_dataset_id)
     _mark("create_staged_done")
 
+    # C4 WAL 探针起点（见 profiler.WalStageProbe）
+    from .profiler import WalStageProbe as _WalStageProbe
+    _wal = _WalStageProbe(async_session)
+    await _wal.start()
+
     # S7-2 + B2: bulk_write_staged 智能派发（小批 INSERT / 大批 COPY，COPY 失败自动降级）
     async def _insert(table_model, rows: list[dict]) -> None:
         await bulk_write_staged(
@@ -693,6 +698,8 @@ async def execute_pipeline(
 
     # B3 诊断：parse_write_streaming 内部各步累计耗时
     _mark("parse_write_streaming_done")
+    await _wal.stop()
+    _write_stage_wal = _wal.wal_bytes
     logger.info(
         "[perf] %s parse_write_streaming breakdown: parse=%.1fs dict=%.1fs prepare=%.1fs "
         "validate=%.1fs convert=%.1fs insert=%.1fs progress=%.1fs (%d calls) "
@@ -896,6 +903,7 @@ async def execute_pipeline(
     profiler = _build_profiler_report(
         _perf, _perf_t0, staging_rows=total_rows_parsed,
         rebuild_rows=total_balance_written + total_aux_balance_written,
+        write_stage_wal_bytes=_write_stage_wal,
     )
 
     return PipelineResult(

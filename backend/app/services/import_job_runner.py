@@ -824,6 +824,8 @@ class ImportJobRunner:
                 "year": result.year,
                 "append": result.append_report,
                 "voucher_diff": result.voucher_diff_report,
+                # C4：分阶段 rows/s + WAL 增量（None = 探针读不到，不写 0）
+                "profiler": result.profiler_report,
             }
             async with async_session() as db:
                 await ImportJobService.transition(

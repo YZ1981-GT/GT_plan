@@ -545,7 +545,7 @@
 | spec | 进度 | 一句话 |
 |------|------|--------|
 | [`platform-global-display-settings-closure`](platform-global-display-settings-closure/tasks.md) | **19/29**（余 10） | **平台全局显示设置收口**：账号显示偏好、项目单位、度量合同、账套导入与正式导出边界。 |
-| [`platform-heavy-jobs-and-capacity-closure`](platform-heavy-jobs-and-capacity-closure/tasks.md) | **21/37 + 1 进行中**（余 15，其中 `[ ]*` 8） | **平台重任务与容量闭环**：durable jobs、容量、SSE、公式推送和大任务恢复。 |
+| [`platform-heavy-jobs-and-capacity-closure`](platform-heavy-jobs-and-capacity-closure/tasks.md) | **21/37 + 2 进行中**（余 14，其中 `[ ]*` 8；余项全部需专用环境或独立 spec 工作量） | **平台重任务与容量闭环**：durable jobs（V243/R243）、容量指标与压测硬闸门、SSE 选主与配额、公式推送引擎级常数 SQL 守卫、附注章节锁真实 PG 并发 barrier、Ledger 分阶段 profiler（含 WAL 探针）、分布式 stage_stats 逐桶合并。余项：6000 VU 实跑 / PgBouncer 灰度 / 2·4·8 worker / TB 虚拟化 / 知识检索 EXPLAIN。 |
 | [`onlyoffice-sheet-open-via-published-artifact`](onlyoffice-sheet-open-via-published-artifact/tasks.md) | **22/34**（余 12 项全部依赖治理前置/人的裁决/真环境） | **Sheet 级 OnlyOffice 改走 Published Representation**：建立显式 sheet→entry 映射，让单 sheet / 整册入口打开同一条 published artifact；目标 sheet 用 descriptor/actionLink 表达，不再复制模板、隐藏 sheet 或按 sheet 名猜父级；按 binding 状态逐入口 drain 旧 config/WOPI/callback。 |
 
 ### 一.1 已完成 / 已归档的历史行（append-only，不回填改写）

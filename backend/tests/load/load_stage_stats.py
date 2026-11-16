@@ -267,3 +267,142 @@ def load_stage_stats(path: Path) -> list[dict[str, Any]]:
         return summarize_stage_payload(payload)
     except (KeyError, TypeError) as exc:
         raise ValueError(f"{path.name} 结构不完整：{exc!r}") from exc
+
+
+# ---------------------------------------------------------------------------
+# E4：分布式负载机（master + N worker）的 stage_stats 合并
+# ---------------------------------------------------------------------------
+#
+# 每个 Locust worker 进程各写自己的 ``stage_stats.json``（``StageRecorder`` 是进程内
+# 累计，不共享内存）。分布式跑时判定必须基于**全部 worker 相加后**的桶计数，否则：
+#   - 只读 master 那份 ⇒ 样本量只有 1/N、p95/p99 无意义；
+#   - 拿某一份当代表 ⇒ 更糟，等于伪造统计。
+#
+# 可相加的前提（本模块保证）：桶键是整数毫秒、计数是纯累加、阶段时间线来自同一份
+# ``load_contract``（同一份阶段定义 ⇒ 同序同字段）。合并只做三件事：
+#   1. 逐阶段（按位置）累加 ``aggregate`` 与同名同类型端点的桶；
+#   2. ``user_count_min`` 取各 worker 最小、``user_count_max`` 取各 worker 最大；
+#   3. ``covered_seconds`` 取各 worker 最小值（覆盖时长不能被「跑得久的那个」撑满：
+#      有 worker 中途掉线时，稳态窗口实际只覆盖到最短的那份）。
+#
+# 不合并的字段：``run_seconds``（各 worker 各自的运行时长，合并后无意义）、
+# ``source``（保留为合并说明）。
+
+
+WORKER_STATS_GLOB = "stage_stats_worker*.json"
+
+
+def _merge_counter_into(target: dict[str, Any], source: Mapping[str, Any]) -> None:
+    """把 source 的 requests/failures/histogram 累加进 target。"""
+    target["requests"] = int(target.get("requests", 0)) + int(source.get("requests", 0))
+    target["failures"] = int(target.get("failures", 0)) + int(source.get("failures", 0))
+    histogram = target.setdefault("histogram", {})
+    for key, count in (source.get("histogram") or {}).items():
+        histogram[str(key)] = int(histogram.get(str(key), 0)) + int(count)
+
+
+def merge_stage_payloads(payloads: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    """把多个 worker 的 stage_stats payload 相加成一份。
+
+    空输入抛 ``ValueError``（没有 worker 数据时绝不返回「全 0 的合法 payload」——
+    那会被下游当成「跑了但零样本」而不是「没有数据」）。
+    """
+    items = [item for item in payloads]
+    if not items:
+        raise ValueError("没有可合并的 stage_stats payload（分布式合并至少要一份）")
+
+    base: dict[str, Any] | None = None
+    merged_stages: list[dict[str, Any]] = []
+    for payload in items:
+        if not isinstance(payload, Mapping):
+            raise ValueError("stage_stats payload 必须是 JSON object")
+        if payload.get("schema_version") != SCHEMA_VERSION:
+            raise ValueError(
+                f"stage_stats schema_version 必须是 {SCHEMA_VERSION}，"
+                f"实际 {payload.get('schema_version')!r}"
+            )
+        stages = payload.get("stages")
+        if not isinstance(stages, list):
+            raise ValueError("stage_stats payload 缺 stages 列表")
+        if base is None:
+            base = payload
+            for stage in stages:
+                merged_stages.append({
+                    **{key: stage[key] for key in stage if key not in ("aggregate", "endpoints")},
+                    "aggregate": _empty_counter(),
+                    "endpoints": {},
+                })
+            continue
+        if len(stages) != len(merged_stages):
+            raise ValueError(
+                f"worker 阶段数不一致（{len(stages)} vs {len(merged_stages)}）——"
+                "各 worker 必须用同一份 load_contract 阶段定义"
+            )
+        for index, stage in enumerate(stages):
+            target = merged_stages[index]
+            if int(stage.get("users", -1)) != int(target.get("users", -2)):
+                raise ValueError(
+                    f"第 {index} 阶段用户数不一致（{stage.get('users')} vs {target.get('users')}）"
+                )
+
+    # 第二轮：真正累加（base 已建好骨架，避免重复初始化）
+    for payload in items:
+        for index, stage in enumerate(payload["stages"]):
+            target = merged_stages[index]
+            _merge_counter_into(target["aggregate"], stage.get("aggregate") or {})
+            for endpoint in stage.get("endpoints") or []:
+                key = f"{endpoint.get('type', '')} {endpoint.get('name', '')}"
+                slot = target["endpoints"].get(key)
+                if slot is None:
+                    slot = {
+                        "name": endpoint.get("name", ""),
+                        "type": endpoint.get("type", ""),
+                        **_empty_counter(),
+                    }
+                    target["endpoints"][key] = slot
+                _merge_counter_into(slot, endpoint)
+
+    # 第三轮：min/max/covered 的聚合语义与计数不同，单独算
+    for index, target in enumerate(merged_stages):
+        stage_values = [payload["stages"][index] for payload in items]
+        mins = [int(v["user_count_min"]) for v in stage_values if v.get("user_count_min") is not None]
+        maxs = [int(v["user_count_max"]) for v in stage_values if v.get("user_count_max") is not None]
+        target["user_count_min"] = min(mins) if mins else None
+        target["user_count_max"] = max(maxs) if maxs else None
+        covereds = [float(v.get("covered_seconds") or 0.0) for v in stage_values]
+        target["covered_seconds"] = round(min(covereds), 3)
+        target["endpoints"] = [
+            value for _, value in sorted(target["endpoints"].items())
+        ]
+
+    assert base is not None
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "source": f"分布式合并：{len(items)} 个 worker 的稳态窗口直方图逐桶相加",
+        "worker_count": len(items),
+        "run_seconds": round(max(float(item.get("run_seconds") or 0.0) for item in items), 3),
+        "stages": merged_stages,
+    }
+
+
+def load_worker_stage_stats(directory: Path) -> tuple[list[dict[str, Any]], list[str]]:
+    """读取目录下全部 worker 的 stage_stats，合并成阶段摘要。
+
+    返回 ``(stages, worker_files)``。任一 worker 文件损坏即抛 ``ValueError``
+    （不能跳过坏文件——跳过等于少算样本，且会让判定看起来更好）。
+    """
+    if not directory.is_dir():
+        raise ValueError(f"未找到 worker 统计目录：{directory}")
+    files = sorted(directory.glob(WORKER_STATS_GLOB))
+    if not files:
+        raise ValueError(
+            f"{directory} 下没有 {WORKER_STATS_GLOB}（分布式运行须每个 worker 各写一份）"
+        )
+    payloads: list[dict[str, Any]] = []
+    for path in files:
+        try:
+            payloads.append(json.loads(path.read_text(encoding="utf-8")))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{path.name} 不是合法 JSON：{exc}") from exc
+    merged = merge_stage_payloads(payloads)
+    return summarize_stage_payload(merged), [path.name for path in files]
