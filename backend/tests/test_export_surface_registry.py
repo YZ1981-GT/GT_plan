@@ -341,6 +341,7 @@ class TestRegistryClosureRatchet:
             if classify_conformance(route, entry.classification) not in (
                 "ok",
                 "unverifiable",
+                "retrieval_ok",
             ):
                 actual_gap_count += 1
 
@@ -420,6 +421,96 @@ class TestRegistryClosureRatchet:
             actual[d["gap"]] = actual.get(d["gap"], 0) + 1
         assert raw["_counts"] == actual, (
             f"_counts 与实际分布不符: 文件 {raw['_counts']} vs 实际 {actual}"
+        )
+
+    def test_file_retrieval_detection(self) -> None:
+        """取回类识别：`FileResponse` 直返且不在请求内新建文件才算。
+
+        🔴 反向自检：这条判据修掉了首版 17 条误报。三个必须区分的形态：
+
+        1. **取回类**（不算缺口）：`/api/exports/{id}/download` —— 只有
+           `FileResponse` 与校验，文件由上游生成，折算在 `/api/export/create`。
+        2. **请求内生成**（仍算缺口）：`excel-html/module/{module}/export-word`
+           —— 也用 `FileResponse`，但 `output_path = ...` + `to_word(...)` 自己
+           写盘，它自己就该负责折算。
+        3. **自己渲染**（仍算缺口）：`reports/.../export-excel` —— 用
+           `Workbook(` + `.save(`，本该有 `ExportUnitPolicy` 但实测没有。
+
+        若判据退化成「有 FileResponse 就算取回」（丢掉条件③），
+        形态 2 会被误豁免 —— 那正是首版误报的来源。
+        """
+        from app.services.export_surface_registry import is_file_retrieval
+
+        # 形态 1：纯取回（三个条件全不违反）
+        assert is_file_retrieval(
+            "file_path = _GLOBAL_ROOT / category / filename\n"
+            "return FileResponse(str(file_path), filename=filename)"
+        ), "纯 FileResponse 直返应判取回类"
+
+        # 形态 2：请求内新建文件 ⇒ 不是取回类（条件③ 起作用）
+        assert not is_file_retrieval(
+            "output_path = str(output_dir / filename)\n"
+            "await module_to_word(db, project_id, year, module, output_path)\n"
+            "return FileResponse(path=output_path, filename=filename)"
+        ), "请求内 output_path + to_word 写盘 ⇒ 生成类，不得豁免"
+
+        # 形态 3：自己渲染 + 也用 FileResponse ⇒ 不是取回类（条件② 起作用）
+        # 🔴 必须带 FileResponse，否则第一个条件就短路，条件② 永远测不到。
+        assert not is_file_retrieval(
+            "wb = Workbook()\nws = wb.active\nws['A1'] = 1\nwb.save(output_path)\n"
+            "return FileResponse(path=output_path, filename='x.xlsx')"
+        ), "自己构造 Workbook 并 save 后再 FileResponse ⇒ 生成类（条件②）"
+
+        # 无 FileResponse ⇒ 当然不是取回类
+        assert not is_file_retrieval("return JSONResponse({'ok': True})")
+
+    def test_registry_auto_surfaces_loaded_from_json(self) -> None:
+        """自动段必须从数据文件加载，且条数与分类分布正确。
+
+        🔴 2026-11-16：295 条三元组从模块内元组移到
+        `backend/data/export_surface_auto_surfaces.json`（300 行纯数据让
+        模块越过 800 行门限）。本判据钉住「迁移后语义等价」：
+        条数、分类分布、以及 `_AUTO_SURFACES` 仍可作为模块级名字访问。
+        """
+        import json
+        from pathlib import Path
+
+        from app.services.export_surface_registry import (
+            AUTO_SURFACE_FILE,
+            _AUTO_SURFACES,
+        )
+
+        path = Path(__file__).resolve().parents[1] / AUTO_SURFACE_FILE
+        assert path.is_file(), f"自动段数据文件不存在: {path}"
+
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        surfaces = raw["surfaces"]
+        assert len(surfaces) == 295, f"数据文件应有 295 条，实得 {len(surfaces)}"
+        assert len(_AUTO_SURFACES) == 295, (
+            f"加载后应有 295 条，实得 {len(_AUTO_SURFACES)}"
+        )
+
+        # 三者逐条对拍（防加载逻辑漏字段）
+        from_json = {(s["path"], s["method"], s["classification"]) for s in surfaces}
+        from_mod = set(_AUTO_SURFACES)
+        assert from_json == from_mod, (
+            f"加载结果与文件不一致：文件独有 {list(from_json - from_mod)[:3]}，"
+            f"模块独有 {list(from_mod - from_json)[:3]}"
+        )
+
+        # 分类分布
+        import collections
+
+        counts = collections.Counter(c for _p, _m, c in _AUTO_SURFACES)
+        assert dict(counts) == {
+            "formal": 43,
+            "data_exchange": 128,
+            "template": 124,
+        }, f"分类分布变了: {dict(counts)}"
+
+        # _counts 必须与实际一致（防手改 counts 掩盖漂移）
+        assert raw["_counts"] == dict(counts), (
+            f"_counts 与实际不符: 文件 {raw['_counts']} vs 实际 {dict(counts)}"
         )
 
     def test_retired_entries_really_have_no_route(self) -> None:

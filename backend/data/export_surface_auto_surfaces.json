@@ -1,0 +1,1485 @@
+{
+ "_doc": "自动补登记的导出出口（path, method, classification）。2026-11-16 从 export_surface_registry.py 移出：300 行纯数据让模块越过 800 行门限，故与本仓库既有做法（wp_code_overrides.json 等）一致改放数据文件。运行时由 export_surface_registry 读取展开成正式注册表，语义完全等价。新增导出出口时在此追加一行（或用登记脚本），并跑 backend/tests/test_export_surface_registry.py（未登记会打红）。",
+ "_counts": {
+  "formal": 43,
+  "data_exchange": 128,
+  "template": 124
+ },
+ "surfaces": [
+  {
+   "path": "/api/a17/export-word",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/audit-logs/export",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/consolidation/reports/{project_id}/{year}/artifacts/{artifact_id}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/consolidation/reports/{project_id}/{year}/workpaper/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/consolidation/{project_id}/snapshots/{snapshot_id}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/custom-query/artifacts/{artifact_id}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/eqcr/projects/{project_id}/memo/export",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/export/create",
+   "method": "POST",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/export/{task_id}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/exports/{export_id}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/knowledge/{category}/documents/{filename}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/audit-checks/export",
+   "method": "POST",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/bulk-tab/export-templates/async",
+   "method": "POST",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/bulk-tab/export/{task_id}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/cf-verification/{year}/export",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/data-validation/export",
+   "method": "POST",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/deliverables/package/{job_id}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/deliverables/trio/items/{item_id}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/deliverables/{task_id}/versions/{version_no}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/excel-html/download/{file_stem}",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/excel-html/module/{module}/export-word",
+   "method": "POST",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/knowledge/documents/{filename}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/notes/export-word",
+   "method": "POST",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/qc-report/export",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/word-exports/{task_id}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/workflow/export-package",
+   "method": "POST",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/working-papers/download-pack",
+   "method": "POST",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/working-papers/{wp_id}/b2-12/export-docx",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/working-papers/{wp_id}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/working-papers/{wp_id}/export-word",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/working-papers/{wp_id}/export-word/check-incomplete",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/workpaper-summary/export",
+   "method": "POST",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/workpapers/download-pack",
+   "method": "POST",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/workpapers/{wp_id}/download-file",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/workpapers/{wp_id}/export-with-metadata",
+   "method": "POST",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/recovery-cases/{case_id}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/recovery-cases/{case_id}/download-only",
+   "method": "POST",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/wp-templates/download-all",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/projects/{project_id}/wp-templates/{wp_code}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/qc/annual-reports/{report_id}/download",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/review-conversations/{conversation_id}/export",
+   "method": "POST",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/workhours/stats/export",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/import-export/export",
+   "method": "GET",
+   "classification": "formal"
+  },
+  {
+   "path": "/api/consolidation/worksheet/pivot/export",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/custom-query/export",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/formula-management/import-export/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/h5/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/h9-lease-liabilities/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/l2-interest-payable/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/l6-special-payables/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/l7-other-noncurrent-liabilities/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/l8-financial-expenses/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/m1-dividends-payable/{wp_id}/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/m10-other-equity-instruments/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/m2-paid-in-capital/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/m3-treasury-stock/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/m4-capital-reserve/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/m5-surplus-reserve/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/m6-retained-earnings/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/m7-special-reserve/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/m8-general-risk-reserve/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/m9-other-comprehensive-income/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/n1-deferred-tax-assets/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/n2-taxes-payable/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/n3-deferred-tax-liabilities/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/n4/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/n5-income-tax-expense/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/projects/{project_id}/adjustments/export-summary",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/projects/{project_id}/bulk-tab/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/projects/{project_id}/bulk-tab/export-data/async",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/projects/{project_id}/excel-html/module/{module}/export-excel",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/projects/{project_id}/ledger/export-aux-balance",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/projects/{project_id}/ledger/export-balance",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/projects/{project_id}/ledger/export-ledger/{account_code}",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/query/export-excel",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/s-estimate/{wp_id}/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/bad-debt-rows/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/c24-journal/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d1-ecl/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d1/disclosure/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d1/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d2/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d3/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d4/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d5/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d6/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d7/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/e1/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/export-review-xlsx",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f0/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f1/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f2-spe/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f2-st/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f2-val/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f2/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f3/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f4/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f5/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g0/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g1/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g10/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g11/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g12/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g13/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g14/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g2/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g3/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g4-ecl/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g4-main/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g4-sppi/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g5/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g6-ecl/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g6-main/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g6-sppi/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g7-equity-method/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g7-main/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g7-sub/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g8/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g9/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h0/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h1/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h10/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h2/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h3/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h4/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h6/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h7/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h8/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/i1/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/i2/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/i3/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/i4/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/i5/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/i6/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/j1/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/j2/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k0/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k1/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k10/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k11/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k12/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k13/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k2/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k3/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k4/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k5/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k6/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k7/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k8/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k9/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/l0/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/l1/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/l2/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/l3/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/l4/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/l5/export-data",
+   "method": "GET",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/l6/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m1/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m10/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m2/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m3/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m4/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m5/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m6/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m7/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m8/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m9/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/n1/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/n2/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/n3/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/n5/export-data",
+   "method": "POST",
+   "classification": "data_exchange"
+  },
+  {
+   "path": "/api/formula-management/import-export/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/h5/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/h9-lease-liabilities/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/l2-interest-payable/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/l6-special-payables/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/l7-other-noncurrent-liabilities/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/l8-financial-expenses/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/m1-dividends-payable/{wp_id}/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/m10-other-equity-instruments/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/m2-paid-in-capital/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/m3-treasury-stock/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/m4-capital-reserve/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/m5-surplus-reserve/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/m6-retained-earnings/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/m7-special-reserve/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/m8-general-risk-reserve/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/m9-other-comprehensive-income/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/n1-deferred-tax-assets/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/n2-taxes-payable/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/n3-deferred-tax-liabilities/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/n4/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/n5-income-tax-expense/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/projects/{project_id}/adjustments/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/projects/{project_id}/bulk-tab/export-templates",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/projects/{project_id}/review-workflow/{year}/export-blank",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/s-estimate/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/staff/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/bad-debt-rows/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/c24-journal/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d1-ecl/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d1/disclosure/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d1/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d2/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d3/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d4/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d5/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d6/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/d7/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/e1/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f0/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f1/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f2-spe/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f2-st/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f2-val/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f2/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f3/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f4/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/f5/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g0/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g1/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g10/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g11/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g12/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g13/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g14/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g2/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g3/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g4-ecl/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g4-main/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g4-sppi/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g5/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g6-ecl/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g6-main/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g6-sppi/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g7-equity-method/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g7-main/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g7-sub/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g8/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/g9/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h0/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h1/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h10/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h2/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h3/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h4/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h6/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h7/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/h8/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/i1/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/i2/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/i3/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/i4/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/i5/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/i6/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/j1/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/j2/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k0/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k1/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k10/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k11/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k12/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k13/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k2/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k3/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k4/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k5/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k6/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k7/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k8/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/k9/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/l0/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/l1/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/l2/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/l3/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/l4/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/l5/export-template",
+   "method": "GET",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/l6/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m1/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m10/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m2/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m3/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m4/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m5/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m6/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m7/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m8/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/m9/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/n1/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/n2/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/n3/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/n5/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/api/workpapers/{wp_id}/offline/export-template",
+   "method": "POST",
+   "classification": "template"
+  },
+  {
+   "path": "/projects/{project_id}/account-packages/{wp_code}/export-template",
+   "method": "GET",
+   "classification": "template"
+  }
+ ]
+}

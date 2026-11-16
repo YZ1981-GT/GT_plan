@@ -193,306 +193,31 @@ EXPORT_SURFACE_REGISTRY: dict[str, ExportSurfaceEntry] = {
 #
 # 新增导出端点时：在 `_AUTO_SURFACES` 末尾加一行，并在 `backend/tests/`
 # 跑 `test_export_surface_registry.py`（未登记会打红）。
-_AUTO_SURFACES: tuple[tuple[str, str, str], ...] = (
-    # formal（43 条）
-    ("/api/a17/export-word", "GET", "formal"),
-    ("/api/audit-logs/export", "GET", "formal"),
-    ("/api/consolidation/reports/{project_id}/{year}/artifacts/{artifact_id}/download", "GET", "formal"),
-    ("/api/consolidation/reports/{project_id}/{year}/workpaper/download", "GET", "formal"),
-    ("/api/consolidation/{project_id}/snapshots/{snapshot_id}/download", "GET", "formal"),
-    ("/api/custom-query/artifacts/{artifact_id}/download", "GET", "formal"),
-    ("/api/eqcr/projects/{project_id}/memo/export", "GET", "formal"),
-    ("/api/export/create", "POST", "formal"),
-    ("/api/export/{task_id}/download", "GET", "formal"),
-    ("/api/exports/{export_id}/download", "GET", "formal"),
-    ("/api/knowledge/{category}/documents/{filename}/download", "GET", "formal"),
-    ("/api/projects/{project_id}/audit-checks/export", "POST", "formal"),
-    ("/api/projects/{project_id}/bulk-tab/export-templates/async", "POST", "formal"),
-    ("/api/projects/{project_id}/bulk-tab/export/{task_id}/download", "GET", "formal"),
-    ("/api/projects/{project_id}/cf-verification/{year}/export", "GET", "formal"),
-    ("/api/projects/{project_id}/data-validation/export", "POST", "formal"),
-    ("/api/projects/{project_id}/deliverables/package/{job_id}/download", "GET", "formal"),
-    ("/api/projects/{project_id}/deliverables/trio/items/{item_id}/download", "GET", "formal"),
-    ("/api/projects/{project_id}/deliverables/{task_id}/versions/{version_no}/download", "GET", "formal"),
-    ("/api/projects/{project_id}/excel-html/download/{file_stem}", "GET", "formal"),
-    ("/api/projects/{project_id}/excel-html/module/{module}/export-word", "POST", "formal"),
-    ("/api/projects/{project_id}/knowledge/documents/{filename}/download", "GET", "formal"),
-    ("/api/projects/{project_id}/notes/export-word", "POST", "formal"),
-    ("/api/projects/{project_id}/qc-report/export", "GET", "formal"),
-    ("/api/projects/{project_id}/word-exports/{task_id}/download", "GET", "formal"),
-    ("/api/projects/{project_id}/workflow/export-package", "POST", "formal"),
-    ("/api/projects/{project_id}/working-papers/download-pack", "POST", "formal"),
-    ("/api/projects/{project_id}/working-papers/{wp_id}/b2-12/export-docx", "GET", "formal"),
-    ("/api/projects/{project_id}/working-papers/{wp_id}/download", "GET", "formal"),
-    ("/api/projects/{project_id}/working-papers/{wp_id}/export-word", "GET", "formal"),
-    ("/api/projects/{project_id}/working-papers/{wp_id}/export-word/check-incomplete", "GET", "formal"),
-    ("/api/projects/{project_id}/workpaper-summary/export", "POST", "formal"),
-    ("/api/projects/{project_id}/workpapers/download-pack", "POST", "formal"),
-    ("/api/projects/{project_id}/workpapers/{wp_id}/download-file", "GET", "formal"),
-    ("/api/projects/{project_id}/workpapers/{wp_id}/export-with-metadata", "POST", "formal"),
-    ("/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/recovery-cases/{case_id}/download", "GET", "formal"),
-    ("/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/recovery-cases/{case_id}/download-only", "POST", "formal"),
-    ("/api/projects/{project_id}/wp-templates/download-all", "GET", "formal"),
-    ("/api/projects/{project_id}/wp-templates/{wp_code}/download", "GET", "formal"),
-    ("/api/qc/annual-reports/{report_id}/download", "GET", "formal"),
-    ("/api/review-conversations/{conversation_id}/export", "POST", "formal"),
-    ("/api/workhours/stats/export", "GET", "formal"),
-    ("/api/workpapers/{wp_id}/import-export/export", "GET", "formal"),
-    # data_exchange（128 条）
-    ("/api/consolidation/worksheet/pivot/export", "GET", "data_exchange"),
-    ("/api/custom-query/export", "POST", "data_exchange"),
-    ("/api/formula-management/import-export/export-data", "POST", "data_exchange"),
-    ("/api/h5/export-data", "POST", "data_exchange"),
-    ("/api/h9-lease-liabilities/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/l2-interest-payable/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/l6-special-payables/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/l7-other-noncurrent-liabilities/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/l8-financial-expenses/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/m1-dividends-payable/{wp_id}/export-data", "POST", "data_exchange"),
-    ("/api/m10-other-equity-instruments/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/m2-paid-in-capital/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/m3-treasury-stock/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/m4-capital-reserve/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/m5-surplus-reserve/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/m6-retained-earnings/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/m7-special-reserve/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/m8-general-risk-reserve/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/m9-other-comprehensive-income/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/n1-deferred-tax-assets/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/n2-taxes-payable/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/n3-deferred-tax-liabilities/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/n4/export-data", "POST", "data_exchange"),
-    ("/api/n5-income-tax-expense/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/projects/{project_id}/adjustments/export-summary", "GET", "data_exchange"),
-    ("/api/projects/{project_id}/bulk-tab/export-data", "POST", "data_exchange"),
-    ("/api/projects/{project_id}/bulk-tab/export-data/async", "POST", "data_exchange"),
-    ("/api/projects/{project_id}/excel-html/module/{module}/export-excel", "POST", "data_exchange"),
-    ("/api/projects/{project_id}/ledger/export-aux-balance", "GET", "data_exchange"),
-    ("/api/projects/{project_id}/ledger/export-balance", "GET", "data_exchange"),
-    ("/api/projects/{project_id}/ledger/export-ledger/{account_code}", "GET", "data_exchange"),
-    ("/api/query/export-excel", "POST", "data_exchange"),
-    ("/api/s-estimate/{wp_id}/export-data", "GET", "data_exchange"),
-    ("/api/workpapers/{wp_id}/bad-debt-rows/export-data", "GET", "data_exchange"),
-    ("/api/workpapers/{wp_id}/c24-journal/export-data", "GET", "data_exchange"),
-    ("/api/workpapers/{wp_id}/d1-ecl/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/d1/disclosure/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/d1/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/d2/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/d3/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/d4/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/d5/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/d6/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/d7/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/e1/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/export-review-xlsx", "GET", "data_exchange"),
-    ("/api/workpapers/{wp_id}/f0/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/f1/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/f2-spe/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/f2-st/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/f2-val/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/f2/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/f3/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/f4/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/f5/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g0/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g1/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g10/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g11/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g12/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g13/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g14/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g2/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g3/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g4-ecl/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g4-main/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g4-sppi/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g5/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g6-ecl/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g6-main/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g6-sppi/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g7-equity-method/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g7-main/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g7-sub/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g8/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/g9/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/h0/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/h1/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/h10/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/h2/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/h3/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/h4/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/h6/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/h7/export-data", "GET", "data_exchange"),
-    ("/api/workpapers/{wp_id}/h8/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/i1/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/i2/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/i3/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/i4/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/i5/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/i6/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/j1/export-data", "GET", "data_exchange"),
-    ("/api/workpapers/{wp_id}/j2/export-data", "GET", "data_exchange"),
-    ("/api/workpapers/{wp_id}/k0/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/k1/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/k10/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/k11/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/k12/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/k13/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/k2/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/k3/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/k4/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/k5/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/k6/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/k7/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/k8/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/k9/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/l0/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/l1/export-data", "GET", "data_exchange"),
-    ("/api/workpapers/{wp_id}/l2/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/l3/export-data", "GET", "data_exchange"),
-    ("/api/workpapers/{wp_id}/l4/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/l5/export-data", "GET", "data_exchange"),
-    ("/api/workpapers/{wp_id}/l6/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/m1/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/m10/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/m2/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/m3/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/m4/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/m5/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/m6/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/m7/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/m8/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/m9/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/n1/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/n2/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/n3/export-data", "POST", "data_exchange"),
-    ("/api/workpapers/{wp_id}/n5/export-data", "POST", "data_exchange"),
-    # template（124 条）
-    ("/api/formula-management/import-export/export-template", "POST", "template"),
-    ("/api/h5/export-template", "POST", "template"),
-    ("/api/h9-lease-liabilities/{wp_id}/export-template", "GET", "template"),
-    ("/api/l2-interest-payable/{wp_id}/export-template", "GET", "template"),
-    ("/api/l6-special-payables/{wp_id}/export-template", "GET", "template"),
-    ("/api/l7-other-noncurrent-liabilities/{wp_id}/export-template", "GET", "template"),
-    ("/api/l8-financial-expenses/{wp_id}/export-template", "GET", "template"),
-    ("/api/m1-dividends-payable/{wp_id}/export-template", "POST", "template"),
-    ("/api/m10-other-equity-instruments/{wp_id}/export-template", "GET", "template"),
-    ("/api/m2-paid-in-capital/{wp_id}/export-template", "GET", "template"),
-    ("/api/m3-treasury-stock/{wp_id}/export-template", "GET", "template"),
-    ("/api/m4-capital-reserve/{wp_id}/export-template", "GET", "template"),
-    ("/api/m5-surplus-reserve/{wp_id}/export-template", "GET", "template"),
-    ("/api/m6-retained-earnings/{wp_id}/export-template", "GET", "template"),
-    ("/api/m7-special-reserve/{wp_id}/export-template", "GET", "template"),
-    ("/api/m8-general-risk-reserve/{wp_id}/export-template", "GET", "template"),
-    ("/api/m9-other-comprehensive-income/{wp_id}/export-template", "GET", "template"),
-    ("/api/n1-deferred-tax-assets/{wp_id}/export-template", "GET", "template"),
-    ("/api/n2-taxes-payable/{wp_id}/export-template", "GET", "template"),
-    ("/api/n3-deferred-tax-liabilities/{wp_id}/export-template", "GET", "template"),
-    ("/api/n4/export-template", "POST", "template"),
-    ("/api/n5-income-tax-expense/{wp_id}/export-template", "GET", "template"),
-    ("/api/projects/{project_id}/adjustments/export-template", "GET", "template"),
-    ("/api/projects/{project_id}/bulk-tab/export-templates", "POST", "template"),
-    ("/api/projects/{project_id}/review-workflow/{year}/export-blank", "GET", "template"),
-    ("/api/s-estimate/{wp_id}/export-template", "GET", "template"),
-    ("/api/staff/export-template", "GET", "template"),
-    ("/api/workpapers/{wp_id}/bad-debt-rows/export-template", "GET", "template"),
-    ("/api/workpapers/{wp_id}/c24-journal/export-template", "GET", "template"),
-    ("/api/workpapers/{wp_id}/d1-ecl/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/d1/disclosure/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/d1/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/d2/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/d3/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/d4/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/d5/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/d6/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/d7/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/e1/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/export-template", "GET", "template"),
-    ("/api/workpapers/{wp_id}/f0/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/f1/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/f2-spe/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/f2-st/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/f2-val/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/f2/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/f3/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/f4/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/f5/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g0/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g1/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g10/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g11/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g12/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g13/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g14/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g2/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g3/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g4-ecl/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g4-main/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g4-sppi/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g5/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g6-ecl/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g6-main/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g6-sppi/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g7-equity-method/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g7-main/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g7-sub/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g8/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/g9/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/h0/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/h1/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/h10/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/h2/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/h3/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/h4/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/h6/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/h7/export-template", "GET", "template"),
-    ("/api/workpapers/{wp_id}/h8/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/i1/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/i2/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/i3/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/i4/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/i5/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/i6/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/j1/export-template", "GET", "template"),
-    ("/api/workpapers/{wp_id}/j2/export-template", "GET", "template"),
-    ("/api/workpapers/{wp_id}/k0/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/k1/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/k10/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/k11/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/k12/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/k13/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/k2/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/k3/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/k4/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/k5/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/k6/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/k7/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/k8/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/k9/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/l0/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/l1/export-template", "GET", "template"),
-    ("/api/workpapers/{wp_id}/l2/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/l3/export-template", "GET", "template"),
-    ("/api/workpapers/{wp_id}/l4/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/l5/export-template", "GET", "template"),
-    ("/api/workpapers/{wp_id}/l6/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/m1/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/m10/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/m2/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/m3/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/m4/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/m5/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/m6/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/m7/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/m8/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/m9/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/n1/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/n2/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/n3/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/n5/export-template", "POST", "template"),
-    ("/api/workpapers/{wp_id}/offline/export-template", "POST", "template"),
-    ("/projects/{project_id}/account-packages/{wp_code}/export-template", "GET", "template"),
-)
+#: 自动补登记的导出出口数据文件（相对 `backend/`）。
+AUTO_SURFACE_FILE = "data/export_surface_auto_surfaces.json"
+
+
+def _load_auto_surfaces() -> tuple[tuple[str, str, str], ...]:
+    """从数据文件读自动补登记出口（`(path, method, classification)` 三元组）。
+
+    🔴 为什么是数据文件而不是模块内元组：295 条三元组逐条展开约 300 行，
+    会把本模块推过 800 行门限。本仓库既有做法一致（`wp_code_overrides.json`
+    / `export_surface_classification_gaps.json` 均为数据文件）。
+    """
+    from pathlib import Path as _Path
+
+    path = _Path(__file__).resolve().parents[2] / AUTO_SURFACE_FILE
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    items = raw.get("surfaces") if isinstance(raw, dict) else raw
+    if not isinstance(items, list):
+        raise ValueError(f"{AUTO_SURFACE_FILE} 格式非法：缺 surfaces 列表")
+    return tuple(
+        (str(it["path"]), str(it["method"]), str(it["classification"]))
+        for it in items
+    )
+
+
+_AUTO_SURFACES: tuple[tuple[str, str, str], ...] = _load_auto_surfaces()
 
 
 #: 自动段的 description 按分类统一（同一分类语义相同）。
@@ -531,14 +256,12 @@ del _path, _method, _cls, _key, _n
 
 # ── 分类一致性（2026-11-16）────────────────────────────────
 #
-# 🔴 `_AUTO_SURFACES` 按「路径末段关键字」自动分类，**没经过实现验证**。
-# 现算：43 条 formal 全部无 `ExportUnitPolicy` 折算，128 条 data_exchange
-# 全部无 `_GT_EXPORT_META`。权威源 `docs/reference/formal-export-unit-policy.md` §1。
-#
-# 🔴 不直接改分类：分类是**业务语义声明**不是代码事实。「没写 marker」既可能
-# 是分类错，也可能是实现漏了应有行为（真实缺陷）—— 改判等于把缺陷合法化
-# （memory ㉗：对齐既有基准 ≠ 正确性依据）。缺口登记在
-# `backend/data/export_surface_classification_gaps.json`，由后续 spec 按族裁决。
+# 🔴 `_AUTO_SURFACES` 按路径关键字自动分类，**没经过实现验证**：
+# 35 条 formal 无 `ExportUnitPolicy`、128 条 data_exchange 无 `_GT_EXPORT_META`
+# （权威源 `docs/reference/formal-export-unit-policy.md` §1）。
+# 🔴 不直接改分类：分类是业务语义声明不是代码事实，「没写 marker」也可能是
+# 实现漏了应有行为（真实缺陷）—— 改判等于把缺陷合法化（memory ㉗）。
+# 缺口登记在 `backend/data/export_surface_classification_gaps.json`，按族裁决。
 
 #: 缺口登记文件的路径（相对仓库 `backend/`）。
 CLASSIFICATION_GAP_FILE = "data/export_surface_classification_gaps.json"
@@ -551,6 +274,23 @@ _UNIT_POLICY_RE = re.compile(
 #: data_exchange 分类要求的实现特征（`_GT_EXPORT_META` marker）。
 _EXPORT_MARKER_RE = re.compile(
     r"_GT_EXPORT_META|ExportMeta|export_meta_marker|marker_rows"
+)
+
+#: 「取回已生成文件」形态：直接返回磁盘文件，不渲染单元格内容。
+#: 这类路由是**两段式导出链的第二段**（先生成、再下载），单位折算发生在
+#: 第一段（生成端点），所以本身不要求 `ExportUnitPolicy`。
+_FILE_RETRIEVAL_RE = re.compile(r"FileResponse\b")
+
+#: 「自己渲染内容」形态：真的构造工作簿 / 文档并写单元格。
+_RENDERS_CONTENT_RE = re.compile(
+    r"openpyxl|Workbook\(|load_workbook|\.save\(|Document\(|docx\."
+)
+
+#: 「请求内新建文件」形态：本请求自己生成再返回（即使最终用 FileResponse）。
+#: 这类**不是**取回类 —— 它自己就该负责折算。
+_CREATES_IN_REQUEST_RE = re.compile(
+    r"output_path\s*=|output_dir\s*/|mkdir\(|to_word\(|to_excel\(|"
+    r"export_bytes\(|build_\w*workbook|render\w*\(.*output"
 )
 
 
@@ -567,19 +307,41 @@ def _endpoint_source(route: object) -> str:
         return ""
 
 
+def is_file_retrieval(src: str) -> bool:
+    """该实现是否为「取回已生成文件」形态（不渲染、不新建文件）。
+
+    三条件同时成立才算取回类：①`FileResponse` 直返；②不构造工作簿/文档
+    （无 openpyxl / Workbook / .save / Document）；③不在请求内新建文件
+    （无 output_path 赋值 / mkdir / to_word / to_excel）。
+
+    🔴 ③ 是关键：`excel-html/module/{module}/export-word` 也用 FileResponse，
+    但它 `output_path = ...` + `module_to_word(..., output_path)` 自己写盘
+    ⇒ 生成类，不豁免（它自己该负责折算）。
+    """
+    if not _FILE_RETRIEVAL_RE.search(src):
+        return False
+    if _RENDERS_CONTENT_RE.search(src):
+        return False
+    if _CREATES_IN_REQUEST_RE.search(src):
+        return False
+    return True
+
+
 def classify_conformance(route: object, declared: str) -> str:
     """该路由的实现与其**声明分类**的符合性。
 
-    - `"ok"`：符合
-    - `"formal_missing_unit_policy"`：声明 formal 但无单位折算
-    - `"data_exchange_missing_marker"`：声明 data_exchange 但无 marker
-    - `"unverifiable"`：取不到源码（不参与判定）
+    `ok` / `formal_missing_unit_policy` / `data_exchange_missing_marker` /
+    `retrieval_ok`（取回已生成文件，不要求折算）/ `unverifiable`。
     """
     src = _endpoint_source(route)
     if not src:
         return "unverifiable"
     if declared == "formal":
-        return "ok" if _UNIT_POLICY_RE.search(src) else "formal_missing_unit_policy"
+        if _UNIT_POLICY_RE.search(src):
+            return "ok"
+        if is_file_retrieval(src):
+            return "retrieval_ok"
+        return "formal_missing_unit_policy"
     if declared == "data_exchange":
         return "ok" if _EXPORT_MARKER_RE.search(src) else "data_exchange_missing_marker"
     return "ok"
@@ -613,6 +375,9 @@ def verify_classification_conformance(
 
     两者任一非空 = 登记与实现漂移。这是棘轮：修好一条删一条，
     新出现一条补一条，总数只许减少（`test_classification_gaps_do_not_grow`）。
+
+    🔴 取回类（FileResponse 直返 + 请求内不新建文件）不算缺口：文件由上游
+    产生（异步任务 / 上传 / 另一段导出链），折算在产生方。
     """
     by_pm: dict[tuple[str, str], object] = {}
     for route in getattr(app, "routes", []):
@@ -630,8 +395,9 @@ def verify_classification_conformance(
         if route is None:
             continue
         verdict = classify_conformance(route, entry.classification)
-        if verdict not in ("ok", "unverifiable"):
-            actual.add(entry.path)
+        if verdict in ("ok", "unverifiable", "retrieval_ok"):
+            continue
+        actual.add(entry.path)
 
     registered = load_classification_gaps()
     return sorted(registered - actual), sorted(actual - registered)
@@ -662,13 +428,12 @@ class RegistryValidationError(Exception):
 
 
 def _normalize_path(path: str) -> str:
-    """归一化路径参数名，**保留转换器**（`:uuid` 等）。
+    """归一化路径参数名，**保留转换器**。
 
-    🔴 2026-11-16 修正：原实现把 `{id:uuid}` 与 `{id}` 归一成同一个 `{}`
-    ⇒ 吞掉转换器差异，`validate_registry` 静默放行漏写转换器的登记，
-    而守卫（逐字符比对）打红 —— **两套口径给出相反答案**。
-    现在：`{name:converter}` → `{:converter}`，`{name}` → `{}`。
-    参数名被忽略（Starlette 实现细节），转换器被保留（`:uuid` 是不同的路由）。
+    `{name:conv}` → `{:conv}`，`{name}` → `{}`。参数名被忽略（Starlette
+    实现细节），转换器被保留 —— `:uuid` 与无转换器是**不同的路由**。
+    🔴 原实现把两者都归一成 `{}`，导致 `validate_registry` 静默放行漏写
+    转换器的登记（两套 path 口径给出相反答案）。
     """
     return re.sub(
         r"\{([^}:]+)(?::([^}]+))?\}",

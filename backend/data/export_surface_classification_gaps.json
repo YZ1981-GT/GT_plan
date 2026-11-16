@@ -1,32 +1,28 @@
 {
- "_doc": "分类一致性缺口登记（棘轮只减不增）。权威源：docs/reference/formal-export-unit-policy.md §1。formal 必须走 ExportUnitPolicy 折算并写单位标注；data_exchange 必须写 _GT_EXPORT_META（原始元值）。本表登记「声明分类与实现不符」的全部非 retired 条目（含手工与自动段），由后续 spec 按族裁决，不在此处改判（改判会把缺陷合法化）。修好一条从 gaps 里删一条；新增缺口必须补登记，verify_classification_conformance(app) 双向比对。",
+ "_doc": "分类一致性缺口登记（棘轮只减不增）。权威源：docs/reference/formal-export-unit-policy.md §1。formal 必须走 ExportUnitPolicy 折算并写单位标注；data_exchange 必须写 _GT_EXPORT_META（原始元值）。本表登记「声明分类与实现不符」的非 retired 条目，由后续 spec 按族裁决，不在此处改判（改判会把缺陷合法化）。修好一条从 gaps 里删一条；新增缺口必须补登记。",
+ "_excluded_form": "取回已生成文件的路由（FileResponse 直返 + 不在请求内新建文件）不算缺口：它的文件由上游产生（异步任务 / 上传 / 另一段导出链），单位折算在产生方完成。实测例：/api/exports/{id}/download 的折算在 /api/export/create；/api/qc/annual-reports/{id}/download 由异步任务生成；/api/knowledge/…/download 由上传产生。反之 excel-html/module/{module}/export-word 虽也用 FileResponse，但请求内 output_path 新建文件 ⇒ 仍算生成类，不豁免。",
  "_counts": {
-  "formal_missing_unit_policy": 52,
+  "formal_missing_unit_policy": 35,
   "data_exchange_missing_marker": 128
  },
  "_by_origin": {
-  "auto": 171,
+  "auto": 154,
   "manual": 9
  },
+ "_baseline": 163,
  "gaps": [
   "/api/a17/export-word",
   "/api/audit-logs/export",
-  "/api/consolidation/reports/{project_id}/{year}/artifacts/{artifact_id}/download",
-  "/api/consolidation/reports/{project_id}/{year}/workpaper/download",
   "/api/consolidation/worksheet/pivot/export",
   "/api/consolidation/{project_id}/snapshots/{snapshot_id}/download",
-  "/api/custom-query/artifacts/{artifact_id}/download",
   "/api/custom-query/export",
   "/api/disclosure-notes/{project_id}/{year}/export-word",
   "/api/disclosure-notes/{project_id}/{year}/offline-export",
   "/api/eqcr/projects/{project_id}/memo/export",
   "/api/export/create",
-  "/api/export/{task_id}/download",
-  "/api/exports/{export_id}/download",
   "/api/formula-management/import-export/export-data",
   "/api/h5/export-data",
   "/api/h9-lease-liabilities/{wp_id}/export-data",
-  "/api/knowledge/{category}/documents/{filename}/download",
   "/api/l2-interest-payable/{wp_id}/export-data",
   "/api/l6-special-payables/{wp_id}/export-data",
   "/api/l7-other-noncurrent-liabilities/{wp_id}/export-data",
@@ -52,17 +48,11 @@
   "/api/projects/{project_id}/bulk-tab/export-data",
   "/api/projects/{project_id}/bulk-tab/export-data/async",
   "/api/projects/{project_id}/bulk-tab/export-templates/async",
-  "/api/projects/{project_id}/bulk-tab/export/{task_id}/download",
   "/api/projects/{project_id}/cf-verification/{year}/export",
   "/api/projects/{project_id}/data-validation/export",
   "/api/projects/{project_id}/deliverables/package",
-  "/api/projects/{project_id}/deliverables/package/{job_id}/download",
-  "/api/projects/{project_id}/deliverables/trio/items/{item_id}/download",
-  "/api/projects/{project_id}/deliverables/{task_id}/versions/{version_no}/download",
-  "/api/projects/{project_id}/excel-html/download/{file_stem}",
   "/api/projects/{project_id}/excel-html/module/{module}/export-excel",
   "/api/projects/{project_id}/excel-html/module/{module}/export-word",
-  "/api/projects/{project_id}/knowledge/documents/{filename}/download",
   "/api/projects/{project_id}/ledger/export-aux-balance",
   "/api/projects/{project_id}/ledger/export-balance",
   "/api/projects/{project_id}/ledger/export-ledger/{account_code}",
@@ -70,23 +60,18 @@
   "/api/projects/{project_id}/qc-report/export",
   "/api/projects/{project_id}/reports/export-excel",
   "/api/projects/{project_id}/word-exports/audit-report/generate",
-  "/api/projects/{project_id}/word-exports/{task_id}/download",
   "/api/projects/{project_id}/workflow/export-package",
   "/api/projects/{project_id}/working-papers/download-pack",
   "/api/projects/{project_id}/working-papers/{wp_id}/b2-12/export-docx",
-  "/api/projects/{project_id}/working-papers/{wp_id}/download",
   "/api/projects/{project_id}/working-papers/{wp_id}/export-pdf",
   "/api/projects/{project_id}/working-papers/{wp_id}/export-word",
   "/api/projects/{project_id}/working-papers/{wp_id}/export-word/check-incomplete",
   "/api/projects/{project_id}/workpaper-summary/export",
   "/api/projects/{project_id}/workpapers/download-pack",
-  "/api/projects/{project_id}/workpapers/{wp_id}/download-file",
   "/api/projects/{project_id}/workpapers/{wp_id}/export-with-metadata",
   "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/recovery-cases/{case_id}/download",
   "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/recovery-cases/{case_id}/download-only",
   "/api/projects/{project_id}/wp-templates/download-all",
-  "/api/projects/{project_id}/wp-templates/{wp_code}/download",
-  "/api/qc/annual-reports/{report_id}/download",
   "/api/query/export-excel",
   "/api/reports/{project_id}/{year}/{report_type}/export-excel",
   "/api/review-conversations/{conversation_id}/export",
@@ -206,20 +191,6 @@
    "auto": true
   },
   {
-   "path": "/api/consolidation/reports/{project_id}/{year}/artifacts/{artifact_id}/download",
-   "key": "auto_consolidation_reports_project_id_year_artifacts_artifact_id_download",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
-   "path": "/api/consolidation/reports/{project_id}/{year}/workpaper/download",
-   "key": "auto_consolidation_reports_project_id_year_workpaper_download",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
    "path": "/api/consolidation/worksheet/pivot/export",
    "key": "auto_consolidation_worksheet_pivot_export",
    "declared": "data_exchange",
@@ -229,13 +200,6 @@
   {
    "path": "/api/consolidation/{project_id}/snapshots/{snapshot_id}/download",
    "key": "auto_consolidation_project_id_snapshots_snapshot_id_download",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
-   "path": "/api/custom-query/artifacts/{artifact_id}/download",
-   "key": "auto_custom_query_artifacts_artifact_id_download",
    "declared": "formal",
    "gap": "formal_missing_unit_policy",
    "auto": true
@@ -276,20 +240,6 @@
    "auto": true
   },
   {
-   "path": "/api/export/{task_id}/download",
-   "key": "auto_export_task_id_download",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
-   "path": "/api/exports/{export_id}/download",
-   "key": "auto_exports_export_id_download",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
    "path": "/api/formula-management/import-export/export-data",
    "key": "auto_formula_management_import_export_export_data",
    "declared": "data_exchange",
@@ -308,13 +258,6 @@
    "key": "auto_h9_lease_liabilities_wp_id_export_data",
    "declared": "data_exchange",
    "gap": "data_exchange_missing_marker",
-   "auto": true
-  },
-  {
-   "path": "/api/knowledge/{category}/documents/{filename}/download",
-   "key": "auto_knowledge_category_documents_filename_download",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
    "auto": true
   },
   {
@@ -493,13 +436,6 @@
    "auto": true
   },
   {
-   "path": "/api/projects/{project_id}/bulk-tab/export/{task_id}/download",
-   "key": "auto_projects_project_id_bulk_tab_export_task_id_download",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
    "path": "/api/projects/{project_id}/cf-verification/{year}/export",
    "key": "auto_projects_project_id_cf_verification_year_export",
    "declared": "formal",
@@ -521,34 +457,6 @@
    "auto": false
   },
   {
-   "path": "/api/projects/{project_id}/deliverables/package/{job_id}/download",
-   "key": "auto_projects_project_id_deliverables_package_job_id_download",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
-   "path": "/api/projects/{project_id}/deliverables/trio/items/{item_id}/download",
-   "key": "auto_projects_project_id_deliverables_trio_items_item_id_download",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
-   "path": "/api/projects/{project_id}/deliverables/{task_id}/versions/{version_no}/download",
-   "key": "auto_projects_project_id_deliverables_task_id_versions_version_no_download",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
-   "path": "/api/projects/{project_id}/excel-html/download/{file_stem}",
-   "key": "auto_projects_project_id_excel_html_download_file_stem",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
    "path": "/api/projects/{project_id}/excel-html/module/{module}/export-excel",
    "key": "auto_projects_project_id_excel_html_module_module_export_excel",
    "declared": "data_exchange",
@@ -558,13 +466,6 @@
   {
    "path": "/api/projects/{project_id}/excel-html/module/{module}/export-word",
    "key": "auto_projects_project_id_excel_html_module_module_export_word",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
-   "path": "/api/projects/{project_id}/knowledge/documents/{filename}/download",
-   "key": "auto_projects_project_id_knowledge_documents_filename_download",
    "declared": "formal",
    "gap": "formal_missing_unit_policy",
    "auto": true
@@ -619,13 +520,6 @@
    "auto": false
   },
   {
-   "path": "/api/projects/{project_id}/word-exports/{task_id}/download",
-   "key": "auto_projects_project_id_word_exports_task_id_download",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
    "path": "/api/projects/{project_id}/workflow/export-package",
    "key": "auto_projects_project_id_workflow_export_package",
    "declared": "formal",
@@ -642,13 +536,6 @@
   {
    "path": "/api/projects/{project_id}/working-papers/{wp_id}/b2-12/export-docx",
    "key": "auto_projects_project_id_working_papers_wp_id_b2_12_export_docx",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
-   "path": "/api/projects/{project_id}/working-papers/{wp_id}/download",
-   "key": "auto_projects_project_id_working_papers_wp_id_download",
    "declared": "formal",
    "gap": "formal_missing_unit_policy",
    "auto": true
@@ -689,13 +576,6 @@
    "auto": true
   },
   {
-   "path": "/api/projects/{project_id}/workpapers/{wp_id}/download-file",
-   "key": "auto_projects_project_id_workpapers_wp_id_download_file",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
    "path": "/api/projects/{project_id}/workpapers/{wp_id}/export-with-metadata",
    "key": "auto_projects_project_id_workpapers_wp_id_export_with_metadata",
    "declared": "formal",
@@ -719,20 +599,6 @@
   {
    "path": "/api/projects/{project_id}/wp-templates/download-all",
    "key": "auto_projects_project_id_wp_templates_download_all",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
-   "path": "/api/projects/{project_id}/wp-templates/{wp_code}/download",
-   "key": "auto_projects_project_id_wp_templates_wp_code_download",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": true
-  },
-  {
-   "path": "/api/qc/annual-reports/{report_id}/download",
-   "key": "auto_qc_annual_reports_report_id_download",
    "declared": "formal",
    "gap": "formal_missing_unit_policy",
    "auto": true
