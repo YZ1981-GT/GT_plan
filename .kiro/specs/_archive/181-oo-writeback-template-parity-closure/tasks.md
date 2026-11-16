@@ -42,7 +42,8 @@
     - [x] 9.1a 批 C（v1.0.31）：N1 几何 29/31→40/42，N1/N2 store item 改 `-detail-rows`，N1/N2/N3 json key 改前端名，五条 N plan 与五份 reviewed 契约落地；field-name 31/388→30/365、UNCOVERED 13→12（明细见 design §4.10 附）
     - [x] 9.1b 复盘收口：三个 provider 补 re-export PAYLOAD_COLUMN（修「声明在 sheets 但运行时仍 remark」假绿）；N2 活导入导出统一 A:Q / `N2-2-detail-rows.conclusion`、补 H=beginRje 与 M=C+G+H、复核上下文按原始行重算 P，真库两键 0 行；N1 生产纯函数 + 对拍适配器；field-name 30/365→29/364；K/N 十一 plan 表驱动（1047→1019 行）；N1 三条磁盘变异 3/3 红；push 工具安全收口（design §4.10、§4.11）
     - [x] 9.1c 语义审查收口：修 N2 跨项目读写、错误表头按位置写、Infinity JSON、国企披露归零、导入后旧快照、N 域新测试/公式数棘轮，以及 push 远端标签 fail-open / 重试竞态 / 本地旧标签基线；定向后端 25、鉴权/挂载 43、前端 643 项通过，候选相对基线新增失败 0（design §4.10、§4.11）
-  - [~] 9.2 L4-3 与 M 循环（含 `placeholder` store item）（L4-3 已闭合；M 循环**投影层已修**、键名层仍是形态冲突，见 design §14.1）
+  - [x] 9.2 L4-3 与 M 循环（含 `placeholder` store item）（L4-3 已闭合；M 循环**投影层已修** —— 「键名对上了、值也进不去」那一层，守卫 `test_m_detail_payload_projection.py` 6 例 + 2 条变异 RED）
+    - **M 键名层（前端驼峰 vs 契约下划线，65 条）已移出本 spec**（2026-11-16 用户拍板 A）：它是「同一张表两套存储形态并存」的结构改造（明细表整表 JSON + 审定表 flat 键），改任一侧都要动 10 个宿主的读写语义 + 导入导出，且改契约要重发布所有 M 表 representation ⇒ 与 §4.3 对 F3-1 / F4-1 同族处置。新 spec `m-cycle-key-naming-unification`（占位三件套已建）承接；在此之前由 `backend/tests/test_m_detail_keys_match_provider.py`（8 例棘轮，M1 18/19 条、M2 19/9 条）冻结为只许减小，不会恶化。详见 design §14.1。
   ### 9.2 现算结论（2026-11-15）
 
 **L4-3 已闭合（无需改生产代码）**：契约 `sheets[].tables[].fields[]` 38 个受管字段、provider `MANAGED_FIELD_SPECS_7`、前端 `useL4FinLiabRows.ts` 运行时键**三处逐字段 0 不一致**（column_key / 列标 / json 键 / mode / value_type / header_text 六项全等）；行身份 `rowId`、store item `L4-3-rows` 三处一致；端到端 `build_store_projection` 取到 38/38、`merge_projection_into_store_rows` 回写后行键集合与前端完全相等。
