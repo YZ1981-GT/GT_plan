@@ -408,7 +408,7 @@
 > D4-33~36 的导出导入/A13/跨项目隔离浏览器实测（代码层守卫已覆盖同一行为）。
 > ⚠️ **逐张 L1 必须 `--workers=1` 串行**：多 worker 会因 OnlyOffice 8080 单实例并发 contention 假失败（已实证）。
 >
-> **未随本批归档（仍 active）**：① [`workpaper-html-onlyoffice-bidirectional-writeback-closure`](workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md) 平台总纲
+> **历史快照（2026-09，路径已更新；2026-11-16 复核：原 umbrella 已交接式归档，当前 47/50，未完成 2.8/6.3/7.5）**：① [`workpaper-html-onlyoffice-bidirectional-writeback-closure`](_archive/180-workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md) 平台总纲
 > 仍有 **5 个 `[-]`**（Tasks 61 / 71 / 72 / 74 / 75），`legacy_fake_bidirectional` 现 **137**，不具备归档条件；
 > 其 `requirements.md` / `tasks.md` 末尾已追加 2026-09-22 现状刷新节（§背景 旧快照 185/276/186/43/136 中 5 个数字
 > 已过期，现读数 175/265/176/33/132；并登记 D4 lane 与「四类 Excel pilot」不是同一组 —— Task 40 的 checklist entry
@@ -546,7 +546,6 @@
 | [`platform-heavy-jobs-and-capacity-closure`](platform-heavy-jobs-and-capacity-closure/tasks.md) | **21/37 + 1 进行中**（余 15，其中 `[ ]*` 8） | **平台重任务与容量闭环**：durable jobs、容量、SSE、公式推送和大任务恢复。 |
 | [`platform-performance-residual-findings-closure`](platform-performance-residual-findings-closure/tasks.md) | **39/42**（余 3 `[ ]*`） | **平台性能残项收口**：路由遮蔽、重复注册、API 前缀、附注列和性能遗留。 |
 | [`platform-release-blocker-closure`](platform-release-blocker-closure/tasks.md) | **23/24**（余 1 `[ ]*`） | **平台发布阻断项收口**：启动、保存、权限、就绪度、审计链和冻结门。 |
-| [`workpaper-html-onlyoffice-bidirectional-writeback-closure`](workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md) | **46/50**（余 4） | **底稿 HTML 与 OnlyOffice 双向回写总纲**：同步解析、写回、冲突、锁和真实验收。 |
 | [`workpaper-writeback-data-loss-and-mirror-consistency-closure`](workpaper-writeback-data-loss-and-mirror-consistency-closure/tasks.md) | **51/59**（余 8） | **底稿回写保存安全与镜像一致性**：CAS、pending writes、过渡屏障和 OO/HTML 镜像。 |
 | [`frozen-contract-read-path-and-legacy-operation-settlement`](frozen-contract-read-path-and-legacy-operation-settlement/tasks.md) | **0/12**（三件套已交付，产品代码未实施） | 冻结契约的读侧重建 + 遗留 operation 结算：按 bundle 的 `contract_slot_ref` 把冻结的旧契约读回来（复用 `parse_contract` 与既有 definition blob 读取，消除第二真源），读侧入口默认取冻结契约并在响应里如实标注来源，使冻结旧契约的 operation 可被正式结算；承接 `_archive/174-wp-sync-conflict-adjudication-and-d4-32-modeling` 的范围外项 12.f |
 | [`onlyoffice-sheet-open-via-published-artifact`](onlyoffice-sheet-open-via-published-artifact/tasks.md) | **0/34**（三件套已交付，产品代码未实施） | **Sheet 级 OnlyOffice 改走 Published Representation**：建立显式 sheet→entry 映射，让单 sheet / 整册入口打开同一条 published artifact；目标 sheet 用 descriptor/actionLink 表达，不再复制模板、隐藏 sheet 或按 sheet 名猜父级；按 binding 状态逐入口 drain 旧 config/WOPI/callback。 |
@@ -555,6 +554,7 @@
 
 | spec | 状态 | 一句话 |
 |------|------|--------|
+| [`workpaper-html-onlyoffice-bidirectional-writeback-closure`](_archive/180-workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md) | **47/50**（交接式归档，3 项未完成） | **底稿 HTML 与 OnlyOffice 双向回写 umbrella（交接归档，非最终完成）**：已完成共享 manifest/readiness/UI 治理基础、0.5 文档消费方闭合与 2.8 第①步旧 URL 门；2.8 sheet 级打开对象映射、6.3 全量真实 OO required scenarios、7.5 最终五角色复核转交后续 spec/owner。 |
 | `consol-note-refresh-multi-header-fix` | ✅ **4/4** 已归档 `_archive/24-consol-note-and-key-isolation/` | **完善合并附注刷新对多级表头的列定位**（2026-10-05 新建并实施）。`refresh_note_by_formula` 端点原有列匹配用 `"期末" in h` 粗暴 `in` 匹配，multi_header 展开为斜杠路径后多列误命中（soe 47 / listed 50 张表受影响）且 `"账面余额"` 不区分期末/期初。改为 `_resolve_value_columns` 三层定位（_column_groups → multi_header 顶行 → 首段关键词降级），多列命中只取第一个。19 测试 + 33 回归全绿。 |
 | `consol-note-template-header-unification` | ✅ **7/7** 已归档 `_archive/24-consol-note-and-key-isolation/` | **统一合并附注模板与单体附注模板的表头格式**（2026-10-05）。seed 脚本加 `multi_header_to_column_groups` 推导（含 span=1），soe 4/4 + listed 13/13 multi_header 表均有 `_column_groups`；`value_column()` 优先按分组名定位列（路径 A），降级到 headers（路径 B）；前端 `parsedMultiHeader` 优先从 `_column_groups` 构建分组表头；soe `report_total` 45→46（五-5-1 应收账款账龄表合计行新增种子）。40 测试全绿。 |
 | `consol-node-key-isolation-and-shared-context` | ✅ **64/64** 已归档 `_archive/24-consol-note-and-key-isolation/` | **合并节点键隔离与共享上下文**（2026-10-06 归档）。64 task 全部完成，合并节点 key 的命名空间隔离 + 共享上下文注入机制，避免跨节点键冲突。 |

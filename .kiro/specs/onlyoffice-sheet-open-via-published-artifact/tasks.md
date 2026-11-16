@@ -121,3 +121,13 @@
 - 不在本 spec 中修 `wp_generation_staging._source_paths` 的 `multi_resolver`：它依赖 staging 是否应受 Property 42 canonical path boundary 约束，需单独裁决；当前错误替换已回退，原有 4 行 writer debt 保持真实。
 - 不把当前 78 个旧式调用按文件机械替换；只有 binding 成为 `migrated` 后才允许迁移，pending 继续标独立在线编辑。
 - 不修改当前工作树中其它会话的 frozen contract、OO template parity、published identity observer 等脏文件；本 spec 的任务按 clean candidate tree 执行。
+
+
+## Umbrella 交接边界（2026-11-16）
+
+本 spec 是 `workpaper-html-onlyoffice-bidirectional-writeback-closure` 2.8 中「sheet 级旧入口与 published artifact 打开语义」的后续承接者。它不把原 umbrella 的未完成项自动标绿：
+
+- 本 spec 承接：SheetOpenBinding、真实 manifest entry、published artifact、target sheet / whole workbook、前端宿主切换、legacy drain 与相应 sheet 级浏览器场景。
+- 本 spec 不单独宣称完成 umbrella 6.3 的全部 entry required scenarios；全量 bidirectional entry 的 operation / evidence 账本仍需后续 owner 按原 umbrella 口径闭合。
+- 本 spec 不单独宣称完成 umbrella 7.5；五角色最终复核、clean-checkout 总验与最终归档必须在本 spec 及相关 residual owner 的证据齐备后执行。
+- 原 umbrella 的 `_source_paths` resolver debt 仍保持真实，需先裁决 staging 是否应纳入 Property 42 canonical path boundary，不因本 spec 的 sheet 映射而自动关闭。

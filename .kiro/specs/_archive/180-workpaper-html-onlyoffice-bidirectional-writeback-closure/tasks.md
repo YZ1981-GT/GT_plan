@@ -508,6 +508,48 @@
       ② 前端 29 文件 78 处迁到 room 协议（16 个 dual-mode composable 同批）；
       ③ 旧 doc key drain 窗口结束才删 legacy direct-write 分支；
       ④ single_onlyoffice / Word / custom 单独裁决。
+  - 🔴 **2026-11-15 第 ② 步实测结论：不能按「22 个 composable 全迁」的原设想做 ——
+    两者打开的不是同一个文件**（这是本轮最重要的发现，推翻了本任务的一项隐含前提）。
+    * **已交付的基础设施**（`61ffe9dca`，独立于下面的结论，本身成立）：
+      `onlyOfficeEntryConfig.ts` 作为前端取配置唯一入口（9 例全绿，含 room 就绪 /
+      供给未就绪 / 端点失败三条臂 + 409 引导文案）；`GET /sync/entry-identity` 端点；
+      `_wp_sheet_code_resolution.py` 让换码判据与 `/onlyoffice-config` 同源；
+      `useG9DualMode` 迁为首个范式（删掉自己拼端点，改调 probe + 暴露 `unavailableReason`）。
+    * 🔴 **原设想失效的实测证据**（逐条现算，非推测）：
+      | 事实 | 现算值 | 含义 |
+      | --- | --- | --- |
+      | manifest 里 `xlsx-sheet/*` 前缀的 entry | **0 条** | `sheet_entry_id()` 算出的 `xlsx-sheet/K11/K11-1` 在 manifest 里**不存在** |
+      | 对 K8/K9/K10/K11/K12/K13/G1/G9/G11/G12/D4/F2 各码现算 sheet_entry_id | **全部 `in_manifest=no`** | 全部走不到 readiness，probe 必然 fail-open 到旧式 ⇒ **迁移零行为收益** |
+      | K11 entry 的 `mount_components` | `['GtOnlyOfficeSheet']` | 它挂的是**旧组件**，不是 room 宿主 |
+      | K11 entry 的 `sync_editor_host_mounted` | **False** | room 宿主从未挂在这个 entry 上 |
+      | manifest 里带 `sheets` 字段的 entry | **0 条** | sync 协议不按 sheet 分 entry |
+    * **架构性差异（根因）**：两条路的**打开对象不同** ——
+      * 旧式 `/sheets/{sheet}/onlyoffice-config`：按 sheet 名 → 猜子码 → **复制模板**成
+        `{wp_code}.xlsx` → 隐藏其他 sheet → 打开那个副本。entry 身份是**「哪张 sheet」**。
+      * room 协议：按 `entry_id` → 取该 entry 的 **current published representation**
+        artifact → 打开它。entry 身份是**「哪份已发布产物」**，与 sheet 名无关。
+      两者的 `entry_id` 命名空间（`xlsx-sheet/…` vs `xlsx/gt-k11-…`）**完全不重叠**，
+      所以不能用一层 probe 把前者「转成」后者 —— 那不是接线问题，是「打开什么」的问题。
+    * **K 系 13 条 entry 的真实状态**（推翻 K11 注释里「零 adapter、missing_adapter」的说法）：
+      `xlsx/gt-k{1..13}-*` **全部 cap=bidirectional 且各有 1 条 representation**（13/13 YES）；
+      `migration_state=adapter_registered`。所以那条注释**已过期**，但过期的是「为什么保留
+      直调」的理由，不改变上面「两者打开对象不同」的结构结论。
+    * **因此第 ② 步的正确形状需要重新界定**（不再由本任务在「迁 composable」层面承接）：
+      1. 让 sheet 级 OO 打开真正走「该 sheet 所属 entry 的 published artifact」——
+        这需要先定义 **sheet → sync entry 的映射**（manifest 现在没有这个字段），
+        以及「打开整本 artifact 的某张 sheet」在 room 协议里的表达方式（`actionLink`
+        已有，但 targeting 的是 artifact 里的 sheet 名，不是 `{wp_code}.xlsx` 副本）；
+      2. 在那之前，22 个 composable 继续走旧端点**是正确行为**，不是欠账 ——
+        它们打开的是「按 sheet 复制的模板副本」，room 协议不提供等价物。
+      3. 真正的收敛点变成：**旧端点停止「复制模板 + 隐藏 sheet」这种写行为**，
+        改为直接打开 entry 的 published artifact；这属 ④「single/Word/custom 单独裁决」
+        与 representation 管道的交界，应另立 spec（跨 manifest schema + 前端打开语义）。
+    * **本任务不再声称能靠「迁 22 个 composable」清零 `multi_resolver`**。已交付的第①步
+      开关与基础设施保留：它们让「停止签发」变成可执行的一件事，且 `entry-identity`
+      端点对**真正按 entry 挂载的宿主**（`WorkpaperSyncEditorHost` 那 25 个文件）是必需的。
+    * **验证与归因**：`onlyOfficeEntryConfig` 9 passed；`composables` + `sync` 全集跑通，
+      3 个 failed 经 `git stash` 基线对比**确认预存**（`dCycleVoucherMappedPrefixes` /
+      `formulaEngineInventory` PBT / `useF5Integration` EventBus），与本批零关系。
   - 🔴 **2026-11-04 清册事实盲区（writer gate 的分母，与上面 4 条 multi_resolver 不同族）**：
     `_record_sql_text` 只认 `text("…")` 的字面量实参，SQL 先赋给局部变量再 `text(update_sql)` 的写库
     路径整条看不见。公式运行时底稿适配器 `WorkpaperMutationAdapter.restore_many`（基线 `8352d7b38` 上还有
@@ -1764,3 +1806,15 @@ entry、pending 态还不存在时生成的），不能直接当前后对比。
 | ruff（改动文件 A/B） | 新增 **0** |
 | 行数门 | **rc=0**（搬模块，未抬白名单） |
 | CRLF churn | 无 |
+
+
+## 交接式归档记录（2026-11-16，非最终完成归档）
+
+> 用户要求先归档原 umbrella，并把剩余工作交给后续 spec/owner。本次归档**不把未完成任务改成 `[x]`**，也不宣称 design §15 的十项最终归档条件已满足；它只冻结本轮已交付事实与未完成项的交接边界。
+
+- **当前完成度仍为 47/50**。已完成项包含 0.5 文档消费方闭合与两组规定变异、2.8 第①步 legacy URL 开关与 drain 门，以及前置 readiness / room 基础设施等。
+- **2.8 未完成**：`multi_resolver` 仍有 4 行（3 个旧式 OnlyOffice handler + `wp_generation_staging::_source_paths`）。其中 sheet 级旧入口与 room published artifact 的打开对象 / entry 身份不一致，已转交新 spec `onlyoffice-sheet-open-via-published-artifact`；`_source_paths` 因 Property 42 canonical path boundary 与 staging 临时测试语义差异，不能靠替换 resolver 清零，仍需单独裁决。
+- **6.3 未完成**：真实 OnlyOffice required scenarios 的完整 entry 账本仍未完成；本目录已有的 D2 readiness 阻断证据不等于进入、编辑、保存、回读的完整证据。新 spec 只承接 sheet→published-artifact 语义与其 required scenarios，不吸收全部 entry 的总体验收责任。
+- **7.5 未完成**：五角色最终复核、最新候选树终验、最终归档条件均未满足。本次是**交接式归档**，不是最终关闭；后续 owner 必须在新 spec / residual spec 中补齐证据后再做最终复核。
+- **后续 owner**：`onlyoffice-sheet-open-via-published-artifact` 承接 sheet 级映射、published artifact、target sheet / whole workbook、legacy drain 与对应浏览器场景；全量 6.3 required scenario closure 与 7.5 最终复核由后续 owner 按新 spec 的完成门继续推进。
+- **归档纪律**：历史复选框与 evidence append-only 保留；本段只记录交接，不回填历史完成度。

@@ -64,15 +64,9 @@ _STRAY_DATED_QUOTE_BASELINE = {
 # test_active_table_lists_exactly_the_active_specs 的报错信息）。
 _UNINDEXED_ACTIVE_SPEC_BASELINE: set[str] = set()
 
-# 同一个 spec 名既在活跃区、又在 `_archive` 下（两代同名）。这不是漂移，但会让"活跃表里不得有
-# 归档 spec"误报 ⇒ 显式豁免 + 反向断言（下面 test_same_name_active_and_archived_exemption_is_real
-# 要求两边都真的存在且都有 tasks.md），不是写个名字就能放行的后门。
-_ACTIVE_AND_ARCHIVED_SAME_NAME = {
-    # 平台总纲：上一代 66/66 已归档 `_archive/17-2026-10-03-verified-batch/`，
-    # 当前这一代仍在办（活跃区 46/50）
-    "workpaper-html-onlyoffice-bidirectional-writeback-closure",
-}
-
+# 同名 active/archive 豁免必须逐条可伪证。当前本轮 umbrella 已移入 `_archive/180-*`，
+# 且新 spec 使用不同名称，因此现算为空；后续出现真实两代同名时再逐条登记。
+_ACTIVE_AND_ARCHIVED_SAME_NAME: set[str] = set()
 
 # ---------------------------------------------------------------- 读取与解析
 @pytest.fixture(scope="module")
