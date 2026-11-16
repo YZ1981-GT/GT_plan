@@ -1209,6 +1209,8 @@ async def fill_by_formula(
     context: "ConsolContext | None" = None,
     tree: "TreeNode | None" = None,
     preserve_pulled: bool = False,
+    _precomputed_cells: list[dict] | None = None,
+    _precomputed_is_root_consol: bool = False,
 ) -> dict:
     """「按公式填入」：按节点把合并数写入 ``consol_note_data``；旧调用不带节点键时使用项目级兼容行。
 
@@ -1221,13 +1223,26 @@ async def fill_by_formula(
             f"standard={standard} 与 template_type={template_type} 指向不同附注模板"
         )
     requested_template = template_type or standard
-    breakdown = await note_breakdown(
-        db, project_id, year, section_id, node_key=node_key, standard=requested_template,
-        _include_internal_scope=True,
-        _view_context=_view_context,
-        context=context,
-        tree=tree,
-    )
+    if _precomputed_cells is None:
+        breakdown = await note_breakdown(
+            db, project_id, year, section_id, node_key=node_key, standard=requested_template,
+            _include_internal_scope=True,
+            _view_context=_view_context,
+            context=context,
+            tree=tree,
+        )
+    else:
+        # 子树重汇总已在内存中按当前 ViewContext 计算好公式单元格；这里只复用既有
+        # 保护格/行定位/来源投影写入路径，不再重新建 context、查公式或读报表。
+        if not requested_template:
+            raise NoteFormulaError("预计算公式值必须带 template_type")
+        breakdown = {
+            "template_type": requested_template,
+            "year": year,
+            "node_key": node_key,
+            "cells": _precomputed_cells,
+            "_is_root_consol": _precomputed_is_root_consol,
+        }
     tt = breakdown["template_type"]
     is_root_consol = bool(breakdown.get("_is_root_consol")) and breakdown["node_key"] == node_key
     table = find_table(tt, section_id) or {}

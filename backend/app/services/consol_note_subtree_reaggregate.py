@@ -288,35 +288,6 @@ class _Run:
             return
         self.measures = node_measures(self.view.basis)
 
-    async def _prefetch_section_sources(self, section_id: str) -> None:
-        """按章节一次批取全部叶子来源，供本章节的逐节点 apply 复用。
-
-        ``apply_detail_refresh`` 仍按节点保存各自的 ``ConsolNoteData``，但来源读取已经
-        从「每个叶子一次 `load_source_tables`」收敛为「每个章节一次」。这补的是 C2 的
-        SQL 放大缺口，不改变映射、保护格或章节 SAVEPOINT 语义。
-        """
-        topn = section_topn_limit(self.template_type, section_id)
-        if not topn and section_id not in self.bound_sections:
-            return
-        source_ids = list(dict.fromkeys(
-            node.project_id
-            for node in self.order
-            if _action(node) == ACTION_PULL and node.project_id is not None
-        ))
-        if not source_ids:
-            self.source_tables[section_id] = {}
-            return
-        from app.services.consol_note_detail_source_service import load_source_tables
-
-        self.source_tables[section_id] = await load_source_tables(
-            self.db,
-            source_ids,
-            section_id,
-            self.year,
-            template_type=self.template_type,
-        )
-    # ── 逐章节 ──
-
     async def process_section(self, section_id: str) -> None:
         if find_table(self.template_type, section_id) is None and section_id not in self.skeletons:
             self.failures.append({"section_id": section_id, "node_key": self.node.node_key, "status": _FAILED,
@@ -326,7 +297,8 @@ class _Run:
         current: TreeNode | None = None
         self.incomplete: dict[str, TreeNode] = {}
         try:
-            await self._prefetch_section_sources(section_id)
+            from app.services.consol_note_reaggregate_prefetch import prefetch_section_sources
+            await prefetch_section_sources(self, section_id)
             async with self.db.begin_nested():
                 for n in self.order:
                     current = n
@@ -459,9 +431,23 @@ class _Run:
         if self.view is None:
             return _Outcome(sid, node, ACTION_ELIM, _FAILED, f"无法计算差额：{self.view_error}")
         try:
+            children = [
+                (child.node_key, self.measures[child.node_key])
+                for child in node.children
+                if child.node_key in self.measures
+            ]
+            cells = await note_cell_values(
+                self.view.rows,
+                self.formulas[sid],
+                self.measures[node.node_key],
+                categories=self.view.basis.categories,
+                children=children,
+            )
             res = await fill_by_formula(
                 self.db, self.project_id, self.year, sid, node_key=node.node_key,
                 template_type=self.template_type, _view_context=self.view,
+                _precomputed_cells=cells,
+                _precomputed_is_root_consol=node is self.tree,
             )
         except NoteFormulaError as exc:
             return _Outcome(sid, node, ACTION_ELIM, _FAILED, str(exc))
