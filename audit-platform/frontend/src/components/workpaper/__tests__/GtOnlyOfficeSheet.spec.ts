@@ -31,7 +31,14 @@ import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
 // ─── Global stubs ───
 const globalStubs = {
   'el-icon': { template: '<span class="el-icon"><slot /></span>', props: ['size'] },
-  'el-alert': { template: '<div class="el-alert"><slot /></div>', props: ['type', 'closable'] },
+  // 🔴 必须同时渲染**默认插槽**与 `title` 命名插槽：本组件把提示标题写在
+  // `<template #title>` 里，只渲染默认插槽的桩会让 `wrapper.text()` 拿不到那段文字
+  // （首版就是这样，断言恒空而看起来像「功能没实现」）。
+  'el-alert': {
+    template:
+      '<div class="el-alert"><div class="el-alert__title"><slot name="title" /></div><slot /></div>',
+    props: ['type', 'closable', 'showIcon', 'show-icon'],
+  },
 }
 
 describe('GtOnlyOfficeSheet - 健康预检 (R9)', () => {
@@ -264,5 +271,110 @@ describe('GtOnlyOfficeSheet - 只读模式 type:embedded (R10)', () => {
 
     expect(mockDocEditor).toHaveBeenCalled()
     expect(capturedConfig.type).toBe('desktop')
+  })
+})
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// task 3.6：独立在线编辑必须**明确标注不同步**（Requirement 4.2 / 6.2）
+//
+// 🔴 为什么这是真需求而不是文案洁癖：`GtOnlyOfficeSheet` 是 pending / out_of_scope /
+// custom / single_onlyoffice 入口的载体。这些入口的在线编辑**不与 HTML 双向同步**
+// （它们走旧式 config，没有 room 协议）。不标注时用户会以为在编辑器里改的内容
+// 会自动出现在左侧结构化表单里 —— 而那正是本 spec 要消灭的假状态。
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('task 3.6：独立在线编辑文案', () => {
+  it('默认（缺 sync_mode）显示「独立在线编辑（不同步）」', async () => {
+    mockHttpGet.mockImplementation((url: string) => {
+      if (url.includes('/health')) {
+        return Promise.resolve({ data: { data: { healthy: true } } })
+      }
+      // 故意不返回 sync_mode —— 默认必须按「不同步」处理
+      return Promise.resolve({ data: { data: { config: {}, token: '', onlyoffice_url: '' } } })
+    })
+    const wrapper = mount(GtOnlyOfficeSheet, {
+      props: { wpId: 'wp-001', sheetName: 'Sheet1' },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('独立在线编辑')
+    expect(wrapper.text()).toContain('不同步')
+  })
+
+  it('config 请求失败时仍显示「独立在线编辑」（默认值必须是 independent）', async () => {
+    // 🔴 这条与上一条**不是**重复：上一条的 config 响应成功，`syncMode.value` 在赋值时被
+    // 显式设成 `'independent'`（`sync_mode` 为 undefined 走 else 分支）⇒ **默认值从未被验证**。
+    // 实测把初始值改成 `'bound'` 时上一条仍绿（M3 存活）。
+    //
+    // 本条让 config 请求抛错 ⇒ 赋值语句不执行 ⇒ 读到的就是初始值。
+    mockHttpGet.mockImplementation((url: string) => {
+      if (url.includes('/health')) {
+        return Promise.resolve({ data: { data: { healthy: true } } })
+      }
+      return Promise.reject(new Error('config failed'))
+    })
+    const wrapper = mount(GtOnlyOfficeSheet, {
+      props: { wpId: 'wp-001', sheetName: 'Sheet1' },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('独立在线编辑')
+  })
+
+  it('sync_mode=bound 时不显示该提示', async () => {
+    mockHttpGet.mockImplementation((url: string) => {
+      if (url.includes('/health')) {
+        return Promise.resolve({ data: { data: { healthy: true } } })
+      }
+      return Promise.resolve({
+        data: {
+          data: { config: {}, token: '', onlyoffice_url: '', sync_mode: 'bound' },
+        },
+      })
+    })
+    const wrapper = mount(GtOnlyOfficeSheet, {
+      props: { wpId: 'wp-001', sheetName: 'Sheet1' },
+      global: { stubs: globalStubs },
+    })
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('独立在线编辑')
+  })
+
+  it('用户可见文案里**不得**出现「已同步」「双向回写」（假状态）', () => {
+    // 🔴 判据只扫**用户可见的字符串**（模板文本 + 字符串字面量），不扫注释：
+    // 注释里写「不得暗示已同步」是说明，不是文案。首版扫全文 ⇒ 抓到我自己的注释（假红）。
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fs = require('node:fs')
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const path = require('node:path')
+    const file = path.join(__dirname, '..', 'GtOnlyOfficeSheet.vue')
+    const raw = fs.readFileSync(file, 'utf-8') as string
+
+    // ① 模板文本节点（去掉 <!-- --> 注释）
+    const tplStart = raw.indexOf('<template>')
+    const tplEnd = raw.lastIndexOf('</template>')
+    const tpl = raw.slice(tplStart, tplEnd).replace(/<!--[\s\S]*?-->/g, '')
+    // ② 字符串字面量（单/双/反引号），排除注释行
+    const codeLines = raw
+      .split('\n')
+      .filter((line) => {
+        const s = line.trim()
+        return !(s.startsWith('//') || s.startsWith('*') || s.startsWith('/*'))
+      })
+      .join('\n')
+    const literals = [...codeLines.matchAll(/['"`]([^'"`\n]*)['"`]/g)]
+      .map((m) => m[1])
+      .join('\n')
+
+    const haystack = `${tpl}\n${literals}`
+    const offenders = haystack
+      .split('\n')
+      .filter((line) => /已同步|双向回写/.test(line))
+      .filter((line) => !/不同步|未同步|不得|禁止|而不是|不是/.test(line))
+    expect(
+      offenders,
+      `GtOnlyOfficeSheet 的用户可见文案声称了已同步：\n${offenders.join('\n')}`,
+    ).toEqual([])
   })
 })

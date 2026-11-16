@@ -1,6 +1,6 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：18/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.7 + 5.3 + 5.4 已完成；真源层 / 服务端解析层 / 前端三态 / legacy ledger / 前端契约守卫 / 变异套件已收口）**
+> **状态：19/34（2026-11-16，Phase 1.1~1.5 + 2.1~2.6 + 3.1 + 3.6 + 3.7 + 5.3 + 5.4 已完成；真源层 / 服务端解析层 / 前端三态与文案 / legacy ledger / 契约守卫 / 变异套件已收口）**
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
@@ -99,7 +99,12 @@
   - _R: 3, 9_
 - [ ] 3.5 迁移一个聚合 source sheet；验证映射到子 entry，不回退父级模板。
   - _R: 1, 3, 9_
-- [ ] 3.6 更新 pending / single_onlyoffice / custom / Word 的前端文案与入口门控；不得显示“双向回写”假状态。
+- [x] 3.6 更新 pending / single_onlyoffice / custom / Word 的前端文案与入口门控；不得显示“双向回写”假状态。
+  - 先现算再改：模板里 **40 条**含「已同步 / 双向回写」的文案，逐条核对后确认**没有一条**是「在线编辑已同步」的假状态（全部是业务语义：披露表→附注、审定数同步、H9 同步等）⇒ 不需要大改全仓文案。
+  - 真实缺口一处：`GtOnlyOfficeSheet`（pending / out_of_scope / custom / single_onlyoffice 的载体）打开成功时**不告诉用户这是独立在线编辑**。已加常驻 `el-alert type="info"` 提示条：「独立在线编辑（不同步）」+「本底稿的在线编辑与左侧结构化表单各自保存，改动不会自动互相同步」。
+  - 用 `type="info"` 而非 `warning`（这不是错误/降级）也非 `success`（那会暗示已同步）。`sync_mode` 默认 `independent`（缺字段按不同步显示 —— 反向会让灰度期全部显示假「已同步」）。
+  - 12 例守卫（原 8 + 新 4）；变异 5/5 全精确打红零假红。
+  - 🔴 三处假绿/假红：①文案判据首版扫全文 ⇒ 抓到我自己的说明性注释（「不得暗示已同步」）⇒ 改成只扫**模板文本 + 字符串字面量**；②`el-alert` 桩只渲染默认插槽而标题在 `<template #title>` ⇒ `wrapper.text()` 恒空（看起来像功能没实现）⇒ 桩补渲染命名插槽；③「默认显示」用例 mock 了成功的 config 响应 ⇒ `syncMode` 在赋值时被显式设成 `independent`，**默认值从未被验证**（M3 存活）⇒ 补「config 请求失败」用例让赋值语句不执行。
   - _R: 4, 5, 6_
 - [x] 3.7 宿主闭包守卫：迁移 binding 的所有旧 `onlyoffice-config` 调用为 0；未迁移调用逐条存在 ledger、owner 与 reason。
   - 生成器 `generate_legacy_onlyoffice_caller_ledger.py`（`--apply` / `--check`，幂等）+ 生成物 `backend/data/workpaper_sync_legacy_onlyoffice_callers.json`：现算 **22 个调用方文件 / 27 处代码调用**（非注释、非测试），3 个合法入口（`onlyOfficeEntryConfig.ts` 唯一入口 + `onlyOfficeSheetConfig.ts` URL 拼装 + `utils/http.ts` URL 判断）。

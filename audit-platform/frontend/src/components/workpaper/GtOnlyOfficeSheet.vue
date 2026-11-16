@@ -19,6 +19,22 @@
         {{ isFullscreen ? '退出全屏' : '全屏编辑' }}
       </el-button>
     </div>
+    <!--
+      task 3.6 / Requirement 4.2 / 6.2：独立在线编辑必须**明确标注不同步**。
+
+      🔴 为什么放在工具栏下方、且是 `el-alert type="info"`（不是 warning）：
+      这不是错误也不是降级 —— pending / out_of_scope 的入口本来就用独立在线编辑。
+      用 warning 会让用户以为出了问题；用 success 则会暗示「已同步」（本 spec 要消灭的假状态）。
+    -->
+    <div v-if="showIndependentHint" class="gt-onlyoffice-sheet__sync-hint">
+      <el-alert type="info" :closable="false" show-icon>
+        <template #title>
+          <span class="gt-onlyoffice-sheet__sync-hint-title">独立在线编辑（不同步）</span>
+        </template>
+        本底稿的在线编辑与左侧结构化表单**各自保存**，改动不会自动互相同步。
+        需要结构化数据与文档一致时，请在两侧分别保存。
+      </el-alert>
+    </div>
     <div v-if="loading" class="gt-onlyoffice-sheet__loading">
       <el-icon class="gt-onlyoffice-sheet__spinner" :size="24"><Loading /></el-icon>
       <span>加载中...</span>
@@ -33,10 +49,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import type { ForceSaveResult } from './sync/forceSaveTypes'
+
+// ─── task 3.6：同步语义（独立在线编辑 / 已绑 room）───
+//
+// 服务端在旧式 config 响应**顶层**回 `sync_mode`（task 2.6）。
+//
+// 🔴 默认 `independent`：缺字段时按「不同步」显示 —— 反向（默认 bound）会让所有入口
+// 在灰度期显示「已同步」假状态，那正是本 spec 要消灭的。
+const syncMode = ref<'bound' | 'independent'>('independent')
+const showIndependentHint = computed(() => syncMode.value === 'independent')
 
 // ─── Props / Emits ───
 const props = withDefaults(defineProps<{
@@ -198,6 +223,8 @@ async function initialize() {
     } as any)
     const configPayload = response.data?.data ?? response.data
     const { config, token, onlyoffice_url } = configPayload
+    // task 3.6：`sync_mode` 在响应**顶层**（与 config 平级），不是 config 内部。
+    syncMode.value = configPayload?.sync_mode === 'bound' ? 'bound' : 'independent'
 
     // 确定 OnlyOffice 服务 URL（API 响应优先，VITE 环境变量兜底）
     const baseUrl = onlyoffice_url || import.meta.env.VITE_ONLYOFFICE_URL || ''
@@ -406,6 +433,14 @@ onBeforeUnmount(() => {
   padding: 8px 16px;
   background: #fff;
   border-bottom: 1px solid #dcdfe6;
+}
+/* task 3.6：独立在线编辑提示条（Requirement 4.2 / 6.2） */
+.gt-onlyoffice-sheet__sync-hint {
+  flex-shrink: 0;
+  padding: 0 8px 6px;
+}
+.gt-onlyoffice-sheet__sync-hint-title {
+  font-weight: 600;
 }
 
 .gt-onlyoffice-sheet__loading {
