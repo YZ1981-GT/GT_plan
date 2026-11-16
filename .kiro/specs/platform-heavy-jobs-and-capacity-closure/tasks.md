@@ -196,6 +196,15 @@
     在真实 PG 上验证（同章节串行 / 跨章节并行 / commit+rollback 释放 / 并发不丢更新，
     5 passed + 2 组变异 RED，详见 C2 条）。本条余项仍是**合并附注特有**的两件：
     差额节点走 `fill_by_formula` 而非纯内存内核、叶子来源整章批取。
+  - **2026-11-17 补（差额节点已改为 ViewContext 内存预计算，`[ ]` 保持——真实 PG 对拍仍缺）**：
+    `_Run._elim` 直接复用已装载的 `ViewContext`、`node_measures`、章节 `formulas`，调用纯求值
+    `note_cell_values` 得到公式单元格，再把 `_precomputed_cells` 传给 `fill_by_formula` 的写入分支。
+    因此子树重汇总不再为差额节点重新执行 `note_breakdown`、重建 context、重查公式/报表；
+    保护格、节点专属记录、来源投影、公式快照和章节 SAVEPOINT 仍复用原写入路径。
+    新增/扩展 `test_consol_reaggregate_batch_prefetch.py` **7 passed**（含预计算接线与默认路径保留）；
+    主编排文件抽出 `consol_note_reaggregate_prefetch.py`，行数门保持通过。
+    **仍未完成**：差额计算与生产金额逐值对拍、真实 PG 并发下的 C2/C3 全链路验证；
+    Windows 共享 `_overlapped` 资源异常导致本轮磁盘变异子进程无法初始化，未虚报变异通过。
 - [ ] C4 Ledger 导入分阶段 profiler；COPY/staging/set-based 合并把真实大项目目标压到 5 分钟内。
   - profiler 骨架 `app/services/ledger_import/profiler.py`（`StagedProfiler` + `StageRecord`）：
     PG 下 `pg_current_wal_lsn()` + `pg_wal_lsn_diff` 自动采集每阶段 WAL 增量字节，非 PG 环境
