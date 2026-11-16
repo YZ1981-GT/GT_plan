@@ -17,7 +17,7 @@ import sqlalchemy as sa
 
 from app.core.config import settings
 from app.models.evidence_governance_models import AttachmentVersion
-from app.models.phase13_models import WordExportTask
+from app.models.phase13_models import WordExportTask, WordExportTaskVersion
 from app.services import archive_section_registry
 from app.services.archive_inventory import MISSING, OK, SKIPPED, build_project_inventory, orphan_files
 from app.services.archive_package_builder import ArchivePackageError, build_archive_package, package_path
@@ -44,6 +44,7 @@ async def world(monkeypatch, tmp_path):
         def _create(sync_session):
             conn = sync_session.connection()
             WordExportTask.__table__.create(conn)
+            WordExportTaskVersion.__table__.create(conn)
             CHECKLIST.create(conn)
         await w.db.run_sync(_create)
         yield w
@@ -68,8 +69,23 @@ def _file(tmp_path: Path, rel: str, data: bytes) -> Path:
 
 async def _deliverable(world, *, status: str, file_path: str | None, doc_type: str = "audit_report"):
     who = await world.edit_member()
-    return await world._add(WordExportTask(project_id=world.target.id, doc_type=doc_type, status=status,
+    task = await world._add(WordExportTask(project_id=world.target.id, doc_type=doc_type, status=status,
                                            file_path=file_path, created_by=who.user.id))
+    # 归档契约要求 terminal 交付件必须绑定 latest version/hash/policy pair。
+    if status in {"confirmed", "signed", "archived"}:
+        path = Path(file_path) if file_path else None
+        file_hash = hashlib.sha256(path.read_bytes()).hexdigest() if path and path.is_file() else None
+        await world._add(WordExportTaskVersion(
+            word_export_task_id=task.id,
+            version_no=1,
+            file_path=file_path,
+            created_by=who.user.id,
+            file_size=path.stat().st_size if path and path.is_file() else None,
+            file_hash=file_hash,
+            unit_policy_snapshot={"unit": "yuan", "divisor": 1, "regions": []},
+            unit_policy_digest="a" * 64,
+        ))
+    return task
 
 
 async def _good_project(world, tmp_path):
@@ -168,6 +184,10 @@ async def test_package_success_manifest_matches_zip(world, tmp_path, monkeypatch
         assert zf.read(f"40-附件/{str(new.id)[:8]}-回函.pdf") == b"new-version"  # 只收现行版本
         assert zf.read("00-项目封面.pdf") == b"%PDF-cover"
         assert zf.read(f"50-交付件/audit_report-{str(report.id)[:8]}.docx") == b"docx"
+        deliverable_entry = next(e for e in manifest["entries"] if e["source_id"] == str(report.id))
+        assert deliverable_entry["evidence"]["version_no"] == 1
+        assert deliverable_entry["evidence"]["policy_digest"] == "a" * 64
+        assert deliverable_entry["evidence"]["file_hash"] == hashlib.sha256(b"docx").hexdigest()
         snap = json.loads(zf.read("11-底稿数据/A30.json"))
         assert snap["checklist_responses"] == [{"item_id": "A30-A1-11", "conclusion": "是", "remark": None,
                                                 "wp_ref": None}]
@@ -241,3 +261,87 @@ async def test_orphan_files(world, tmp_path):
                                        storage_type="local", storage_key=str(versioned), actor_type="user",
                                        actor_user_id=(await world.edit_member()).user.id))
     assert await orphan_files(world.db, world.target.id) == [orphan]
+
+
+async def test_deliverable_inventory_binds_latest_version_hash_and_policy(world, tmp_path):
+    """归档清单只绑定 version_no 最大的交付件版本，并带 policy pair 证据。"""
+    _wp, _blank, _old, _new, report = await _good_project(world, tmp_path)
+    latest_path = _file(tmp_path, "dl/report-v2.docx", b"docx-v2")
+    who = await world.edit_member()
+    latest = await world._add(WordExportTaskVersion(
+        word_export_task_id=report.id,
+        version_no=2,
+        file_path=str(latest_path),
+        created_by=who.user.id,
+        file_size=latest_path.stat().st_size,
+        file_hash=hashlib.sha256(latest_path.read_bytes()).hexdigest(),
+        unit_policy_snapshot={"unit": "wan", "divisor": 10000, "regions": []},
+        unit_policy_digest="b" * 64,
+    ))
+    await world.db.flush()
+
+    inv = await build_project_inventory(world.db, world.target.id)
+    entry = next(e for e in inv.entries if e.source_id == str(report.id))
+    assert entry.status == OK
+    assert entry.local_path == latest_path
+    assert entry.evidence == {
+        "version_id": str(latest.id),
+        "version_no": 2,
+        "file_hash": hashlib.sha256(latest_path.read_bytes()).hexdigest(),
+        "policy_digest": "b" * 64,
+        "policy_snapshot": {"unit": "wan", "divisor": 10000, "regions": []},
+    }
+
+
+async def test_deliverable_without_version_evidence_is_missing(world, tmp_path):
+    """terminal 交付件没有版本记录时 fail-closed，不回退旧主任务 file_path。"""
+    who = await world.edit_member()
+    path = _file(tmp_path, "dl/legacy.docx", b"legacy")
+    task = await world._add(WordExportTask(
+        project_id=world.target.id,
+        doc_type="legacy",
+        status="confirmed",
+        file_path=str(path),
+        created_by=who.user.id,
+    ))
+    await world.db.flush()
+
+    inv = await build_project_inventory(world.db, world.target.id)
+    entry = next(e for e in inv.entries if e.source_id == str(task.id))
+    assert entry.status == MISSING
+    assert "没有版本证据" in entry.reason
+
+
+async def test_deliverable_hash_mismatch_is_missing(world, tmp_path):
+    """latest version 声明的 hash 与磁盘不一致时阻断归档。"""
+    _wp, _blank, _old, _new, report = await _good_project(world, tmp_path)
+    version = (await world.db.execute(
+        sa.select(WordExportTaskVersion).where(
+            WordExportTaskVersion.word_export_task_id == report.id
+        )
+    )).scalar_one()
+    version.file_hash = "c" * 64
+    await world.db.flush()
+
+    inv = await build_project_inventory(world.db, world.target.id)
+    entry = next(e for e in inv.entries if e.source_id == str(report.id))
+    assert entry.status == MISSING
+    assert "hash 不匹配" in entry.reason
+
+
+async def test_deliverable_policy_pair_missing_is_missing(world, tmp_path):
+    """latest version 缺 policy pair 时阻断归档，不回退项目当前单位。"""
+    _wp, _blank, _old, _new, report = await _good_project(world, tmp_path)
+    version = (await world.db.execute(
+        sa.select(WordExportTaskVersion).where(
+            WordExportTaskVersion.word_export_task_id == report.id
+        )
+    )).scalar_one()
+    version.unit_policy_digest = None
+    version.unit_policy_snapshot = None
+    await world.db.flush()
+
+    inv = await build_project_inventory(world.db, world.target.id)
+    entry = next(e for e in inv.entries if e.source_id == str(report.id))
+    assert entry.status == MISSING
+    assert "policy pair" in entry.reason

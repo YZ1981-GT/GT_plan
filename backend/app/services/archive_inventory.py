@@ -14,10 +14,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -47,6 +49,7 @@ class InventoryEntry:
     local_path: Path | None = None
     paperless_document_id: int | None = None
     wp_code: str = ""
+    evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -191,7 +194,7 @@ async def _attachment_entries(db: AsyncSession, project_id: UUID, names: _ArcNam
 
 
 async def _deliverable_entries(db: AsyncSession, project_id: UUID, names: _ArcNames) -> list[InventoryEntry]:
-    from app.models.phase13_models import WordExportTask
+    from app.models.phase13_models import WordExportTask, WordExportTaskVersion
     from app.services.attachment_upload_policy import resolve_local_attachment_file
     from app.services.deliverable_service import TERMINAL_REEXPORT_STATUSES
 
@@ -201,17 +204,67 @@ async def _deliverable_entries(db: AsyncSession, project_id: UUID, names: _ArcNa
             WordExportTask.status.in_(sorted(TERMINAL_REEXPORT_STATUSES)),
         ).order_by(WordExportTask.doc_type, WordExportTask.created_at, WordExportTask.id)
     )).scalars().all()
+    task_ids = [task.id for task in tasks]
+    versions_by_task: dict[UUID, WordExportTaskVersion] = {}
+    if task_ids:
+        # 归档只收**精确最新版本**：按 version_no DESC，再以 created_at/id 作稳定平局裁决。
+        version_rows = (await db.execute(
+            sa.select(WordExportTaskVersion)
+            .where(WordExportTaskVersion.word_export_task_id.in_(task_ids))
+            .order_by(
+                WordExportTaskVersion.version_no.desc(),
+                WordExportTaskVersion.created_at.desc(),
+                WordExportTaskVersion.id.desc(),
+            )
+        )).scalars().all()
+        for version in version_rows:
+            versions_by_task.setdefault(version.word_export_task_id, version)
+
     out: list[InventoryEntry] = []
     for task in tasks:
         label = f"{task.doc_type}（{task.status}）"
         base = dict(category="deliverable", source_id=str(task.id), label=label)
-        path = resolve_local_attachment_file(task.file_path)
+        version = versions_by_task.get(task.id)
+        if version is None:
+            out.append(InventoryEntry(**base, arcname="", status=MISSING,
+                                      reason="交付件没有版本证据，无法绑定 latest version/hash/policy"))
+            continue
+        path = resolve_local_attachment_file(version.file_path)
         if path is None:
-            out.append(InventoryEntry(**base, arcname="", status=MISSING, reason="交付件文件不存在"))
+            out.append(InventoryEntry(**base, arcname="", status=MISSING,
+                                      reason="交付件文件不存在"))
+            continue
+        expected_hash = getattr(version, "file_hash", None) or getattr(version, "file_sha256", None)
+        policy_digest = getattr(version, "unit_policy_digest", None)
+        policy_snapshot = getattr(version, "unit_policy_snapshot", None)
+        if not expected_hash or not policy_digest or not policy_snapshot:
+            out.append(InventoryEntry(**base, arcname="", status=MISSING,
+                                      reason="交付件最新版本缺少 file hash 或 policy pair"))
+            continue
+        actual_hash = _file_sha256(path)
+        if actual_hash != expected_hash:
+            out.append(InventoryEntry(**base, arcname="", status=MISSING,
+                                      reason="交付件最新版本 file hash 不匹配"))
             continue
         arcname = names.take("50-交付件", f"{safe_name(task.doc_type)}-{str(task.id)[:8]}", path.suffix.lower())
-        out.append(InventoryEntry(**base, arcname=arcname, status=OK, local_path=path))
+        evidence = {
+            "version_id": str(version.id),
+            "version_no": version.version_no,
+            "file_hash": expected_hash,
+            "policy_digest": policy_digest,
+            "policy_snapshot": policy_snapshot,
+        }
+        out.append(InventoryEntry(**base, arcname=arcname, status=OK, local_path=path,
+                                  evidence=evidence))
     return out
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 async def _consol_entries(db: AsyncSession, project_id: UUID, names: _ArcNames) -> list[InventoryEntry]:

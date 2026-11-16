@@ -180,13 +180,40 @@ class _Writer:
         self.names.add(name.casefold())
         return name
 
-    def add_bytes(self, arcname: str, data: bytes, *, category: str, source_id: str, label: str) -> None:
+    def add_bytes(
+        self,
+        arcname: str,
+        data: bytes,
+        *,
+        category: str,
+        source_id: str,
+        label: str,
+        evidence: dict | None = None,
+    ) -> None:
         arcname = self._unique(arcname)
         self.zf.writestr(arcname, data)
-        self.entries.append({"category": category, "source_id": source_id, "label": label, "arcname": arcname,
-                             "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+        entry = {
+            "category": category,
+            "source_id": source_id,
+            "label": label,
+            "arcname": arcname,
+            "size": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+        }
+        if evidence:
+            entry["evidence"] = evidence
+        self.entries.append(entry)
 
-    def add_file(self, arcname: str, src: Path, *, category: str, source_id: str, label: str) -> None:
+    def add_file(
+        self,
+        arcname: str,
+        src: Path,
+        *,
+        category: str,
+        source_id: str,
+        label: str,
+        evidence: dict | None = None,
+    ) -> None:
         arcname = self._unique(arcname)
         h, size = hashlib.sha256(), 0
         with open(src, "rb") as f, self.zf.open(arcname, "w", force_zip64=True) as dst:
@@ -194,8 +221,17 @@ class _Writer:
                 h.update(chunk)
                 size += len(chunk)
                 dst.write(chunk)
-        self.entries.append({"category": category, "source_id": source_id, "label": label, "arcname": arcname,
-                             "size": size, "sha256": h.hexdigest()})
+        entry = {
+            "category": category,
+            "source_id": source_id,
+            "label": label,
+            "arcname": arcname,
+            "size": size,
+            "sha256": h.hexdigest(),
+        }
+        if evidence:
+            entry["evidence"] = evidence
+        self.entries.append(entry)
 
 
 async def build_archive_package(db: AsyncSession, project_id: UUID, job_id: UUID) -> PackageResult:
@@ -223,10 +259,23 @@ async def build_archive_package(db: AsyncSession, project_id: UUID, job_id: UUID
                 w.add_bytes(name, data, category="section", source_id=prefix, label=name)
             for e in ok_entries:
                 if e.local_path is not None:
-                    w.add_file(e.arcname, e.local_path, category=e.category, source_id=e.source_id, label=e.label)
+                    w.add_file(
+                        e.arcname,
+                        e.local_path,
+                        category=e.category,
+                        source_id=e.source_id,
+                        label=e.label,
+                        evidence=e.evidence or None,
+                    )
                 else:
-                    w.add_bytes(e.arcname, paperless[e.source_id], category=e.category, source_id=e.source_id,
-                                label=e.label)
+                    w.add_bytes(
+                        e.arcname,
+                        paperless[e.source_id],
+                        category=e.category,
+                        source_id=e.source_id,
+                        label=e.label,
+                        evidence=e.evidence or None,
+                    )
             for code, name, snap in snapshots:
                 data = json.dumps(snap, ensure_ascii=False, sort_keys=True, indent=2, default=str).encode("utf-8")
                 w.add_bytes(f"11-底稿数据/{safe_name(code)}.json", data, category="workpaper_data",
