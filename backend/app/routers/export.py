@@ -29,7 +29,10 @@ from app.models.report_schemas import (
     ExportHistoryResponse,
 )
 from app.services.export_policy_snapshot import resolve_policy_snapshot_for_project
-from app.services.pdf_export_engine import PDFExportEngine
+from app.services.pdf_export_engine import (
+    PDFConversionUnavailable,
+    PDFExportEngine,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,14 +53,19 @@ async def create_export_task(
     try:
         # spec platform-global-display-settings-closure 任务 10 / AC-21：
         # 落单位策略快照证据（`export_tasks.unit_policy_snapshot`，V265）。
-        # 失败**不阻断导出**（它是审计证据不是业务前置），但要在日志留痕。
-        unit_policy_snapshot: str | None = None
+        # 🔴 失败**不得静默放行**：没有 policy 快照的正式导出无法审计
+        # 「这份交付件按哪个单位出的」。AC-20 明文要求「逐调用方删除参数均失败」
+        # ⇒ 构造失败返回 422（策略不完整属请求前置条件问题），不是 warning。
         try:
             unit_policy_snapshot = await resolve_policy_snapshot_for_project(
                 db, project_id=data.project_id
             )
         except Exception as exc:  # noqa: BLE001
-            logger.warning("导出单位策略快照构造失败（不阻断导出）: %s", exc)
+            logger.error("导出单位策略快照构造失败: %s", exc)
+            raise HTTPException(
+                status_code=422,
+                detail=f"项目单位策略不完整，无法正式导出：{exc}",
+            ) from exc
         task = await engine.create_export_task(
             project_id=data.project_id,
             task_type=data.task_type,
@@ -68,6 +76,13 @@ async def create_export_task(
         task = await engine.execute_export(task.id)
         await db.commit()
         return ExportTaskStatusResponse.model_validate(task)
+    except HTTPException:
+        await db.rollback()
+        raise
+    except PDFConversionUnavailable as exc:
+        # 转换链缺失是环境问题：503 + 可重试语义（任务已标 failed 留痕）。
+        await db.rollback()
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"导出任务创建失败: {str(e)}")

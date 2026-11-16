@@ -33,6 +33,21 @@ CHECKLIST = sa.Table(
 )
 TEMPLATE = BACKEND_ROOT / "wp_templates" / "A" / "A30 电子底稿归档检查表.xlsx"
 
+from app.models.workpaper_sync_models import (
+    WorkpaperArtifact as _WpArtifact,
+    WorkpaperContentRepresentation as _WpRep,
+    WorkpaperContentVersion as _WpCv,
+    WorkpaperSyncEntryState as _WpEntry,
+)
+
+VERSION_CHAIN_TABLES = (
+    _WpCv.__table__,
+    _WpArtifact.__table__,
+    _WpRep.__table__,
+    _WpEntry.__table__,
+)
+EXTRA_TABLES_FOR_VERSION_CHAIN = VERSION_CHAIN_TABLES
+
 
 @pytest_asyncio.fixture
 async def world(monkeypatch, tmp_path):
@@ -345,3 +360,240 @@ async def test_deliverable_policy_pair_missing_is_missing(world, tmp_path):
     entry = next(e for e in inv.entries if e.source_id == str(report.id))
     assert entry.status == MISSING
     assert "policy pair" in entry.reason
+
+
+# ── content version evidence 端到端（AC-22 / 任务 10）───────────────────────
+#
+# 版本链四表在 SQLite world 里默认不存在（`EXTRA_TABLES` 只建附件相关表），
+# 本组用例自己建；`WorkingPaper.current_content_version_id` 刻意不声明
+# ForeignKey（权威在 DB 侧 `fk_wp_current_content_version`），所以能直接赋值。
+
+
+@pytest_asyncio.fixture
+async def version_world(monkeypatch, tmp_path):
+    """在 ``world`` 之上补建 content version / representation / artifact / entry state。"""
+    from app.models.workpaper_sync_models import (
+        WorkpaperArtifact,
+        WorkpaperContentRepresentation,
+        WorkpaperContentVersion,
+        WorkpaperSyncEntryState,
+    )
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(settings, "STORAGE_ROOT", str(tmp_path / "storage"))
+    monkeypatch.setattr(settings, "ATTACHMENT_LOCAL_STORAGE_ROOT", str(tmp_path / "attachments"))
+    async with sqlite_attachment_world(monkeypatch) as w:
+
+        def _create(sync_session):
+            conn = sync_session.connection()
+            WordExportTask.__table__.create(conn)
+            WordExportTaskVersion.__table__.create(conn)
+            CHECKLIST.create(conn)
+            # 版本链四表：外键只保留指向已建表的，避免 SQLite 解析缺表
+            created = {t.name for t in (
+                *EXTRA_TABLES_FOR_VERSION_CHAIN, CHECKLIST, WordExportTask.__table__,
+                WordExportTaskVersion.__table__,
+            )}
+            for table in VERSION_CHAIN_TABLES:
+                fks = [
+                    fk for fk in table.foreign_key_constraints
+                    if fk.referred_table.name in created
+                ]
+                conn.execute(sa.schema.CreateTable(table, include_foreign_key_constraints=fks))
+            for table in VERSION_CHAIN_TABLES:
+                for index in sorted(table.indexes, key=lambda item: item.name or ""):
+                    from tests.authz_world import _index_statement
+                    statement = _index_statement(index, conn.dialect.name)
+                    if isinstance(statement, str):
+                        conn.exec_driver_sql(statement)
+                    else:
+                        conn.execute(statement)
+
+        await w.db.run_sync(_create)
+        yield w
+
+
+_GOOD_POLICY = {"unit": "yuan", "divisor": 1, "regions": []}
+
+#: 版本链 NOT NULL 列的固定占位（真实写入方由 workpaper-sync 提供，这里只造形状）
+_CHAIN_DEFAULTS = {
+    "definition_bundle_id": uuid.UUID("11111111-1111-1111-1111-111111111111"),
+    "definition_bundle_sha256": "1" * 64,
+    "authority_model_definition_id": uuid.UUID("22222222-2222-2222-2222-222222222222"),
+    "authority_model_definition_sha256": "2" * 64,
+    "adapter_id": "test-adapter",
+    "adapter_build_digest": "3" * 64,
+    "structure_hash": "4" * 64,
+    "identity_inventory_sha256": "5" * 64,
+    "reason": "test",
+}
+
+
+async def _version_chain(
+    world,
+    wp,
+    *,
+    surface: str,
+    digest: str | None = None,
+    snapshot: dict | None = None,
+    source_storage_unit: str | None = None,
+    artifact_sha256: str = "f" * 64,
+):
+    """给底稿造一条完整版本链（content version → artifact → representation → entry state）。"""
+    from app.models.workpaper_sync_models import (
+        WorkpaperArtifact,
+        WorkpaperContentRepresentation,
+        WorkpaperContentVersion,
+        WorkpaperSyncEntryState,
+    )
+
+    cv = await world._add(WorkpaperContentVersion(
+        wp_id=wp.id,
+        revision=1,
+        source="html",
+        export_surface_class=surface,
+        unit_policy_snapshot=snapshot,
+        unit_policy_digest=digest,
+        source_storage_unit=source_storage_unit,
+    ))
+    artifact = await world._add(WorkpaperArtifact(
+        project_id=world.target.id,
+        wp_id=wp.id,
+        kind="projection",
+        state="published",
+        relative_path="sync/proj/wp/published.xlsx",
+        sha256=artifact_sha256,
+        size_bytes=12,
+        document_type="xlsx",
+        retention_class="standard",
+        legal_hold=False,
+    ))
+    rep = await world._add(WorkpaperContentRepresentation(
+        wp_id=wp.id,
+        content_version_id=cv.id,
+        entry_id="entry-1",
+        generation=1,
+        document_type="xlsx",
+        artifact_id=artifact.id,
+        artifact_sha256=artifact_sha256,
+        **_CHAIN_DEFAULTS,
+    ))
+    await world._add(WorkpaperSyncEntryState(
+        wp_id=wp.id,
+        entry_id="entry-1",
+        current_representation_id=rep.id,
+        representation_generation=1,
+    ))
+    wp.current_content_version_id = cv.id
+    await world.db.flush()
+    return cv, artifact, rep
+
+
+async def test_archive_binds_formal_content_version_evidence(version_world, tmp_path):
+    """formal 完整链 ⇒ 条目 OK 且 evidence 带 content version / policy digest。"""
+    world = version_world
+    wp_file = _file(tmp_path, "wp/D2-1.xlsx", b"wp-bytes")
+    wp = await add_wp(world, world.target, wp_code="D2-1")
+    wp.file_path = str(wp_file)
+    await world.db.flush()
+    cv, artifact, rep = await _version_chain(
+        world, wp,
+        surface="formal",
+        digest="a" * 64,
+        snapshot={**_GOOD_POLICY, "_digest": "a" * 64},
+    )
+
+    inventory = await build_project_inventory(world.db, world.target.id)
+    entries = [e for e in inventory.entries if e.category == "workpaper_file"]
+    assert len(entries) == 1, entries
+    entry = entries[0]
+    assert entry.status == OK, entry.reason
+    assert entry.evidence["content_version_id"] == str(cv.id)
+    assert entry.evidence["representation_id"] == str(rep.id)
+    assert entry.evidence["artifact_id"] == str(artifact.id)
+    assert entry.evidence["artifact_sha256"] == "f" * 64
+    assert entry.evidence["classification"] == "formal"
+    assert entry.evidence["policy_digest"] == "a" * 64
+    assert entry.evidence["policy_snapshot"]["unit"] == "yuan"
+    assert entry.evidence["source_storage_unit"] is None
+
+
+async def test_archive_turns_evidence_error_into_missing(version_world, tmp_path, monkeypatch):
+    """resolver 抛证据错误 ⇒ 条目转 MISSING，不得回退 file_path 伪装当前版本。
+
+    🔴 这里刻意 monkeypatch **resolver 抛真异常类型**而不是让 SQLite 自己走到
+    抛错：SQLite world 的 `bind.dialect.name == "sqlite"` 会走
+    `export_evidence` 的旧 schema 兼容分支（返回 None），在 SQLite 上根本
+    到不了 fail-closed。方言语义由
+    `test_workpaper_export_evidence.TestDialectCompatibilityBranch` 用脚本化
+    db 双态钉住；本用例只负责归档层的**消费方行为**。
+    """
+    world = version_world
+    from app.models.workpaper_sync_models import WorkpaperContentVersion
+    from app.services.workpaper_sync import export_evidence
+
+    wp_file = _file(tmp_path, "wp/D2-1.xlsx", b"wp-bytes")
+    wp = await add_wp(world, world.target, wp_code="D2-1")
+    wp.file_path = str(wp_file)
+    await world.db.flush()
+    cv = await world._add(WorkpaperContentVersion(wp_id=wp.id, revision=1, source="html"))
+    wp.current_content_version_id = cv.id
+    await world.db.flush()
+
+    async def _raise(*_a, **_kw):
+        raise export_evidence.WorkpaperExportEvidenceError(
+            "当前内容版本缺少 export_surface_class，不能正式导出或归档"
+        )
+
+    monkeypatch.setattr(
+        export_evidence, "resolve_current_content_export_evidence", _raise
+    )
+
+    inventory = await build_project_inventory(world.db, world.target.id)
+    entries = [e for e in inventory.entries if e.category == "workpaper_file"]
+    assert len(entries) == 1, entries
+    assert entries[0].status == MISSING, entries[0]
+    assert "证据无效" in entries[0].reason
+    assert "export_surface_class" in entries[0].reason
+    assert entries[0].evidence == {}
+    # 不得静默降级成「有文件就算 OK」
+    assert entries[0].arcname == ""
+
+
+async def test_archive_without_content_version_stays_compatible(version_world, tmp_path):
+    """历史底稿（无 current content version）仍 OK，evidence 为空 —— 合法兼容路径。"""
+    world = version_world
+    wp_file = _file(tmp_path, "wp/D2-1.xlsx", b"wp-bytes")
+    wp = await add_wp(world, world.target, wp_code="D2-1")
+    wp.file_path = str(wp_file)
+    await world.db.flush()
+
+    inventory = await build_project_inventory(world.db, world.target.id)
+    entries = [e for e in inventory.entries if e.category == "workpaper_file"]
+    assert len(entries) == 1, entries
+    assert entries[0].status == OK, entries[0].reason
+    assert entries[0].evidence == {}
+
+
+async def test_archive_data_exchange_evidence_is_recorded(version_world, tmp_path):
+    """data_exchange 链 ⇒ evidence.classification=data_exchange 且带 source_storage_unit。"""
+    world = version_world
+    wp_file = _file(tmp_path, "wp/D2-1.xlsx", b"wp-bytes")
+    wp = await add_wp(world, world.target, wp_code="D2-1")
+    wp.file_path = str(wp_file)
+    await world.db.flush()
+    await _version_chain(
+        world, wp,
+        surface="data_exchange",
+        digest=None,
+        snapshot=None,
+        source_storage_unit="yuan",
+        artifact_sha256="e" * 64,
+    )
+
+    inventory = await build_project_inventory(world.db, world.target.id)
+    entry = next(e for e in inventory.entries if e.category == "workpaper_file")
+    assert entry.status == OK, entry.reason
+    assert entry.evidence["classification"] == "data_exchange"
+    assert entry.evidence["source_storage_unit"] == "yuan"
+    assert entry.evidence["policy_digest"] is None
