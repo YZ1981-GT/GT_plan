@@ -324,3 +324,83 @@
 ### 6.6 第二次语义审查补充
 
 发现 `!state.value.authorityId` 与 `input.authorityId !== state.value.authorityId` **语义重叠**（后者完全蕴含前者：state 为 null 时 `string !== null` 恒真）⇒ 两条并存会互相兜底，把任何一条的变异掩盖掉（实测 `finalize authority guard removed` 连跑两轮存活）。已按「同一判据合成一处」合并为单条 `input.authorityId !== state.value.authorityId`，注释写明它同时覆盖两种情形。合并后 9/9 RED。
+
+---
+
+## 七、publication registry 持久化（2026-11-15 本轮）
+
+### 7.1 问题实证
+
+实施前现算确认（禁猜）：
+
+| 对象 | 生产调用方 | 结论 |
+| --- | --- | --- |
+| `publication_ops.PublicationRegistry` | **0**（只有 `test_merge_publication_retention.py`） | 纯内存 dataclass，重启即丢 |
+| `publication_ops.instantiate_from_active` | **0** | 同上 |
+| `finalize_saga.InMemoryAckLedger` | **0**（只有 `test_finalize_saga.py`） | 内存 ACK ledger |
+| `finalize_saga.run_finalize_saga` | **0** | 内存 saga |
+| `finalize_saga.begin_pending_visibility` | **0** | 只 `return` record，不落库 |
+
+同时确认**持久化能力其实早已存在**：`guidance_handoff_consumer_service.record_ack` /
+`resolve_visibility` 读写真实 `guidance_consumer_ack` / `guidance_handoff_visibility`
+表，`finalize_saga` 已经 import 了它们但只用了内存替身。⇒ 缺的不是存储层，
+而是「把 saga 接到持久化存储 + 有生产调用方」。
+
+### 7.2 交付内容
+
+| 文件 | 说明 |
+| --- | --- |
+| `backend/migrations/V272__custom_template_publication_registry.sql` | 新建 `custom_template_publications` + `custom_template_publication_pins` 两张表 |
+| `backend/migrations/R272__rollback_custom_template_publication_registry.sql` | 回滚（先 pins 后 publications） |
+| `backend/app/models/custom_template_publication.py` | ORM：`CustomTemplatePublication` / `CustomTemplatePublicationPin` |
+| `backend/app/services/custom_template_ingestion/publication_registry_store.py` | 持久化仓储：`register_publication` / `get_publication` / `list_publications` / `transition_publication` / `pin_project` / `get_project_pin` / `assert_instantiate_allowed_persisted` |
+| `backend/app/routers/custom_template_ingestion.py` | finalize 落库 PENDING_VISIBILITY publication；新增 `GET /publications`、`POST /publications/instantiate` |
+
+迁移号 **V272 / R272**（实施前现扫磁盘最高 = V271，`count=259`）。
+
+### 7.3 关键不变量
+
+- **publication 不可覆盖**：`(organization_id, publication_key)` 唯一；重复登记抛
+  `PublicationStoreError`，**不 UPDATE** 已有行的 `artifact_digest` / `authority_ref` /
+  `candidate_digest`（不可变性是 AC「新 version 不覆盖旧 artifact」的直接实现）。
+- **finalize 落 PENDING_VISIBILITY，不是 ACTIVE**：`runtimeDiscoverable` 仍为
+  `False`；推进 ACTIVE 需要 ACK 全 ACCEPTED（`resolve_visibility`），属下一段。
+- **状态推进单源**：`transition_publication` 直接复用
+  `lifecycles._PUBLICATION_TRANSITIONS`，不另立一套合法转换表。
+- **一个项目一个 pin**：DB 唯一约束 `uq_custom_publication_pin_project` 兜底；
+  upgrade 是**改写**本行而非新增，历史由 publication 行保留。
+- **instantiate 门禁**：只认 ACTIVE；`assert_project_permission(..., "edit")`
+  （不是只登录）；响应显式 `pinned: true` + `instantiated: false` + 原因，
+  避免调用方把 pin 当成已完成实例化。
+
+### 7.4 验证
+
+- 仓储 21 passed（`test_publication_registry_store.py`）：不可覆盖 / 被拒登记不留痕 /
+  状态门禁 / 状态推进单源 / org 隔离 / 一个项目一个 pin / instantiate 门禁参数化。
+- 端点 10 passed（`test_publication_routes.py`）：未登录 401/403 / org 隔离 /
+  `runtimeDiscoverable` 跟随 state / 未知 state 400 / 非 ACTIVE 409 / 未知 publication 404 /
+  底稿缺失 404 / pin≠instantiated / **`assert_project_permission` 实参必须是 `"edit"`**。
+- 整包自定义模板摄取 **343 passed**。
+- 迁移守卫 104 passed（V/R 配对 + runner + 漂移台账 + 注释剥离）。
+- **变异 17/17 RED**：仓储 9 条 + 端点 8 条。
+
+### 7.5 变异复盘（两条曾假存活）
+
+1. **`instantiate edit level downgraded to readonly` 存活** —— 文件里
+   `assert_project_permission(..., "edit")` 有 **3 处**（旧端点 / unit-authority /
+   instantiate），`str.replace(..., 1)` 只改第一处，instantiate 那处没动 ⇒ 测试当然绿。
+   ⇒ 靶点必须带足够上下文唯一定位，并在脚本里断言 `hits == expected_n`。
+2. **`finalize does not persist publication` 存活** —— `test_finalize_*` 只断言
+   handoff 字段（phase / runtimeDiscoverable / idempotent），**没有断言 publication
+   落库**，故把 `register_publication` 换成不存在的名字也全绿。
+   ⇒ 补 `db.publications` 长度、state、artifact_digest、publication_key 前缀断言。
+
+### 7.6 仍未完成（不得据此标完成）
+
+- **ACTIVE instantiate 写 WorkingPaper / workbook instance**：需要 sheet 种子
+  （G-ID + mapping 裁决），端点当前显式返回 `instantiated: false`。
+- **finalize saga 接持久化 ACK**：`run_finalize_saga` 仍用 `InMemoryAckLedger`；
+  推进 ACTIVE 的 `resolve_visibility` 尚无生产调用方。
+- **publication 前端页面**：目前只有后端端点。
+- **V272 未落共享库**（按纪律不写共享库，需用户放行）。
+- 端点未做 Playwright 浏览器实测。

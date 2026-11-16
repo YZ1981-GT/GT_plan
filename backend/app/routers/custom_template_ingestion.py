@@ -25,6 +25,8 @@ from pathlib import Path
 from typing import Any
 import hashlib
 import json
+import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -61,6 +63,7 @@ router = APIRouter(
     prefix="/api/custom-template-ingestion",
     tags=["custom-template-ingestion"],
 )
+logger = logging.getLogger(__name__)
 
 #: 旧链（/api/custom-templates 的 template_file_path / file_content / 首 sheet）
 #: 退出正式路径的期限。到期后旧路由应整体下线（Requirement 1.5 迁移删除门）。
@@ -516,6 +519,7 @@ async def finalize_unit_authority(
             return {
                 "artifactId": artifact_id,
                 "phase": "finalized",
+                "publicationKey": f"pub-{artifact_id}-{body.authorityId}",
                 "handoffId": existing["handoffId"],
                 "handoffDigest": existing["handoffDigest"],
                 "idempotent": True,
@@ -541,11 +545,171 @@ async def finalize_unit_authority(
         artifact_id,
         {"finalize": handoff},
     )
+    # 落库 PENDING_VISIBILITY publication —— 此后即使进程重启，publication 与
+    # handoff 都还在；`runtimeDiscoverable` 仍为 False，直到 ACK 全 ACCEPTED
+    # 由 commit-visibility 推进到 ACTIVE（见 finalize_saga 与 guidance ACK ledger）。
+    from app.services.custom_template_ingestion.lifecycles import (
+        PublicationState,
+        TemplatePublicationRecord,
+    )
+    from app.services.custom_template_ingestion.publication_registry_store import (
+        PublicationStoreError,
+        register_publication,
+    )
+
+    now = datetime.now(timezone.utc)
+    publication_key = f"pub-{artifact_id}-{body.authorityId}"
+    try:
+        await db.run_sync(
+            lambda s: register_publication(
+                s,
+                record=TemplatePublicationRecord(
+                    publication_id=publication_key,
+                    organization_id=scope.organization_id,
+                    candidate_id=artifact_id,
+                    candidate_digest=artifact["preflightDigest"],
+                    authority_ref=str(body.authorityId),
+                    state=PublicationState.PENDING_VISIBILITY,
+                    created_at=now,
+                    updated_at=now,
+                ),
+                artifact_digest=artifact["sha256"],
+                handoff=handoff,
+            )
+        )
+    except PublicationStoreError as exc:
+        # 同 key 已登记（并发双击 / 重放另一路）⇒ 复用既有行，不覆盖
+        logger.info("publication 已存在，复用既有登记: %s (%s)", publication_key, exc)
+    await db.commit()
     return {
         "artifactId": artifact_id,
         "phase": "finalized",
+        "publicationKey": publication_key,
         "handoffId": handoff["handoffId"],
         "handoffDigest": handoff_digest,
         "idempotent": False,
         "runtimeDiscoverable": False,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# publication registry（消费 finalize handoff）
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@router.get("/publications")
+async def list_template_publications(
+    state: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """列出本组织的 custom template publication。
+
+    `runtimeDiscoverable` 只对 ACTIVE 为 true —— 前端据此决定能否实例化。
+    """
+    from app.services.custom_template_ingestion.lifecycles import PublicationState
+    from app.services.custom_template_ingestion.publication_registry_store import (
+        list_publications,
+    )
+
+    scope = derive_implicit_scope(user=current_user)
+    states: tuple[PublicationState, ...] | None = None
+    if state:
+        try:
+            states = (PublicationState(state),)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"未知 publication 状态: {state}") from exc
+    rows = await db.run_sync(
+        lambda s: list_publications(
+            s, organization_id=scope.organization_id, states=states
+        )
+    )
+    return {
+        "publications": [
+            {
+                "publicationKey": r.publication_key,
+                "candidateId": r.candidate_id,
+                "state": r.state.value,
+                "artifactDigest": r.artifact_digest,
+                "authorityRef": r.authority_ref,
+                "reason": r.reason,
+                "runtimeDiscoverable": r.state == PublicationState.ACTIVE,
+                "createdAt": r.created_at.isoformat(),
+                "updatedAt": r.updated_at.isoformat(),
+            }
+            for r in rows
+        ]
+    }
+
+
+class InstantiateFromPublicationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    publicationKey: str = Field(min_length=1, max_length=160)
+    workingPaperId: UUID
+
+
+@router.post("/publications/instantiate")
+async def instantiate_from_publication(
+    body: InstantiateFromPublicationRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """把 ACTIVE publication pin 到项目。
+
+    🔴 本端点**不**创建 WorkingPaper，也不写 workbook instance —— 那需要 sheet
+    种子（G-ID + mapping 裁决），属下一段工作。这里只做「ACTIVE 校验 + pin 落库」，
+    并显式返回 `instantiated: false`，避免调用方把 pin 当成已完成实例化。
+    """
+    from app.models.workpaper_models import WorkingPaper
+    from app.services.custom_template_ingestion.publication_registry_store import (
+        PublicationStoreError,
+        get_publication,
+        pin_project,
+    )
+
+    scope = derive_implicit_scope(user=current_user)
+    wp = (await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.id == body.workingPaperId,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )).scalar_one_or_none()
+    if wp is None:
+        raise HTTPException(status_code=404, detail="目标底稿不存在")
+    await assert_project_permission(db, current_user, wp.project_id, "edit")
+
+    pub = await db.run_sync(
+        lambda s: get_publication(
+            s,
+            organization_id=scope.organization_id,
+            publication_key=body.publicationKey,
+        )
+    )
+    if pub is None:
+        raise HTTPException(status_code=404, detail="publication 不存在")
+    if not pub.runtime_discoverable:
+        raise HTTPException(
+            status_code=409,
+            detail=f"publication 当前状态 {pub.state.value} 不可实例化（需 ACTIVE）",
+        )
+
+    try:
+        await db.run_sync(
+            lambda s: pin_project(
+                s,
+                organization_id=scope.organization_id,
+                project_id=wp.project_id,
+                publication_key=body.publicationKey,
+            )
+        )
+    except PublicationStoreError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await db.commit()
+    return {
+        "publicationKey": pub.publication_key,
+        "projectId": str(wp.project_id),
+        "pinned": True,
+        "instantiated": False,
+        "reason": "instantiate 需要 sheet 种子（G-ID + mapping 裁决），尚未接线",
     }

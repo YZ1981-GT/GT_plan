@@ -61,6 +61,46 @@ class _Db:
     async def commit(self):
         return None
 
+    async def run_sync(self, fn):
+        """模拟 AsyncSession.run_sync：把自身当作 sync Session 交给回调。
+
+        🔴 publication 落库走 run_sync（仓储是 sync Session 友好的），
+        替身不提供会让 finalize 用例全部 AttributeError。
+        注意：仓储内部用**同步** `session.execute()`，而本替身的 execute 是
+        async，故这里包一层同步适配器，按当前轮次序号直接返回下一个预置结果。
+        """
+        return fn(_SyncDbView(self))
+
+    def query(self, *args, **kwargs):  # noqa: ARG002
+        """仓储的 register_publication 用 query(...).filter(...).one_or_none()。"""
+        raise AssertionError(
+            "finalize 用例不应触发 publication 查询路径；"
+            "若新增断言需要，请为本替身补 query 实现"
+        )
+
+
+class _SyncDbView:
+    """把 `_Db` 的 async execute 包装成同步接口，仅供 run_sync 内的仓储使用。
+
+    `register_publication` 只做 `select(...).scalar_one_or_none()` 判存在与
+    `session.add/flush`。这里让 select 恒返回 None（= 尚无 publication），
+    并把 add/flush 转发给替身记账。
+    """
+
+    def __init__(self, db: "_Db") -> None:
+        self._db = db
+
+    def execute(self, _stmt):
+        self._db.selects = getattr(self._db, "selects", 0) + 1
+        return _Result(None)
+
+    def add(self, obj):
+        self._db.publications = getattr(self._db, "publications", [])
+        self._db.publications.append(obj)
+
+    def flush(self):
+        return None
+
 
 class _Quarantine:
     def __init__(self, manifest):
@@ -324,6 +364,18 @@ def test_finalize_authority_creates_non_active_handoff_and_is_idempotent():
     assert second.json()["handoffDigest"] == first.json()["handoffDigest"]
     assert second.json()["idempotent"] is True
     assert second.json()["runtimeDiscoverable"] is False
+
+    # 🔴 finalize 必须真的把 publication 落库（PENDING_VISIBILITY），
+    # 否则进程重启就丢，且 instantiate 链路根本接不上。
+    # 首版只断言 handoff 字段 ⇒ 把 register_publication 换成不存在的名字仍然全绿。
+    pubs = getattr(db, "publications", [])
+    assert len(pubs) == 1, "finalize 未登记 publication"
+    assert pubs[0].state == "PENDING_VISIBILITY"
+    assert pubs[0].artifact_digest == "a" * 64
+    assert pubs[0].publication_key.startswith("pub-art-1-")
+    assert pubs[0].handoff["phase"] == "finalized"
+    # 幂等重放不得再登记第二条
+    assert first.json()["publicationKey"] == second.json()["publicationKey"]
 
 
 def test_finalize_rejects_authority_manifest_digest_drift():
