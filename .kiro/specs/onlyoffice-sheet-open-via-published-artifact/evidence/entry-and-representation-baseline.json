@@ -1,0 +1,40 @@
+{
+  "schema_version": "entry-and-representation-baseline:v1",
+  "snapshot_date": "2026-11-16",
+  "worktree_head": "d74073641374b2d4696df2024602d2df1ea3e6d8",
+  "manifest": {
+    "entry_count": 197,
+    "independent_entry_count": 145,
+    "parent_duplicate_count": 52,
+    "unadjudicated_count": 78,
+    "bidirectional_count": 111,
+    "xlsx_sheet_namespace_entry_count": 0,
+    "manifest_digest": "4244bc53d4fc6661fa579ca61e0de8f332a999b0feceb12dd58e2480c593de79",
+    "source_digest": "b76adb534403f61d2d592ad2f7689f9d4c5668a68d741f89d1bf4a22dd390fb6"
+  },
+  "database_snapshot": {
+    "working_paper_content_representation_rows": 465,
+    "working_paper_sync_entry_state_rows": 84,
+    "working_paper_sync_test_run_rows": 0,
+    "working_paper_entry_evidence_scenario_rows": 0,
+    "volatile": true,
+    "note": "Shared PG counts are evidence-time observations, not permanent completion thresholds."
+  },
+  "k11_entry": {
+    "entry_id": "xlsx/gt-k11-asset-impairment-loss",
+    "effective_entry_id": "xlsx/gt-k11-asset-impairment-loss",
+    "capability": "bidirectional",
+    "migration_state": "adapter_registered",
+    "mount_components": ["GtOnlyOfficeSheet"],
+    "sync_editor_host_mounted": false,
+    "wp_code_patterns": ["K11"],
+    "sheet_expressions": [":sheet-name=\"props.sheetName || ''\""],
+    "sheet_literals": []
+  },
+  "identity_comparison": {
+    "legacy_sheet_entry_shape": "xlsx-sheet/{wp_code}/{sheet_slug} or xlsx-sheet/{wp_code}/__whole__",
+    "manifest_entry_shape_example": "xlsx/gt-k11-asset-impairment-loss",
+    "same_namespace": false,
+    "conclusion": "The current room identity helper cannot be treated as a manifest binding. An explicit sheet_open_binding is required."
+  }
+}

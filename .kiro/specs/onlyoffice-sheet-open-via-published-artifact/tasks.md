@@ -1,32 +1,31 @@
 # 任务：Sheet 级 OnlyOffice 改走 Published Representation
 
-> **状态：0/34（2026-11-16 新建，产品代码未实施）**
+> **状态：5/34（2026-11-16，Phase 0.1~0.3 与 Phase 1.1~1.2 已完成；产品代码未实施）**
 >
 > 本 spec 必须在现状事实冻结后再改生产代码。所有 `[ ]` 都是必做任务；外部依赖不能标绿，必须写明 owner、证据和下一步。
 
 ## Phase 0：事实冻结与范围裁决
 
-- [ ] 0.1 固化旧式调用面：现算 backend 三个旧端点、前端 78 个调用 / 29 个文件，按 host、composable、Word、custom、single_onlyoffice 分组。
-  - 产物：`evidence/legacy-sheet-onlyoffice-callers.json`
+- [x] 0.1 固化旧式调用面：现算 backend 三个旧端点、前端 78 个调用 / 29 个文件，按 host、composable、Word、custom、single_onlyoffice 分组。
+  - 产物：`evidence/legacy-sheet-onlyoffice-callers.json`（raw string mentions 81/30，去掉本 spec 新增唯一 helper 与共享声明后的 direct call baseline 78/29）。
   - _R: 4, 5, 6_
-- [ ] 0.2 固化 manifest / entry / representation 事实：现算 manifest entry、capability、`xlsx-sheet/*` 命名空间、current representation、mount host 与 room host。
-  - 产物：`evidence/entry-and-representation-baseline.json`
-  - 共享 PG 行数只能作 snapshot，不能写成永久门槛。
+- [x] 0.2 固化 manifest / entry / representation 事实：现算 manifest entry、capability、`xlsx-sheet/*` 命名空间、current representation、mount host 与 room host。
+  - 产物：`evidence/entry-and-representation-baseline.json`；共享 PG 行数只作 snapshot，不是永久门槛。
   - _R: 1, 2, 8_
-- [ ] 0.3 逐入口列出 sheet→entry 候选映射，分为 `exact` / `provider` / `whole_workbook` / `ambiguous` / `out_of_scope`。
+- [x] 0.3 逐入口列出 sheet→entry 候选映射，分为 `exact` / `provider` / `whole_workbook` / `ambiguous` / `out_of_scope`。
   - 不得把当前 `sheet_entry_id()` 生成的 `xlsx-sheet/*` 直接当作已存在 entry。
-  - 产物：`evidence/sheet-binding-adjudication.json`
+  - 产物：`evidence/sheet-binding-adjudication.json`；首批候选为 K11 provider mapping 与 D4 aggregate source-sheet mapping，custom/Word 明确 out_of_scope。
   - _R: 1, 5_
 - [ ] 0.4 完成五角色范围复核：合伙人确认打开对象与业务含义，项目经理确认 rollout，质控确认不伪造双向，审计助理确认界面文案，EQCR 确认历史 operation / artifact 审计边界。
   - _R: 5, 6, 10_
 
 ## Phase 1：SheetOpenBinding 真源与生成器
 
-- [ ] 1.1 定义 `sheet-open-binding:v1` JSON schema 与封闭枚举：scope、mapping_kind、status、reason、source_refs、digest。
-  - 守卫拒绝缺 entry、缺 source digest、重复 binding、未知 status 与裸正则。
+- [x] 1.1 定义 `sheet-open-binding:v1` JSON schema 与封闭枚举：scope、mapping_kind、status、reason、source_refs、digest。
+  - 守卫拒绝缺 entry、缺 source digest、重复 binding、未知 status 与裸正则；`test_sheet_open_bindings.py` 现算覆盖。
   - _R: 1, 8_
-- [ ] 1.2 实现 `generate_workpaper_sync_sheet_open_bindings.py`：从 manifest、reviewed overlay、provider `wp_match` / sheet declarations 生成 binding。
-  - 提供 `--write` / `--check`；内容不变重跑零 diff。
+- [x] 1.2 实现 `generate_workpaper_sync_sheet_open_bindings.py`：从 manifest、reviewed overlay、provider `wp_match` / sheet declarations 生成 binding。
+  - 提供 `--apply` / `--check`；内容不变重跑零 diff；当前生成 197 条 binding，全部保持 `pending` 或 `out_of_scope`，不伪造迁移完成。
   - _R: 1, 8_
 - [ ] 1.3 为 exact / provider / whole workbook 分别建立正向与反向 fixture；provider resolver 必须有稳定 resolver identity。
   - _R: 1, 9_

@@ -1,0 +1,32 @@
+{
+  "schema_version": "legacy-sheet-onlyoffice-callers:v1",
+  "snapshot_date": "2026-11-16",
+  "worktree_head": "d74073641374b2d4696df2024602d2df1ea3e6d8",
+  "scope": "audit-platform/frontend/src excluding tests and specs",
+  "raw_string_scan": {
+    "files": 30,
+    "onlyoffice_config_mentions": 81,
+    "note": "Raw mentions include the new onlyOfficeEntryConfig helper and shared URL declarations; they are not all direct call sites."
+  },
+  "legacy_call_site_baseline": {
+    "files": 29,
+    "calls": 78,
+    "groups": {
+      "dual_mode_composables": 22,
+      "components": 4,
+      "shared_or_word_popup": 3
+    },
+    "source": "tmp_spec_consumers/survey_oo_callers.py from the umbrella investigation"
+  },
+  "backend_legacy_routes": [
+    "GET /api/workpapers/{wp_id}/sheets/{sheet_name}/onlyoffice-config",
+    "GET /api/workpapers/{wp_id}/sheets/{sheet_name}/wopi/contents",
+    "POST /api/workpapers/{wp_id}/sheets/{sheet_name}/onlyoffice-callback"
+  ],
+  "room_routes": [
+    "GET /api/projects/{project_id}/workpapers/{wp_id}/sync/entry-identity",
+    "POST /api/workpaper-sync/rooms/{room_id}/onlyoffice-callback",
+    "GET /api/workpaper-sync/rooms/{room_id}/contents"
+  ],
+  "interpretation": "The raw legacy surface is a census, not a migration completion claim. The unique helper and shared URL declarations are kept in the census so later guards cannot silently lose them."
+}

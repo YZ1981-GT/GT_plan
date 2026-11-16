@@ -1,0 +1,55 @@
+{
+  "schema_version": "sheet-binding-adjudication:v1",
+  "snapshot_date": "2026-11-16",
+  "status_vocabulary": ["exact", "provider", "whole_workbook", "ambiguous", "out_of_scope"],
+  "candidates": [
+    {
+      "sample": "xlsx/gt-k11-asset-impairment-loss",
+      "host": "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue",
+      "current_mount": "GtOnlyOfficeSheet",
+      "mapping_kind": "provider",
+      "status": "provider",
+      "reason": "wp_match has K11 as a code pattern but the sheet name is a runtime prop; no exact target sheet declaration is present",
+      "first_canary_candidate": true
+    },
+    {
+      "sample": "xlsx/gt-d4-operating-revenue",
+      "host": "D4 aggregate workbook family",
+      "mapping_kind": "provider",
+      "status": "provider",
+      "reason": "aggregate source sheets require an explicit source entry and target sheet mapping; parent-code fallback is prohibited",
+      "first_canary_candidate": true
+    },
+    {
+      "sample": "whole_workbook",
+      "mapping_kind": "whole_workbook",
+      "status": "pending",
+      "reason": "current manifest has no xlsx-sheet namespace binding and whole-workbook target scope is not yet represented as a published entry binding",
+      "first_canary_candidate": false
+    },
+    {
+      "sample": "custom workbook",
+      "mapping_kind": "out_of_scope",
+      "status": "out_of_scope",
+      "reason": "custom business file is edited as its own file authority and must not be treated as a normal provider published artifact",
+      "first_canary_candidate": false
+    },
+    {
+      "sample": "Word/DOCX entry",
+      "mapping_kind": "out_of_scope",
+      "status": "out_of_scope",
+      "reason": "Word carrier and Word engine have a separate identity and contract lane",
+      "first_canary_candidate": false
+    }
+  ],
+  "initial_canary_scope": [
+    "xlsx/gt-k11-asset-impairment-loss provider mapping",
+    "xlsx/gt-d4-operating-revenue aggregate source-sheet mapping"
+  ],
+  "prohibited_shortcuts": [
+    "Treat xlsx-sheet/* as an existing manifest entry",
+    "Guess a parent wp_code from a sheet name at request time",
+    "Use current registry alias to fill a missing frozen binding",
+    "Copy a template or hide sheets to manufacture a published artifact"
+  ]
+}
