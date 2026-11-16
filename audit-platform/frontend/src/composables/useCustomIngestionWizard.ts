@@ -8,6 +8,7 @@
  * button/dialog/location store/fixed rail CSS.
  */
 import { computed, ref, type Ref } from 'vue'
+import { api } from '@/services/apiProxy'
 import {
   assertFShellConsumerCompatible,
   FSHELL_CONTRACT_VERSION,
@@ -50,6 +51,71 @@ export interface IngestionWizardState {
   staticPreviewOnly: boolean
   /** ACTIVE project entries only — never register on candidate upload success */
   hostFactsRegistered: boolean
+  preflightDigest: string | null
+  authorityId: string | null
+  handoffId: string | null
+  handoffDigest: string | null
+  lastError: string | null
+}
+
+export interface UnitAuthorityInput {
+  workingPaperId: string
+  workbookSha256: string
+  preflightDigest: string
+  manifest: Record<string, unknown>
+  manifestDigest: string
+}
+
+export interface FinalizeAuthorityInput {
+  workingPaperId: string
+  authorityId: string
+  manifestDigest: string
+  idempotencyKey: string
+}
+
+interface IngestResponse {
+  artifactId: string
+  state: string
+  displayName: string
+  sizeBytes: number
+  sha256: string
+  policyVersion: string
+  actionId: string
+  message: string
+}
+
+interface PreflightResponse {
+  artifactId: string
+  state: string
+  preflight: Record<string, unknown>
+  preflightDigest: string
+}
+
+interface AuthorityResponse {
+  authorityId: string
+  workingPaperId: string
+  workbookSha256: string
+  manifestDigest: string
+  idempotent: boolean
+}
+
+interface FinalizeResponse {
+  artifactId: string
+  phase: 'finalized'
+  handoffId: string
+  handoffDigest: string
+  idempotent: boolean
+  runtimeDiscoverable: false
+}
+
+function apiErrorMessage(error: unknown, fallback: string): string {
+  const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+  if (typeof detail === 'string' && detail.trim()) return detail
+  if (detail && typeof detail === 'object') {
+    const message = (detail as { message?: unknown }).message
+    if (typeof message === 'string' && message.trim()) return message
+  }
+  return fallback
 }
 
 export function gateFShellForCustomIngestion(): {
@@ -106,6 +172,11 @@ export function useCustomIngestionWizard() {
         ],
     staticPreviewOnly: true,
     hostFactsRegistered: false,
+    preflightDigest: null,
+    authorityId: null,
+    handoffId: null,
+    handoffDigest: null,
+    lastError: null,
   })
 
   const canProceed = computed(
@@ -166,6 +237,161 @@ export function useCustomIngestionWizard() {
     }
   }
 
+  const BASE = '/api/custom-template-ingestion'
+
+  /** 上传字节到隔离区；返回 artifactId 与 sha256，绝不标记 ACTIVE。 */
+  async function ingestFile(file: File): Promise<IngestResponse | null> {
+    if (!fshell.ok) return null
+    const form = new FormData()
+    form.append('file', file)
+    try {
+      const response = await api.post<IngestResponse>(`${BASE}/ingest`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        _silent: true,
+      })
+      state.value = {
+        ...state.value,
+        entry: 'ingest_excel',
+        artifactId: response.artifactId,
+        phase: 'quarantined',
+        staticPreviewOnly: true,
+        hostFactsRegistered: false,
+        preflightDigest: null,
+        authorityId: null,
+        handoffId: null,
+        handoffDigest: null,
+        lastError: null,
+      }
+      return response
+    } catch (error) {
+      setBlockers([
+        {
+          code: 'ingest_failed',
+          messageZh: apiErrorMessage(error, '上传失败，请重试'),
+          recoverable: true,
+        },
+      ])
+      state.value = { ...state.value, lastError: apiErrorMessage(error, '上传失败，请重试') }
+      return null
+    }
+  }
+
+  /** 触发服务端 preflight，冻结 preflightDigest；失败即阻断，不伪造通过。 */
+  async function runPreflight(artifactId?: string): Promise<PreflightResponse | null> {
+    const id = artifactId ?? state.value.artifactId
+    if (!fshell.ok || !id) return null
+    try {
+      const response = await api.post<PreflightResponse>(`${BASE}/artifacts/${id}/preflight`, undefined, {
+        _silent: true,
+      })
+      state.value = {
+        ...state.value,
+        artifactId: id,
+        phase: response.state === 'PREFLIGHT_READY' ? 'preflight' : 'blocked',
+        preflightDigest: response.preflightDigest,
+        lastError: null,
+      }
+      if (response.state !== 'PREFLIGHT_READY') {
+        setBlockers([
+          {
+            code: 'preflight_failed',
+            messageZh: '预检未通过：请按报告修正后重新上传',
+            recoverable: true,
+          },
+        ])
+      }
+      return response
+    } catch (error) {
+      const message = apiErrorMessage(error, '预检失败，请重试')
+      setBlockers([{ code: 'preflight_failed', messageZh: message, recoverable: true }])
+      state.value = { ...state.value, lastError: message }
+      return null
+    }
+  }
+
+  /** 提交 unit authority；只在 preflightDigest 已冻结时可用。 */
+  async function putUnitAuthority(
+    input: UnitAuthorityInput,
+    artifactId?: string,
+  ): Promise<AuthorityResponse | null> {
+    const id = artifactId ?? state.value.artifactId
+    if (!fshell.ok || !id) return null
+    if (!state.value.preflightDigest || state.value.preflightDigest !== input.preflightDigest) {
+      setBlockers([
+        {
+          code: 'preflight_digest_mismatch',
+          messageZh: '预检结果已变化，请重新预检后再确认单位',
+          recoverable: true,
+        },
+      ])
+      return null
+    }
+    try {
+      const response = await api.put<AuthorityResponse>(
+        `${BASE}/artifacts/${id}/unit-authority`,
+        input,
+        { _silent: true },
+      )
+      state.value = {
+        ...state.value,
+        authorityId: response.authorityId,
+        phase: 'mapping',
+        lastError: null,
+      }
+      return response
+    } catch (error) {
+      const message = apiErrorMessage(error, '单位确认失败，请重试')
+      setBlockers([{ code: 'unit_authority_failed', messageZh: message, recoverable: true }])
+      state.value = { ...state.value, lastError: message }
+      return null
+    }
+  }
+
+  /** finalize 只产出 handoff，不进入 ACTIVE。 */
+  async function finalizeAuthority(
+    input: FinalizeAuthorityInput,
+    artifactId?: string,
+  ): Promise<FinalizeResponse | null> {
+    const id = artifactId ?? state.value.artifactId
+    if (!fshell.ok || !id) return null
+    // 🔴 防调用方拿过期 / 未确认的 authority 去定稿。这一条同时覆盖
+    // 「本会话还没确认过单位」（state 为 null）与「传的是上一轮的 authority」
+    // 两种情形，故不再单列 `!state.value.authorityId` —— 两处并存会互相兜底，
+    // 把任何一处的变异掩盖掉（已实测）。
+    if (input.authorityId !== state.value.authorityId) {
+      setBlockers([
+        {
+          code: 'authority_id_mismatch',
+          messageZh: '单位确认结果已变化，请重新确认后再定稿',
+          recoverable: true,
+        },
+      ])
+      return null
+    }
+    try {
+      const response = await api.post<FinalizeResponse>(
+        `${BASE}/artifacts/${id}/finalize`,
+        input,
+        { _silent: true },
+      )
+      state.value = {
+        ...state.value,
+        handoffId: response.handoffId,
+        handoffDigest: response.handoffDigest,
+        phase: 'pending_approval',
+        hostFactsRegistered: false,
+        staticPreviewOnly: true,
+        lastError: null,
+      }
+      return response
+    } catch (error) {
+      const message = apiErrorMessage(error, '提交定稿失败，请重试')
+      setBlockers([{ code: 'finalize_failed', messageZh: message, recoverable: true }])
+      state.value = { ...state.value, lastError: message }
+      return null
+    }
+  }
+
   return {
     fshell,
     state,
@@ -176,5 +402,9 @@ export function useCustomIngestionWizard() {
     markActiveAndRegisterHostFacts,
     revalidateCapabilities,
     entrySuccessMessage,
+    ingestFile,
+    runPreflight,
+    putUnitAuthority,
+    finalizeAuthority,
   }
 }

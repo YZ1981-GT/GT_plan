@@ -274,3 +274,53 @@
 - 未做 Playwright/浏览器实测（A-V/C-V/终验的 computedStyle、账号隔离、正式下载全部未验）。
 - 未在真实 PG 上跑本轮任何写入型验收（按纪律不写共享库）。
 - 本轮**未修改任何产品代码**，只更新本 spec 的 tasks.md 状态与勘误。
+
+---
+
+## 六、custom workbook 摄取 —— 前端四阶段接线（2026-11-15 本轮）
+
+### 6.1 交付内容
+
+`src/composables/useCustomIngestionWizard.ts` 新增四个阶段方法，把后端已通的四端点接进向导：
+
+| 方法 | 端点 | 状态推进 |
+| --- | --- | --- |
+| `ingestFile(file)` | `POST /api/custom-template-ingestion/ingest`（multipart） | → `quarantined`，清空后续 digest / authority / handoff |
+| `runPreflight(artifactId?)` | `POST …/artifacts/{id}/preflight` | `PREFLIGHT_READY` → `preflight` 并冻结 `preflightDigest`；其余 → `blocked` |
+| `putUnitAuthority(input, artifactId?)` | `PUT …/artifacts/{id}/unit-authority` | → `mapping`，记录 `authorityId` |
+| `finalizeAuthority(input, artifactId?)` | `POST …/artifacts/{id}/finalize` | → `pending_approval`，记录 `handoffId` / `handoffDigest` |
+
+状态字段补 `preflightDigest` / `authorityId` / `handoffId` / `handoffDigest` / `lastError`（初始化显式置 `null`）。
+
+### 6.2 关键不变量
+
+- **上传 / 预检 / 单位确认 / 定稿全程 `hostFactsRegistered` 保持 `false`、`staticPreviewOnly` 保持 `true`** —— 只有 `markActiveAndRegisterHostFacts()`（ACTIVE）才允许翻转。`finalize` 后停在 `pending_approval`，**不等于 ACTIVE**。
+- **`preflightDigest` 必须已冻结且与入参一致**才允许提交 unit authority，否则写 `preflight_digest_mismatch` blocker 且**不发请求**。
+- **`input.authorityId` 必须等于本会话冻结的 `authorityId`** 才允许定稿；不一致（含「本会话还没确认过单位」这一情形）写 `authority_id_mismatch` blocker 且**不发请求**。
+- **`state !== 'PREFLIGHT_READY'` 一律按失败处理**（写 blocker + `blocked`），不因服务端返回 200 就当成通过。
+- 四个方法全部带 `_silent: true`（调用方自管中文提示，避免 `utils/http` 全局 toast 重复弹）。
+
+### 6.3 验证
+
+- 测试：`src/composables/__tests__/customIngestionWizardStages.spec.ts`（9 例）+ 既有 `useCustomIngestionWizard.spec.ts`（5 例）= **14 passed**。
+- 变异：**9/9 RED**（`tmp_wizard_mutate.py`，改动前后逐字节核对）。覆盖四个端点字面量、两处 `_silent`、`preflightDigest` 守卫、`PREFLIGHT_READY` 判据、finalize 注册 host facts、`authorityId` 一致性守卫。
+- 回归：`src/composables/__tests__/` 全量 2644 例中 9 failed。归因结论 = **8 例为预存失败**（干净 HEAD worktree 逐文件复跑同样红：`dSalesCycleLabelGuard` 2 / `useAiHostContext` 1 / `useAgingConfig.property` 2 / `useAiCapabilities` 2 / `useCControlTestData` 1），第 9 例 `useG4EclFormulaEngine.pbt.spec.ts` 为**偶发 PBT**（同文件连跑两次：1 failed → 28 passed）。grep 确认 6 个失败文件与 `useCustomIngestionWizard` 零引用。
+
+### 6.4 本轮变异复盘（三条存活，根因各异）
+
+1. **`finalize endpoint changed` 存活** —— 靶点 `"${BASE}/artifacts/${id}/finalize"` 不带反引号，先把同一子串命中的是注释/字符串，替换后真正的模板串没变。靶点必须带反引号。
+2. **`preflight _silent removed` 存活** —— 靶点写成单行，而源码是跨行 config 对象（`url, undefined, {\n  _silent: true,\n})`），文本不匹配直接 TARGET-MISS 后被我误当存活。
+3. **`finalize authority guard removed` 连跑两轮存活** —— 第一轮测试只断言 `result === null`：守卫删掉后请求照发，mock 无返回值 → 解构 `undefined` 抛错 → 走 catch 仍返回 `null`，断言照样通过。补 `expect(post).not.toHaveBeenCalled()` 后仍存活，因为测试没先上传、被前置的 `!id` 拦截，`!authorityId` 判据根本没执行。补「先 ingest 拿到 artifactId，再 `post.mockClear()`」才真正 RED。
+   ⇒ 教训：**守卫类变异必须同时断言「副作用没发生」+「前置条件已满足」**，只断言返回值会被兜底路径骗过。
+
+### 6.5 仍未完成（不得据此标完成）
+
+- **publication registry 持久化**：`runtimeDiscoverable=false` 的 handoff 尚无消费方把它推进 ACTIVE。
+- **ACTIVE instantiate 写 WorkingPaper / authority**：定稿后不生成项目底稿。
+- **前端逐 amount region 确认 UI**：目前 `putUnitAuthority` 要求调用方自行构造 `manifest.regions`，没有逐区域勾选界面。
+- **结构漂移回退**：workbook 结构变化后如何回到 preflight 未在设计里定稿。
+- 四阶段均**未做 Playwright 浏览器实测**。
+
+### 6.6 第二次语义审查补充
+
+发现 `!state.value.authorityId` 与 `input.authorityId !== state.value.authorityId` **语义重叠**（后者完全蕴含前者：state 为 null 时 `string !== null` 恒真）⇒ 两条并存会互相兜底，把任何一条的变异掩盖掉（实测 `finalize authority guard removed` 连跑两轮存活）。已按「同一判据合成一处」合并为单条 `input.authorityId !== state.value.authorityId`，注释写明它同时覆盖两种情形。合并后 9/9 RED。
