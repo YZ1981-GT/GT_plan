@@ -76,13 +76,30 @@
   - 临时库 `gt_release_blocker_*`：CREATE_ALL 365 表、磁盘迁移 252 执行 251 失败 0、pending=[]、failures=[]、
     checksum drift=[]、V229+V264 已登记、is_complete=True、/readyz=200、90 passed、DROP=OK。口径「当前全部迁移」
     （V229 早已落库，见 design §9.4）。
-- [ ]* 22. 独立端口浏览器验证登录、项目、TB、底稿、复核、报表、附注、trio 主链
-  - 写入型主链已完成（见下 ✅）；浏览器生产构建 smoke 与 OO→HTML 往返仍外部阻断，故整条标 `[ ]*`。
-  - Dev 模式渲染正常：共享 dev server（127.0.0.1:3030）登录页表单完整。
-  - 🔴 生产构建 `build:verify` 产物浏览器白屏（`vendor-core:30:11317` TDZ `Cannot access 'Rt' before
-    initialization`）= **远端 HEAD 既有缺陷**，干净 base worktree 重建后同样白屏（符号 / 位置一致），非本批
-    35 文件引入（均不触 vendor-core）；smoke 不执行 JS 故漏检。⇒ 候选 verified-dist 的只读浏览器 smoke 无法执行。
-    建议另立 spec 修 vendor-core 分块 + smoke 加无头浏览器步（见 design §9.6）。
+- [x]* 22. 独立端口浏览器验证登录、项目、TB、底稿、复核、报表、附注、trio 主链
+  - ✅ **2026-11-16 补做完成（16/16 全通过）**：两个原登记阻断均已由后续 spec 解除 ——
+    ①生产构建白屏由 `frontend-prod-build-white-screen-closure`（`_archive/160-…`，7/7）修好；
+    ②OO→HTML 往返由 `wp-sync-conflict-adjudication-and-d4-32-modeling`（`_archive/174-…`）的 Task 12
+    真库 UAT + 12.e OO iframe 完整往返（2026-11-15）打通。
+    本轮在**干净检出 worktree**（`HEAD=6e6bc5dc8` / `tree=de87804f4`）重跑 `build:verify` 并做浏览器只读走查。
+  - **build:verify 全绿**：vite 生产构建 3m48s、入口 gzip **566,436 B**（预算通过）、chunk 静态 import 图
+    **2501 块严格无环**、smoke 通过（主页 / SPA 深链 / 动态块 / API 与 WOPI 代理）、**浏览器首屏挂载断言通过**
+    （`smoke-browser-mount.mjs` 默认不跳过）、验证产物发布 `.verified-dist/c851dacdb880f9eb…`。
+  - **独立端口 3041（`preview:verified` 同源代理到共享后端 9980）浏览器走查 16/16 通过**（`ok=true`）：
+    ①生产构建首屏挂载 `#app` children=1；②登录页 inputs=2；③登录成功跳转；④项目列表 len=728 含【测试】；
+    ⑤项目工作台 len=281；⑥试算表 len=8788；⑦报表 len=3432；⑧附注 len=769；⑨底稿列表 len=500；
+    ⑩调整分录 len=623；⑪交付中心 len=351；⑫`/api/health` 200；⑬trio readiness 端点 200；
+    ⑭**底稿编辑器 D1-1 应收票据审定表打开 len=1450**（`heavy-univer` 重块动态加载正常，即原 `Kp` TDZ 已消）；
+    ⑮console error=0（排除资源 404）；⑯pageerror=0。全程各页 `newPageError=0`。
+  - **trio readiness 实取证据**（`GET /api/projects/{pid}/deliverables/trio/readiness?year=2025` → HTTP 200）：
+    返回六源结构 `dataset / tb / formula_push / report / notes / adjustment` 与逐源 `content_digest`，即 Task 15/16
+    交付的六源统一 + 快照内容摘要在生产构建下真实生效。`status=blocked` 是**业务正确行为**（该【测试】项目
+    报表 9 行过期含 7 行计算失败、附注 165/199 章 `is_stale`），如实阻断出具而非假放行。
+  - 写入型主链（复核→终态→内容写 423）此前已在用户授权后于候选代码（v1.0.139）验证，四重证据见 design §11；
+    本轮为**只读**走查，未写业务数据。
+  - 仍未覆盖（如实登记）：复核→终态链的**浏览器**写入型走查（后端已由 `test_workpaper_review_lifecycle_pg.py`
+    + 共享库 freeze 探针 + `test_workpaper_terminal_freeze_guard.py` 覆盖）；OO 在线编辑 iframe 的**本 spec 视角**
+    往返（上游 spec 174 已独立实测通过，本 spec 未重复）。
   - 终态冻结（本批核心）由真 PG `test_workpaper_review_lifecycle_pg.py` + 一次性库 `PARTIAL_STATUS_STUB=OK`
     + 守卫 `test_workpaper_terminal_freeze_guard.py`（17 passed）覆盖；前端只读 / 冻结横幅由 vitest 隔离 54 passed 覆盖。
   - ✅ 写入型主链（复核→终态→内容写 423）已在用户授权后于候选代码（v1.0.139）验证，四重证据（design §11）：
@@ -96,8 +113,15 @@
     ④ 全复核链→终态→423 由一次性库 lifecycle 覆盖（Task 21 的 90 passed 含 lifecycle）；
     `test_workpaper_review_lifecycle_pg` 自带 `_require_disposable_database` 守卫，禁止对共享库跑（防追加型
     `audit_log_entries` 哈希链被测试数据污染）——故不对共享库做完整复核链 UAT，是设计意图而非遗漏。
-  - OO→HTML 往返依赖上游 `wp-sync-conflict-adjudication-and-d4-32-modeling`（代码在 v1.0.136，但其 Task 12
-    真库 UAT + definition re-provision 未执行）⇒ 无可通路径。如实标未完成 + 登记依赖。
+  - 归档时（2026-11-16）复核：核心守卫在干净检出 worktree 上 **42 passed**（`test_workpaper_terminal_freeze_guard`
+    + `test_release_readiness_content_snapshot` + `test_workpaper_review_submission_service`）；7 个关键交付物
+    全部在 HEAD（`workpaper_content_freeze` / `workpaper_review_submission_service` /
+    `deliverable_readiness_sources` / `consol_note_export_adapter` / `WorkpaperFrozenBanner.vue` /
+    `test_workpaper_terminal_freeze_guard` / `test_workpaper_review_lifecycle_pg`）。
+  - 🔴 归档时范围外发现（未改，登记）：共享库 `/readyz` 当前返回 **503**，根因是 **V273 checksum 漂移未登记**
+    （`V273__sync_conflict_abandon_columns.sql` 应用后被编辑，登记 `c5a6e5709f34…` / 当前 `608d8ed9e65d…`）。
+    V273 属 `frozen-contract-read-path-and-legacy-operation-settlement` spec，**非本 spec 引入**；本 spec 的
+    R6.3 判据（critical drift ⇒ 503）本身按设计正确生效。处置见该 spec / 迁移负责人。
 - [x] 23. 五角色复核、语义审查、INDEX 登记；同步最新远端后单 commit 与版本化推送
   - 两阶段版本化推送：阶段一 v1.0.138（commit f73449c3b，Task 1–21 + Task 24 调查 + Task 22 非写入证据）；
     阶段二 v1.0.139（本 commit，Task 22 写入型 UAT 的 2 文件下游收口 + Task 24 执行结果 + 本翻牌）。

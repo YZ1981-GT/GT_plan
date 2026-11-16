@@ -245,4 +245,95 @@ VALIDATE 10 约束 + REINDEX 3 索引由 apply 脚本（`tmp_release_blocker_app
 ### 9.6 追加（2026-11-11）：生产构建白屏已由后续 spec 修复
 - 白屏根因与修复见 `frontend-prod-build-white-screen-closure`：①`vendor-core` 反向 import 入口 `index`（element-plus 传递依赖与 CJS 辅助落在 index）②`WorkpaperEditor ↔ heavy-univer` 懒加载环（Univer 第三方依赖落在编辑器块，打开底稿编辑器报 `Cannot access 'Kp' before initialization`）。两处均已改 `heavyFeatureChunk` 分组修复。
 - 修复后 `build:verify` 通过（预算、严格无环、浏览器首屏 smoke），并在独立端口对【测试】项目只读走查登录 / 试算表 / 报表 / 附注 / 底稿列表 / 底稿 E1 编辑器，console error 为 0。
-- 本 spec Task 22 仍保持 `[ ]*`：复核→终态链的浏览器写入型走查、OO→HTML 往返依赖上游 UAT，未执行。
+- 本 spec Task 22 于 **2026-11-16 补做完成**（16/16 通过，见 §12）：生产构建首屏与底稿编辑器重块均已实测正常，
+  trio readiness 在生产构建下返回六源结构与内容摘要。仍未覆盖的仅「复核→终态链的浏览器**写入型**走查」与
+  「OO 往返的本 spec 视角复测」（上游 spec 174 已独立实测），如实登记在 §12.6。
+
+---
+
+## 12. Task 22 浏览器主链走查补做（2026-11-16，归档前收口）
+
+> 背景：spec 实施期（2026-11-05）Task 22 标 `[ ]*`，理由是「浏览器生产构建 smoke 与 OO→HTML 往返仍外部阻断」。
+> 归档前复核发现**两个阻断均已由后续 spec 解除**，故按「`*` 任务也要做」补做，不再以旧阻断为由挂账。
+
+### 12.1 阻断解除的两条证据
+1. **生产构建白屏**（原 `vendor-core:30:11317` TDZ `Cannot access 'Rt' before initialization`）：
+   `frontend-prod-build-white-screen-closure`（`_archive/160-…`，7/7）已修两处环并给 smoke 加无头浏览器步 ——
+   ①`vendor-core` 反向 import 入口 `index`（element-plus 传递依赖与 CJS 辅助落在 index）；
+   ②`WorkpaperEditor ↔ heavy-univer` 懒加载环（Univer 第三方依赖落在编辑器块，打开编辑器报 `Cannot access 'Kp'`）。
+2. **OO→HTML 往返**：上游 `wp-sync-conflict-adjudication-and-d4-32-modeling`（`_archive/174-…`）的 Task 12 真库 UAT
+   与 12.e OO iframe 完整往返已于 **2026-11-15** 实测通过（三方一致 / 冲突 0 / A 列序号保留）。
+
+### 12.2 环境与方法
+- 干净检出 worktree：`HEAD=6e6bc5dc8` / `tree=de87804f4`（不参与主工作区的 32 个脏文件）。
+- `npm ci --prefer-offline` 装独立依赖（不建 node_modules 联接，避免 vitest / vite 双实例与联接误删）。
+- `npm run build:verify`：vite 生产构建 → 包体预算 `--check` → **`check-chunk-cycles --strict`** → built smoke
+  （含 `smoke-browser-mount.mjs` 无头浏览器首屏挂载断言）→ 发布 `.verified-dist/<manifest-sha256>`。
+- `preview:verified` 起独立端口 **3041**，`VITE_API_BASE_URL=http://127.0.0.1:9980` 同源代理到共享后端（只读）。
+- Playwright chromium 无头浏览器，1600×1000；采集 `console` error 与 `pageerror`。
+- 导航用 `domcontentloaded` 而非 `networkidle`：工作台 / 交付中心带 SSE 与轮询，网络永不 idle（这是探针口径，
+  不是页面缺陷；首轮误用 `networkidle` 导致 90 秒超时）。
+
+### 12.3 build:verify 结果（全绿）
+| 项 | 结果 |
+| --- | --- |
+| vite 生产构建 | 3m48s，14828 modules transformed |
+| 入口 gzip | **566,436 B**（预算通过） |
+| chunk 静态 import 图 | **2501 块，严格无环** |
+| built smoke | 通过（主页 / SPA 深链 / 动态块 / API 与 WOPI 代理） |
+| 浏览器首屏挂载 | 通过（`smoke-browser-mount.mjs` 默认不跳过，仅 `GT_SMOKE_SKIP_BROWSER=1` 才跳过并告警） |
+| 验证产物 | `.verified-dist/c851dacdb880f9eb28e3c0b84df1b08c8e6d242358a4a2a22924d3d1de21c793` |
+
+### 12.4 浏览器走查 16/16 通过（`ok=true`）
+项目：【测试】公式同步甲有限公司_2025（`4c77f3e8-…`，15 份底稿）。
+
+| # | 项 | 结果 |
+| --- | --- | --- |
+| 1 | 生产构建首屏挂载 | `#app` children=1（**白屏已消**） |
+| 2 | 登录页表单完整 | inputs=2 |
+| 3 | 登录成功并跳转 | `/` |
+| 4 | 项目列表 | len=728，含【测试】 |
+| 5 | 项目工作台 | len=281，newPageError=0 |
+| 6 | 试算表 | len=8788，newPageError=0 |
+| 7 | 报表 | len=3432，newPageError=0 |
+| 8 | 附注 | len=769，newPageError=0 |
+| 9 | 底稿列表 | len=500，newPageError=0 |
+| 10 | 调整分录 | len=623，newPageError=0 |
+| 11 | 交付中心 | len=351，newPageError=0 |
+| 12 | `/api/health` | 200 |
+| 13 | trio readiness 端点 | 200（见 §12.5） |
+| 14 | 底稿编辑器（D1-1 应收票据审定表） | len=1450，`heavy-univer` 重块动态加载正常（**原 `Kp` TDZ 已消**） |
+| 15 | console error | **0**（排除资源 404） |
+| 16 | pageerror | **0** |
+
+### 12.5 trio readiness 实取证据（Task 15/16 在真实栈生效）
+`GET /api/projects/{pid}/deliverables/trio/readiness?year=2025` → **HTTP 200**，返回六源结构与逐源 `content_digest`：
+
+```
+data.status = "blocked"
+data.sources = { dataset{available:false, content_digest:4f53cda1…},
+                 tb{available:true, count:174, content_digest:e5ff19fc…},
+                 formula_push{available:true, count:88, run_id:93f7fc14…}, report…, notes…, adjustment… }
+data.hard_blockers = [ {code:"stale_source", component:"financial_report",
+                        evidence:{stale_count:9,total_count:258,calc_error_count:7}},
+                       {code:"stale_source", component:"disclosure_notes",
+                        evidence:{stale_count:165,total_count:199}} ]
+```
+
+两点结论：
+1. **六源统一 + 内容摘要在生产构建下真实生效** —— 正是 Task 15（删子类 override、六源走
+   `deliverable_readiness_sources.ReadinessSourceChecks.content_digest`）与 Task 16（snapshot 纳入内容/版本摘要）的交付面。
+2. `status=blocked` 是**业务正确行为**，不是缺陷：该【测试】项目报表 9/258 行过期（其中 7 行计算失败）、
+   附注 165/199 章 `is_stale`，readiness 如实阻断出具而非假放行 —— 这正是 R5「出具权威源」要的 fail-closed。
+
+### 12.6 未覆盖（如实登记，不粉饰）
+- **复核→终态链的浏览器写入型走查**：本轮为只读走查，未写业务数据。该链的后端行为已由三重证据覆盖 ——
+  真 PG `test_workpaper_review_lifecycle_pg.py`（退回→编制完成→重提→L1/L2/L3 + EQCR 拒）、共享库 freeze 探针
+  （4 个终态全 423 / draft 放行 / 回滚零残留）、守卫 `test_workpaper_terminal_freeze_guard.py`；前端只读与
+  冻结横幅由 vitest 隔离 54 passed 覆盖。浏览器写入型留作后续真环境 UAT。
+- **OO 在线编辑 iframe 的本 spec 视角往返**：上游 spec 174 已于 2026-11-15 独立实测通过，本 spec 不重复。
+- **`/readyz` 当前 503（范围外，非本 spec 引入）**：根因是共享库 **V273 checksum 漂移未登记**
+  （`V273__sync_conflict_abandon_columns.sql` 应用后被编辑，登记 `c5a6e5709f34…` / 当前 `608d8ed9e65d…`）。
+  V273 属 `frozen-contract-read-path-and-legacy-operation-settlement`。本 spec R6.3 的判据
+  （critical drift ⇒ 503）**本身按设计正确生效**，`/api/health` 仍 200 并如实列出 `migration.pending_versions=[]` /
+  `failures=[]`。处置交该 spec / 迁移负责人（登记到 `app/core/migration_drift_ledger.py` 或按现查真库确认效果）。
