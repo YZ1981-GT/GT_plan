@@ -964,7 +964,22 @@ class WorkpaperSyncConflict(Base):
         _UUID, ForeignKey("users.id"), nullable=True
     )
     resolved_at: Mapped[datetime | None] = mapped_column(_TS, nullable=True)
+    #: 观测同步语义的「本轮不再出现的旧 key」（唯一写入方 = `repository.record_conflicts`，
+    #: 且同函数对**本轮命中**的行清零）—— **不得**拿它存人工作废，会被下一次重观测抹掉。
     superseded_at: Mapped[datetime | None] = mapped_column(_TS, nullable=True)
+    #: 🔴 V273 三列：人工作废（spec frozen-contract-read-path 任务 8 / R3.3）。
+    #:
+    #: 与 `superseded_at` **语义不同、写入方不同**：那套是观测同步（自动化、可被下一轮
+    #: 清零），这套是人工审计动作（一次性、永不改写）。复用同一列会让「本轮不再出现」
+    #: 与「人工判为无意义」两种事实互相遮蔽，且前者会静默抹掉后者。
+    #:
+    #: 三列**同生共死**（DB 侧 `ck_wpsc_abandon_triplet`）：只写一两列等于让「谁在什么
+    #: 时候因为什么作废了」残缺。
+    abandoned_at: Mapped[datetime | None] = mapped_column(_TS, nullable=True)
+    abandon_reason: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    abandoned_by: Mapped[uuid.UUID | None] = mapped_column(
+        _UUID, ForeignKey("users.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(_TS, nullable=False, server_default=sa.func.now())
 
 

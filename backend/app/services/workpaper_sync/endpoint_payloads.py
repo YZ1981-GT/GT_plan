@@ -570,3 +570,35 @@ def scope_only_projection() -> Any:
         values={},
         row_keys={},
     )
+
+
+async def resolution_choices_for(
+    svc: Any,
+    *,
+    operation_id: Any,
+    project_id: Any,
+    wp_id: Any,
+    entry_id: str,
+    items: tuple[Mapping[str, Any], ...],
+):
+    """`{conflict_id, choice, value}` → `ResolutionChoice`（从 router 抽出，行数门）。
+
+    与 router 里那个薄壳同一语义；抽出去是因为 `wp_sync_router.py` 在 whitelist 硬上限
+    （3639 / cap 3640）上，而本修改必须加一个端点。行为逐字未变。
+    """
+    if not items:
+        return ()
+    canonical = await svc.requests.read_operation(
+        operation_id=operation_id,
+        declared_project_id=project_id,
+        declared_wp_id=wp_id,
+        declared_entry_id=entry_id,
+        action="resolve_conflicts",
+        require_application=True,
+    )
+    return build_resolution_choices(
+        items=items,
+        conflict_rows=await svc.repo.load_conflicts(
+            operation_id=canonical.canonical_operation.id
+        ),
+    )

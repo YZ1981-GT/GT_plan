@@ -62,7 +62,7 @@ from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Requ
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.services.wp_visibility.action_matrix import (
     _DEDICATED_ENTRYPOINT as _MATRIX_DEDICATED_ENTRYPOINT,
@@ -85,13 +85,21 @@ from app.services.workpaper_sync.command_service import (
     CommandServiceClient,
     build_httpx_command_transport,
 )
+from app.services.workpaper_sync.conflict_abandon import (
+    AbandonActorRequiredError,
+    AbandonReasonRequiredError,
+    ConflictAbandonService,
+    ConflictNotAbandonableError,
+)
 from app.services.workpaper_sync.conflict_resolution import ConflictResolutionService
 from app.services.workpaper_sync.content_mutation import ContentMutationService
 from app.services.workpaper_sync.endpoint_payloads import (
     build_projection,
     build_resolution_choices,
     build_resolve_fence,
+    resolution_choices_for,
 )
+from app.services.workpaper_sync.application_failure_facts import application_failure_facts
 from app.services.workpaper_sync.failure_wording import describe_sync_failure_code
 from app.services.workpaper_sync.entry_readiness import (
     EntryReadinessNotFound,
@@ -368,6 +376,10 @@ _WRITE_ACTIONS: frozenset[str] = frozenset(
         "claim_recovery_case",
         "download_only",
         "resolve_conflicts",
+        # spec frozen-contract-read-path-and-legacy-operation-settlement 任务 8：
+        # 冲突集「显式作废」。**写** action —— 它推进 operation 终态并写三列审计事实，
+        # 归档 / 复核通过的底稿不该被人工作废（那等于在定稿件上改状态）。
+        "abandon_conflicts",
         "retry_apply",
         "rollback",
         # spec workpaper-sync-managed-row-convergence Requirement 2：反向收敛覆盖 store，
@@ -2559,50 +2571,6 @@ def _operation_ref(operation_id: uuid.UUID) -> ScopeRef:
     )
 
 
-async def _application_failure_facts(
-    svc: _SyncServices, *, application_id: uuid.UUID
-) -> dict[str, Any]:
-    """把 application 事件流里的失败真因投影给前端（**只读**，不改任何状态）。
-
-    为什么必须从事件流读：`apply_durable_incoming` 在 durable 之后刻意不抛
-    （AC 5.7/5.8），失败只表现为 `result.result`，落库落在
-    `working_paper_content_application_event.error_code` 上；
-    `working_paper_sync_operation.error_code` 在这条路径上恒为 NULL。
-
-    中文说明取后端**已有的单源词表**（`excel_materialize.FAILURE_KINDS` 等），
-    不在前端再抄一份码→文案的映射：抄一份就必然与后端漂移，而漂移的表现是
-    「用户看到一个没人维护的旧措辞」。查不到登记时**不编**，只回码本身。
-    """
-    from app.models.workpaper_sync_models import WorkpaperContentApplicationEvent
-
-    row = (
-        await svc.session.execute(
-            sa.select(
-                WorkpaperContentApplicationEvent.error_code,
-                WorkpaperContentApplicationEvent.to_state,
-            )
-            .where(
-                WorkpaperContentApplicationEvent.application_id == application_id,
-                WorkpaperContentApplicationEvent.error_code.isnot(None),
-            )
-            .order_by(WorkpaperContentApplicationEvent.sequence_no.desc())
-            .limit(1)
-        )
-    ).first()
-    if row is None:
-        return {
-            "application_error_code": None,
-            "application_error_stage": None,
-            "application_error_message": None,
-        }
-    code = str(row[0])
-    return {
-        "application_error_code": code,
-        "application_error_stage": (None if row[1] is None else str(row[1])),
-        "application_error_message": describe_sync_failure_code(code),
-    }
-
-
 async def _fold_observability_facts(
     svc: _SyncServices,
     *,
@@ -2743,7 +2711,7 @@ async def get_operation(
                 ),
                 "durable_at": row.durable_at.isoformat() if row.durable_at else None,
                 "finished_at": row.finished_at.isoformat() if row.finished_at else None,
-                **await _application_failure_facts(svc, application_id=row.id),
+                **await application_failure_facts(svc, application_id=row.id),
                 # 🔴 same-application higher-sequence fold 的**可观测读侧**（Task 32 欠账修复）。
                 # 写侧（Task 23 的 advance_room_durable_fence）一直在维护 application 的
                 # origin/effective sequence 与 room 的 latest-durable application/sequence，
@@ -2953,6 +2921,44 @@ async def resolve_conflicts(
     return outcome.as_dict()
 
 
+@router.post(
+    USER_SYNC_PREFIX + "/operations/{operation_id}/abandon",
+    # 项目级 **review** 门（作废是复核级动作）。`_guard` 判 scope 可见性 + workflow
+    # 锁 + action 登记，**不判项目成员级别** ⇒ 必须显式挂。
+    dependencies=[Depends(require_project_access("review"))],
+)
+async def abandon_conflicts(
+    project_id: uuid.UUID,
+    wp_id: uuid.UUID,
+    entry_id: str,
+    operation_id: uuid.UUID,
+    payload: Mapping[str, Any] = Body(default_factory=dict),
+    svc: _SyncServices = Depends(_services),
+) -> dict[str, Any]:
+    """冲突集**显式作废**（R3.3）。语义与全部约束见 `conflict_abandon` 模块 docstring。"""
+    scope = await _guard(
+        svc, project_id=project_id, wp_id=wp_id, entry_id=entry_id,
+        action="abandon_conflicts", refs=(_operation_ref(operation_id),),
+    )
+    try:
+        # `require_application=False`：作废对象是冲突集，不要求它还能发布内容。
+        canonical = await svc.requests.read_operation(
+            operation_id=operation_id, declared_project_id=project_id,
+            declared_wp_id=wp_id, declared_entry_id=entry_id,
+            action="abandon_conflicts", require_application=False,
+        )
+        outcome = await ConflictAbandonService(repo=svc.repo).abandon(
+            operation_id=canonical.canonical_operation.id,
+            reason=payload.get("reason"),
+            actor_id=scope.user_id,  # 服务端当前用户，**不**读请求体
+        )
+        await svc.session.commit()
+    except SyncDomainError as exc:
+        await svc.session.rollback()
+        raise _sync_http(exc) from exc
+    return outcome.as_dict()
+
+
 async def _resolution_choices(
     svc: _SyncServices,
     *,
@@ -2962,36 +2968,18 @@ async def _resolution_choices(
     entry_id: str,
     items: tuple[Mapping[str, Any], ...],
 ):
-    """design §API 的 `{conflict_id, choice, value}` → 域内 :class:`ResolutionChoice`。
+    """薄壳委派：实现在 `endpoint_payloads.resolution_choices_for`（行数门要求抽出去）。
 
-    🔴 前端只有 `conflict_id`（preview 给它的 opaque id），而 merge 域按
-    `(stable_field_key, row_key, oo_location)` 去重 —— 两者之间的翻译**必须在服务端**：
-    让前端提交 stable key 等于让它决定裁决落在哪个字段，而那正是 AC 8.3「服务端自行
-    校验」要禁的形态（改一个字符就能把裁决落到另一行）。
-
-    翻译前先走 Task 23 的授权四步读路径拿 canonical primary：conflict 行永远挂在
-    canonical primary 上，requested 是合法 duplicate 时它自己没有冲突行。
-    翻译本体在 `endpoint_payloads`（服务层）—— 见那个模块 docstring 的两条理由。
+    保留同名同签名的理由：既有用例按这个名字 monkeypatch / 断言；删名会让它们改测一条不再是生产路径的分支。
     """
-    if not items:
-        return ()
-    try:
-        canonical = await svc.requests.read_operation(
-            operation_id=operation_id,
-            declared_project_id=project_id,
-            declared_wp_id=wp_id,
-            declared_entry_id=entry_id,
-            action="resolve_conflicts",
-            require_application=True,
-        )
-        return build_resolution_choices(
-            items=items,
-            conflict_rows=await svc.repo.load_conflicts(
-                operation_id=canonical.canonical_operation.id
-            ),
-        )
-    except SyncDomainError as exc:
-        raise _sync_http(exc) from exc
+    return await resolution_choices_for(
+        svc,
+        operation_id=operation_id,
+        project_id=project_id,
+        wp_id=wp_id,
+        entry_id=entry_id,
+        items=items,
+    )
 
 
 @router.post(USER_SYNC_PREFIX + "/operations/{operation_id}/retry", status_code=202)
@@ -3606,12 +3594,16 @@ def _build_error_code_status(
                ResolveFenceRejectedError, ResolveSupersededError,
                ResolveRebaseRequiredError, StateTransitionError,
                ReapplyForbiddenError, RollbackRevisionRewindError,
-               ParticipantDirtyLeaveError, ParticipantLeaveInFlightError)),
+               ParticipantDirtyLeaveError, ParticipantLeaveInFlightError,
+               # spec frozen-contract-read-path 任务 8：作废的状态准入归 409 而非 404（scope 可见且行存在）
+               ConflictNotAbandonableError)),
         # 422 —— 请求本身不适配（客户端可读的拒绝）。
         (422, (QuarantinedIncomingError, QuarantinedOperationForbiddenError,
                RecoveryCaseRetryForbiddenError, ResolveWithoutConflictError,
                ResolveApplyFailedError, RollbackSourceNotPublishedError,
-               RollbackSourceQuarantinedError)),
+               RollbackSourceQuarantinedError,
+               # 作废的入参校验（缺原因 / 原因过短 / 缺操作者）。
+               AbandonReasonRequiredError, AbandonActorRequiredError)),
     )
     table: dict[str, int] = {}
     for status, classes in (production_spec if spec is None else spec):

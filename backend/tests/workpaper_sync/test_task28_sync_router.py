@@ -906,6 +906,9 @@ class TestRouterShape:
             ("GET", f"/operations/{op}/conflicts"),
             ("GET", f"/operations/{op}/timeline"),
             ("POST", f"/operations/{op}/resolve"),
+            # spec frozen-contract-read-path-and-legacy-operation-settlement 任务 8：
+            # 冲突集显式作废（唯一的遗留 operation 出口）。
+            ("POST", f"/operations/{op}/abandon"),
             ("POST", f"/operations/{op}/retry"),
             ("POST", f"/versions/{version}/rollback"),
         ]
@@ -1079,12 +1082,15 @@ class TestGuardIsTheFirstAwaitInEveryHandler:
         # `POST …/first-publication`
         # （spec d2-online-edit-platform-closure R7 追加）、
         # `POST …/materialize-from-store`
-        # （spec workpaper-sync-switch-performance P5 追加）。
+        # （spec workpaper-sync-switch-performance P5 追加）、
+        # `POST …/operations/{operation_id}/abandon`
+        # （spec frozen-contract-read-path-and-legacy-operation-settlement 任务 8 追加）。
         # 🔴 `GET …/sync/entry-identity` **不在**本分母里：它挂在兄弟 scope 前缀
         # （`ENTRY_IDENTITY_PREFIX`）上、不经 `_guard`，鉴权形态由
         # `TestRouterShape::test_entry_identity_uses_project_level_read_gate` 覆盖。
-        # 上面 `continue` 已把它从循环里排除，故这里仍是 `+7` 而非 `+8`。
-        assert checked == len(_REQUIRED_ENDPOINTS) + 7, (
+        # 上面 `continue` 已把它从循环里排除。本 spec（任务 8）新增 `abandon_conflicts`
+        # handler ⇒ 偏移从 `+7` 变 `+8`（多出来的正是 abandon 这一条）。
+        assert checked == len(_REQUIRED_ENDPOINTS) + 8, (
             f"只核对了 {checked} 个 handler —— 端点数变化时本判据的分母必须同步"
         )
 
