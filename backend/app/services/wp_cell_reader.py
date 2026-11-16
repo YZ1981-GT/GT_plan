@@ -16,6 +16,7 @@ ACNR 一侧在 ``services/acnr/wp_cell_target.py`` 用锁定目录（``effective
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Literal
@@ -27,6 +28,8 @@ from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.address_registry import extract_custom_cells
 from app.services.formula_management.stable_key import normalize_sheet_key
 from app.services.project_audit_year import fetch_project_audit_year
+
+_logger = logging.getLogger(__name__)
 
 __all__ = ["CatalogSheetKeys", "WpCellRead", "resolve_wp_cell"]
 
@@ -126,6 +129,30 @@ async def resolve_wp_cell(db, project_id, year, wp_code, sheet_key, cell) -> WpC
     wp_id, parsed_data = rows[0]
     cell_up = str(cell or "").strip().upper()
     records = extract_custom_cells(parsed_data if isinstance(parsed_data, dict) else None)
+
+    # ── M 循环「表单存储」fallback（spec `m-cycle-form-storage-cell-projection`）──
+    # M 循环（应付股利 / 实收资本 / 库存股 …）的数据在 checklist_responses（表单逐行 JSON），
+    # parsed_data 是 None ⇒ extract_custom_cells 返回 [] ⇒ 原来恒判 missing 并被
+    # wp_cell_target._refine 细化成「该底稿以表单方式录入…暂不支持取值」。
+    # 这里即时投影成 CellRecord，让 WP() 能取到值。
+    # 🔴 只在 records 为空时触发 —— 已有 parsed_data 的底稿（Excel 单元格类）行为不变。
+    # 🔴 零写入：投影不落库，checklist_responses 仍是唯一真源。
+    if not records:
+        try:
+            from app.services.address_registry import CellRecord as _CellRecord
+            from app.services.wp_form_storage_projection import load_form_storage_cells
+
+            proj_cells, proj_reasons = await load_form_storage_cells(db, wp_id, wp_code)
+        except Exception as exc:  # noqa: BLE001 — 投影失败不该让取值整体崩，但要可见
+            _logger.warning("M 循环表单投影失败 wp=%s code=%s: %s", wp_id, wp_code, exc)
+            proj_cells, proj_reasons = [], []
+        if proj_cells:
+            records = [
+                _CellRecord(sheet=c.sheet, cell=c.cell, row_label=None, value=c.value)
+                for c in proj_cells
+            ]
+        if proj_reasons:
+            _logger.info("M 循环表单投影原因 wp=%s code=%s: %s", wp_id, wp_code, proj_reasons[:5])
 
     if sheet_key is None:
         hits = [r for r in records if r.cell == cell_up]

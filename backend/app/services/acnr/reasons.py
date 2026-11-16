@@ -71,6 +71,11 @@ CELL_VALUE_REASONS: dict[str, str] = {
     "wp_ambiguous": "项目中该底稿有多份，无法确定取哪一份",
     "sheet_ambiguous": "表名有歧义，无法确定取哪一张表",
     "sheet_name_borrowed": "该表名被父级条目借用，无法唯一定位单元格所在表",
+    # ── M 循环「表单存储 → 单元格投影」（spec `m-cycle-form-storage-cell-projection`）──
+    "form_row_json_invalid": "表单某行的数据不是合法 JSON，无法投影成单元格",
+    "form_field_not_in_provider": "表单某行的字段不在 provider 声明里（前端多写了键），已跳过",
+    "form_row_beyond_template": "表单某行的行号超出模板数据区，未投影",
+    "determination_sheet_not_projected": "审定表等非行表形态暂不支持投影（本 spec 只做明细表逐行 JSON）",
 }
 
 
