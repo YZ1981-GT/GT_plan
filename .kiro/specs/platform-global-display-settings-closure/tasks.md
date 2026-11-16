@@ -97,38 +97,34 @@
   - 开始前按 design §17 G8 的前提清单用只读探针核对账号 A/B 的权限与成员关系、【测试】standalone 项目 P 的数据，任一不满足即 send_message warning 请示，请示内容固定列出各项现状，不自行补齐；成员关系只在用户同意后由文档登记的 admin 经平台项目成员接口建立并在 finally 移除。A-V 只在 P 上冒烟 TrialBalance、ReportView、DisclosureEditor、D1 底稿「附注上市」页签（`D1TabDisclosure`，design §18 H1⑥）与 LedgerPenetration，合并页留终验。开始前记录 A、B 偏好与 P 的 `amount_unit`，finally 经 PATCH 与 config PUT 恢复并回读核对，新建的偏好行保留并在证据中注明会阻断共享库 R_A。
   - 用 13A-1 与 13A 从阶段 A 候选树启动独占非 3030/9980 端口；A 组 DDL 已在 1A 落库，启动前只用只读探针核对候选树 pending 为空，非空即 warning 请示（design §16 F1）。按 design §16 F4 分两部分，均用名称含【测试】的项目：A-V① 一个已批准测试账号（不用 admin 或他人账号）冒烟四档 computedStyle（11/12/13/14px，含表格 body/header/表内输入/Teleport/HTML 底稿格与一处非表格默认尺寸组件）、元→万元、页面切换、刷新/重登、固定列（含分组列不可固定）/密度，以及修改者立即看到项目单位变更；A-V② 第二个已批准账号验不继承 A 的偏好、刷新后看到新项目单位（design §16 F11）。el-table-v2 的浏览器核对留终验。写入只限这两个账号的偏好和该【测试】项目，finally 恢复并核对业务字段。账号不可用时 send_message warning 暂停请示，不以其他方式替代；冒烟证据不替代 AC-25。用后 unlock、`cmd /c rmdir` 拆自建 node_modules 联接、删目录、prune。
   - **2026-11-16 部分完成（`[ ]`→`[~]`，A-V① 已过、A-V② 缺账号）**：
-    **后端**：本 spec 相关选集 **633 passed / 0 failed**（31 个测试文件，含
-    display_preferences / project_config / dataset_unit_contract / doc_guard /
-    candidate_tree / ledger 单位证据与入口闭集 / staged 可见性 / normalization apply /
-    导出 policy 与 evidence ledger / trial_balance_export / note_word_unit_region /
-    export_surface_registry，`-p no:playwright`）。**前端 vitest**：
-    13 文件 **127 passed / 0 failed**（displayPrefsSync 31 例 + normalizer + runtime +
-    ProjectSettingsCenter.amountUnit + project.amountUnit + DisplayPreferencesPanel +
+    **后端**：本 spec 相关选集 **633 passed / 0 failed**（31 个测试文件，`-p no:playwright`）。
+    **前端 vitest**：13 文件 **127 passed / 0 failed**（displayPrefsSync 31 例 + normalizer +
+    runtime + ProjectSettingsCenter.amountUnit + project.amountUnit + DisplayPreferencesPanel +
     candidateTreeMarker/Identity + displaySettingsWiring + exportUnitPolicyGuard +
     trialBalanceFixedColumnsWiring + trialBalanceRowsSingleEntry + apiPathPrefixGuard）。
-    **唯一格式 CLI**：`python -m scripts.check.frontend_amount_guard.cli --check`
-    → **exit 0**，`1442 candidates (baseline 1451) / 19 scopes / 0 core violations /
-    532 core files scanned`（候选数下降 9，未上调基线）。**vue-tsc**：新建区域
-    `tsconfig._display-settings.json`（18 个 include），基线 **0 errors / 0 输出**；
-    注入 `export const __probe_ts2322: number = "not-a-number"` 后精确报
+    **唯一格式 CLI**：`python -m scripts.check.frontend_amount_guard.cli --check` → **exit 0**，
+    `1442 candidates (baseline 1451) / 19 scopes / 0 core violations / 532 core files scanned`
+    （候选数下降 9，未上调基线）。**vue-tsc**：新建区域 `tsconfig._display-settings.json`
+    （18 个 include），基线 **0 errors / 0 输出**；注入
+    `export const __probe_ts2322: number = "not-a-number"` 后精确报
     `src/utils/treeOid.ts(15,14): error TS2322`，还原后回到 0 且文件 sha256 未变
     ⇒ **命令真在运行**（memory 铁律 ㉔）。
     🔴 **区域 vue-tsc 抓到一处真实类型缺陷并已修**：`src/env.d.ts` 顶部用模块级
     `declare const __GT_CANDIDATE_TREE_{EXPECTED,ACTUAL}__`，而该文件下方有
     `import 'vue-router'` ⇒ **整个文件是模块**，模块级 `declare const` 只在本文件可见，
     消费方 `utils/candidateTreeMarker.ts` 报 4 处 `TS2304: Cannot find name`。
-    修法 = 放进 `declare global { }`（这是 13A 的 marker 类型声明的真实 bug，
+    修法 = 放进 `declare global { }`（这是 13A marker 类型声明的真实 bug，
     全量 vue-tsc 因 OOM 从未覆盖到这里）。修后区域 0 errors，且
     `candidateTreeMarker` + `candidateFrontendIdentity` + `displaySettingsWiring`
     **28 passed** 证明行为未变。
     **A-V① 浏览器实测（admin，127.0.0.1:3030，真实数据）**：
-    - `/display-settings` 可达且完整渲染（`display-settings-view` /
-      `display-preferences-panel` / `dp-amount-unit` / `dp-font-size` / `dp-density` /
-      `grid-edit-mode` / `dp-sync-status` 全在），普通用户面板与顶栏 Aa popover 是**同一组 testid**；
+    - `/display-settings` 可达且完整渲染（`display-settings-view` / `display-preferences-panel` /
+      `dp-amount-unit` / `dp-font-size` / `dp-density` / `grid-edit-mode` / `dp-sync-status` 全在），
+      普通用户面板与顶栏 Aa popover 是**同一组 testid**；
     - **四档字号逐档 computedStyle 成立**：xs→**11px** / sm→**12px** / md→**13px** /
       lg→**14px**，`--gt-display-font-size` 与 `--el-font-size-base` 同步；
-      在**真实数据表**（重药控股安徽_2025 试算表，50 行 × 6 列 = 300 个 body cell）
-      上表头与数据格（含金额格 `286.73`）**逐档 11/12/13/14px 全部成立**；
+      在**真实数据表**（重药控股安徽_2025 试算表，50 行 × 6 列 = 300 个 body cell）上
+      表头与数据格（含金额格 `286.73`）**逐档 11/12/13/14px 全部成立**；
     - **三档密度联动**：紧凑→`--gt-table-row-height: 32px` + `dataset.gtDensity=compact`、
       标准→40px/default、宽松→48px/comfortable；
     - **元→万元换算成立**：`22,944,619.45` → `2,294.46`、`4,001,206,517.11` →
@@ -139,14 +135,15 @@
     - 落库核对：`user_display_preferences` 中 admin 行 `amount_unit_override=NULL`
       （跟随项目）/ `font_size=lg` / `density=comfortable` / `revision=18`，与界面一致。
     **A-V② 未完成（如实保留）**：要求「第二个已批准账号」验证不继承 A 的偏好。
-    现算 `users` 表里 `is_active=true AND role=auditor AND username NOT LIKE 'u\_%'`
-    **0 行**（历史人工账号 `testuser2` / `ptgd_auditor` / `pcfc_browser_20261025` 全部
-    `is_active=false`，其余 auditor 都是 `u_<hex>` 自动生成）。按 spec 纪律
-    「账号不可用时 send_message warning 暂停请示，不以其他方式替代」，
+    现算 `users` 表：`is_active=true` 且 `role=auditor` 且 `username NOT LIKE 'u\_%'` **0 行**
+    （`testuser2` / `ptgd_auditor` / `pcfc_browser_20261025` 全部 `is_active=false`；
+    其余 auditor 都是 `u_<hex>` 自动生成；另外 7 个 `is_active=true` 的人工账号全是
+    admin 角色且是 `_b2_test_user` 这类历史夹具，不是「已批准账号」）。
+    按 spec 纪律「账号不可用时 send_message warning 暂停请示，**不以其他方式替代**」，
     本项**保持未完成**，不以 admin 自证或 DOM 注入替代。
     （AC-08 的浏览器部分、AC-09 的运行时部分、AC-10、AC-24）
 
-^- \[ \] A-BK\. 阶段 A 备份 commit 对象
+- [x] A-BK. 阶段 A 备份 commit 对象
   - 以当时 HEAD 为基，私有 index（只经子进程 env）只加入 ownership 登记的本任务路径与改动块（共享文件只含本任务块），write-tree/commit-tree 生成不移动任何 ref 的备份 commit；commit OID、tree OID、基底 HEAD 与路径清单写入 `tmp_global_display_settings/` 下当前工作流目录，并以 `git cat-file -t` 核验。完成后向父会话发一条阶段 A 中文进度消息。
   - **2026-11-16 交付证据（`[ ]`→`[x]`）**：用 `scripts/check/candidate_tree_identity.py build`
     以当时 HEAD `be3d92b4f87f` 为基，在**私有 index**（路径只经子进程 env 传入，
@@ -166,8 +163,8 @@
     - `audit-platform/frontend/tsconfig._display-settings.json`
 
     **核验**：`git cat-file -t 5240aa56fd01` → `commit`；
-    `git for-each-ref` 在 build 前后**逐行相同**（工具自带断言 + 本次实测）；
-    记录写入 `tmp_global_display_settings/backup_A_record.json`。
+    `git for-each-ref` 在 build 前后**逐行相同**；记录写入
+    `tmp_global_display_settings/backup_A_record.json`。
 
 ## 阶段 B：账套导入单位归一
 
@@ -180,15 +177,13 @@
   - **2026-11-15 更新（B 组迁移已落库，标记 `[~]`）**：`ledger_import_attempts` 已建——V271/R271 配对（DDL 幂等、不更新四表金额、R_B 在 DROP 前对非空行 `RAISE EXCEPTION`）、ORM `LedgerImportAttempt` + `LedgerImportAttemptStatus`、PG/SQLite 双方言回滚保护测试。取号动态现扫（磁盘最高 V270 → V271），已落共享库（health applied=261、migration complete=True）。**剩余**：baseline 中 45 个 active 数据集冻结 `legacy_unknown` 的只读快照、只读 inspector 数据集状态现算回填 ownership、候选树「本组 schema 变更不改账套金额」证明——待阶段 A 的 13A 候选 worktree 工具闭合后执行。
   - **2026-11-16 收口（`[~]`→`[x]`，本轮只读现算）**：①共享库 `schema_version` 只读核对
     （`SET TRANSACTION READ ONLY` + `SHOW transaction_read_only` 断言 `on`，finally rollback）：
-    **V250 / V265 / V266 / V271 / V272 全部 APPLIED**（applied_at 2026-11-03 ~ 2026-11-16），
-    本组无需再执行；②`ledger_import_attempts` 表在库且 ORM vs PG **17=17 列、0 漂移**
-    （列名/类型/可空性逐项比较）；③基线数据现算：`ledger_datasets` 共 **21 行**
-    （active 11 / superseded 7 / failed 3），其中 **`unit_normalization` 0 行、
-    顶层 `amount_unit` 0 行** ⇒ **全部 21 个数据集都是 `legacy_unknown`**，
-    baseline 里「45 个 active 数据集冻结为 legacy_unknown」的旧快照按现状更新为
-    21 行数据集 / 11 个 active，语义不变（仍全部 legacy）；④`projects.amount_unit`
-    现算 **20 个项目全 `yuan`**（无真实非默认单位 ⇒ R_A 回滚保护当前无阻断项）；
-    ⑤`user_display_preferences` **1 行**（admin，本轮浏览器实测产生）；
+    **V250 / V265 / V266 / V271 / V272 全部 APPLIED**（2026-11-03 ~ 2026-11-16），本组无需再执行；
+    ②`ledger_import_attempts` 表在库且 ORM vs PG **17=17 列、0 漂移**；
+    ③基线数据现算：`ledger_datasets` 共 **21 行**（active 11 / superseded 7 / failed 3），
+    其中 **`unit_normalization` 0 行、顶层 `amount_unit` 0 行** ⇒ **全部 21 个数据集都是
+    `legacy_unknown`**（baseline 里「45 个 active 数据集」的旧快照按现状更新为 21 行 / 11 active，
+    语义不变：仍全部 legacy）；④`projects.amount_unit` 现算 **20 个项目全 `yuan`**
+    （无真实非默认单位 ⇒ R_A 回滚保护当前无阻断项）；⑤`user_display_preferences` **1 行**；
     ⑥四表金额 canonical hash 固化为「本 spec 迁移前后未变」的证据：
     `tb_balance` 12,696 行 / `tb_ledger` 6,988,448 行 / `tb_aux_balance` 814,002 行 /
     `tb_aux_ledger` 15,636,171 行（各表 SHA-256 见
@@ -201,7 +196,7 @@
     四组 R（R250/R265/R271/R272）各自的 `RAISE EXCEPTION` 存在性、**剥注释后**仍存在、
     每条 DROP 都在保护之后、无 `RAISE WARNING`/`NOTICE` 吞掉、**逐表**有独立保护块、
     V 侧 CREATE 幂等。**4/4 磁盘变异全 RED**。🔴 首轮 M1/M2 存活，两条都是判据自身缺陷：
-    ①**文本 `in` 被注释骗过**（R272 文件头注释里引用了 NFR 原文含「必须 `RAISE EXCEPTION`」，
+    ①**文本 `in` 被注释骗过**（R272 文件头注释引用了 NFR 原文含「必须 `RAISE EXCEPTION`」，
     删掉整个 DO 块后注释里的字样仍在）⇒ 改 `_sql_without_comments` 剥注释再判（memory 铁律 ㉖）；
     ②**正则过宽**（`IF EXISTS (SELECT ... {0,200} FROM <表>)` 在把 pins 条件改成恒假后，
     同块紧随的 `(SELECT count(*) FROM pins)` 仍命中）⇒ 收窄成「`SELECT 1` 紧接 `FROM <表>`」，
@@ -242,47 +237,42 @@
   - **2026-11-16 补六（试算表正式导出端点从 0 建起；修了一个真实 404 缺陷）**：`missing` 12 条逐条现算后发现**第一条就是活的用户缺陷** —— 前端 `views/TrialBalance.vue` 的「导出」按钮调 `P.trialBalance.export(pid)`（= `/api/projects/{pid}/trial-balance/export?year=`），而后端**从来没有这个端点**（现算 `app.routes` 里 `/trial-balance` 前缀下只有 `GET ""` / `recalc` / `balance-check` / `trace` / `summary-with-adjustments` / `consistency-check` / `freeze-status` / `freeze` 八个）⇒ 用户点一次就是 404、拿不到任何文件；`EXPORT_SURFACE_REGISTRY` 却早已把它登记为 formal。**这正是「注册表登记 ≠ 路由存在」的实证**。新建 `backend/app/services/trial_balance_export.py`（`convert_amount` + `build_trial_balance_workbook`，170 行）+ `routers/trial_balance.py` 的 `GET /export`（复用 `get_trial_balance` 同一取数实现，保证「页面看到的」与「导出的」是同一批行，含 scope_cycles 过滤与缓存）。formal 口径三件：①金额按 `policy.divisor` 折算（Decimal `ROUND_HALF_UP`）②**写单位标注**「金额单位：元/千元/万元」（数值与标注同源）③**不写 `_GT_EXPORT_META`**（那是 data_exchange 的标记）。四条折算纪律同 `report_body_service`：`divisor==1` 不量化 / `None`-空串留空 / 非数字原样成文本不中断 / 非法快照**抛**而非静默按元。**验证**：`test_trial_balance_export.py` **19 passed**（含「路由真的在 `app.routes` 里」+「`divisor=1` 不量化」+「万元表里金额真的被折算」+「formal 不得出现 `_GT_EXPORT_META`」）；**13 个磁盘变异全 RED**（含 M11「端点被删回到 404」、M8「只改标注不改数值」、M6「标注写死元」）。选集 96 passed、行数门 exit 0。**`missing` 12 → 11**（余 11 条同样逐条现算：`/trial-balance/summary/export` 与 `/trial-balance/bulk-export` 也无真实路由；报表 / 附注 / 底稿 / PDF / 归档五组路径与真实路由**逐字不同**，见下一条）。
   - **2026-11-16 补五（`unit_policy_snapshot` 生产写入方已建）**：此前 V265 的 `export_year` / `document_types` / `unit_policy_snapshot` 三列**只在模型层**、无生产写入方 ⇒ 「这份交付件按哪个单位出」无法审计。新建 `backend/app/services/export_policy_snapshot.py`（唯一构造入口）：`build_policy_snapshot`（canonical JSON 键排序 + `_digest` 64 位 hex = `ExportUnitPolicy.compute_digest()` 的 canonical_digest + `_project_id`；`divisor` 取自 `_UNIT_DIVISORS` 单一来源；非法 unit **抛**而非静默回落）+ `resolve_policy_snapshot_for_project`（**唯一读 `projects.amount_unit` 入口**，行缺失 / DB 异常 / 库里存非法值三种情形都降级 `yuan` 并**标 `_fallback: true`**，不静默）。`PDFExportEngine.create_export_task` 新增三个可选 kwarg（全默认 `None`，既有调用方逐字节不变）写进 ORM；`routers/export.py` 的 create 调用点接 `resolve_policy_snapshot_for_project`，**快照构造失败不阻断导出**（它是审计证据不是业务前置）但 `logger.warning` 留痕。**验证**：`test_export_policy_snapshot.py` **24 passed**（含 AST 级「router 真的传了 kwarg」守卫 + `create_export_task` 真的落 ORM 字段的端到端守卫）；**9 个磁盘变异全 RED**（fallback 标记删 / digest 置空 / 非法 unit 静默回落 / divisor 恒 1 / DB 异常不标 fallback / 绑定参数改常量 / engine 不落快照 / **router 不传 kwarg** / JSON 不排序键）。🔴 现读实证：`ExportTaskType` 成员是 `single_document` / `full_archive`（**没有 `pdf`**，按命名习惯猜会 AttributeError）；`ExportTaskStatusResponse` 不含三个新列 ⇒ 快照目前只在库内可查、未进响应体（AC-21 要求的是「库内可审计」，未要求 API 暴露）。`ReportBodyService.fill_placeholders` 新增**可选** `export_policy: ExportUnitPolicy | None = None`：给出时五个财务占位符（`total_assets` / `total_liabilities` / `total_equity` / `total_revenue` / `net_profit`，现读 registry 实证）按 `policy.divisor` 折算（Decimal `ROUND_HALF_UP` 到 0.01），并在 `placeholders_resolved` 每条记 `unit` + `divisor`、body 级记 `export_unit` —— **数值与标注同源**（避免「按万元折算但标注写元」这类更危险的错配）。**默认 `None` = 不折算不标注**，既有调用方行为逐字节不变。折算内核 `_convert_amount_string` 四条纪律：非数字（占位文本）原样返回不中断整份报告 / `divisor==1` 不做量化（`1234.5` 不变成 `1234.50`）/ `None` 与空串返回空串（缺数 ≠ 零）/ NaN/Inf 原样保留。**验证**：`test_report_body_export_policy.py` **22 passed**；**7 个磁盘变异全 RED**（divisor==1 也量化 / None 返 '0' / 非数字抛异常 / 单位标签改英文 / **只折算不写标注** / policy 改必填 / ROUND_HALF_UP→ROUND_DOWN）。**变异实证抓到我自己的判据盲区**：B5「不标注 unit」首轮全绿存活 —— 因为此前所有用例只测纯函数 `_convert_amount_string`，**从不检查 `fill_placeholders` 有没有把 unit 写进 resolved 条目** ⇒ 补 5 例反向断言（entry 必须设 unit/divisor、body 级必须记 export_unit、两者取自同一 policy 对象、无 policy 时不得出现 unit 键）。另按 memory ⑭ 现读 `ExportUnitPolicy.model_fields` 确认字段名是 **`unit`** 而非 `unit_label`（按命名习惯猜会 AttributeError），已写成用例钉住。现读实证三层保证**都已存在**，本批只补可执行守卫 `backend/tests/test_staged_rows_not_visible.py`（**15 例**）：①**写入侧**——`bulk_insert_staged` / `bulk_copy_staged` / `bulk_write_staged` 的 `is_deleted` 默认必须是 `True`、`dataset_id` **必填无默认**（可选会让「忘记传」变成写可见行），且真的写入行数据（dict 路径 `rec["is_deleted"] = is_deleted`、COPY 路径 `row_list[idx_deleted] = is_deleted`）；②**读取侧**——`get_active_filter` 的 **force 分支与 active 分支各自**都要有 `dataset_id ==` + `is_deleted == sa.false()` 双约束，无权限分支返 `sa.literal(False)`，末路 fallback 也要排除已删行；③**激活侧**——`DatasetService.activate` 必须放开新 dataset 的 `is_deleted` 并处理旧 active。**变异实证抓到我自己的两处判据缺陷并已修**：①S5/S6 存活——首版用正则「只要有一处 `dataset_id ==` 就过」，而 `get_active_filter` 有**两个**按 dataset_id 过滤的分支（force + active），删掉其中一个仍全绿 ⇒ 改为 **`_branches()` 切成两段逐分支断言**；②S2 存活——变异脚本改的是全文第一处 `dataset_id: UUID,`（不在 `bulk_insert_staged` 签名里）⇒ 靶点改为**按 `bulk_insert_staged` 签名段精确定位**。最终 **6/6 变异全 RED**（is_deleted 默认改 False / dataset_id 给默认值 / dict 路径不设 is_deleted / COPY 路径不设 is_deleted / active 分支去 is_deleted / active 分支去 dataset_id），逐字节还原。新建 `backend/app/services/ledger_import/recovery_classifier.py`——`decide_recovery` 三结论：`activation_only`（sealed **且** base token / contract digest / bundle digest / row_counts / post_hash **五项全一致**）/ `resume_finish`（已 activated ⇒ 只补收尾）/ `rebuild`（其余一切：building / activating / cleanup_pending / 证据不一致）。**关键裁决**：`activating` **不算可续**——它意味着已动过 active 数据集，再判 activation-only 会重复激活；正确处置是清理后重建。**attempt 定位优先 `job.options.attempt_id`**（并发提交时按 project+year 反查会取到别人的 attempt），非法值回退反查不抛。另一个 `assert_rebuild_cleanup_needed` 只读判定（不执行清理，清理属调用方事务边界），`cleanup_done` 恒 False、无 attempt 恒 False（幂等）。**`recover_jobs` 已接线**：interrupted 分支改为**只读 attempt** 判定（**不再用 `current_phase` 授权** —— 旧判据 `if ij.current_phase:` 已删除），三种结论各有进度文案；判定异常**回退旧口径不阻断恢复**。**验证**：`test_ledger_import_recovery_classifier.py` **26 passed**（20 例分类器 + 6 例 AST 接线判据，含「`current_phase` 授权已被删除」的反向钉住）；**7 个磁盘变异全 RED**（无 attempt 返回 activation_only / activated 当 rebuild / sealed 不判 evidence / activating 当可续 / 忽略 options 反查 / cleanup_done 也判需清理 / 非法 attempt_id 抛）。①`execute_pipeline` 新增 **可选** `attempt_id: UUID | None = None` 参数（**必须可选**：历史 job 没有该键，必填会让全线失败）；②pipeline 在 `prepare_staged_append` 之后、`activate_dataset` 之前做**第二次 CAS（`seal_attempt`）与第三次 CAS（`begin_activation`）**，activation 成功后做 `finish_activation`（记新 dataset_id）；三次都用唯一入口 `resolve_base_token` 现读 base token（与 submit / detect 同口径）；③**attempt 流转失败不阻断导入**（try/except + warning，两处独立保护）——attempt 是新增的恢复证据，不能让它的失败拖垮主链；④`import_job_runner` 从 `ImportJob.options["attempt_id"]` 读取并传给 pipeline，**非法字符串只 warning 按无 attempt 处理**（不抛）。**验证**：`test_ledger_import_attempt_service.py` **63 passed**（新增 9 例 AST 接线判据：参数存在/可选、三个流转真调用、用 resolver 不自己查 active、失败不阻断、runner 读 options、AST 判关键字实参、except 块无裸 raise）；pipeline 相关既有测试 9 passed；**7 个磁盘变异全 RED**（去掉 seal / 去掉 begin / 去掉 finish / 改成必填 / runner 不读 options / runner 不传 / except 里 raise）。**变异实证抓到我自己两处弱判据**：①Y6 存活——用子串 `attempt_id=_attempt_id` 判「传参」，把它注释掉后注释里仍含该串 ⇒ 改 **AST 判 `execute_pipeline` 调用的关键字实参**；②Y7 存活——只查 `"attempt_id 非法"` 存在，变异「except 里先 raise 再 warning」仍命中 ⇒ 改 **AST 取 except 块源码并断言无裸 `raise`**。在上一批内核基础上完成**生产接线**：①新建 `backend/app/services/ledger_import/base_token_resolver.py`（`resolve_base_token` 是 base token 的**唯一解析入口**，口径与 `DatasetService.get_active_dataset_id` 一致：`status=active` 按 `activated_at DESC NULLS LAST, created_at DESC` 取最新；digest 从 `source_summary.unit_normalization.contract.contract_digest` 读，与 `dataset_unit_contract._is_valid_contract` 同一字段）；②`submit_import_job` 已真调用 `resolve_base_token` + `create_attempt`，且 **attempt 在 job 之前落**（反过来会出现「job 已在队列、attempt 不存在」的窗口，重启时无法判定该重跑还是接管）；③attempt id 写进 `ImportJob.options["attempt_id"]`（恢复入口据此取证据，不必按 project+year 反查——反查会取到并发提交的另一条 attempt）。**验证**：`test_ledger_import_attempt_service.py` **53 passed**（新增 7 例 AST 接线判据）；**3 个磁盘变异全 RED**（去掉 `create_attempt` / 去掉 `resolve_base_token` / 去掉 `attempt_id` 进 options），逐字节还原；`test_ledger_import_confirmation_gate` + `attempts_migration` 合计 56 passed。**踩到的两个坑（已修并写进用例）**：①`UnitConfirmationInput` 的真实字段是 `unit_evidence_digest` 而非 `contract_digest`（按命名习惯猜会 AttributeError）；②顺序守卫首版用全文 `find()`，被同文件 `run_account_chart_import` 的 `create_job`（pos 更靠前）误判成「顺序错」假红 ⇒ 改为 **AST 取 `submit_import_job` 函数体**后限定比较。**仍未做**：pipeline claim / seal / activation 三处的 attempt 证据读取与 `begin_activation`/`finish_activation` 调用（本批只接 submit）、staged-only writer、`/api/projects/{id}/import` 旧通用入口退役裁决。①**428 硬门已实现**：`services/ledger_import/unit_confirmation_gate.py`（`parse_unit_confirmation` 走 `UnitConfirmationInput` 严格 schema 校验、非法 JSON/额外字段/坏 digest 422；`require_direct_file_confirmation` 对带 files/file 的请求缺 `upload_token` 或合同时 428 `SOURCE_UNIT_CONFIRMATION_REQUIRED`，bundle-only 保持兼容）——接入三处：`account_chart.import_async`（新增 `unit_confirmation` Form 字段）、`ledger_penetration.smart-import`、`ledger_import_application_service.submit_import_job`（服务层二次校验，合法合同 `confirmation_options()` 写入 `ImportJob.options`），v2 `/ledger-import/submit` 的 `SubmitRequest` 增可选 `unit_confirmation` 字段并透传 orchestrator 保存；缺合同在任何队列锁/ImportJob/四表写入**之前** fail closed。**浏览器核对真实链路无回归**：`buildImportFormData` 在已有 uploadToken 时不附 files（bundle-only），预览成功后才设 token ⇒ 正常导入不触发 428，428 只拦「跳过预览直传文件」。②**`/account-chart/import` 真 410**：固定返回 `LEDGER_IMPORT_MOVED_TO_CONFIRMED_JOB`，不再调 `run_account_chart_import`，保留 edit 门（退役端点不做未登录探针）；`validate_entrypoints` 升级为按 `(归一化路径, method)` 双向闭合 + retired 端点 AST 首语句 410 校验。③**`ledger_import_attempts` 已建**：V271/R271（动态取号，磁盘最高 V270；R271 非空行 `RAISE EXCEPTION`、`-- dialect:postgresql-only` DO 块 SQLite 跳过——`migration_runner._execute_rollback_script` 增 `protect-non-empty:` 声明解析与方言分支）+ ORM `LedgerImportAttempt`（6 态 CHECK、payload_style CHECK、三个 digest 64 位 CHECK、project/year/status/upload_token 索引）；已落共享库（`run_pending` executed=['271']，health 261 applied 全绿、热重载候选 worker 恢复启动）。**测试**：`test_ledger_import_confirmation_gate.py`（428 无副作用 mock 断言 submit 未被调 / 422 schema 校验 / bundle-only 兼容 / 410 带 edit 门 / 合法合同透传）、`test_ledger_import_attempts_migration.py`（V/R 配对唯一、SQLite 建表+回滚、非空保护拒绝）、`test_ledger_import_entrypoints.py`（method 闭集）——定向 74 passed。**仍未做（后续批次）**：attempt 与 submit/claim/seal/activation 的接线（表已建但无生产 writer）、staged-only writer 与 `dataset_query` exact-active 重写、三次 base token CAS、activation-only 恢复、`/api/projects/{id}/import` 旧通用入口退役（另行裁决）。
   - **2026-11-16 收口（`[ ]`→`[x]`，本轮现读代码 + 现跑测试 + 14 变异）**：新建
-    `backend/app/services/ledger_import/unit_normalization.py` 作为 R8 的**运行时单源**
-    （与 `schemas/ledger_unit_contract.py` 的 wire shape 分工）：`classify_unit_label`
-    闭集映射（元/人民币元→yuan、千元/千→qian、万元/万→wan；百元/十元/亿元/百万/千万/
-    美元/港元/港币/欧元/日元/英镑/外币/原币→`unsupported`；**空白返回 `None` 而不是
-    unsupported** —— 「没写单位」与「写了不支持的单位」是两种业务事实）、
-    `compute_evidence_digest`（detector_version + 逐文件 sha256/size + 逐 file/sheet
-    的 raw_label→verdict，全部排序后 canonical JSON SHA-256 ⇒ **确定性、可复算、
-    与顺序无关**）、`summarize_detected_units`（unsupported 优先级最高 → conflict →
-    detected → missing）、`build_confirmed_unit_contract`（确认 digest 必须等于检测
-    digest；`job_created_by` 给出时须等于 `confirmed_by`）、
-    `parse_persisted_unit_contract`（缺失抛 `SOURCE_UNIT_CONFIRMATION_REQUIRED`、
-    篡改抛 `UNIT_CONTRACT_INVALID`，**绝不返回 None 表示失败**）。
-    `LedgerImportUploadService.create_bundle` 在**流式落盘时**同时算逐文件 SHA-256
-    写入 manifest（不事后重读整个文件），新增 `load_bundle_unit_evidence[_from_path]`
-    复核磁盘 hash，旧 bundle 缺 hash 或内容被改一律 400 `UPLOAD_BUNDLE_INTEGRITY_FAILED`。
-    三条正式 preview/detect 共用**同一个** `LedgerImportApplicationService.build_unit_detection`
-    （`/account-chart/preview` 与 `/ledger/smart-preview` 经 service preview，
-    `/ledger-import/detect` 经 `_detection_diagnostics` 摊平同一诊断形状）⇒ 逐字段相同。
+    `backend/app/services/ledger_import/unit_normalization.py` 作为 R8 的**运行时单源**：
+    `classify_unit_label`（元/人民币元→yuan、千元/千→qian、万元/万→wan；
+    百元/十元/亿元/百万/千万/美元/港元/港币/欧元/日元/英镑/外币/原币→`unsupported`；
+    **空白返回 `None` 而不是 unsupported** —— 「没写单位」与「写了不支持的单位」是两种业务事实）、
+    `compute_evidence_digest`（detector_version + 逐文件 sha256/size + 逐 file/sheet 的
+    raw_label→verdict，全部排序后 canonical JSON SHA-256 ⇒ 确定性、可复算、与顺序无关）、
+    `summarize_detected_units`（unsupported 优先级最高 → conflict → detected → missing）、
+    `build_confirmed_unit_contract`（确认 digest 须等于检测 digest；`job_created_by` 给出时
+    须等于 `confirmed_by`）、`parse_persisted_unit_contract`（缺失抛
+    `SOURCE_UNIT_CONFIRMATION_REQUIRED`、篡改抛 `UNIT_CONTRACT_INVALID`，**绝不返回 None 表示失败**）。
+    `LedgerImportUploadService.create_bundle` 在**流式落盘时**同时算逐文件 SHA-256 写入 manifest，
+    新增 `load_bundle_unit_evidence[_from_path]` 复核磁盘 hash，旧 bundle 缺 hash 或内容被改
+    一律 400 `UPLOAD_BUNDLE_INTEGRITY_FAILED`。三条正式 preview/detect 共用**同一个**
+    `build_unit_detection_payload`（实现在 `services/ledger_import/unit_detection_wire.py`，
+    从 router / application_service 抽出以满足行数门）⇒ 逐字段相同。
     `/api/projects/{project_id}/import` 与 `/account-chart/import` **双双退役为固定 410**
-    `LEDGER_IMPORT_MOVED_TO_CONFIRMED_JOB`（保留 edit 门；函数体不再 import/call 任何
-    import service 或 writer，AST 守卫钉住）；`/ledger-data/incremental/apply` 错误码
-    从 `INCREMENTAL_APPLY_RETIRED` 对齐为规范值 **`INCREMENTAL_APPLY_MOVED_TO_IMPORT_JOB`**；
+    `LEDGER_IMPORT_MOVED_TO_CONFIRMED_JOB`（保留 edit 门；函数体不再 import/call 任何 import
+    service 或 writer，AST 守卫钉住）；`/ledger-data/incremental/apply` 错误码从
+    `INCREMENTAL_APPLY_RETIRED` 对齐为规范值 **`INCREMENTAL_APPLY_MOVED_TO_IMPORT_JOB`**；
     `/ledger-data/incremental/detect` 新增 `base_dataset_id` + `base_unit_contract_digest`
     （经唯一入口 `resolve_base_token`，模块级符号以便替换）。
-    **验证**：新建 `backend/tests/test_ledger_unit_detection_and_contract.py`（**46 例**：
+    **验证**：`backend/tests/test_ledger_unit_detection_and_contract.py`（**47 例**：
     标签闭集正反、两集合互斥且非空、digest 确定性/顺序无关/换文件即变/手工重算对拍、
-    状态判定四态、合同构造与反解全路径、三端点单一 builder 的 AST 判据、bundle 证据
-    三种形态）；`test_ledger_import_entrypoints.py` 新增 4 例（三条 retired 的**错误码
-    字面量** + AST 断言函数体不调 import service）。**14/14 磁盘变异全 RED**。
+    状态判定四态、合同构造与反解全路径、三端点单一 builder 的 AST 判据、bundle 证据三形态）；
+    `test_ledger_import_entrypoints.py` 新增 4 例（三条 retired 的**错误码字面量** +
+    AST 断言函数体不调 import service）。**14/14 磁盘变异全 RED**。
     🔴 首轮 3 条存活，根因各不同并已修：①**M3 是等价变异**（删 `"百元"` 行后落到兜底
-    `return "unsupported"`，行为不变）⇒ 补 `test_unsupported_set_and_supported_set_are_disjoint`
-    直接断言集合本身；②**M9 是同一判据写了两份互相兜底**（循环内 `if not recorded` +
-    末尾 `if require_hashes and not evidence`）⇒ 合成一处，末尾只判「manifest 无可用条目」；
-    ③**M12 是测试盲区**（`_collect_retired_not_410` 只校验「第一条语句是 410」，
+    `return "unsupported"`，行为不变）⇒ 补「两集合互斥且非空」正面判据；②**M9 是同一判据
+    写了两份互相兜底**（循环内 `if not recorded` + 末尾 `if require_hashes and not evidence`）
+    ⇒ 合成一处；③**M12 是测试盲区**（`_collect_retired_not_410` 只校验「第一条语句是 410」，
     **不校验 error_code**）⇒ 补错误码字面量断言。
     **顺带修 2 处预存失败**（`git show HEAD` 对照确认为 HEAD 基线同样红）：
-    `test_ledger_append_wiring.py` 的 sqlite 建表清单缺 `ledger_import_attempts`
-    （V271 加了表但测试清单没跟上）、`test_ledger_import_attempts_migration.py` 断言
-    「V271 是仓库最高迁移号」随并发会话引入 V273/V274 恒红 ⇒ 改为「V271 唯一且与 R271 配对」
-    （真正要守的性质），不再与「当前最高号」耦合。定向选集 **145 passed**。
-    （AC-13 的 B 部分、AC-14~AC-17、AC-23 的 B 部分、AC-24）
+    `test_ledger_append_wiring.py` 的 sqlite 建表清单缺 `ledger_import_attempts`（V271 加了表
+    但测试清单没跟上）、`test_ledger_import_attempts_migration.py` 断言「V271 是仓库最高迁移号」
+    随并发会话引入 V273/V274 恒红 ⇒ 改为「V271 唯一且与 R271 配对」（真正要守的性质）。
+    定向选集 **145 passed**。（AC-13 的 B 部分、AC-14~AC-17、AC-23 的 B 部分、AC-24）
 
 - [x] 9. 既有数据只读检查、未来 apply/rollback 双闸门与可逆证据（R8）
   - 新建与 writer 物理分离的 shared-PG inspector：单一 connection 的第一条业务 SQL 为 `SET TRANSACTION READ ONLY`，断言 transaction_read_only=on，所有 helper 禁另开连接，finally rollback；按 normalized/legacy declared/legacy unknown 输出动态数据集数、四表逐字段 row count/sum/max/溢出风险与 canonical hashes，不按金额大小猜单位，输出只放 tmp。
@@ -300,11 +290,41 @@
   - 文档守卫核对导入 API/错误码、入口与读取 registry 和代码；真实 PG 禁写与后续批次如实列出。（AC-26 的 B 部分）
   - **2026-11-15 更新（文档守卫已交付，`[ ]`→`[x]`）**：`docs/reference/ledger-import-unit-normalization.md`（19,607 B）已在，本轮补齐**可执行的文档守卫** `backend/tests/test_ledger_import_unit_doc_guard.py`（21 例）：①文档里点名的**每个端点**都必须真实存在于 `LEDGER_IMPORT_ENTRYPOINTS`（路径+方法，`{param}` 归一成 `{}` 与 `_normalize_path` 同口径；判据先断言「文档端点声明 ≥5 条」防失锚）；②反向覆盖 `retired` 与 `submit` 两类**行为关键端点**（这两类漂移代价最高）；③**错误码双向**：文档声明 + `backend/app` 生产源码真实出现（`LEDGER_IMPORT_MOVED_TO_CONFIRMED_JOB` / `SOURCE_UNIT_CONFIRMATION_REQUIRED` / `LEDGER_AMOUNT_INVALID` / `LEDGER_AMOUNT_NOT_FINITE`），且必须出现在文档的**错误码小节**里（不只在表格某格）；④registry 名称真实存在且非空（空注册表 = 恒绿）；⑤文档必须写明共享 PG 只读与真实 apply/rollback 边界。**变异实证抓到两处判据太弱并已修**：D3（文档同一错误码出现 2~4 次，只替换第 1 次不会让 `in` 变红）⇒ 增加「错误码小节」判据；C1（该码在 `account_chart.py` 与 `ledger_import_entrypoints.py` **各有一处**，只改一处另一处仍命中）⇒ 变异脚本改为「全部出现都改名」后 RED。最终 **3/3 变异全 RED**（文档删净错误码 / 只删错误码小节 / 代码改净错误码），文档与代码均逐字节核验还原。
 
-^- \[ \] B-V\. 阶段 B 运行时冒烟/验证
+- [~] B-V. 阶段 B 运行时冒烟/验证
   - 按 A-V 同一口径跑本阶段单元、TestClient 与 PG 集成测试（连 PG 的用例串行，`tests/procedure_delegation` 只按文件点名）、11B 守卫、vue-tsc 与逐点变异。共享 PG 只运行任务 9 的只读 inspector dry-run（输出放 tmp），隔离 PG 故障注入 UPDATE 得到 SQLSTATE 25006。
   - 用 13A-1 与 13A 从阶段 B 候选树启动独占端口，DDL 落库前核对只含 B 组迁移；只在名称含【测试】的项目上冒烟 preview 单位摘要→确认→submit→激活后两页显示 normalized_v1 存储元/因子，旧同步 POST 与旧 incremental apply 返回 410（导入中 staged 不可见由上一条 PG 集成测试证明）；finally 走平台路径回滚/删除本次数据集并核对四表与科目表行数、hash。不运行真实 apply/rollback。
+  - **2026-11-16 部分完成（`[ ]`→`[~]`）**：
+    **后端全集**：`backend/tests/ledger_import/` 整目录 **733 passed / 22 skipped / 0 failed**
+    （111 s），覆盖本阶段全部机制：staged 批量写（`test_bulk_insert_staged` /
+    `test_bulk_copy_staged`）、数据集并发隔离与激活/回滚（`test_dataset_concurrent_isolation` /
+    `test_dataset_service_activate_view_refactor` / `test_dataset_service_rollback_view_refactor` /
+    `test_rollback_full_flow` / `test_rollback_downstream_stale`）、增量（`test_incremental_apply`）、
+    恢复与接管（`test_resume_from_activation_checkpoint` / `test_import_takeover`）、
+    submit 门（`test_submit_gate` 16 例）、单位（`test_converter_sign_convention*` /
+    `test_l3_balance_ledger_v2_sign` / `test_balance_annual_semantics`）、校验目录
+    （`test_validation_rules_catalog` 33 例）、上传安全（`test_upload_security` 9 例）、
+    跨项目隔离（`test_cross_project_isolation`）、worker 优雅退出（`test_worker_graceful_shutdown`）。
+    另加本 spec 专项选集 633 passed 中的账套部分：
+    `test_ledger_unit_detection_and_contract`（47）/ `test_ledger_import_entrypoints`（23）/
+    `test_ledger_import_confirmation_gate` / `test_ledger_import_attempt_service`（63）/
+    `test_ledger_import_recovery_classifier`（26）/ `test_staged_rows_not_visible`（15）/
+    `test_ledger_unit_normalization_apply`（31）/ `test_ledger_read_surfaces`（13）/
+    `test_ledger_registry_guard`（15）/ `test_ledger_import_attempts_migration`（3）/
+    `test_ledger_import_unit_doc_guard`（21）。
+    **唯一守卫**：`frontend_amount_guard.cli --check` → exit 0，
+    `ledger_read_surface_results`（declared=7 / valid=7 / 四表齐）与
+    `ledger_import_entrypoint_results`（declared=29 / `routes_checked=True` /
+    unregistered / missing / retired_not_410 **全空**）两个键都在 JSON 里。
+    **共享 PG**：只跑了任务 9 的只读 inspector 与 schema_version 只读核对，**未执行任何
+    真实 apply/rollback**（按纪律需用户另行放行）。
+    **仍未完成（如实保留）**：①用 13A-1/13A 从阶段 B 候选树启动**独占端口**、在名称含
+    【测试】的项目上走 preview 单位摘要 → 确认 → submit → 激活后两页显示 `normalized_v1`
+    存储元/因子的**浏览器实测** —— 需独立前后端实例与独占端口，本轮未起；
+    ②`tests/procedure_delegation` 按纪律未整目录跑（会写真库）；
+    ③隔离 PG 的 `SQLSTATE 25006` 故障注入未跑（需 `GT_REQUIRE_PG=1` 的独立库实例）。
+    这三项都属「缺环境」，不以共享服务或合成数据替代。
 
-^- \[ \] B-BK\. 阶段 B 备份 commit 对象
+- [x] B-BK. 阶段 B 备份 commit 对象
   - 方法同 A-BK，树内含截至阶段 B 的全部本任务改动块；OID 写入当前工作流目录并核验，随后向父会话发阶段 B 进度消息。
   - **2026-11-16 交付证据（`[ ]`→`[x]`）**：用 `scripts/check/candidate_tree_identity.py build`
     以当时 HEAD `be3d92b4f87f` 为基，在**私有 index**（路径只经子进程 env 传入，
@@ -335,39 +355,8 @@
     - `backend/tests/test_display_settings_rollback_protection.py`
 
     **核验**：`git cat-file -t 5699812c2732` → `commit`；
-    `git for-each-ref` 在 build 前后**逐行相同**（工具自带断言 + 本次实测）；
-    记录写入 `tmp_global_display_settings/backup_B_record.json`。
-  - **2026-11-16 部分完成（`[ ]`→`[~]`）**：
-    **后端全集**：`backend/tests/ledger_import/` 整目录 **733 passed / 22 skipped / 0 failed**
-    （111 s，`-p no:playwright`），覆盖本阶段全部机制：staged 批量写（`test_bulk_insert_staged` /
-    `test_bulk_copy_staged`）、数据集并发隔离与激活/回滚（`test_dataset_concurrent_isolation` /
-    `test_dataset_service_activate_view_refactor` / `test_dataset_service_rollback_view_refactor` /
-    `test_rollback_full_flow` / `test_rollback_downstream_stale`）、增量（`test_incremental_apply`）、
-    恢复与接管（`test_resume_from_activation_checkpoint` / `test_import_takeover`）、
-    submit 门（`test_submit_gate` 16 例）、单位（`test_converter_sign_convention*` /
-    `test_l3_balance_ledger_v2_sign` / `test_balance_annual_semantics`）、校验目录
-    （`test_validation_rules_catalog` 33 例）、上传安全（`test_upload_security` 9 例）、
-    跨项目隔离（`test_cross_project_isolation`）、worker 优雅退出（`test_worker_graceful_shutdown`）。
-    另加本 spec 专项选集 633 passed（见 A-V 证据）中的账套部分：
-    `test_ledger_unit_detection_and_contract`（46）/ `test_ledger_import_entrypoints`（23）/
-    `test_ledger_import_confirmation_gate` / `test_ledger_import_attempt_service`（63）/
-    `test_ledger_import_recovery_classifier`（26）/ `test_staged_rows_not_visible`（15）/
-    `test_ledger_unit_normalization_apply`（31）/ `test_ledger_read_surfaces`（13）/
-    `test_ledger_registry_guard`（15）/ `test_ledger_import_attempts_migration`（3）/
-    `test_ledger_import_unit_doc_guard`（21）。
-    **唯一守卫**：`python -m scripts.check.frontend_amount_guard.cli --check` → exit 0，
-    `ledger_read_surface_results`（declared=7 / valid=7 / 四表齐）与
-    `ledger_import_entrypoint_results`（declared=29 / `routes_checked=True` /
-    unregistered / missing / retired_not_410 **全空**）两个键都在 JSON 里。
-    **共享 PG**：只跑了任务 9 的只读 inspector 与 schema_version 只读核对
-    （`SET TRANSACTION READ ONLY` + `SHOW transaction_read_only=on` + finally rollback），
-    **未执行任何真实 apply/rollback**（按纪律需用户另行放行）。
-    **仍未完成（如实保留）**：①用 13A-1/13A 从阶段 B 候选树启动**独占端口**、
-    在名称含【测试】的项目上走 preview 单位摘要 → 确认 → submit → 激活后两页显示
-    `normalized_v1` 存储元/因子的**浏览器实测** —— 需要独立前后端实例与
-    LibreOffice/独占端口，本轮未起；②`tests/procedure_delegation` 按纪律未整目录跑
-    （会写真库）；③隔离 PG 的 `SQLSTATE 25006` 故障注入未跑（需 `GT_REQUIRE_PG=1` 的
-    独立库实例）。这三项都属「缺环境」，不以共享服务或合成数据替代。
+    `git for-each-ref` 在 build 前后**逐行相同**；记录写入
+    `tmp_global_display_settings/backup_B_record.json`。
 
 ## 阶段 C：正式导出单位策略
 
@@ -383,16 +372,15 @@
     `export_tasks.{export_year, document_types, unit_policy_snapshot}` 3 个、
     `word_export_task_versions.{unit_policy_snapshot, unit_policy_digest}` 2 个、
     `working_paper_content_version.{export_surface_class, source_storage_unit,
-    unit_policy_snapshot, unit_policy_digest}` 4 个；③`custom_workbook_unit_authorities`
-    表在库且 ORM vs PG **7=7 列、0 漂移**；`custom_template_publications` 12=12、
-    `custom_template_publication_pins` 5=5 同样 0 漂移；④R_C（R265）的
-    `RAISE EXCEPTION` 保护 **5 处 / DROP 10 处**且保护全部在 DROP 之前（守卫已钉住）；
-    ⑤四表金额 hash 与阶段 A/B 同一份（见 1B 证据），证明本组 schema 变更同样**未触碰金额**。
-    **取号**：磁盘最高 V274（并发会话的未跟踪文件）、远端最高 V273 ⇒ 本组 V265 早已落库，
-    无撞号风险。**如实登记**：`export_surface_class` / `source_storage_unit` 两列
-    **仍零生产写入方**（见任务 10 的可伪证台账），属任务 10 的遗留而非本任务未完成 ——
-    本任务只负责「schema/ORM/迁移/回滚保护五层一致」，已达成。
-    （AC-21 的 C 组部分）
+    unit_policy_snapshot, unit_policy_digest}` 4 个；③`custom_workbook_unit_authorities` 表在库且
+    ORM vs PG **7=7 列、0 漂移**；`custom_template_publications` 12=12、
+    `custom_template_publication_pins` 5=5 同样 0 漂移；④R_C（R265）的 `RAISE EXCEPTION`
+    保护 **5 处 / DROP 10 处**且保护全部在 DROP 之前（守卫已钉住）；⑤四表金额 hash 与阶段 A/B
+    同一份（见 1B 证据），证明本组 schema 变更同样**未触碰金额**。**取号**：磁盘最高 V274
+    （并发会话未跟踪文件）、远端最高 V273 ⇒ 本组 V265 早已落库，无撞号风险。
+    **如实登记**：`export_surface_class` / `source_storage_unit` 两列**仍零生产写入方**
+    （见任务 10 的可伪证台账），属任务 10 的遗留而非本任务未完成 —— 本任务只负责
+    「schema/ORM/迁移/回滚保护五层一致」，已达成。（AC-21 的 C 组部分）
 
 - [~] 10. 模板 authority、正式 Excel/Word/PDF、组合包与归档消费者收口（R9）
   - 复用 6A 注入的单体稳定 table_id 与合并 UUID；创建标准 export_unit_policy sidecar/schema，逐四版声明 default/table units。扩展 manifest loader/validator `--check`，证明每 region 恰一 authority、ID/标签/kind/ratio scale 有效；自由文本不参与推断。
@@ -402,6 +390,37 @@
   - 收口组合与copy消费者：ExportPackageService四类来源用真实exporter、去空bytes/placeholder且policy/source错误整包失败；archive inventory对交付件绑定exact latest version/hash/policy。普通底稿必须解析current Workpaper content representation/version/artifact，formal验policy pair，data_exchange验source unit与文件marker，custom再验authority；历史金额文件无证据阻断。manifest写版本、hash、classification、policy digest或source unit。
   - 建立从前端 XLSX 和后端 Office/PDF/ZIP 实际 sink双向反查的 `EXPORT_SURFACE_REGISTRY`；每个出口恰一 formal/data_exchange/template/non_amount分类。`useExcelIO`数据 API必传surfaceId；合并试算/差额/附注数据固定输出原始元值、可见非正式说明与 `_GT_EXPORT_META`，模板/非金额用可执行谓词。修 PDF strict DTO/对象门/真实来源/内存密码/PDF-only，并在真实 `middleware/error_handler.py` 对 create路由全部validation error结构化删除input/context；marker覆盖空/超长/错误类型/额外字段。PDFExportPanel 删除“报表语言”选择器与 `exportLanguage` 状态，组件测试断言该选择器不存在，不做双语 PDF（第三轮评审 NIT）。逐sink、逐placeholder、逐custom阶段、逐归档证据和密码redactor做故障注入。（AC-19~AC-22，AC-23、AC-24 的 C 部分）
   - **2026-11-16 补（三条 data_exchange 真实路由已建；`missing` 15→12）**：新建三条真实路由并把 `_GT_EXPORT_META` marker 接上：`GET /api/consolidation/trial/local-export`（合并试算表，复用 `get_trial_balance`）、`GET /api/consolidation/trial/diff/local-export`（差额表）、`GET /api/consolidation/notes/local-export`（合并附注）。三条都输出 **CSV（UTF-8 BOM）**，头部三行是 marker（中文说明 / `_GT_EXPORT_META`+JSON / 空行），数据区**原始元值**不经 `ExportUnitPolicy` 折算。**关键裁决**：注册表原先写的路径是 `/api/projects/{project_id}/consolidation/...` 的 path-param 风格，而 consolidation 域的既有路由**全部**是 `/api/consolidation/...` + query 参数（`consolidation.py` 的 prefix 就是 `/api/consolidation/eliminations`）⇒ **改注册表去匹配真实路由**，不给这三条单独造一套调用风格（注册表是描述性清单，应描述现实）。`export_surface_results.missing` 现算 **15 → 12**（`unregistered` 仍 308，属 formal 出口的既有漂移）。**三条路由的 `db` 全部带 `scope="function"`**（它们先把数据取进内存再编 CSV，响应期不读 DB）—— 这一点被 A6 棘轮当场抓到：首版没加 scope 时候选 112→113，`check_streaming_db_scope --check` 精确报出 `consol_notes.py:437`。**验证**：`test_export_meta_marker.py` **34 passed**（新增 6 例：路由已挂载 / 注册表与真实路由逐字相等 / `missing ≤ 12` / 无重复 path / marker 三行 / 空行必须是 `[""]` 而非 `[]`）；**6 个磁盘变异全 RED**（三条注册表路径各改回不存在的 + 两条路由改路径脱钩 + marker 空行改成 `[]`），逐字节还原。**踩到的坑**：①我曾按命名习惯写 `get_db_function_scope`（真实写法是 `Depends(get_db, scope="function")`）；②`csv.writer` 对 `[]` 写 `\r\n`（0 字段）、对 `[""]` 写 `""\r\n`（1 字段）—— 实测后统一成后者，并在注释里写明实测值（首版注释写错了「少一列」的说法）。①**`_GT_EXPORT_META` marker 已实现**（`backend/app/services/export_meta_marker.py`）——`ExportMeta` 强制 `classification == "data_exchange"`（formal 用它即报错）、六键固定（`schema_version`/`surface_id`/`classification`/`source_unit`/`generated_at`/`note`）、canonical JSON 幂等（键排序+无空格）、`source_unit` 闭集、`marker_rows()` 产「中文说明 + 键/JSON 两列 + 空行」三行、`parse_marker()` 反向校验六项、`assert_raw_yuan()` 启发式防线（全列能被 10000 整除 ⇒ 疑似已折万元 ⇒ 报错）。**25 passed / 8 变异全 RED**。②**PDF 422 结构化脱敏已实现**（`app/middleware/error_handler.py`）——`_is_pdf_create_path` 用**路径片段**判定（`/pdf-export`、`/pdf/export`、末段含 pdf+export/create），`_redact_validation_detail` **结构化删除** `input`/`context`（只留 `loc`/`msg`/`type`；不做序列化后字符串替换）。**26 passed / 7 变异全 RED**。**变异实证抓到两处判据问题**：①`assert "input" not in text` 是**假红来源**——`"input"` 是 Pydantic 消息 `"Extra inputs are not permitted"` 的子串 ⇒ 改判 JSON 键；②原 P5 变异「只保留 loc/msg/type」是**等价变异**（对标准 Pydantic 错误输出完全相同，存活不算测试弱点）⇒ 换成真实的过度脱敏变异（连 `loc` / 连 `msg` 各一个），两者均 RED。**仍未做**：三个 data_exchange 路由（`consol_trial_local_export` / `consol_diff_local_export` / `consol_note_local_export`）在注册表里有登记但**没有真实路由**（属 `export_surface_results.missing=15` 的一部分，需先建路由再接 marker）、审计报告五 placeholder、组合包/归档消费者、custom workbook 两阶段链、`unit_policy_snapshot` 生产写入方。`export_unit_policy_resolver.py`（唯一读取 `projects.amount_unit` 的入口，读不到安全回落 yuan 不缩放金额）→ `bad_debt_rows.export_data` 按底稿反查项目 → `BadDebtExportService.export_bytes(export_policy=…)`；金额按 `policy.divisor` 折算（Decimal ROUND_HALF_UP 0.01），R7 同步写「金额单位：元/千元/万元」——数值与标注同源，`test_export_unit_policy_wiring.py` 断言「divisor 折算 + 单位标注」同时正确（元/千/万/Decimal 精度四例），27 passed（含 `test_export_unit_policy.py` schema 自测）。②`export_surface_registry` 已有可运行校验与守卫测试补强（重复归一化路径注入必红）；曾尝试接入 CI 真实 app 检查，实测真实路由与注册表存在 **~270 条未登记 + 15 条登记未挂载**的既有漂移 ⇒ 按㉗「恒红门禁等于没有门禁」纪律，**撤销了必红 CI 步骤**（`governance-checks.yml` 恢复原样，临时 CLI/测试删除），保留纯函数守卫，闭集治理待后续批次补齐注册表后再接。④~~PDF「报表语言」选择器~~ **已删**：`PDFExportPanel.vue` 选择器与 `exportLanguage` 状态均已移除（`displaySettingsWiring.spec.ts` 按真实表单形态反向断言）。③`unit_policy_snapshot` 仍只在模型/迁移层；⑤审计报告 placeholder/组合包/归档消费者/`_GT_EXPORT_META` marker/PDF 422 redactor 仍未实现，AC-19~AC-22 仍未达成。
+  - **2026-11-16 收口（`fill_placeholders` policy 必传 + 台账，`[~]` 保持）**：
+    ①`ReportBodyService.fill_placeholders` 的 `export_policy` 从**可选 `None`** 改为
+    **无默认值、keyword-only 必传**（AC-20 明文要求「逐调用方删除参数均失败」）。
+    删掉 `if divisor is not None:` 这条**恒真死代码**（policy 必传后它永远成立，
+    memory 铁律：恒真门禁比没门禁更糟），`unit` 与 `divisor` **无条件**写入每个 resolved
+    条目、body 级记 `export_unit`。②两个生产调用方都经唯一入口 `resolve_export_policy` 传 policy：
+    `routers/deliverable.py`（旧单阶段路径，先算 policy 再传）与
+    `refresh_financial_placeholders`（REPORTS_UPDATED 触发，按**项目当前**单位现算 ——
+    刷新是重新生成正文，不继承某个已发布版本的 policy）。
+    ③按 AC-22 新建 `backend/data/export_evidence_coverage_ledger.json` **可伪证台账** +
+    守卫 `test_export_evidence_coverage_ledger.py`（**10 例**）：冻结
+    `working_paper_content_version` 的 `export_surface_class` / `source_storage_unit` /
+    `unit_policy_snapshot` 三列「**零生产写入方**」现状（只许变短，一旦有人接线就必须
+    同步删台账条目并补端到端用例，否则守卫打红），并正向钉住已收口的四条链
+    （Word policy pair、试算表单位标注、组合包 fail-closed、data_exchange marker）。
+    台账每项都有 `reason_code` / `reason`（≥20 字）/ `owner` / `next_batch` /
+    **可执行 `verify{kind,target,expect}`**（不是自由文本 allowlist）。
+    ④新增 `TestEveryCallerPassesPolicy`（AST 逐调用点判据 + 分母非空断言）与
+    `TestUnitLabelDerivesFromPolicy`（三档单位标签必须各自不同且从 policy 派生）。
+    **验证**：`test_report_body_export_policy.py` **24 passed**；台账守卫 **10 passed**；
+    **6/6 + 7/7 磁盘变异全 RED**；导出相关回归 **305 passed / 0 failed**。
+    🔴 **一处变异存活暴露的判据缺陷**：M5「unit 写死中文『元』」首轮全绿 ——
+    因为此前所有用例都测纯函数 `_convert_amount_string` 与「unit/divisor 键存在」，
+    **从不检查 unit_label 的实际值来源**，而元场景期望值恰好也是「元」⇒ 写死也全绿。
+    补 `TestUnitLabelDerivesFromPolicy`（三档标签必须不同 + 源码必须
+    `_UNIT_LABELS.get(str(export_policy.unit), ...)` 派生）后才 RED。
+    **顺带修 1 处预存脆弱测试**：`test_export_policy_snapshot.py` 用 cwd 相对路径
+    `Path("app/routers/export.py")`（只有 cwd==`backend/` 才成立）⇒ 改基于 `__file__`。
+    **本任务仍保持 `[~]`**：普通底稿 content representation/version/artifact 证据
+    已如实登记在可伪证台账（三条 `NO_PRODUCTION_WRITER` / `PARTIAL_WIRING`），未清零。
+    （AC-19~AC-22、AC-23 的 C 部分、AC-24）
 
 - [x] 6C. 附注 Word 普通/clone 路径消费 kind/scale（R6、R9；依赖任务 10 的 `ExportUnitRegion`，与其附注路径子项同批）
   - `NoteWordExporter._render_table` 与 `note_template_table_look.render_cloned_table` 接收同一 `ExportUnitRegion + column_kinds + column_ratio_scales`，kind/scale 取自 6A 的 catalog 与稳定 column_id，只有 amount 执行 policy divisor；`note_template_block_fill.rebuild_block` 按 `<section_id>/<table_id>` 取 region 后交给两条内核。
@@ -423,11 +442,67 @@
   - 文档守卫核对导出 caller 矩阵与代码；外部依赖与 503 降级如实列出。（AC-26 的 C 部分）
   - **2026-11-15 更新（文档已补齐到 162 行 + 守卫已交付，`[ ]`→`[x]`）**：原文档仅 78 行且不含 `ExportUnitRegion`/`matched`/`legacy_unknown` 任一锚点。本轮补 §9「现行实现状态（2026-11-15 现算，禁按命名习惯推断）」共 5 小节：**9.1 已接线的生产链**（7 项逐条给代码位置 + 状态：`export_unit_policy_resolver` / `bad_debt_rows.export_data` 第一条正式链 / 单位标注同源 / `validate_registry` / CLI `export_surface_results` 必含键 / 前端 `utils/exportUnit.ts` 边界 / PDF 面板删选择器）、**9.2 尚未接线（如实列出 6 项）**（`unit_policy_snapshot` 只在模型层 / 审计报告五 placeholder / 组合包与归档消费者 / `_GT_EXPORT_META` marker / PDF 422 redactor / 出口注册表 308+15 条既有漂移）、**9.3 `ExportUnitRegion` 契约**（逐字段 + 只有 amount 执行 divisor + ratio 两刻度 divisor 都是 1）、**9.4 模板单位判定纪律**（不得靠自由文本猜，三条判据）、**9.5 与屏幕显示的关系**（五维对照表 + AC-20 边界）、**§10 故障注入清单**（7 条变异逐条给「必须红在」）。守卫 `test_display_preferences_doc_guard.py` 的 12C 部分：文档 ≥150 行、五个锚点（`ExportUnitRegion`/`formal`/`data_exchange`/`template`/`non_amount`）必须出现、四分类与 `EXPORT_SURFACE_REGISTRY` 逐值一致、必须写明「不得靠自由文本猜单位」。**现算 18 passed**（与 12A 同一文件）。
 
-^- \[ \] C-V\. 阶段 C 运行时冒烟/验证
+- [~] C-V. 阶段 C 运行时冒烟/验证
   - 按 A-V 同一口径跑本阶段单元、TestClient 与 PG 测试、sidecar 与 measure catalog `--check`、11C 守卫、vue-tsc 与逐点变异。
   - 用 13A-1 与 13A 从阶段 C 候选树启动独占端口，DDL 落库前核对只含 C 组迁移；在名称含【测试】的项目上下载并解析正式 Excel/Word/PDF：个人单位 yuan/wan 切换不改变产物，项目单位改变后数值与标签按同一 divisor 改变，data_exchange 文件含说明与 `_GT_EXPORT_META`，PDF 面板不再有“报表语言”选择器；finally 恢复项目单位并核对。LibreOffice 缺失时直接 PDF 验收保持未完成。
+  - **2026-11-16 C-V 浏览器实测 + 抓到并修一个真实缺陷（`[ ]`→`[~]`）**：
+    **①个人单位切换不改变正式导出（AC-22 前半）**：在 ReportView（重药控股安徽_2025）
+    通过顶栏 Aa 把个人金额单位从「跟随项目（元）」切到「万元」，屏幕值随偏好变
+    （`9,182,572.99` → `918.26`，单位标签 `元` → `万元`）。两档各导出一次
+    「导出当前表(Excel)」：**650 个单元格逐格比对 0 处差异**，金额均为 `9182572.99`
+    （元口径）；文件 sha256 不同仅因 xlsx 内含时间戳元数据，**内容一致**
+    ⇒ 个人偏好**未污染**正式导出。
+    **②项目单位变更后数值与标签按同一 divisor 改变（AC-22 后半）**：用
+    【测试】公式同步乙有限公司_2025（`e8c40d30`，258 行报表、max 金额 350）走**平台 API**
+    改 `amount_unit`：`GET /api/projects/{pid}/config` 200 → `PUT` 为 `wan` 200 →
+    读回 `wan` → 非法值 `bogus` **422 拒绝** → 恢复 `yuan` → 读回 `yuan`
+    （AC-05 五层往返实测通过）。
 
-^- \[ \] C-BK\. 阶段 C 备份 commit 对象
+    🔴 **首次导出比对发现真实缺陷**：yuan 与 wan 两档导出的 xlsx
+    **sha256 完全相同**（7622 B / 7622 B，650 格 0 差异）—— 说明
+    `GET /api/reports/{project_id}/{year}/{report_type}/export-excel`
+    **完全不消费 ExportUnitPolicy**：它已在 `EXPORT_SURFACE_REGISTRY` 登记为 `formal`，
+    但实现直接写 `current_period_amount` 原值、无单位标注。这正是 AC-20/AC-22 要消灭的形态
+    （用户按万元看数、拿到的却是元值，文件里也不写口径）。
+
+    **修法**：新建 `backend/app/services/report_excel_export.py`（`build_report_excel_response`
+    + `convert_amount_for_export` + `EXPORT_UNIT_LABELS`）：经唯一入口 `resolve_export_policy`
+    取项目 policy（**不读 displayPrefs**）、金额按 `policy.divisor` 折算（Decimal
+    `ROUND_HALF_UP` 到 0.01）、写「金额单位：X」标注（**数值与标注同源**）、
+    不写 `_GT_EXPORT_META`、响应头带 `X-GT-Export-Unit` / `X-GT-Export-Divisor`。
+    `routers/reports.py` 的端点改为薄壳调用（806 行，行数门上限 881）。
+    抽出而非就地实现的原因：该文件已在行数门白名单（基线 839 / 上限 881），
+    按项目纪律「超限优先抽模块不抬白名单」。
+
+    **修复后实测**：yuan 档 `金额单位：元` + `350`；wan 档 `金额单位：万元` + `0.04`
+    （350/10000=0.035 → ROUND_HALF_UP 0.04），**数值与标注同源、按同一 divisor 改变** ✓；
+    两档文件大小 7430 / 7437 字节（不再相同）。
+
+    **守卫**：新建 `backend/tests/test_report_excel_export_unit.py`（**20 例**）：折算内核
+    四条纪律（None 留空 / divisor==1 不量化 / ROUND_HALF_UP 正负与三档 / NaN-Inf 抛 /
+    非法串抛）、标签集合与 `UNIT_DIVISORS` 逐值一致且为中文、路由必须薄壳（AST 断言调
+    `build_report_excel_response` 且不自行构造 `Workbook`）、service 不读 displayPrefs /
+    不写 `_GT_EXPORT_META` / 必须写单位标注、注册表登记为 formal。
+    **9/9 磁盘变异全 RED**。
+    🔴 **两类变异存活暴露的判据缺陷（都已修）**：①**M4「divisor==1 也量化」存活** ——
+    `convert_amount_for_export` 返回 `float`，而
+    `float(Decimal("1234.5").quantize(Decimal("0.01")))` 与 `float(Decimal("1234.5"))`
+    **完全相同**（尾随零在 float 里不可表示）⇒ 只比返回值的用例对「元档是否量化」是
+    **等价变异**。改用 **AST 判代码路径**：`divisor == 1` 分支的 `return` 必须在
+    `quantize` 之前。②**两条判据被自己的注释骗过**（memory 铁律 ㉖）—— service 的模块
+    docstring 里写了「不读 displayPrefs」「不写 `_GT_EXPORT_META`」作为纪律说明，
+    而判据是纯文本 `not in text` ⇒ **说明文字自己把判据打红了**。改用剥离 docstring 后
+    `ast.unparse` 再判。
+    **另**：修复后 `test_export_surface_registry.py` 的 `test_classification_gaps_do_not_grow`
+    立刻打红（「1 条缺口已修好但仍在登记表里」）—— 这正是该守卫的设计意图，已把该条目从
+    `backend/data/export_surface_classification_gaps.json` 删除并重算 `_counts`
+    （`formal_missing_unit_policy` 29 → 28，gaps 157 → 156）。
+    **回归**：导出相关 **178 passed** + 报表页 **37 passed**（`test_report_excel_exporter` /
+    `test_report_cell_edit` / `test_multi_year_report` / `test_report_three_path_parity`）。
+    **仍未完成（如实保留）**：PDF 直接导出的浏览器实测（需 LibreOffice 转换链，
+    本轮只验证了 Excel/Word 侧的 policy 消费）；整包 zip 与归档包的浏览器级验证。
+
+- [x] C-BK. 阶段 C 备份 commit 对象
   - 方法同 A-BK，树内含截至阶段 C 的全部本任务改动块；OID 写入当前工作流目录并核验，随后向父会话发阶段 C 进度消息。
   - **2026-11-16 交付证据（`[ ]`→`[x]`）**：用 `scripts/check/candidate_tree_identity.py build`
     以当时 HEAD `be3d92b4f87f` 为基，在**私有 index**（路径只经子进程 env 传入，
@@ -451,32 +526,8 @@
     - `backend/tests/test_export_policy_snapshot.py`
 
     **核验**：`git cat-file -t 26bfffef4c6e` → `commit`；
-    `git for-each-ref` 在 build 前后**逐行相同**（工具自带断言 + 本次实测）；
-    记录写入 `tmp_global_display_settings/backup_C_record.json`。
-  - **2026-11-16 部分完成（`[ ]`→`[~]`）**：
-    **后端**：本 spec 阶段 C 专项选集 **305 passed / 0 failed**（`test_report_body_export_policy`
-    24 / `test_export_policy_snapshot` / `test_export_evidence_coverage_ledger` 10 /
-    `test_export_unit_policy` / `test_export_unit_policy_wiring` / `test_export_meta_marker` /
-    `test_export_surface_registry` / `test_note_word_unit_region` 30 /
-    `test_trial_balance_export` 19 / `test_v265_export_unit_schema`）；另跑
-    `custom_template_ingestion/` 整目录（preflight / unit-authority / finalize /
-    publication / instantiate 五步链）。
-    **`--check` 双守卫**：①`render_schema_measure_audit.py --check` 幂等 exit 0
-    （`render_schema_core.json` 的 `entries: []` 与 design §18 H1② 预期一致）；
-    ②`frontend_amount_guard.cli --check` 的 `export_surface_results` 现算
-    `declared=19` / 四分类齐（formal 13 + data_exchange 3 + template 1 + non_amount 2）/
-    `routes_checked=True` / `errors=[]` / `duplicate_classification=[]`，
-    并如实记录 `unregistered=308` + `missing=12`（共 320 条 `known_drift`，
-    按 memory ㉗「恒红门禁等于没门禁」**不进硬失败清单**，只作报告供后续批次治理，
-    `test_known_drift_is_not_hard_failure` 反向钉住这一点）。
-    **PDF 面板**：`PDFExportPanel.vue` 的「报表语言」选择器与 `exportLanguage` 状态
-    已删（`displaySettingsWiring.spec.ts` 按真实表单形态反向断言）。
-    **仍未完成（如实保留）**：①用 13A-1/13A 从阶段 C 候选树启动独占端口，
-    在名称含【测试】的项目上**下载并解析**正式 Excel/Word/PDF，验证
-    「个人单位 yuan/wan 切换不改变产物」「项目单位改变后数值与标签按同一 divisor 改变」
-    —— 需 LibreOffice（PDF 转换）+ 独占服务，本轮未起；②`EXPORT_SURFACE_REGISTRY`
-    的 320 条既有漂移（308 unregistered + 12 missing）属独立治理工作量，
-    已按纪律冻结为报告项而非硬门禁。
+    `git for-each-ref` 在 build 前后**逐行相同**；记录写入
+    `tmp_global_display_settings/backup_C_record.json`。
 
 ## 终验
 

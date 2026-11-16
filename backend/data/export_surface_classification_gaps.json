@@ -2,7 +2,7 @@
  "_doc": "分类一致性缺口登记（棘轮只减不增）。权威源：docs/reference/formal-export-unit-policy.md §1。formal 必须走 ExportUnitPolicy 折算并写单位标注；data_exchange 必须写 _GT_EXPORT_META（原始元值）。本表登记「声明分类与实现不符」的非 retired 条目，由后续 spec 按族裁决，不在此处改判（改判会把缺陷合法化）。修好一条从 gaps 里删一条；新增缺口必须补登记。",
  "_excluded_form": "取回已生成文件的路由（FileResponse 直返 + 不在请求内新建文件）不算缺口：它的文件由上游产生（异步任务 / 上传 / 另一段导出链），单位折算在产生方完成。实测例：/api/exports/{id}/download 的折算在 /api/export/create；/api/qc/annual-reports/{id}/download 由异步任务生成；/api/knowledge/…/download 由上传产生。反之 excel-html/module/{module}/export-word 虽也用 FileResponse，但请求内 output_path 新建文件 ⇒ 仍算生成类，不豁免。",
  "_counts": {
-  "formal_missing_unit_policy": 29,
+  "formal_missing_unit_policy": 28,
   "data_exchange_missing_marker": 128
  },
  "_by_origin": {
@@ -69,7 +69,6 @@
   "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/recovery-cases/{case_id}/download",
   "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/recovery-cases/{case_id}/download-only",
   "/api/query/export-excel",
-  "/api/reports/{project_id}/{year}/{report_type}/export-excel",
   "/api/s-estimate/{wp_id}/export-data",
   "/api/workpapers/{wp_id}/bad-debt-rows/export-data",
   "/api/workpapers/{wp_id}/c24-journal/export-data",
@@ -575,13 +574,6 @@
    "declared": "data_exchange",
    "gap": "data_exchange_missing_marker",
    "auto": true
-  },
-  {
-   "path": "/api/reports/{project_id}/{year}/{report_type}/export-excel",
-   "key": "report_single_export",
-   "declared": "formal",
-   "gap": "formal_missing_unit_policy",
-   "auto": false
   },
   {
    "path": "/api/s-estimate/{wp_id}/export-data",

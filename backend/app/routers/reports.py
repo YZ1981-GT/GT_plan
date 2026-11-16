@@ -407,69 +407,29 @@ async def export_report_excel(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """导出单张报表为 Excel（只认项目成员）"""
+    """导出单张报表为 Excel（只认项目成员）。
+
+    🔴 spec platform-global-display-settings-closure 任务 10 / AC-20：
+    本端点已在 `EXPORT_SURFACE_REGISTRY` 登记为 `formal`，但此前**直接写原值、
+    不消费 ExportUnitPolicy** ⇒ 项目单位设成万元时，导出文件仍是元值且无单位标注
+    （浏览器实测：yuan 与 wan 两档导出的 xlsx **sha256 完全相同**）。
+
+    实现已抽到 `services/report_excel_export.build_report_excel_response`
+    （经唯一入口 `resolve_export_policy` 取 policy、按 divisor 折算、
+    写「金额单位：X」标注、不写 `_GT_EXPORT_META`）。
+    抽出而非就地实现的原因：本文件已在文件行数门白名单（基线 839 / 上限 881）。
+    """
     import logging
-    logger = logging.getLogger(__name__)
-    logger.info(
+
+    from app.services.report_excel_export import build_report_excel_response
+
+    logging.getLogger(__name__).info(
         "report_export: user=%s project=%s year=%s type=%s",
         str(current_user.id), str(project_id), year, report_type.value,
     )
-    result = await db.execute(
-        sa.select(FinancialReport)
-        .where(
-            FinancialReport.project_id == project_id,
-            FinancialReport.year == year,
-            FinancialReport.report_type == report_type,
-            FinancialReport.is_deleted == sa.false(),
-        )
-        .order_by(FinancialReport.row_code)
+    return await build_report_excel_response(
+        db, project_id=project_id, year=year, report_type=report_type
     )
-    rows = result.scalars().all()
-    if not rows:
-        raise HTTPException(status_code=404, detail="报表数据不存在")
-
-    try:
-        import openpyxl
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = report_type.value
-
-        # Header（「说明」= report_freshness.status_note：已过期 / 计算失败原因 / 口径留空原因）
-        ws.append(["行次代码", "项目", "期末余额", "年初余额", "说明"])
-        formulas, definition_hashes = await load_effective_formula_state(
-            db, project_id, report_type=report_type,
-        )
-
-        for row in rows:
-            ws.append([
-                row.row_code,
-                row.row_name or "",
-                float(row.current_period_amount) if row.current_period_amount else 0,
-                float(row.prior_period_amount) if row.prior_period_amount else 0,
-                status_note(row_status(
-                    row,
-                    formula_for(formulas, row),
-                    definition_hash_for(definition_hashes, row),
-                )),
-            ])
-
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-
-        filename = f"{report_type.value}_{year}.xlsx"
-        # 统一 RFC5987 编码（防御：report_type 未来可能含非 ASCII）
-        from urllib.parse import quote
-        ascii_name = filename.encode("ascii", "ignore").decode() or "report.xlsx"
-        disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename, safe='')}"
-        return StreamingResponse(
-            output,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": disposition},
-        )
-    except ImportError:
-        raise HTTPException(status_code=500, detail="openpyxl 未安装，无法导出 Excel")
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Phase 3 F1.2: 报表行构成科目 API（项目级路由）
