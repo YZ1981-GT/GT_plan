@@ -147,11 +147,27 @@ def _export_surface_summary(app: Any | None) -> dict[str, Any]:
     - **未与真实 app.routes 对拍** ⇒ 判失败（`routes_checked=False`）；
     - 每个出口必须恰有一个分类（`formal|data_exchange|template|non_amount`）。
 
-    🔴 已知既有漂移（2026-11-15 现算）：真实 app 与注册表存在约
-    ~270 条未登记 + 15 条登记未挂载。按 memory ㉗「恒红门禁等于没有门禁」
-    纪律，CLI 侧**不把该漂移当硬失败**，而是记进摘要的 `known_drift` 字段
-    并保留 `unregistered`/`missing` 供后续批次逐条治理；一旦漂移降为 0，
-    `known_drift` 自然变空。
+    🔴 2026-11-16 变更：`known_drift` 由「只报告」改为**硬失败**。
+
+    变更前（2026-11-15）的写法是：把 `unregistered` / `missing` 降级进
+    `known_drift`，而 `all_failures` 刻意不检查它，理由是「~270 条未登记属
+    独立工作量，按 memory ㉗『恒红门禁等于没有门禁』先不硬失败」。
+
+    该理由用错了地方 —— memory ㉗ 针对的是**永假判据**（时间戳 / 随机数 /
+    绝对路径进判据），而这里是**已知待办**。后果是三层门禁同时失效：
+
+    | 层 | 变更前行为 |
+    | --- | --- |
+    | `validate_registry` | 抛异常（正确） |
+    | `test_missing_is_zero` | 只看 `missing`，`unregistered` 静默放行 |
+    | 本函数 | 两个方向都降级成 `known_drift`，`all_failures` 不算失败 |
+
+    实测证据：把 `is_metadata_only_export_path` 整个删掉（让 status / history /
+    manifest 都算导出出口），首轮 8 条变异里 3 条元数据口径变异全部 GREEN 存活。
+
+    漂移已于 2026-11-16 清零（303 → 0），本函数现在要求**双向闭合**：
+    `unregistered` / `missing` 任一非空即进 `errors`，`known_drift` 仅在
+    非空时填充（键保留以维持 CLI JSON schema 稳定，但填充即失败）。
     """
     from app.services.export_surface_registry import (
         EXPORT_SURFACE_REGISTRY,
@@ -195,7 +211,13 @@ def _export_surface_summary(app: Any | None) -> dict[str, Any]:
         summary["unregistered"] = list(exc.unregistered)
         summary["missing"] = list(exc.missing)
         summary["duplicate_classification"] = list(exc.duplicate_classification)
-        # 既有漂移登记为 known_drift（不硬失败），但重复分类是**新增缺陷信号**，仍要报
+        # 双向闭合都是硬失败：`unregistered` = 实现了没登记（新加导出端点漏登记），
+        # `missing` = 登记了没实现（注册表登记 ≠ 路由存在，曾导致用户点一次 404）。
+        summary["errors"].extend(
+            f"unregistered: {u}" for u in exc.unregistered
+        )
+        summary["errors"].extend(f"missing: {m}" for m in exc.missing)
+        # 键保留（CLI JSON schema 稳定），但**填充即失败** —— 不再有「只报告」语义。
         summary["known_drift"] = (
             [f"unregistered: {u}" for u in exc.unregistered]
             + [f"missing: {m}" for m in exc.missing]
@@ -214,12 +236,18 @@ def collect_all_registry_results(app: Any | None = None) -> dict[str, Any]:
 
 
 def all_failures(results: dict[str, Any]) -> list[str]:
-    """把三个摘要里的**硬失败**摊平；`known_drift` 不算失败（只报告）。"""
+    """把三个摘要里的**硬失败**摊平；空清单 = 通过。
+
+    🔴 2026-11-16：`known_drift` 不再是「只报告」—— 它非空即失败。
+    变更前本函数刻意跳过 `known_drift`，导致 `unregistered`（实现了没登记）
+    与 `missing`（登记了没实现）在 CLI 侧永不阻断；实测把元数据口径过滤
+    整个删掉后 CLI 仍然 exit 0。
+    """
     issues = failures(results)
     export = results.get("export_surface_results") or {}
     if not export.get("declared"):
         issues.append("export_surface_results.declared == 0")
-    for key in ("errors", "duplicate_classification"):
+    for key in ("errors", "duplicate_classification", "known_drift"):
         for item in export.get(key) or []:
             issues.append(f"export_surface_results.{key}: {item}")
     return issues

@@ -11,6 +11,7 @@ design §9, R9, AC-20, AC-23.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
@@ -527,6 +528,114 @@ for _path, _method, _cls in _AUTO_SURFACES:
 del _path, _method, _cls, _key, _n
 
 
+
+# ── 分类一致性（2026-11-16）────────────────────────────────
+#
+# 🔴 `_AUTO_SURFACES` 按「路径末段关键字」自动分类，**没经过实现验证**。
+# 现算：43 条 formal 全部无 `ExportUnitPolicy` 折算，128 条 data_exchange
+# 全部无 `_GT_EXPORT_META`。权威源 `docs/reference/formal-export-unit-policy.md` §1。
+#
+# 🔴 不直接改分类：分类是**业务语义声明**不是代码事实。「没写 marker」既可能
+# 是分类错，也可能是实现漏了应有行为（真实缺陷）—— 改判等于把缺陷合法化
+# （memory ㉗：对齐既有基准 ≠ 正确性依据）。缺口登记在
+# `backend/data/export_surface_classification_gaps.json`，由后续 spec 按族裁决。
+
+#: 缺口登记文件的路径（相对仓库 `backend/`）。
+CLASSIFICATION_GAP_FILE = "data/export_surface_classification_gaps.json"
+
+#: formal 分类要求的实现特征（`ExportUnitPolicy` 折算链）。
+_UNIT_POLICY_RE = re.compile(
+    r"ExportUnitPolicy|export_policy|convert_amount|divisor|amount_unit"
+)
+
+#: data_exchange 分类要求的实现特征（`_GT_EXPORT_META` marker）。
+_EXPORT_MARKER_RE = re.compile(
+    r"_GT_EXPORT_META|ExportMeta|export_meta_marker|marker_rows"
+)
+
+
+def _endpoint_source(route: object) -> str:
+    """取路由 endpoint 源码；取不到返回空串（调用方按「无法判定」处理）。"""
+    import inspect as _inspect
+
+    ep = getattr(route, "endpoint", None)
+    if ep is None:
+        return ""
+    try:
+        return _inspect.getsource(ep)
+    except (OSError, TypeError):
+        return ""
+
+
+def classify_conformance(route: object, declared: str) -> str:
+    """该路由的实现与其**声明分类**的符合性。
+
+    - `"ok"`：符合
+    - `"formal_missing_unit_policy"`：声明 formal 但无单位折算
+    - `"data_exchange_missing_marker"`：声明 data_exchange 但无 marker
+    - `"unverifiable"`：取不到源码（不参与判定）
+    """
+    src = _endpoint_source(route)
+    if not src:
+        return "unverifiable"
+    if declared == "formal":
+        return "ok" if _UNIT_POLICY_RE.search(src) else "formal_missing_unit_policy"
+    if declared == "data_exchange":
+        return "ok" if _EXPORT_MARKER_RE.search(src) else "data_exchange_missing_marker"
+    return "ok"
+
+
+def load_classification_gaps() -> frozenset[str]:
+    """读缺口登记文件；文件缺失/损坏按空集（会让 `verify` 报全部为新增）。"""
+    from pathlib import Path as _Path
+
+    path = _Path(__file__).resolve().parents[2] / CLASSIFICATION_GAP_FILE
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return frozenset()
+    paths = raw.get("gaps") if isinstance(raw, dict) else raw
+    if not isinstance(paths, list):
+        return frozenset()
+    return frozenset(str(p) for p in paths)
+
+
+def verify_classification_conformance(
+    app: "Starlette",
+) -> tuple[list[str], list[str]]:
+    """现算分类一致性缺口，与登记文件双向比对。
+
+    Returns
+    -------
+    (resolved, new)
+        `resolved` = 已修好但仍留在登记里的路径（须从文件里删）
+        `new`      = 现算有缺口但未登记的路径（须补登记）
+
+    两者任一非空 = 登记与实现漂移。这是棘轮：修好一条删一条，
+    新出现一条补一条，总数只许减少（`test_classification_gaps_do_not_grow`）。
+    """
+    by_pm: dict[tuple[str, str], object] = {}
+    for route in getattr(app, "routes", []):
+        path = getattr(route, "path", None)
+        if not path:
+            continue
+        for method in getattr(route, "methods", None) or ():
+            by_pm[(path, method)] = route
+
+    actual: set[str] = set()
+    for entry in EXPORT_SURFACE_REGISTRY.values():
+        if entry.retired or entry.classification not in ("formal", "data_exchange"):
+            continue
+        route = by_pm.get((entry.path, entry.method))
+        if route is None:
+            continue
+        verdict = classify_conformance(route, entry.classification)
+        if verdict not in ("ok", "unverifiable"):
+            actual.add(entry.path)
+
+    registered = load_classification_gaps()
+    return sorted(registered - actual), sorted(actual - registered)
+
 # ── 校验 ──────────────────────────────────────────────────
 
 class RegistryValidationError(Exception):
@@ -553,8 +662,19 @@ class RegistryValidationError(Exception):
 
 
 def _normalize_path(path: str) -> str:
-    """归一化路径参数。"""
-    return re.sub(r"\{[^}]+\}", "{}", path)
+    """归一化路径参数名，**保留转换器**（`:uuid` 等）。
+
+    🔴 2026-11-16 修正：原实现把 `{id:uuid}` 与 `{id}` 归一成同一个 `{}`
+    ⇒ 吞掉转换器差异，`validate_registry` 静默放行漏写转换器的登记，
+    而守卫（逐字符比对）打红 —— **两套口径给出相反答案**。
+    现在：`{name:converter}` → `{:converter}`，`{name}` → `{}`。
+    参数名被忽略（Starlette 实现细节），转换器被保留（`:uuid` 是不同的路由）。
+    """
+    return re.sub(
+        r"\{([^}:]+)(?::([^}]+))?\}",
+        lambda m: f"{{:{m.group(2)}}}" if m.group(2) else "{}",
+        path,
+    )
 
 
 _EXPORT_KEYWORDS = (

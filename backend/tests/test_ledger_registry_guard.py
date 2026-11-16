@@ -188,25 +188,101 @@ class TestExportSurfaceSummary:
         assert ex["errors"]
         assert any("没有任何登记出口" in e for e in ex["errors"])
 
-    def test_known_drift_is_not_hard_failure(self) -> None:
-        """既有漂移记 `known_drift`，不硬失败（memory ㉗：恒红门禁等于没有门禁）。"""
-        from app import main  # noqa: F401 — 构建真实 app
+    def test_known_drift_is_hard_failure(self) -> None:
+        """漂移（unregistered / missing）必须进入硬失败清单。
+
+        🔴 2026-11-16 反转：变更前本条断言的是「known_drift 不应进入硬失败清单」，
+        理由是 memory ㉗「恒红门禁等于没有门禁」。但该规则针对的是**永假判据**
+        （时间戳 / 随机数进判据），而这里是**已知待办** —— 结果是三层门禁同时
+        失效：`test_missing_is_zero` 只看 missing、本函数跳过 known_drift、
+        `validate_registry` 的抛异常没人接。实测把元数据口径过滤整个删掉
+        （让 status / history / manifest 都算导出出口），8 条变异里 3 条存活。
+
+        漂移已清零（303 → 0），现在两个方向都必须阻断：
+        - `unregistered` = 实现了没登记（新加导出端点漏登记）
+        - `missing` = 登记了没实现（曾导致前端点一次 404）
+        """
+        from app.main import app
+        from app.services.export_surface_registry import (
+            EXPORT_SURFACE_REGISTRY,
+            ExportSurfaceEntry,
+        )
         from app.services.ledger_registry_guard import (
             all_failures,
             collect_all_registry_results,
         )
 
-        from app.main import app
+        # 先确认基线干净（否则下面的注入证明不了任何事）
+        baseline = collect_all_registry_results(app)
+        assert baseline["export_surface_results"]["known_drift"] == []
+        assert all_failures(baseline) == []
 
-        results = collect_all_registry_results(app)
-        ex = results["export_surface_results"]
-        assert ex["routes_checked"] is True
-        # 漂移存在时记 known_drift，但 all_failures 不得因它而失败
-        issues = all_failures(results)
-        drift_issues = [i for i in issues if "unregistered" in i or "missing:" in i]
-        assert drift_issues == [], (
-            "known_drift 不应进入硬失败清单；它只作报告"
+        # 注入一条「登记了但没实现」⇒ missing 非空
+        key = "_probe_missing_entry"
+        try:
+            EXPORT_SURFACE_REGISTRY[key] = ExportSurfaceEntry(
+                path="/api/_probe/never-implemented/export",
+                method="GET",
+                classification="formal",
+                description="probe",
+            )
+            results = collect_all_registry_results(app)
+            ex = results["export_surface_results"]
+            assert ex["known_drift"], "注入后 known_drift 必须非空"
+            assert ex["errors"], "注入后 errors 必须非空（不再只报告）"
+
+            issues = all_failures(results)
+            assert any("missing" in i for i in issues), (
+                f"missing 必须进入硬失败清单，实得 {issues}"
+            )
+            assert any("known_drift" in i for i in issues), (
+                f"known_drift 非空本身也必须进入硬失败清单，实得 {issues}"
+            )
+        finally:
+            EXPORT_SURFACE_REGISTRY.pop(key, None)
+
+        # 还原后必须重新干净
+        restored = collect_all_registry_results(app)
+        assert restored["export_surface_results"]["known_drift"] == []
+        assert all_failures(restored) == []
+
+    def test_metadata_filter_weakening_breaks_closure(self) -> None:
+        """反向自检：弱化元数据口径必须让闭合判定失败。
+
+        🔴 这是 `known_drift` 改硬失败后才成立的判据。变更前：把
+        `is_metadata_only_export_path` 整个删掉（让 /status、/history、
+        /manifest 都算导出出口）时，全部用例仍然全绿 —— 因为多出来的
+        8 条「未登记」全被降级进 known_drift，没人检查它。
+        """
+        from app.main import app
+        from app.services import export_surface_registry as reg
+        from app.services.ledger_registry_guard import (
+            all_failures,
+            collect_all_registry_results,
         )
+
+        baseline = collect_all_registry_results(app)
+        assert all_failures(baseline) == [], "基线必须先干净"
+
+        original = reg.is_metadata_only_export_path
+        try:
+            # 弱化：任何路径都不算元数据 ⇒ 8 条元数据路由变成「未登记的导出出口」
+            reg.is_metadata_only_export_path = lambda _p: False
+            results = collect_all_registry_results(app)
+            ex = results["export_surface_results"]
+            assert ex["unregistered"], (
+                "弱化口径后 unregistered 必须非空（否则说明 _is_export_path "
+                "没调用它，或判据没扫到）"
+            )
+            issues = all_failures(results)
+            assert any("unregistered" in i for i in issues), (
+                f"unregistered 必须进入硬失败清单，实得 {issues}"
+            )
+        finally:
+            reg.is_metadata_only_export_path = original
+
+        restored = collect_all_registry_results(app)
+        assert all_failures(restored) == []
 
 
 class TestCliSchemaVersion3:
