@@ -265,14 +265,14 @@ async def test_create_export_task_persists_snapshot():
         document_types=["audit_report", "financial_report"],
     )
     assert isinstance(task, ExportTask)
-    assert task.unit_policy_snapshot == snapshot
+    assert task.unit_policy_snapshot == json.loads(snapshot)
     assert task.export_year == 2025
     assert task.document_types == ["audit_report", "financial_report"]
 
 
 @pytest.mark.anyio
-async def test_create_export_task_defaults_new_fields_to_none():
-    """三个新字段**默认 None**：既有调用方行为必须逐字节不变。"""
+async def test_create_export_task_defaults_new_fields_to_safe_json_values():
+    """旧调用方也必须满足 V265：数组字段不能写 JSON null。"""
     from app.models.report_models import ExportTaskType
     from app.services.pdf_export_engine import PDFExportEngine
 
@@ -287,8 +287,60 @@ async def test_create_export_task_defaults_new_fields_to_none():
         project_id=uuid.uuid4(), task_type=ExportTaskType.single_document
     )
     assert task.export_year is None
-    assert task.document_types is None
+    assert task.document_types == []
     assert task.unit_policy_snapshot is None
+
+
+@pytest.mark.anyio
+async def test_create_export_task_legacy_single_type_is_normalized():
+    """旧单数调用必须落成单元素 document_types 数组。"""
+    from app.models.report_models import ExportTaskType
+    from app.services.pdf_export_engine import PDFExportEngine
+
+    class _Db:
+        def __init__(self):
+            self.added = []
+
+        def add(self, obj):
+            self.added.append(obj)
+
+        async def flush(self):
+            return None
+
+    task = await PDFExportEngine(_Db()).create_export_task(  # type: ignore[arg-type]
+        project_id=uuid.uuid4(),
+        task_type=ExportTaskType.single_document,
+        document_type="financial_report",
+        unit_policy_snapshot=json.dumps({"_digest": "a" * 64, "unit": "yuan", "divisor": 1}),
+    )
+    assert task.document_types == ["financial_report"]
+    assert task.unit_policy_snapshot == {
+        "_digest": "a" * 64,
+        "unit": "yuan",
+        "divisor": 1,
+    }
+
+
+@pytest.mark.anyio
+async def test_create_export_task_rejects_conflicting_single_and_plural_types():
+    """单数与复数不一致时拒绝，不能静默选择错误的文档类型。"""
+    from app.models.report_models import ExportTaskType
+    from app.services.pdf_export_engine import PDFExportEngine
+
+    class _Db:
+        def add(self, obj):
+            raise AssertionError("冲突输入不应写库")
+
+        async def flush(self):
+            raise AssertionError("冲突输入不应 flush")
+
+    with pytest.raises(ValueError, match="document_type"):
+        await PDFExportEngine(_Db()).create_export_task(  # type: ignore[arg-type]
+            project_id=uuid.uuid4(),
+            task_type=ExportTaskType.single_document,
+            document_type="financial_report",
+            document_types=["audit_report"],
+        )
 
 
 def test_router_passes_snapshot_to_engine():
@@ -311,6 +363,6 @@ def test_router_passes_snapshot_to_engine():
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
             if node.func.attr == "create_export_task":
                 kwargs = {kw.arg for kw in node.keywords}
-                if "unit_policy_snapshot" in kwargs:
+                if {"unit_policy_snapshot", "document_types", "export_year"} <= kwargs:
                     found = True
-    assert found, "router 的 create_export_task 调用未传 unit_policy_snapshot"
+    assert found, "router 的 create_export_task 调用未传 policy/document_types/export_year"

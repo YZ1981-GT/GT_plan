@@ -70,6 +70,9 @@ async def create_export_task(
             project_id=data.project_id,
             task_type=data.task_type,
             document_type=data.document_type,
+            document_types=data.document_types,
+            export_year=data.export_year,
+            created_by=current_user.id,
             unit_policy_snapshot=unit_policy_snapshot,
         )
         # MVP: execute synchronously

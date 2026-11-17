@@ -481,6 +481,24 @@
     **仍未完成（如实保留）**：`Repository.create_content_version` 的 V265 四列 production
     writer 未接入（台账保持 `PARTIAL_WIRING`）；PDF 的浏览器级实测仍需 LibreOffice 转换链
     + 独占端口实例（C-V 口径）。
+  - **2026-11-16 继续验收：修复 PDF 创建链的真实 PostgreSQL 500（`[~]` 保持）**：
+    共享 `9980` 浏览器登录 `admin` 后，对【测试】项目
+    `e8c40d30-de96-440d-a880-fafcf41f32f3` 做项目单位往返：yuan 配置 200，正式 Excel
+    响应 200、`X-GT-Export-Unit=yuan`、`X-GT-Export-Divisor=1`、XLSX 魔数
+    `PK\x03\x04`；临时切换 wan 后配置 200，响应为 `wan`/`10000`，最后恢复 yuan 并
+    读回 200，配置已恢复。
+    首次真实 PDF 创建请求返回 500，PG 错误为
+    `ck_export_tasks_document_types_array`：旧 DTO 丢弃 `document_types`，service 显式
+    把 `None` 写成 JSON null；同一路径还把 policy canonical JSON 字符串直接写入 JSONB。
+    修复为 DTO 接受 `document_types`/`export_year`，router 逐项传入，service 在写库边界
+    将旧单数归一为数组、复数去重并拒绝冲突，且将 policy snapshot 解析为 JSON object。
+    候选后端独占 `9991` 用 admin 对同一测试项目发送 plural 请求，返回 200、
+    `status=completed`，PDF 17234 bytes、魔数 `%PDF-`；PG 核对
+    `document_types=['financial_report']`/`jsonb_typeof(...)=array`/policy object 均正确。
+    验收任务和文件已按精确 id 清理。新增归一/冲突测试，PDF/policy 选集 **47 passed**，
+    导出证据/归档/报表单位选集 **88 passed**。仍未完成：真实报表数据注入 PDF、独占
+    PG/端口完整 C-V、data_exchange marker/组合包/归档全链；production writer 仍为
+    `PARTIAL_WIRING`。
 
 - [x] 6C. 附注 Word 普通/clone 路径消费 kind/scale（R6、R9；依赖任务 10 的 `ExportUnitRegion`，与其附注路径子项同批）
   - `NoteWordExporter._render_table` 与 `note_template_table_look.render_cloned_table` 接收同一 `ExportUnitRegion + column_kinds + column_ratio_scales`，kind/scale 取自 6A 的 catalog 与稳定 column_id，只有 amount 执行 policy divisor；`note_template_block_fill.rebuild_block` 按 `<section_id>/<table_id>` 取 region 后交给两条内核。
@@ -568,6 +586,11 @@
     `test_pdf_export_engine_fail_closed.py` 6 例 + 4 组变异全 RED。
     **PDF 直接导出的浏览器实测仍未完成**：需独占端口实例 + 真实【测试】项目 +
     项目单位 yuan/wan 往返；本轮未启动服务、未写库。
+  - **2026-11-17 继续验收（`[~]` 保持）**：共享项目单位/Excel 往返再次通过；真实
+    PDF 创建请求首次暴露并修复 `document_types` JSON null 与 policy snapshot JSON string
+    两个 V265 合同缺陷。候选后端真实返回 `%PDF-` 并完成 PG 逐值核对，测试任务和 PDF
+    已清理。由于候选后端复用共享 PG、PDF 当前仍用空 rows/paragraphs/notes，占位数据
+    未接正式报表来源，且尚未完成独占端口/PG 与正式 Playwright PDF 面板验收，C-V 继续保留 `[~]`。
 
 - [x] C-BK. 阶段 C 备份 commit 对象
   - 方法同 A-BK，树内含截至阶段 C 的全部本任务改动块；OID 写入当前工作流目录并核验，随后向父会话发阶段 C 进度消息。

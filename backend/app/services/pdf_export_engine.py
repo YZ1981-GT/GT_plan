@@ -11,12 +11,14 @@ Validates: Requirements 7.1, 7.2, 7.3, 7.7
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import subprocess
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -206,6 +208,33 @@ def render_with_ai_statement(html_content: str, reviewer: str = "审计师") -> 
     return html_content
 
 
+def _normalize_document_types(
+    document_type: str | None,
+    document_types: list[str] | None,
+) -> list[str]:
+    """把旧单数/新复数导出合同归一成数据库要求的 JSON 数组。"""
+    if not document_types:
+        return [document_type] if document_type else []
+    normalized = list(dict.fromkeys(str(item) for item in document_types if item))
+    if document_type and document_type not in normalized:
+        raise ValueError(
+            "document_type 与 document_types 不一致，不能静默选择其中一套"
+        )
+    return normalized
+
+
+def _normalize_policy_snapshot(
+    snapshot: str | dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """把 resolver 的 canonical JSON 转成 JSONB object，禁止写入 JSON 字符串。"""
+    if snapshot is None:
+        return None
+    parsed: Any = json.loads(snapshot) if isinstance(snapshot, str) else snapshot
+    if not isinstance(parsed, dict):
+        raise ValueError("unit_policy_snapshot 必须是 JSON object")
+    return parsed
+
+
 class PDFConversionUnavailable(RuntimeError):
     """PDF 转换链不可用（WeasyPrint 未安装且 LibreOffice 不可用）。
 
@@ -314,24 +343,18 @@ class PDFExportEngine:
         *,
         export_year: int | None = None,
         document_types: list[str] | None = None,
-        unit_policy_snapshot: str | None = None,
+        unit_policy_snapshot: str | dict[str, Any] | None = None,
     ) -> ExportTask:
         """创建导出任务记录。
 
-        Validates: Requirements 7.2, 7.7
-
-        spec platform-global-display-settings-closure 任务 10 / AC-21：新增三个可选字段
-        落 `unit_policy_snapshot` 证据（V265 已建列）。**全部默认 None**，
-        既有调用方行为逐字节不变。
-
-        - `export_year`：导出年度（V265 的 `export_year` 列）。缺失时保持 None
-          （不猜当前年——猜出来的年度会让「按年度取数」的验收误判）。
-        - `document_types`：多文档类型列表（V265 的 `document_types` 列）。
-          单文档时调用方仍可只传 `document_type`（旧契约保持）。
-        - `unit_policy_snapshot`：`ExportUnitPolicy` 的 canonical JSON
-          （含 `unit` / `divisor` / `canonical_digest`）——**这是正式导出的单位证据**，
-          缺它则无法审计「这份交付件是按哪个单位出的」。
+        旧调用方只传 `document_type` 时归一为单元素数组；新调用方传
+        `document_types` 时保留去重后的顺序。`unit_policy_snapshot` 在
+        JSONB 写入边界统一解析为 object，避免 PostgreSQL CHECK 收到 JSON 字符串。
         """
+        normalized_document_types = _normalize_document_types(
+            document_type, document_types
+        )
+        normalized_policy_snapshot = _normalize_policy_snapshot(unit_policy_snapshot)
         task = ExportTask(
             project_id=project_id,
             task_type=task_type,
@@ -340,8 +363,8 @@ class PDFExportEngine:
             progress_percentage=0,
             created_by=created_by,
             export_year=export_year,
-            document_types=document_types,
-            unit_policy_snapshot=unit_policy_snapshot,
+            document_types=normalized_document_types,
+            unit_policy_snapshot=normalized_policy_snapshot,
         )
         self.db.add(task)
         await self.db.flush()
