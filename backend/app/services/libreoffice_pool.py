@@ -11,6 +11,8 @@ import asyncio
 import logging
 import os
 import shutil
+import signal
+import subprocess
 import tempfile
 import time
 import weakref
@@ -267,13 +269,132 @@ def _release_slot() -> None:
     _libreoffice_semaphore.release()
 
 
-async def _terminate_and_reap(proc, communicate_task: asyncio.Task) -> None:
-    """终止子进程并排空 PIPE；取消和超时共用。"""
-    if proc.returncode is None:
+def _process_group_kwargs() -> dict[str, object]:
+    """给子进程建独立进程组，终止时才能连带 soffice 的 fork 子进程。"""
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+def _spawn_process(cmd: list[str]) -> subprocess.Popen:
+    """在线程里用 ``subprocess.Popen`` 拉起 soffice。
+
+    🔴 **不能用 `asyncio.create_subprocess_exec`**：Windows 开发服务器
+    （`run_uvicorn.py`）强制 `WindowsSelectorEventLoopPolicy`，该循环不支持
+    子进程，`create_subprocess_exec` 恒抛 **`NotImplementedError`**（不是
+    `OSError`，原有的 `except OSError` 接不住）⇒ 转换永远 500。
+    也不能换回 Proactor 循环：SQLAlchemy async 引擎在 Proactor 下
+    `greenlet_spawn` 递归超限，那是全服务级影响。
+
+    同一写法已在 `services/note_headless_refresh_service._spawn` 验证过。
+    """
+    return subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        **_process_group_kwargs(),
+    )
+
+
+def _communicate_blocking(proc: subprocess.Popen) -> tuple[bytes, bytes]:
+    """在线程里等待子进程结束并排空 PIPE。
+
+    不加内部超时：超时由外层 ``asyncio.wait_for`` 判定，超时分支 kill 之后
+    本调用会立即返回 —— 这样既不会挂住线程池线程，也不会留下未排空的 PIPE。
+    """
+    out, err = proc.communicate()
+    return out or b"", err or b""
+
+
+def _kill_blocking(proc: subprocess.Popen) -> None:
+    """终止子进程及其子进程（幂等；进程已退出时静默）。
+
+    🔴 Windows 的 ``proc.kill()``（TerminateProcess）**不连带子进程**，soffice
+    会派生子进程做真正转换，只杀父进程会留下孤儿 soffice.bin 与未释放的
+    profile 目录锁（后续转换恒失败）。用 ``taskkill /T`` 杀整棵树。
+    """
+    if proc.poll() is not None:
+        return
+    try:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+                check=False,
+            )
+        else:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except (subprocess.TimeoutExpired, ProcessLookupError, OSError):
+        logger.warning(
+            "[LIBREOFFICE_POOL] tree kill failed pid=%s, falling back to kill()",
+            proc.pid,
+            exc_info=True,
+        )
         try:
             proc.kill()
         except (ProcessLookupError, OSError):
             pass
+
+
+async def _reap(proc: subprocess.Popen) -> None:
+    """收尸：等待进程真正退出。
+
+    清理路径不覆盖原始超时/取消原因 —— 收尸失败只告警。``CancelledError``
+    在调用方（``except asyncio.CancelledError`` 分支）会随后重新抛出，
+    这里吞掉只是为了把收尸做完。
+    """
+    try:
+        await asyncio.wait_for(
+            asyncio.to_thread(proc.wait),
+            timeout=LIBREOFFICE_REAP_TIMEOUT_SECONDS,
+        )
+    except (asyncio.TimeoutError, asyncio.CancelledError, subprocess.TimeoutExpired):
+        logger.warning(
+            "[LIBREOFFICE_POOL] reap timeout pid=%s (process may leak)", proc.pid
+        )
+    except (ProcessLookupError, OSError):
+        pass
+
+
+async def _reap_spawn_then_kill(
+    spawn_task: "asyncio.Task[subprocess.Popen]",
+) -> None:
+    """spawn 线程仍在跑时被取消：等它给出句柄再杀，否则真实进程无主泄漏。
+
+    🔴 只 `cancel()` to_thread 的 future 不会停掉线程，``subprocess.Popen``
+    仍然会创建进程并返回，而返回值被丢弃 ⇒ 孤儿 soffice 占着 profile 目录锁，
+    让后续所有转换失败。
+    """
+    try:
+        proc = await asyncio.wait_for(
+            asyncio.shield(spawn_task),
+            timeout=LIBREOFFICE_REAP_TIMEOUT_SECONDS,
+        )
+    except (asyncio.TimeoutError, asyncio.CancelledError):
+        if not spawn_task.done():
+            spawn_task.cancel()
+        await asyncio.gather(spawn_task, return_exceptions=True)
+        logger.warning("[LIBREOFFICE_POOL] spawn did not return in time on cancel")
+        return
+    except Exception:
+        return
+    await asyncio.to_thread(_kill_blocking, proc)
+    await _reap(proc)
+
+
+async def _terminate_and_reap(
+    proc: subprocess.Popen,
+    communicate_task: "asyncio.Task[tuple[bytes, bytes]] | None",
+) -> None:
+    """终止子进程并排空 PIPE；取消和超时共用。"""
+    await asyncio.to_thread(_kill_blocking, proc)
+    if communicate_task is None:
+        # 没有等待任务时也要收尸，否则取消发生在「spawn 之后、communicate 之前」
+        # 会留下一个已被 kill 但从未 wait 的进程句柄。
+        await _reap(proc)
+        return
     try:
         await asyncio.wait_for(
             asyncio.shield(communicate_task),
@@ -286,6 +407,9 @@ async def _terminate_and_reap(proc, communicate_task: asyncio.Task) -> None:
     except Exception:
         # 进程已终止，清理阶段不应覆盖原始超时/取消原因。
         await asyncio.gather(communicate_task, return_exceptions=True)
+    finally:
+        # 排空失败时也要收尸，避免僵尸进程与句柄泄漏。
+        await _reap(proc)
 
 
 async def _run_conversion(
@@ -347,12 +471,13 @@ async def _run_conversion(
         )
 
         try:
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            # 🔴 spawn 放线程 + subprocess.Popen（见 `_spawn_process` 的说明）：
+            #    Selector 循环上 create_subprocess_exec 恒 NotImplementedError。
+            spawn_task = asyncio.ensure_future(
+                asyncio.to_thread(_spawn_process, cmd)
             )
-        except OSError as exc:
+            proc = await asyncio.shield(spawn_task)
+        except (OSError, NotImplementedError) as exc:
             outcome = "spawn_failed"
             raise HTTPException(
                 status_code=503,
@@ -362,14 +487,20 @@ async def _run_conversion(
                 },
                 headers={"Retry-After": str(LIBREOFFICE_RETRY_AFTER_SECONDS)},
             ) from exc
+        except asyncio.CancelledError:
+            outcome = "cancelled"
+            await _reap_spawn_then_kill(spawn_task)
+            raise
 
-        communicate_task = asyncio.create_task(proc.communicate())
+        communicate_task = asyncio.ensure_future(
+            asyncio.to_thread(_communicate_blocking, proc)
+        )
         try:
             _stdout, stderr_bytes = await asyncio.wait_for(
                 asyncio.shield(communicate_task),
                 timeout=timeout,
             )
-        except asyncio.TimeoutError as exc:
+        except (asyncio.TimeoutError, subprocess.TimeoutExpired) as exc:
             outcome = "timeout"
             await _terminate_and_reap(proc, communicate_task)
             raise HTTPException(

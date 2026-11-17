@@ -863,7 +863,17 @@ async def export_workpaper_pdf(
             },
         )
 
-    display_name = f"{wp.wp_code or 'workpaper'}_{wp.wp_name or ''}.pdf".strip()
+    # 🔴 文件名只能从 `wp_index` 取：`WorkingPaper` 模型**没有** `wp_code` / `wp_name`
+    #    列（只有 `wp_index_id`），直接读 `wp.wp_code` 是恒抛 AttributeError ⇒ 本端点
+    #    长期 500（实测 0.04s 秒回、响应体是裸 `{"code":500,"message":"服务器内部错误"}`）。
+    #    同文件其余 4 处都按 `wp_index_id` 查 `WpIndex`，这里沿用同一写法。
+    #    悬空 `wp_index_id`（历史数据）会让名字落到兜底名 —— 不阻断导出，文件名不该是门禁。
+    idx_row = (await db.execute(
+        sa.select(WpIndex.wp_code, WpIndex.wp_name).where(WpIndex.id == wp.wp_index_id)
+    )).first()
+    wp_code = (idx_row[0] if idx_row else None) or "workpaper"
+    wp_name = (idx_row[1] if idx_row else None) or ""
+    display_name = f"{wp_code}_{wp_name}.pdf".strip()
     await db.close()
     pdf_bytes = await convert_office_to_pdf_bytes(
         fp,

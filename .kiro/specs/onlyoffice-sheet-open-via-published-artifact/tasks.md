@@ -227,8 +227,9 @@
 ## Phase 4：Legacy Drain 与旧路径删除
 
 - [ ]* 4.1 将全局 legacy 开关收敛为 binding 级状态机：pending → ready → migrated → draining → retired。
-  - **阻断类别：治理前置（真实 drain 周期）**。已有 1 条 `migrated`（B60），状态机**代码已就绪**：`backend/app/routers/_wp_onlyoffice_legacy_url_gate.py` 按 binding 级判定，`test_sheet_legacy_gate_binding_states.py` 17 例覆盖五态 + 非法跃迁。
-  - 为什么不能标完成：后三态（`migrated → draining → retired`）需要真实有 binding 走过才能证明。现算 `migrated` = **1 条**（B60，仅单 sheet）⇒ 后三态在生产上仍从未被真实触达（空分母恒真）。
+  - **阻断类别：治理前置（真实 drain 周期）**。当前 `migrated` = 1 条（**D4**，B60 的审核已于 2026-11-16 撤回），状态机**代码已就绪**：`backend/app/routers/_wp_onlyoffice_legacy_url_gate.py` 按 binding 级判定，`test_sheet_legacy_gate_binding_states.py` 17 例覆盖五态 + 非法跃迁。
+  - 为什么不能标完成：后三态（`migrated → draining → retired`）需要真实有 binding 走过才能证明。现算 `migrated` = **1 条**（`xlsx/gt-d4-operating-revenue`，project-scoped 到【测试】乙项目）⇒ 后三态在生产上仍从未被真实触达（空分母恒真）。
+  - 🔴 **2026-11-17 勘误**：生成物现算 `summary.status_counts = {migrated: 1, out_of_scope: 7, pending: 189}`；review overlay 的 `reviews` 只有 1 条（D4 / `decision=migrated` / `project_ids=['e8c40d30-…']`）。B60 那条早在 11-16 撤回。
   - 下一步：随 3.3（首条 binding 进 `migrated` 后，draining / retired 才有对象可验）。
   - _R: 6, 8_
 - [ ]* 4.2 新增旧 doc key / callback drain ledger：记录签发时间、TTL、binding、entry、generation、终结状态。
@@ -242,7 +243,8 @@
   - 下一步：随 3.3。
   - _R: 6, 7_
 - [ ]* 4.4 旧 direct-write 分支按 binding 逐个删除；删除前守卫要求旧签发数、callback in-flight、drain timeout 连续为 0。
-  - **阻断类别：治理前置 + 时间**。「连续为 0」需要**真实运行一段时间的观测数据**；当前 1 条 migrated 但从未打开过 ⇒ 三个计数天然为 0 但**没有观测意义**（空分母恒真）。
+  - **阻断类别：治理前置 + 时间**。「连续为 0」需要**真实运行一段时间的观测数据**。
+  - 🔴 **2026-11-17 勘误（原记「从未打开过 ⇒ 计数天然为 0」已不成立）**：真实库现有 **1 条**未结算签发行（`entry_id='xlsx-sheet/D1-1/审定表D1-1'` / `issued_at=2026-11-16T15:45Z` / `expires_at=19:45Z` / `settled_at=None`）；现算 `drain_metrics = {open_issuances: 1, expired_unsettled: 1, callback_in_flight: 0}` ⇒ 删除门禁**当下会正确拒绝**（这正是它该做的事，不是缺陷）。须先结算那 1 条（或等它过期后结算）再让三个判据连续为 0。
   - 下一步：3.3 完成 → 观察一个完整 drain 周期 → 才能按 binding 逐个删。
   - _R: 2, 6, 10_
 - [ ]* 4.5 删除无调用方的 `GtOnlyOfficeSheet` 兼容代码前，完成 grep 0 调用、测试全绿、独立提交与回滚标签；single/custom/Word 豁免必须有真实条件断言。
@@ -342,3 +344,66 @@
 - 本 spec 不单独宣称完成 umbrella 6.3 的全部 entry required scenarios；全量 bidirectional entry 的 operation / evidence 账本仍需后续 owner 按原 umbrella 口径闭合。
 - 本 spec 不单独宣称完成 umbrella 7.5；五角色最终复核、clean-checkout 总验与最终归档必须在本 spec 及相关 residual owner 的证据齐备后执行。
 - 原 umbrella 的 `_source_paths` resolver debt 仍保持真实，需先裁决 staging 是否应纳入 Property 42 canonical path boundary，不因本 spec 的 sheet 映射而自动关闭。
+
+## 2026-11-17 批 2：roundtrip「空表示 vs 键缺失」判据修复（**结论部分否定**，如实登记）
+
+用户指令「按建议来」后按上一批的「建议下一步」去修 boolean 归一化，目标解 3.3。
+**修是修了，但真库实测证明它不是那个 500 的成因** —— 两件事必须分开记账。
+
+### 修了什么（代码侧，语义正确且真库确有需求）
+
+`content_mutation.assert_roundtrip_equivalent` 的 missing 判据原是**裸键级差集**
+`set(left) - set(right)`。而同一条链上两侧对「无值」的**表示形态不同**：
+
+| 侧 | 表示 |
+|---|---|
+| 提交侧 intended | `{"键": None}` 或 `{"键": ""}`（D4-27 未勾经 `_coerce_checkbox_to_store` → `None`） |
+| 反读侧 extracted | 该键**不存在**（`excel_extract._collect_fields` 对空格 `if not present: continue`） |
+
+materialize 刻意把 `None` 写成**空格** `<c r=".."/>`（写 `<v>0</v>` 会把「未填」变成
+「填了 false」，对「是否关联方」这类审计字段是实质性语义错误）。于是那类键必然被判
+「materialize 没写进去」。
+
+修法两处，共用**同一个** `_is_roundtrip_empty`（该判据整族已抽到新模块
+`workpaper_sync/roundtrip_equivalence.py`，`content_mutation` 只留转发薄壳）：
+1. `missing` 判据对**提交侧确实是空表示**的键豁免（fail-closed：提交侧非空而反读缺键仍报）；
+2. `for key in sorted(left)` 逐键循环加 `if key not in right: continue`
+   （否则豁免后立刻 `KeyError` —— 这是首版漏掉的一半，被自己的新用例咬出来）。
+
+**真库实证这条判据确实会在真实数据上误报**（不是理论推演）：【测试】乙 D4 gen=5 的
+投影 artifact 里有 **8 个提交侧 `''` 空表示键**
+（`d413_erp_check_fixed/conclusion`、`d413_erp_check_fixed/process`、
+`d45_policy_fixed/biz_{delivery,order,pricing,produce,sales,scene}`）。
+
+验证：新增 `test_roundtrip_empty_missing_symmetry.py` **8 例**（正向 2 + fail-closed 反向 3
+参数化 + `_is_roundtrip_empty` 边界 + 单一口径 AST 判据 + 薄壳转发同一函数对象），
+变异 **7/7 全 RED**（退回裸差集 / 内联 `is None` / 豁免放宽到全部缺键 / 不跳过缺键 /
+`False` 当空 / 薄壳调空 / 转发别名非同一对象）。
+
+### 🔴 它 **不是** D4 那个 500 的成因（实测否定）
+
+真库完整比对（【测试】乙 D4 `d7fa0522`，gen=5，**全程只读**：只读两个 artifact 文件 + 只读库）：
+
+| 指标 | 实测值 |
+|---|---|
+| intended values（投影 artifact `gen 3`） | **484** |
+| extracted values（反读 representation `gen 5`） | **484** |
+| 裸 missing（**修复前**口径） | **0** |
+| 4 个 `undisclosed_rp_rows/GTROW-D427-0015\|0016/is_*` 提交值 | **`True`**（非空，`value_type=boolean`） |
+
+⇒ ①那 4 个键**提交侧非空**，与「空表示豁免」无关；
+②当前 generation=5 的 missing 本就是 **0**，修复前后都通过 ⇒ **该 500 不复现**。
+
+本文件「2026-11-16 批 2：3.3 真浏览器取证」记的 500 是 **当时状态**；在那之后 D4 的
+representation 已推进到 gen=5（另有安徽真实项目 gen=171），当时那个差集已被后续物化消解。
+**不得把本次修复记成「解了 D4 / 3.3 阻断」。**
+
+### 3.3 的阻断点因此需要重新认定
+
+上一批把 3.3 阻断写成「materialize 的 boolean 归一化不一致（预存）」。本批实测**证伪**该归因。
+当前 3.3 真实状态：
+- 代码侧链路（binding 解析 → room 协议 → materialize → extract → roundtrip）在 gen=5 上**全部通过**；
+- 余项是**真实 OO required-scenario 验收证据**（`acceptance.state = "missing"`），
+  即「真实用户在 OO 里改值 → forcesave → 切回 HTML 不丢写」，不是任何已知代码缺陷。
+
+⇒ 3.3 仍 `[ ]*`，阻断类别更正为「真实验收取证（**无已知代码缺陷**）」。

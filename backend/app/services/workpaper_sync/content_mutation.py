@@ -825,21 +825,6 @@ def html_only_entry_id(*, wp_code: str | None, wp_id: uuid.UUID) -> str:
     return f"{HTML_ONLY_ENTRY_PREFIX}{stem}"[:200]
 
 
-def _is_roundtrip_empty(value: Any) -> bool:
-    """roundtrip 等值判据里「该单元格无值」的空表示。
-
-    仅用于 `_assert_roundtrip_equivalent`：提交空 enum/text（`""`）写进 OOXML 得到空
-    单元格，extract 反读空单元格得到 `None` —— 二者表示同一件事。`None` 与空白字符串
-    都算空；数值 `0` / `False` / `Decimal("0")` **不算**（它们是真实值，不得折叠成空）。
-    不改全局 `merge.normalize_value`（那里刻意区分 `""`/`None`/`MISSING`）。
-    """
-    if value is None:
-        return True
-    if isinstance(value, str) and value.strip() == "":
-        return True
-    return False
-
-
 @dataclass(frozen=True)
 class HtmlOnlyCommitPlan:
     """一次 `single_html` 业务 commit 的冻结身份。
@@ -2386,142 +2371,22 @@ class ContentMutationService:
 def assert_roundtrip_equivalent(
     *, intended: Projection, extracted: Projection, contract: SyncContract
 ) -> None:
-    """反读出来的受管 projection 必须与要提交的逐字段等值（Property 65）。
-
-    比较口径复用 `merge.values_equal`（金额 Decimal / 日期 ISO / 文本仅归一
-    CRLF），不自己写第二套。`word_only` 字段被排除：它们按定义永不进 HTML
-    projection，拿它们比较会让 Word 底稿恒判不等值。
-    """
-    word_only = {
-        spec.stable_field_key
-        for spec in contract.all_fields()
-        if spec.mode is FieldMode.word_only
-    }
-    # formula / auto_source 不由 materialize 写值；Excel 空公式格反读常为 0，
-    # store 侧多为 None —— 把它们拉进 Property 65 会在 OO 重算后假红（G4-0d）。
-    protected = {
-        spec.stable_field_key
-        for spec in contract.all_fields()
-        if spec.mode in PROTECTED_MODES
-    }
-
-    def _key_excluded(key: str, templates: set[str]) -> bool:
-        if key in templates:
-            return True
-        return any(
-            "{row_uuid}" in tpl
-            and key.startswith(tpl.split("{row_uuid}")[0])
-            and key.endswith(tpl.split("{row_uuid}")[-1])
-            for tpl in templates
-        )
-
-    def _managed(proj: Projection) -> dict[str, Any]:
-        return {
-            key: value
-            for key, value in proj.values.items()
-            if not _key_excluded(key, word_only) and not _key_excluded(key, protected)
-        }
-
-    left = _managed(intended)
-    right = _managed(extracted)
-    missing = sorted(set(left) - set(right))
-    if missing:
-        raise RoundtripEquivalenceError(
-            f"staged representation 反读后缺少受管字段 {missing[:5]}"
-            f"（共 {len(missing)} 个）—— materialize 没有把它们写进 OOXML，"
-            "或 extract 找不到 identity 载体"
-        )
-    extra = sorted(set(right) - set(left))
-    # ── 模板骨架行的 extra 豁免（spec workpaper-sync-managed-row-convergence E3）──
-    #
-    # ═══ 为什么必须豁免 ═══
-    #
-    # instrumentation 给模板的**每个**受管行预生成 `GTROW-{template}-{row:04d}` 身份，
-    # 而模板在受管区内**自带非空业务值**（实测 D4 权威模板：166 个 editable 非空字段，
-    # 含 `年度预算`/`1月`~`12月`/`1.销售商品收入` 这类**模板应有内容**，以及
-    # `大额客户一`/`产品1` 这类示例）。store 只声明「有业务数据的行」，所以这些骨架行
-    # 不在 `intended.row_keys` 里是**常态**。
-    #
-    # 后果：extract 反读出模板自带的值 ⇒ 它们恒为 `extra` ⇒ `roundtrip_projection_mismatch`
-    # 恒 500（D4 实测 77 个 extra 全部来自 46 个骨架身份），而三条显而易见的出路都不通：
-    #   * 当 stale 删掉骨架行 → `IdentityRetentionError`（Property 23/66，实测 4 红）
-    #   * 清空模板占位内容    → 会连 `年度预算`/`1月` 一起清掉，破坏模板业务语义
-    #   * 让 store 认领它们    → store 侧 merge 语义「不追加 base 没有的行」，追不上
-    #
-    # ═══ 豁免条件是**合取**，不弱化 fail-closed ═══
-    #
-    #   ① 身份是模板骨架（`is_template_skeleton_identity`，与收敛判据共用真源）
-    #   ② **且** store 在本次 projection 里**完全没声明**这一行
-    #
-    # ②是关键：它把豁免限定在「store 不负责的行」上。语义是诚实的 —— 那一行的 Excel
-    # 侧内容不是 materialize 写的（materialize 只写 projection 里有的东西），所以判它
-    # 「反读出未提交的受管字段」本就是归因错误。
-    #
-    # 反之两种情形**仍然报错**（fail-closed 未被削弱）：
-    #   * store **声明了**某骨架行却缺字段 ⇒ ②不成立 ⇒ 仍报（store 认领了就要字段完整）
-    #   * 非骨架身份（`d4r-*` / `xsheet-*` / `GTROW-MINTED-*`）的孤儿 ⇒ ①不成立 ⇒ 仍报
-    #     （那才是真孤儿，由 `excel_materialize` 的受管行收敛负责删除/清空）
-    if extra:
-        declared: set[str] = set()
-        for ids in (intended.row_keys or {}).values():
-            declared.update(str(x) for x in (ids or ()))
-        retained = []
-        for key in extra:
-            parts = key.split("/")
-            identity = parts[1] if len(parts) >= 3 else ""
-            if (
-                identity
-                and identity not in declared
-                and is_template_skeleton_identity(identity)
-            ):
-                continue  # 模板自带内容，且 store 未声明该行 ⇒ 豁免
-            retained.append(key)
-        extra = retained
-    if extra:
-        raise RoundtripEquivalenceError(
-            f"staged representation 反读出未提交的受管字段 {extra[:5]}"
-            f"（共 {len(extra)} 个）—— 受管区域被写入了不属于本次 projection 的值"
-        )
-    for key in sorted(left):
-        mine, theirs = left[key], right[key]
-        # roundtrip 空值等价：提交「空 enum/text」（`""`）写进 OOXML 得到空单元格，
-        # extract 反读空单元格得到 `None` —— 两者表示同一件事「该格无值」。全局
-        # `normalize_value` 刻意不折叠 `""`/`None`/`MISSING`（merge 场景「清空」与
-        # 「从未设置」有别），故这里**仅在 roundtrip 场景**、且**两侧都为空表示**时
-        # 视为等值；只要有一侧非空就仍走严格 `values_equal`（不会放过真实漂移）。
-        if _is_roundtrip_empty(mine.value) and _is_roundtrip_empty(theirs.value):
-            continue
-        # 🔴 归一化失败必须**点名字段**。`normalize_value` 抛的
-        #    `ValueNormalizationError` 只说「amount 字段收到 time
-        #    datetime.time(0, 0)」，不说是哪个 stable_field_key ——
-        #    18 张表 360 个值的 entry 上这等于无法定位（本仓库已登记过
-        #    同族教训：平台报错不点名会把排查带向错误方向）。
-        #    这里只补上下文再原样抛出，不改判定语义。
-        try:
-            equal = values_equal(mine.value, theirs.value, mine.value_type)
-        except Exception as exc:  # noqa: BLE001 —— 补上下文后原样抛
-            raise type(exc)(
-                f"受管字段 {key} 归一化失败（value_type={mine.value_type.value}，"
-                f"提交 {mine.value!r} → 反读 {theirs.value!r}）：{exc}"
-            ) from exc
-        if not equal:
-            raise RoundtripEquivalenceError(
-                f"受管字段 {key} 反读不等值：提交 {mine.value!r} → 反读 {theirs.value!r}"
-                f"（value_type={mine.value_type.value}）—— Property 65 要求 projection "
-                "与同 revision representation 等值"
-            )
+    """薄壳：转发给 :func:`roundtrip_equivalence.assert_roundtrip_equivalent`（实现住 service）。"""
+    _roundtrip_assert(intended=intended, extracted=extracted, contract=contract)
 
 
-#: Task 26：本函数的实现已下沉到 `definitions.json_safe`（与 `canonical_json_bytes`
-#: 同一模块），因为 `conflicts.ValueEnvelope.to_jsonb()` 也必须用它 —— 少了那一步，
-#: 任何金额/日期字段的冲突在算 `conflict_set_digest` 时直接 `TypeError`。
-#: 这里保留旧名做别名：输出对每个输入逐字节相同（Decimal 仍走 `format(v, "f")`），
-#: 因此既有 projection artifact / event payload 的 digest 一个都不变。
-_json_safe = json_safe
-
+from app.services.workpaper_sync.roundtrip_equivalence import (  # noqa: E402
+    _is_roundtrip_empty,
+    assert_roundtrip_equivalent as _roundtrip_assert,
+)
 from app.services.workpaper_sync.projection_digest_value import (  # noqa: E402
     canonical_value_for_digest,
 )
+
+#: Task 26：`json_safe` 的实现已下沉到 `definitions.json_safe`。这里保留旧名做别名：
+#: 输出对每个输入逐字节相同（Decimal 仍走 `format(v, "f")`），
+#: 因此既有 projection artifact / event payload 的 digest 一个都不变。
+_json_safe = json_safe
 
 
 def projection_canonical_digest(projection: Projection) -> str:

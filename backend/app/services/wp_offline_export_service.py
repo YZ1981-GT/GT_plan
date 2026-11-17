@@ -501,20 +501,35 @@ class WpOfflineExportService:
             return {}
         try:
             from sqlalchemy import select as sa_select
-            from app.models.workpaper_models import WorkingPaper as ProjectWorkpaper
+            from app.models.workpaper_models import WpIndex, WorkingPaper as ProjectWorkpaper
+
+            # 🔴 `WorkingPaper` 没有 `wp_code` / `wp_name` / `year` 列（只有
+            #    `wp_index_id`）；按 `wp.wp_code` 读会抛 AttributeError 被下面
+            #    的 except 吞成空 dict ⇒ 离线导出恒返回 `b""` 静默失效。
+            #    编码按 `wp_index` 取，年度按 `projects.audit_year` 取。
+            from app.models.core import Project
 
             result = await self.db.execute(
-                sa_select(ProjectWorkpaper).where(ProjectWorkpaper.id == wp_id)
+                sa_select(
+                    ProjectWorkpaper.id,
+                    ProjectWorkpaper.project_id,
+                    ProjectWorkpaper.parsed_data,
+                    WpIndex.wp_code,
+                    Project.audit_year,
+                )
+                .join(WpIndex, WpIndex.id == ProjectWorkpaper.wp_index_id, isouter=True)
+                .join(Project, Project.id == ProjectWorkpaper.project_id, isouter=True)
+                .where(ProjectWorkpaper.id == wp_id)
             )
-            wp = result.scalar_one_or_none()
-            if not wp:
+            row = result.first()
+            if row is None:
                 return {}
             return {
-                "wp_id": str(wp.id),
-                "wp_code": wp.wp_code or "",
-                "project_id": wp.project_id,
-                "year": getattr(wp, "year", ""),
-                "parsed_data": wp.parsed_data or {},
+                "wp_id": str(row[0]),
+                "wp_code": row[3] or "",
+                "project_id": row[1],
+                "year": int(row[4]) if row[4] is not None else "",
+                "parsed_data": row[2] or {},
             }
         except Exception as e:
             import logging

@@ -1560,13 +1560,31 @@ class TestEventPayload:
 
         assert EventType.WORKPAPER_CONTENT_UPDATED.value == "workpaper.content.updated"
         # design §outbox 的键清单与代码常量双向锁死
-        design = (
-            _REPO
-            / ".kiro"
-            / "specs"
+        # 🔴 spec 已归档到 `_archive/180-*` ⇒ 按「活跃 → 归档」两候选取，
+        #    只钉活跃路径会让本条在归档后恒 FileNotFoundError（整个模块采集失败与否
+        #    取决于它在 parametrize 里还是测试体内 —— 这里在测试体内，故只是 1 条红）。
+        spec_dir = (
+            _REPO / ".kiro" / "specs"
             / "workpaper-html-onlyoffice-bidirectional-writeback-closure"
-            / "design.md"
-        ).read_text(encoding="utf-8")
+        )
+        if not spec_dir.exists():
+            archived = sorted(
+                (_REPO / ".kiro" / "specs" / "_archive").glob(
+                    "*workpaper-html-onlyoffice-bidirectional-writeback-closure"
+                )
+            )
+            assert archived, "活跃与归档两处都找不到该 spec 目录"
+            spec_dir = archived[0]
+        design = (spec_dir / "design.md").read_text(encoding="utf-8")
+        if "### outbox" not in design:
+            # 🔴 归档时该段落已不在 design.md 里（现扫 `_archive/180-*/design.md` 无任何
+            #    `outbox` 字样）。判据的**输入源**不存在，既不能恒绿（那会把「没验」记成
+            #    「验过」），也不能恒红（与代码无关）。显式 skip 并说明原因。
+            pytest.skip(
+                "归档 design.md 已不含 §outbox 段（现扫无 outbox 字样）⇒ "
+                "键清单判据的输入源不存在；代码侧判据仍由 "
+                "EVENT_PAYLOAD_REQUIRED_KEYS 自身与 outbox 写入方守卫覆盖"
+            )
         block = design.split("### outbox", 1)[1].split("```", 2)[1]
         declared = set(re.findall(r'"(\w+)":', block))
         assert declared == set(CM.EVENT_PAYLOAD_REQUIRED_KEYS), (
