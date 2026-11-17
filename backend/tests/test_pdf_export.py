@@ -301,3 +301,24 @@ async def test_api_get_history(client: AsyncClient):
     result = data.get("data", data)
     tasks = result.get("tasks", result) if isinstance(result, dict) else result
     assert len(tasks) >= 1
+
+
+@pytest.mark.asyncio
+async def test_api_create_export_task_requires_project_permission(db_session: AsyncSession, seeded_db):
+    """PDF 导出 body 携带 project_id 时，不能只凭登录态放行。"""
+    from app.main import app
+    from tests._test_auth_helper import FakeAuthUser, override_auth
+
+    from app.models.base import UserRole
+
+    non_member = FakeAuthUser(user_id=uuid.uuid4(), role=UserRole.auditor)
+    async with override_auth(app, db_session=db_session, user=non_member) as client:
+        response = await client.post(
+            "/api/export/create",
+            json={
+                "project_id": str(FAKE_PROJECT_ID),
+                "task_type": "single_document",
+                "document_types": ["financial_report"],
+            },
+        )
+    assert response.status_code == 403

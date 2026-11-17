@@ -499,6 +499,14 @@
     导出证据/归档/报表单位选集 **88 passed**。仍未完成：真实报表数据注入 PDF、独占
     PG/端口完整 C-V、data_exchange marker/组合包/归档全链；production writer 仍为
     `PARTIAL_WIRING`。
+  - **2026-11-16 继续收口：PDF 出口补项目级鉴权（`[~]` 保持）**：
+    复核发现 `POST /api/export/create`、任务状态、下载和历史四个 PDF 出口原先只有
+    `get_current_user`，没有项目级权限复核；正式导出不能把登录态当项目授权。
+    现在四条路径统一调用 `assert_project_permission(..., 'readonly')`：创建从请求体
+    取 project_id，状态/下载先由 task 反查 project_id，历史直接按路径 project_id 校验。
+    新增非成员 auditor TestClient 端点用例（创建请求 403）、四出口 AST 接线守卫和
+    磁盘变异（删除 history 项目门禁后守卫 1 failed / 6 passed）。PDF 相关回归
+    **23 passed**。仍未完成：正式 PDF 数据来源、独占 PG/端口和终验 Playwright。
 
 - [x] 6C. 附注 Word 普通/clone 路径消费 kind/scale（R6、R9；依赖任务 10 的 `ExportUnitRegion`，与其附注路径子项同批）
   - `NoteWordExporter._render_table` 与 `note_template_table_look.render_cloned_table` 接收同一 `ExportUnitRegion + column_kinds + column_ratio_scales`，kind/scale 取自 6A 的 catalog 与稳定 column_id，只有 amount 执行 policy divisor；`note_template_block_fill.rebuild_block` 按 `<section_id>/<table_id>` 取 region 后交给两条内核。

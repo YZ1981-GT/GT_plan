@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import assert_project_permission, get_current_user
 from app.models.core import User
 from app.models.report_models import ExportTaskStatus
 from app.models.report_schemas import (
@@ -51,6 +51,7 @@ async def create_export_task(
     """创建导出任务并同步执行（MVP 无 Celery）"""
     engine = PDFExportEngine(db)
     try:
+        await assert_project_permission(db, current_user, data.project_id, "readonly")
         # spec platform-global-display-settings-closure 任务 10 / AC-21：
         # 落单位策略快照证据（`export_tasks.unit_policy_snapshot`，V265）。
         # 🔴 失败**不得静默放行**：没有 policy 快照的正式导出无法审计
@@ -102,6 +103,7 @@ async def get_task_status(
     task = await engine.get_task_status(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="导出任务不存在")
+    await assert_project_permission(db, current_user, task.project_id, "readonly")
     return ExportTaskStatusResponse.model_validate(task)
 
 
@@ -116,6 +118,7 @@ async def download_export(
     task = await engine.get_task_status(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="导出任务不存在")
+    await assert_project_permission(db, current_user, task.project_id, "readonly")
     if task.status != ExportTaskStatus.completed:
         raise HTTPException(status_code=400, detail=f"任务状态为 {task.status.value}，无法下载")
     if not task.file_path:
@@ -139,6 +142,7 @@ async def get_export_history(
     current_user: User = Depends(get_current_user),
 ):
     """获取项目导出历史"""
+    await assert_project_permission(db, current_user, project_id, "readonly")
     engine = PDFExportEngine(db)
     tasks = await engine.get_history(project_id)
     return ExportHistoryResponse(
