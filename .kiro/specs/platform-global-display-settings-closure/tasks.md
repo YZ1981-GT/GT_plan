@@ -507,6 +507,7 @@
     新增非成员 auditor TestClient 端点用例（创建请求 403）、四出口 AST 接线守卫和
     磁盘变异（删除 history 项目门禁后守卫 1 failed / 6 passed）。PDF 相关回归
     **23 passed**。仍未完成：正式 PDF 数据来源、独占 PG/端口和终验 Playwright。
+  - **2026-11-16 V265 验证基础设施收口（`[~]` 保持）**：Task 15 的 PostgreSQL scratch harness 原只执行 V151，ORM 已包含 V265 四列后导致隔离 schema 缺列，46 条判据被统一吞成 harness error。现改为从真实 `V265__add_export_unit_policy_columns.sql` 复用分句器，只在 scratch `search_path` 中应用涉及 `working_paper_content_version` 的四列与 CHECK 语句，并增加列/约束逐值守卫；不触碰 shared public schema。真实 PostgreSQL scratch schema 验证 **50 passed**；V265 overlay 被移除的磁盘变异 **47 failed / 4 passed**，逐字节恢复；content mutation/evidence 选集 **105 passed / 1 skipped**。这只解除 writer 验证的基础设施阻断，**没有把任何 content version 默认写成 formal**，production writer 台账继续保持 `PARTIAL_WIRING`。
 
 - [x] 6C. 附注 Word 普通/clone 路径消费 kind/scale（R6、R9；依赖任务 10 的 `ExportUnitRegion`，与其附注路径子项同批）
   - `NoteWordExporter._render_table` 与 `note_template_table_look.render_cloned_table` 接收同一 `ExportUnitRegion + column_kinds + column_ratio_scales`，kind/scale 取自 6A 的 catalog 与稳定 column_id，只有 amount 执行 policy divisor；`note_template_block_fill.rebuild_block` 按 `<section_id>/<table_id>` 取 region 后交给两条内核。
