@@ -69,7 +69,7 @@ async def test_engine_calls_source_resolver_with_task_year(tmp_path, monkeypatch
 
     calls: list[dict] = []
 
-    async def _fake_resolver(_db, *, project_id, year, document_types, unit_policy_snapshot):
+    async def _fake_dispatcher(_db, *, project_id, year, document_types, unit_policy_snapshot):
         calls.append(
             {
                 "project_id": project_id,
@@ -78,7 +78,7 @@ async def test_engine_calls_source_resolver_with_task_year(tmp_path, monkeypatch
                 "snapshot": unit_policy_snapshot,
             }
         )
-        return {
+        return "balance_sheet", {
             "report_type": "balance_sheet",
             "unit_label": "元",
             "sections": [
@@ -98,7 +98,7 @@ async def test_engine_calls_source_resolver_with_task_year(tmp_path, monkeypatch
             ],
         }
 
-    monkeypatch.setattr(mod, "build_financial_pdf_data", _fake_resolver)
+    monkeypatch.setattr(mod, "build_pdf_source_data", _fake_dispatcher)
     monkeypatch.setattr(
         mod.PDFExportEngine, "_convert_html_to_pdf", staticmethod(lambda _html: b"%PDF-1.7\n")
     )
@@ -118,8 +118,8 @@ async def test_engine_renders_resolved_rows_not_empty_payload(tmp_path, monkeypa
     monkeypatch.setattr(mod, "EXPORT_DIR", tmp_path)
     captured: dict = {}
 
-    async def _fake_resolver(*_a, **_kw):
-        return {
+    async def _fake_dispatcher(*_a, **_kw):
+        return "balance_sheet", {
             "report_type": "balance_sheet",
             "unit_label": "万元",
             "sections": [
@@ -137,7 +137,7 @@ async def test_engine_renders_resolved_rows_not_empty_payload(tmp_path, monkeypa
             ],
         }
 
-    monkeypatch.setattr(mod, "build_financial_pdf_data", _fake_resolver)
+    monkeypatch.setattr(mod, "build_pdf_source_data", _fake_dispatcher)
     real_render = mod.PDFExportEngine.render_document
 
     def _spy_render(self, document_type, data, output_path):
@@ -166,7 +166,7 @@ async def test_engine_marks_failed_and_raises_when_source_unavailable(tmp_path, 
     async def _raise(*_a, **_kw):
         raise PDFSourceUnavailable("没有可导出的正式数据")
 
-    monkeypatch.setattr(mod, "build_financial_pdf_data", _raise)
+    monkeypatch.setattr(mod, "build_pdf_source_data", _raise)
     monkeypatch.setattr(
         mod.PDFExportEngine, "_convert_html_to_pdf", staticmethod(lambda _html: b"%PDF-1.7\n")
     )

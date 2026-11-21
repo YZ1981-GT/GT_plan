@@ -32,6 +32,7 @@ from app.models.report_models import (
 from app.services.pdf_export_sources import (
     PDFSourceUnavailable,
     build_financial_pdf_data,
+    build_pdf_source_data,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,7 +65,7 @@ tr.total td {{ font-weight: bold; border-top: 1pt solid #000; }}
 
 
 def _render_audit_report_html(data: dict) -> str:
-    """渲染审计报告 HTML"""
+    """渲染审计报告 HTML（真实正文，已按段名转义）"""
     paragraphs = data.get("paragraphs", {})
     body_parts = [f'<div class="header">审计报告</div>']
     for section_name, content in paragraphs.items():
@@ -101,18 +102,23 @@ def _render_financial_report_html(data: dict) -> str:
 
 
 def _render_disclosure_notes_html(data: dict) -> str:
-    """渲染附注 HTML"""
+    """渲染附注 HTML（真实附注读取链产出）"""
     notes = data.get("notes", [])
+    unit_label = data.get("unit_label")
     body_parts = ['<div class="header">财务报表附注</div>']
+    if unit_label:
+        body_parts.append(f'<div class="footer">金额单位：{unit_label}</div>')
     for note in notes:
         body_parts.append(f"<h3>{note.get('note_section', '')} {note.get('section_title', '')}</h3>")
-        if note.get("table_data"):
-            td = note["table_data"]
+        td = note.get("table_data")
+        if td:
             headers = td.get("headers", [])
             body_parts.append("<table><tr>" + "".join(f"<th>{h}</th>" for h in headers) + "</tr>")
             for row in td.get("rows", []):
                 cls = ' class="total"' if row.get("is_total") else ""
-                vals = "".join(f"<td>{v}</td>" for v in row.get("values", []))
+                vals = "".join(
+                    f"<td>{'' if v is None else v}</td>" for v in row.get("values", [])
+                )
                 body_parts.append(f"<tr{cls}><td>{row.get('label', '')}</td>{vals}</tr>")
             body_parts.append("</table>")
         if note.get("text_content"):
@@ -419,7 +425,7 @@ class PDFExportEngine:
             if not document_types and task.document_type:
                 document_types = [task.document_type]
             if task.export_year is not None:
-                source_data = await build_financial_pdf_data(
+                renderer_type, source_data = await build_pdf_source_data(
                     self.db,
                     project_id=task.project_id,
                     year=task.export_year,
@@ -427,6 +433,7 @@ class PDFExportEngine:
                     unit_policy_snapshot=task.unit_policy_snapshot,
                 )
             else:
+                renderer_type = task.document_type or "financial_report"
                 source_data = {
                     "report_type": task.document_type or "financial_report",
                     "rows": [],
@@ -436,7 +443,7 @@ class PDFExportEngine:
 
             # Render the resolved source data; the formal path must not invent rows.
             rendered = self.render_document(
-                document_types[0] if len(document_types) == 1 else "financial_report",
+                renderer_type,
                 source_data,
                 output_path,
             )

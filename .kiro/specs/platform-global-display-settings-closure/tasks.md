@@ -541,6 +541,49 @@
     均 **89 passed**，属并发读写而非产品缺陷（禁止并行跑变异与回归）。
     **回归**：PDF/policy/redaction 选集 **89 passed**。**仍未完成**：审计报告与附注的真实 PDF
     数据源、多文档合并/密码保护、整包 ZIP 与归档全链、独?? PG/端口与 C-V 正式 Playwright。
+  - **2026-11-21 审计报告与附注的真实 PDF 数据源接入（`[~]` 保持）**：继财务报表后
+    收口剩下两类正式 PDF 文档，全部**复用各领域正式读取入口**（不复制第二份 SQL）：
+    ①**审计报告**（`build_audit_report_pdf_data`）—— 正式入口
+    `AuditReportService.get_report(project_id, year)`（唯一带 year+is_deleted 的官方读法；
+    不复制 `archive_pdf_generators` 的「最新年度 limit 1」错口径）。正文优先
+    `report_body_json.sections`（Word 模板模式主源：按 `section_order` 排序、KAM `items`
+    与 `render_docx` 同口径合入正文），回退旧 `paragraphs` 载体（JSON 单阶段模式只写这套
+    —— 只读一套会让 Word 模式项目误判「无正文」或 JSON 模式项目导空白）；**两套都空 409**。
+    状态门按 `ReportStatus` 枚举成员名实证（无 "approved"）：只有 `eqcr_approved` /
+    `final` 可导出，`draft` / `review` **409**（真实栈实测：全库唯一 draft 报告
+    重药安徽_2025 ⇒ 409「未达可导出状态」）。所有用户正文经 `html.escape`
+    （两个 renderer 原无转义，正文含「<1年」会破坏版面）。
+    ②**附注**（`build_disclosure_notes_pdf_data`）—— 委托
+    `NoteWordExporter._load_export_notes` + `_note_tables`（正式读取链；**不直查
+    `disclosure_notes`**），并补齐三件 export() 才有、读取函数没有的判据：软删过滤
+    （`_load_notes` 不带 `is_deleted`）、报告口径过滤（`note_applies_to_report_scope`，
+    否则单体项目长出合并专属章节）、按任务冻结 policy 折算（renderer 不做）。单元格
+    dict 载体按 `_render_table` 同口径解包（`value` → `manual_value`）后折算；一章多表时
+    第 2+ 张表名并入 `section_title`（renderer 每条只吃一张表）；合并项目 adapter 的
+    fail-closed 错误转 `PDFSourceUnavailable`（保留 409/400）。exporter 构造抽成模块级
+    `_new_note_exporter` 单一接缝，测试注入替身并配防御断言「附注源不得自己查附注表」。
+    ③**分派器**（`build_pdf_source_data`）—— 多类文档选择**明确 409**（多文档合并
+    TODO 15.4 未实现；旧形态「选了审计报告+资产负债表却得到一张报表 PDF 还标
+    completed」正是要消灭的），未知类型 422；engine 按返回的 renderer 类型渲染
+    （audit_report 的 paragraphs 不再被 financial renderer 静默丢弃）。
+    **真实栈实测（候选后端 9993，共享 PG，只读真实业务数据、写入仅 export_tasks）**：
+    【测试】公式同步甲_2025（199 条 active 附注）⇒ 200/completed、PDF **7,718,517 B**、
+    魔数 `%PDF-`；draft 审计报告 ⇒ **409**；多选 ⇒ **409「多文档合并尚未实现」**。
+    验收 export_task 与产物已按 id 精确删除（leftover=0）。
+    **守卫**：新增 `test_pdf_export_report_and_notes_sources.py`（**17 例**：sections 排序 +
+    KAM 合入 / HTML 转义 / paragraphs 回退 / 空正文 409 / draft 409 / 报告缺失 409 /
+    缺年度 422；附注表+文字双条目 / 多表标题 / 软删过滤 / dict 解包+折算 / 公式串转义不折算 /
+    空附注 409；多选 409 / 未知类型 422 / 缺年度 422 / 财务分派正确）。
+    🔴 **变异两轮**：首轮 8 组变异**全部存活**于旧 wiring 测试（它们只认
+    `build_financial_pdf_data`）⇒ wiring 测试改钉分派器后，**8/8 全 RED**（draft 放行 /
+    空正文放行 / 去 HTML 转义 / 丢 paragraphs 回退 / 软删放行 / dict 不解包 / 多表标题丢失 /
+    多选静默丢一类），无存活。
+    🔴 **一次误判已归因**：wiring 三例首跑全红 —— 猿因是分派器换名后旧测试仍 monkeypatch
+    `build_financial_pdf_data`（engine 已不再引用它）⇒ 属测试失锚，不是产品缺陷；改钉
+    `build_pdf_source_data` 后 4 例全绿。
+    **回归**：PDF 全选集 **106 passed**。**仍未完成**：多文档合并（TODO 15.4）、PDF 密码
+    （15.5）、整包 ZIP 与归档全链、独占 PG/端口与 C-V 正式 Playwright；production writer
+    台账保持 `PARTIAL_WIRING`。
 
 - [x] 6C. 附注 Word 普通/clone 路径消费 kind/scale（R6、R9；依赖任务 10 的 `ExportUnitRegion`，与其附注路径子项同批）
   - `NoteWordExporter._render_table` 与 `note_template_table_look.render_cloned_table` 接收同一 `ExportUnitRegion + column_kinds + column_ratio_scales`，kind/scale 取自 6A 的 catalog 与稳定 column_id，只有 amount 执行 policy divisor；`note_template_block_fill.rebuild_block` 按 `<section_id>/<table_id>` 取 region 后交给两条内核。
