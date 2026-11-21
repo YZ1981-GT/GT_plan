@@ -320,17 +320,32 @@ class TestDisclosureNotesSource:
 
 class TestDispatcher:
     @pytest.mark.asyncio
-    async def test_multiple_document_kinds_are_rejected_not_dropped(self):
-        """多选必须明确拒绝：静默丢一类会让任务 completed 但产物缺失。"""
-        with pytest.raises(PDFSourceUnavailable) as excinfo:
-            await build_pdf_source_data(
-                _with_exporter([]),
+    async def test_multiple_document_kinds_return_ordered_parts(self):
+        """多选已接通合并（TODO 15.4）：按固定顺序返回各块，不静默丢一类。
+
+        任一源失败仍整体失败 —— 该判据由 test_pdf_bundle_merge.py 钉住，
+        这里只验证「不再 409 尚未实现」且块数与顺序正确。
+        """
+        from tests.test_pdf_bundle_merge import (
+            _AUDIT_OK,
+            _FakeProjectDb,
+            _patched_sources,
+        )
+
+        row = SimpleNamespace(
+            row_code="BS-001", row_name="货币资金",
+            current_period_amount=100, prior_period_amount=80,
+            is_total_row=False, indent_level=0,
+        )
+        with _patched_sources(report=_AUDIT_OK):
+            parts = await build_pdf_source_data(
+                _FakeProjectDb(rows_for_other=[row, row]),
                 project_id=PROJECT_ID, year=YEAR,
                 document_types=["audit_report", "balance_sheet"],
                 unit_policy_snapshot=_SNAPSHOT,
             )
-        assert excinfo.value.status_code == 409
-        assert "多文档合并尚未实现" in str(excinfo.value)
+        assert isinstance(parts, list)
+        assert [r for r, _ in parts] == ["audit_report", "balance_sheet"]
 
     @pytest.mark.asyncio
     async def test_unknown_type_is_422(self):

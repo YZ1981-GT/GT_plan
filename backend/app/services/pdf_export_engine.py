@@ -307,6 +307,46 @@ class PDFExportEngine:
         logger.info("Rendered PDF: %s", pdf_path)
         return pdf_path
 
+    def _render_multi_document(
+        self,
+        parts: list[tuple[str, dict[str, Any]]],
+        output_path: Path,
+    ) -> Path:
+        """多文档合并（TODO 15.4）：逐块渲染 PDF 后按给定顺序 pypdf 合并。
+
+        失败语义：
+        - 任一块的 HTML renderer 抛错（源数据问题）→ 原样上抛（409/422）；
+        - 任一块转换不可用 → `PDFConversionUnavailable`（503，环境问题）；
+        - 合并前**逐块落临时文件**，全部成功才写最终 `.pdf` —— 不产出半份产物
+          （失败时临时目录整体删除，最终输出路径不残留旧内容）。
+        """
+        from pypdf import PdfWriter
+
+        writer = PdfWriter()
+        with tempfile.TemporaryDirectory(prefix="tmp_pdf_bundle_") as tmpdir:
+            for index, (renderer_type, data) in enumerate(parts):
+                block_html = _RENDERERS.get(renderer_type, _render_financial_report_html)(data)
+                block_bytes = self._convert_html_to_pdf(block_html)
+                if block_bytes is None:
+                    raise PDFConversionUnavailable(
+                        f"多文档合并的第 {index + 1} 块（{renderer_type}）转换失败："
+                        "WeasyPrint 未安装且 LibreOffice 不可用。"
+                    )
+                if not block_bytes.startswith(b"%PDF"):
+                    raise PDFConversionUnavailable(
+                        f"多文档合并的第 {index + 1} 块（{renderer_type}）输出不是 PDF"
+                        "（转换器返回了非 PDF 内容），已放弃合并"
+                    )
+                block_path = Path(tmpdir) / f"block_{index:02d}.pdf"
+                block_path.write_bytes(block_bytes)
+                writer.append(str(block_path))
+
+            final_path = output_path.with_suffix(".pdf")
+            with final_path.open("wb") as fh:
+                writer.write(fh)
+        logger.info("Rendered multi-document PDF (%s blocks): %s", len(parts), final_path)
+        return final_path
+
     @staticmethod
     def _convert_html_to_pdf(html_content: str) -> bytes | None:
         """HTML → PDF bytes；两条链都不可用返回 ``None``（不写 HTML 冒充）。"""
@@ -425,7 +465,7 @@ class PDFExportEngine:
             if not document_types and task.document_type:
                 document_types = [task.document_type]
             if task.export_year is not None:
-                renderer_type, source_data = await build_pdf_source_data(
+                resolved = await build_pdf_source_data(
                     self.db,
                     project_id=task.project_id,
                     year=task.export_year,
@@ -434,19 +474,25 @@ class PDFExportEngine:
                 )
             else:
                 renderer_type = task.document_type or "financial_report"
-                source_data = {
+                resolved = (renderer_type, {
                     "report_type": task.document_type or "financial_report",
                     "rows": [],
                     "paragraphs": {},
                     "notes": [],
-                }
+                })
 
             # Render the resolved source data; the formal path must not invent rows.
-            rendered = self.render_document(
-                renderer_type,
-                source_data,
-                output_path,
-            )
+            if isinstance(resolved, list):
+                # 多文档合并（TODO 15.4）：逐块渲染为 PDF 后按固定顺序 pypdf 合并；
+                # 任一块转换失败即整体失败（不产出半份产物）。
+                rendered = self._render_multi_document(resolved, output_path)
+            else:
+                renderer_type, source_data = resolved
+                rendered = self.render_document(
+                    renderer_type,
+                    source_data,
+                    output_path,
+                )
 
             task.progress_percentage = 100
             task.status = ExportTaskStatus.completed

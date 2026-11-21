@@ -584,6 +584,41 @@
     **回归**：PDF 全选集 **106 passed**。**仍未完成**：多文档合并（TODO 15.4）、PDF 密码
     （15.5）、整包 ZIP 与归档全链、独占 PG/端口与 C-V 正式 Playwright；production writer
     台账保持 `PARTIAL_WIRING`。
+  - **2026-11-21 多文档合并接通（TODO 15.4，`[~]` 保持）**：前端 PDFExportPanel 允许
+    勾选多文档（task_type=full_archive），此前分派器一律 409「多文档合并尚未实现」。
+    本批接通合并链：
+    ①**分派器**（`build_pdf_source_data`）—— 多文档返回
+    `[(renderer_type, data), ...]`，顺序**固定**（`_BUNDLE_ORDER`：audit_report →
+    四张报表枚举序 → disclosure_notes），与前端勾选顺序无关；单文档仍返回
+    `(renderer_type, data)` tuple（既有契约，调用方零改动）。未知类型**先报** 422
+    （避免解析到一半才红）；逐类独立校验，任一失败整体 409/422 —— 不静默丢一类。
+    ②**引擎**（`_render_multi_document`）—— 逐块经 `_RENDERERS` 纯函数渲染 HTML →
+    `_convert_html_to_pdf` 转 PDF → **pypdf 按顺序合并**；每块转换结果先验
+    `%PDF` 魔数（非 PDF 内容立即整体失败，防「把 HTML 当 PDF 塞进合并器」）；
+    各块写临时目录、全部成功才写最终 `.pdf` —— 失败时临时目录整体删除，
+    **不产出半份产物**（`file_path is None`）。任一块 409/422 语义沿用
+    `PDFSourceUnavailable`，转换不可用仍是 503。
+    ③**接缝**：audit builder 的 service 构造抽 `_new_audit_service`（与
+    `_new_note_exporter` 同型），测试注入替身。旧用例「多选 409 尚未实现」随新
+    契约改为「断言有序分块」。
+    **真实栈实测（候选后端 9994，只读真实数据）**：【测试】甲
+    balance_sheet + disclosure_notes 多选 ⇒ 200/completed、合并 PDF
+    **1,076,344 B / 404 页**，pypdf 提取同时含报表行名（货币资金）与附注章节
+    —— 证明两块都进了产物。验收 export_task 与产物已按 id 精确删除（leftover=0）。
+    **守卫**：新增 `test_pdf_bundle_merge.py`（**10 例**：固定顺序 / 任一源失败整体
+    409 / 未知类型 422 / 重复类型去重回 tuple / 单文档契约不变 tuple / 合并 PDF 含
+    全部块文本（pypdf 验证）/ 非 PDF 块整体失败 / 转换不可用整体失败 / 单文档路径
+    不变 / audit+notes 两类顺序）。**5/5 磁盘变异全 RED**：顺序回退到勾选顺序 /
+    只合并第一块 / 跳过魔数校验 / 合并未完成就写最终产物 / 分派器退回 409。
+    🔴 **两处夹具迭代**（如实记录）：①分派器多选用例首版把 financial 查询交给
+    `_FakeAuditSvcDb`（只支持 audit 查询形态）⇒ `'_Result' object has no attribute
+    'scalars'`；②改为 `_FakeProjectDb(rows_for_other=[...])` 混合替身（Project 查询
+    + financial 空行集/脚本行）后全绿。wiring 旧断言「路由不应自己拼报表 SQL」仍按
+    `build_financial_pdf_data` 名字判 —— 该守卫语义仍成立（router 依旧不 import 任何
+    builder），未改动。
+    **回归**：PDF 全选集 **116 passed**。**仍未完成**：PDF 密码（TODO 15.5，需产品
+    拍板加密链与前端密码字段语义）、整包 ZIP 与归档全链、独占 PG/端口与 C-V 正式
+    Playwright；production writer 台账保持 `PARTIAL_WIRING`。
 
 - [x] 6C. 附注 Word 普通/clone 路径消费 kind/scale（R6、R9；依赖任务 10 的 `ExportUnitRegion`，与其附注路径子项同批）
   - `NoteWordExporter._render_table` 与 `note_template_table_look.render_cloned_table` 接收同一 `ExportUnitRegion + column_kinds + column_ratio_scales`，kind/scale 取自 6A 的 catalog 与稳定 column_id，只有 amount 执行 policy divisor；`note_template_block_fill.rebuild_block` 按 `<section_id>/<table_id>` 取 region 后交给两条内核。

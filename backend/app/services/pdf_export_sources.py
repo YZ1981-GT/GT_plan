@@ -138,6 +138,13 @@ async def build_financial_pdf_data(
 # ---------------------------------------------------------------------------
 
 
+def _new_audit_service(db: AsyncSession):
+    """构造审计报告正式读取服务（单一接缝，测试注入点）。"""
+    from app.services.audit_report_service import AuditReportService
+
+    return AuditReportService(db)
+
+
 async def build_audit_report_pdf_data(
     db: AsyncSession,
     *,
@@ -151,11 +158,11 @@ async def build_audit_report_pdf_data(
     （JSON 单阶段模式）。两套载体都空 = 409。草稿/复核中不导出（409）：
     正式交付件只有 EQCR 已批准或定稿两种状态。
     """
-    from app.services.audit_report_service import AuditReportService
+    from app.services.audit_report_service import AuditReportService  # noqa: F401 - 保留旧导入兼容
 
     if year is None:
         raise PDFSourceUnavailable("正式 PDF 导出必须携带审计年度", status_code=422)
-    report = await AuditReportService(db).get_report(project_id, year)
+    report = await _new_audit_service(db).get_report(project_id, year)
     if report is None:
         raise PDFSourceUnavailable(
             f"项目 {project_id} 的 {year} 年审计报告尚未生成，请先在报告模块生成"
@@ -336,6 +343,37 @@ async def build_disclosure_notes_pdf_data(
 # 分派器
 # ---------------------------------------------------------------------------
 
+#: 多文档合并的固定顺序：审计报告 → 四张报表（枚举序）→ 附注。
+#: 前端勾选顺序不稳定，正式交付件顺序必须确定。
+_BUNDLE_ORDER: tuple[str, ...] = (
+    "audit_report",
+    FinancialReportType.balance_sheet.value,
+    FinancialReportType.income_statement.value,
+    FinancialReportType.cash_flow_statement.value,
+    FinancialReportType.equity_statement.value,
+    "disclosure_notes",
+)
+
+_SINGLE_DOC_BUILDERS: dict[str, Any] = {}
+
+
+def _single_doc_builder(doc_type: str):
+    """返回单文档 builder 协程；未知类型 422。"""
+    if doc_type in _FINANCIAL_TYPES:
+        return lambda db, *, project_id, year, snapshot: build_financial_pdf_data(
+            db, project_id=project_id, year=year, document_types=[doc_type],
+            unit_policy_snapshot=snapshot,
+        )
+    if doc_type == "audit_report":
+        return lambda db, *, project_id, year, snapshot: build_audit_report_pdf_data(
+            db, project_id=project_id, year=year
+        )
+    if doc_type == "disclosure_notes":
+        return lambda db, *, project_id, year, snapshot: build_disclosure_notes_pdf_data(
+            db, project_id=project_id, year=year, unit_policy_snapshot=snapshot
+        )
+    raise PDFSourceUnavailable(f"未知文档类型：{doc_type}", status_code=422)
+
 
 async def build_pdf_source_data(
     db: AsyncSession,
@@ -344,41 +382,44 @@ async def build_pdf_source_data(
     year: int | None,
     document_types: list[str],
     unit_policy_snapshot: dict[str, Any] | None,
-) -> tuple[str, dict[str, Any]]:
-    """按任务冻结的文档清单解析 PDF 数据，返回 ``(renderer_type, data)``。
+) -> tuple[str, dict[str, Any]] | list[tuple[str, dict[str, Any]]]:
+    """按任务冻结的文档清单解析 PDF 数据。
 
-    多文档合并（TODO 15.4）尚未实现：请求含多类文档时明确 409，**不静默丢
-    其中一类**（旧形态是「选了审计报告 + 资产负债表却得到一张报表 PDF 还标
-    completed」）。
+    返回：
+    - 单文档：``(renderer_type, data)``（既有契约，调用方行为不变）；
+    - 多文档：``[(renderer_type, data), ...]``，按 :data:`_BUNDLE_ORDER` 排序；
+      逐类独立校验，任一失败整体 409/422 —— **不静默丢一类**（旧形态是
+      「选了审计报告 + 资产负债表却得到一张报表 PDF 还标 completed」）。
     """
     if year is None:
         raise PDFSourceUnavailable("正式 PDF 导出必须携带审计年度", status_code=422)
     if not document_types:
         raise PDFSourceUnavailable("正式 PDF 导出至少选择一份文档", status_code=422)
     unique = list(dict.fromkeys(document_types))
-    if len(unique) > 1:
-        raise PDFSourceUnavailable(
-            "当前批次只支持单类文档导出（多文档合并尚未实现），请只选择一类："
-            + ", ".join(unique)
-        )
-    doc_type = unique[0]
+
+    if len(unique) == 1:
+        doc_type = unique[0]
+        builder = _single_doc_builder(doc_type)
+        data = await builder(db, project_id=project_id, year=year,
+                             snapshot=unit_policy_snapshot)
+        return _bundle_renderer_type(doc_type), data
+
+    # 多文档：按固定顺序逐类解析；未登记类型先报，避免「解析到一半才红」。
+    for doc_type in unique:
+        if doc_type not in _BUNDLE_ORDER:
+            raise PDFSourceUnavailable(f"未知文档类型：{doc_type}", status_code=422)
+    ordered = [t for t in _BUNDLE_ORDER if t in unique]
+    parts: list[tuple[str, dict[str, Any]]] = []
+    for doc_type in ordered:
+        builder = _single_doc_builder(doc_type)
+        data = await builder(db, project_id=project_id, year=year,
+                             snapshot=unit_policy_snapshot)
+        parts.append((_bundle_renderer_type(doc_type), data))
+    return parts
+
+
+def _bundle_renderer_type(doc_type: str) -> str:
+    """多文档分块渲染时每块用的 renderer 名（financial 系列共用同一 renderer）。"""
     if doc_type in _FINANCIAL_TYPES:
-        return "financial_report", await build_financial_pdf_data(
-            db,
-            project_id=project_id,
-            year=year,
-            document_types=unique,
-            unit_policy_snapshot=unit_policy_snapshot,
-        )
-    if doc_type == "audit_report":
-        return "audit_report", await build_audit_report_pdf_data(
-            db, project_id=project_id, year=year
-        )
-    if doc_type == "disclosure_notes":
-        return "disclosure_notes", await build_disclosure_notes_pdf_data(
-            db,
-            project_id=project_id,
-            year=year,
-            unit_policy_snapshot=unit_policy_snapshot,
-        )
-    raise PDFSourceUnavailable(f"未知文档类型：{doc_type}", status_code=422)
+        return doc_type
+    return doc_type
