@@ -29,6 +29,10 @@ from app.models.report_models import (
     ExportTaskStatus,
     ExportTaskType,
 )
+from app.services.pdf_export_sources import (
+    PDFSourceUnavailable,
+    build_financial_pdf_data,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -70,19 +74,29 @@ def _render_audit_report_html(data: dict) -> str:
 
 
 def _render_financial_report_html(data: dict) -> str:
-    """渲染财务报表 HTML"""
+    """渲染真实财务报表数据（支持单表或多个 section）。"""
     report_type = data.get("report_type", "financial_report")
-    rows = data.get("rows", [])
+    unit_label = data.get("unit_label")
+    sections = data.get("sections")
+    if not sections:
+        sections = [{"report_type": report_type, "rows": data.get("rows", [])}]
     body_parts = [f'<div class="header">{report_type}</div>']
-    body_parts.append("<table><tr><th>项目</th><th>期末余额</th><th>年初余额</th></tr>")
-    for row in rows:
-        cls = ' class="total"' if row.get("is_total") else ""
-        body_parts.append(
-            f"<tr{cls}><td>{row.get('row_name', '')}</td>"
-            f"<td>{row.get('current_period_amount', 0)}</td>"
-            f"<td>{row.get('prior_period_amount', 0)}</td></tr>"
-        )
-    body_parts.append("</table>")
+    if unit_label:
+        body_parts.append(f'<div class="footer">金额单位：{unit_label}</div>')
+    for section in sections:
+        section_type = section.get("report_type", report_type)
+        rows = section.get("rows", [])
+        if len(sections) > 1:
+            body_parts.append(f"<h3>{section_type}</h3>")
+        body_parts.append("<table><tr><th>项目</th><th>期末余额</th><th>年初余额</th></tr>")
+        for row in rows:
+            cls = ' class="total"' if row.get("is_total") else ""
+            body_parts.append(
+                f"<tr{cls}><td>{row.get('row_name', '')}</td>"
+                f"<td>{row.get('current_period_amount') or ''}</td>"
+                f"<td>{row.get('prior_period_amount') or ''}</td></tr>"
+            )
+        body_parts.append("</table>")
     return _BASE_HTML.format(title=report_type, body="\n".join(body_parts))
 
 
@@ -397,15 +411,33 @@ class PDFExportEngine:
         try:
             # Ensure export directory exists
             EXPORT_DIR.mkdir(parents=True, exist_ok=True)
-
-            # Generate a simple placeholder file
             output_path = EXPORT_DIR / f"export_{task.id}"
-            doc_type = task.document_type or "financial_report"
 
-            # Render a minimal document
+            # 先解析任务冻结的文档清单；只有带年度的正式请求进入真实数据源。
+            # 旧内部调用没有年度时保留兼容状态，后续正式出口批次会移除该兼容路径。
+            document_types = list(task.document_types or [])
+            if not document_types and task.document_type:
+                document_types = [task.document_type]
+            if task.export_year is not None:
+                source_data = await build_financial_pdf_data(
+                    self.db,
+                    project_id=task.project_id,
+                    year=task.export_year,
+                    document_types=document_types,
+                    unit_policy_snapshot=task.unit_policy_snapshot,
+                )
+            else:
+                source_data = {
+                    "report_type": task.document_type or "financial_report",
+                    "rows": [],
+                    "paragraphs": {},
+                    "notes": [],
+                }
+
+            # Render the resolved source data; the formal path must not invent rows.
             rendered = self.render_document(
-                doc_type,
-                {"report_type": doc_type, "rows": [], "paragraphs": {}, "notes": []},
+                document_types[0] if len(document_types) == 1 else "financial_report",
+                source_data,
                 output_path,
             )
 
@@ -423,6 +455,14 @@ class PDFExportEngine:
             logger.error("Export task %s: PDF 转换链不可用: %s", task_id, e)
             task.status = ExportTaskStatus.failed
             task.error_message = str(e)
+            task.completed_at = datetime.now(timezone.utc)
+            await self.db.flush()
+            raise
+
+        except PDFSourceUnavailable as exc:
+            logger.warning("Export task %s source unavailable: %s", task_id, exc)
+            task.status = ExportTaskStatus.failed
+            task.error_message = str(exc)
             task.completed_at = datetime.now(timezone.utc)
             await self.db.flush()
             raise

@@ -101,6 +101,12 @@ class TestExecuteExportFailsClosed:
         class _Task:
             id = UUID("aaaaaaaa-0000-0000-0000-000000000001")
             document_type = "financial_report"
+            # 真实 ORM 字段（V265）：替身必须与生产模型同形，否则
+            # 「没年度走兼容路径」这类判据会在替身上假绿/假红。
+            document_types = ["financial_report"]
+            export_year = None
+            unit_policy_snapshot = None
+            project_id = UUID("bbbbbbbb-0000-0000-0000-000000000002")
             status = ExportTaskStatus.queued
             started_at = None
             completed_at = None

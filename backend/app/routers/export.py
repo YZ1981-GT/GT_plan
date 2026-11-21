@@ -33,6 +33,7 @@ from app.services.pdf_export_engine import (
     PDFConversionUnavailable,
     PDFExportEngine,
 )
+from app.services.pdf_export_sources import PDFSourceUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,14 @@ async def create_export_task(
     engine = PDFExportEngine(db)
     try:
         await assert_project_permission(db, current_user, data.project_id, "readonly")
+        # 正式出口必须冻结审计年度：没有年度就无法按 project_id + year 取真实报表，
+        # 而 engine 的兼容分支（旧内部调用）会用空 rows 产出「成功」的空白 PDF。
+        # 因此在路由层拒绝，不把缺年度降级成兼容路径。
+        if data.export_year is None:
+            raise HTTPException(
+                status_code=422,
+                detail="正式 PDF 导出必须携带审计年度（export_year）",
+            )
         # spec platform-global-display-settings-closure 任务 10 / AC-21：
         # 落单位策略快照证据（`export_tasks.unit_policy_snapshot`，V265）。
         # 🔴 失败**不得静默放行**：没有 policy 快照的正式导出无法审计
@@ -83,6 +92,11 @@ async def create_export_task(
     except HTTPException:
         await db.rollback()
         raise
+    except PDFSourceUnavailable as exc:
+        # 正式数据来源缺失 / 未接入：任务已标 failed 留痕，再按来源自身语义
+        # 回 409（数据未就绪）或 422（请求前置条件不足），不用空页面冒充成功。
+        await db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     except PDFConversionUnavailable as exc:
         # 转换链缺失是环境问题：503 + 可重试语义（任务已标 failed 留痕）。
         await db.rollback()

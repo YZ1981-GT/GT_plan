@@ -508,6 +508,39 @@
     磁盘变异（删除 history 项目门禁后守卫 1 failed / 6 passed）。PDF 相关回归
     **23 passed**。仍未完成：正式 PDF 数据来源、独占 PG/端口和终验 Playwright。
   - **2026-11-16 V265 验证基础设施收口（`[~]` 保持）**：Task 15 的 PostgreSQL scratch harness 原只执行 V151，ORM 已包含 V265 四列后导致隔离 schema 缺列，46 条判据被统一吞成 harness error。现改为从真实 `V265__add_export_unit_policy_columns.sql` 复用分句器，只在 scratch `search_path` 中应用涉及 `working_paper_content_version` 的四列与 CHECK 语句，并增加列/约束逐值守卫；不触碰 shared public schema。真实 PostgreSQL scratch schema 验证 **50 passed**；V265 overlay 被移除的磁盘变异 **47 failed / 4 passed**，逐字节恢复；content mutation/evidence 选集 **105 passed / 1 skipped**。这只解除 writer 验证的基础设施阻断，**没有把任何 content version 默认写成 formal**，production writer 台账继续保持 `PARTIAL_WIRING`。
+  - **2026-11-21 正式 PDF 真实数据来源首批接线（`[~]` 保持）**：`execute_export` 原固定传
+    `{"rows": [], "paragraphs": {}, "notes": []}`，转换器可用即产出一份「成功」的空白 PDF ——
+    即 AC-20 要消灭的「报成功的失败」。新增 `services/pdf_export_sources.py`：
+    `build_financial_pdf_data` 只读当前项目年度的 `financial_report`，按任务**冻结**的
+    `unit_policy_snapshot` 折算一次（Decimal 量化到 0.01，`None` 保持留空），四张财务报表
+    的类型闭集为 `balance_sheet` / `income_statement` / `cash_flow_statement` / `equity_statement`。
+    缺年度 422、缺 policy 快照 422、该年度无正式行 409、尚未接入的 `audit_report` /
+    `disclosure_notes` 明确报「尚未接入」（不静默产出空页）。engine 只在有 `export_year`
+    时走真实 resolver（旧内部兼容分支保留，路由层已强制年度，正式端点缺年度即 422）；
+    路由把 `PDFSourceUnavailable` 按其 `status_code` 映射为 409/422，不落到 500 或空页面。
+    前端 `PDFExportPanel` 从项目 store 透传审计年度，`createExportTask` 改为显式
+    `export_year` 参数（不再发送 DTO 已删除的 `password_protected`）。
+    **真实栈实测（候选后端 9992，共享 PG，仅【测试】项目 `e8c40d30`）**：
+    `balance_sheet` + 2025 ⇒ 200/completed、PDF **171,207 B**、魔数 `%PDF-`；
+    项目单位切 `wan` 再导出 ⇒ 200/completed、**170,081 B**，随后恢复 `yuan` 并读回一致；
+    无报表数据的【测试】项目 ⇒ **409**；`audit_report` ⇒ **409「尚未接入」**；缺年度
+    （修复前实测 200 空 PDF，修复后）⇒ **422**。验收写入的 3 条 `export_tasks` 与产物已按
+    id 精确删除，`leftover=0`，`amount_unit` 读回 `yuan`。
+    **守卫**：新增 `test_pdf_export_sources.py`（9 例：真实行透传 / wan 折算一次 / `None` 留空 /
+    缺年度 422 / 空表 409 / 非法 policy 422 / divisor=0 拒绝 / 未接入类型点名 / 空清单 422）与
+    `test_pdf_export_engine_source_wiring.py`（4 例：engine 必须调 resolver 并带年度与清单 /
+    渲染输入必须来自 resolver 而非空 payload / 来源不可用任务 failed 且 `file_path` 为空 /
+    路由强制年度且不自己拼 SQL）；`test_pdf_export.py` 的端点契约从「空占位完成」改为
+    「真实行 + 非零 `file_size`」，并新增缺年度 422 用例。
+    🔴 **变异两轮**：第一轮 4 个变异中 `engine-back-to-empty-payload` **存活** —— 只测
+    resolver 本体时「engine 挂着 resolver 但从不调用」全绿，补 engine 层用例后转 RED；
+    最终 **5/5 变异全 RED**（空表当成功 / 不折算 divisor / 允许缺年度 / engine 回退空 payload /
+    engine 忽略 resolver 输出）。
+    🔴 **一次误判已归因**：把变异脚本与回归并行跑时，回归读到了正在被改写的
+    `pdf_export_sources.py`，`test_wan_rows_are_scaled_exactly_once` 短暂报红；串行复跑两次
+    均 **89 passed**，属并发读写而非产品缺陷（禁止并行跑变异与回归）。
+    **回归**：PDF/policy/redaction 选集 **89 passed**。**仍未完成**：审计报告与附注的真实 PDF
+    数据源、多文档合并/密码保护、整包 ZIP 与归档全链、独?? PG/端口与 C-V 正式 Playwright。
 
 - [x] 6C. 附注 Word 普通/clone 路径消费 kind/scale（R6、R9；依赖任务 10 的 `ExportUnitRegion`，与其附注路径子项同批）
   - `NoteWordExporter._render_table` 与 `note_template_table_look.render_cloned_table` 接收同一 `ExportUnitRegion + column_kinds + column_ratio_scales`，kind/scale 取自 6A 的 catalog 与稳定 column_id，只有 amount 执行 policy divisor；`note_template_block_fill.rebuild_block` 按 `<section_id>/<table_id>` 取 region 后交给两条内核。

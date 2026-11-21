@@ -1082,12 +1082,19 @@ export interface ExportTaskData {
   completed_at: string | null
 }
 
-export async function createExportTask(projectId: string, taskType: string, documentTypes: string[], passwordProtected: boolean = false, password?: string) {
+export async function createExportTask(
+  projectId: string,
+  taskType: string,
+  documentTypes: string[],
+  exportYear: number | null,
+  passwordProtected: boolean = false,
+  password?: string,
+) {
   const { data } = await http.post(P_exp.create, {
     project_id: projectId,
     task_type: taskType,
     document_types: documentTypes,
-    password_protected: passwordProtected,
+    export_year: exportYear,
     password,
   })
   return data

@@ -59,6 +59,39 @@ async def seeded_db(db_session: AsyncSession):
     return FAKE_PROJECT_ID
 
 
+@pytest_asyncio.fixture
+async def seeded_report_rows(db_session: AsyncSession, seeded_db):
+    """正式 PDF 出口要求真实报表行；空表必须 409，不能用空页面冒充成功。"""
+    from decimal import Decimal
+
+    from app.models.report_models import FinancialReport, FinancialReportType
+
+    db_session.add_all([
+        FinancialReport(
+            project_id=FAKE_PROJECT_ID,
+            year=2025,
+            report_type=FinancialReportType.balance_sheet,
+            row_code="BS-001",
+            row_name="货币资金",
+            current_period_amount=Decimal("100.00"),
+            prior_period_amount=Decimal("80.00"),
+        ),
+        FinancialReport(
+            project_id=FAKE_PROJECT_ID,
+            year=2025,
+            report_type=FinancialReportType.balance_sheet,
+            row_code="BS-099",
+            row_name="资产合计",
+            current_period_amount=Decimal("100.00"),
+            prior_period_amount=Decimal("80.00"),
+            is_total_row=True,
+        ),
+    ])
+    await db_session.flush()
+    await db_session.commit()
+    return FAKE_PROJECT_ID
+
+
 # ===== HTML 渲染测试 =====
 
 
@@ -226,8 +259,8 @@ async def test_get_history_empty(db_session: AsyncSession, seeded_db):
 
 
 @pytest_asyncio.fixture
-async def client(db_session: AsyncSession, seeded_db):
-    """创建测试 HTTP 客户端"""
+async def client(db_session: AsyncSession, seeded_report_rows):
+    """创建测试 HTTP 客户端（带真实报表行）"""
     from app.main import app
     from tests._test_auth_helper import override_auth
 
@@ -243,7 +276,8 @@ async def test_api_create_export_task(client: AsyncClient):
         json={
             "project_id": str(FAKE_PROJECT_ID),
             "task_type": "single_document",
-            "document_type": "audit_report",
+            "document_types": ["balance_sheet"],
+            "export_year": 2025,
         },
     )
     assert resp.status_code == 200
@@ -251,6 +285,22 @@ async def test_api_create_export_task(client: AsyncClient):
     result = data.get("data", data)
     assert result["status"] == "completed"
     assert result["progress_percentage"] == 100
+    # 真实数据来源：产物必须非空（空页面冒充成功是本轮要消灭的形态）
+    assert result["file_size"] and result["file_size"] > 0
+
+
+@pytest.mark.asyncio
+async def test_api_create_export_without_year_is_422(client: AsyncClient):
+    """缺审计年度 ⇒ 422；不得退化成空 rows 的兼容路径。"""
+    resp = await client.post(
+        "/api/export/create",
+        json={
+            "project_id": str(FAKE_PROJECT_ID),
+            "task_type": "single_document",
+            "document_types": ["balance_sheet"],
+        },
+    )
+    assert resp.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -262,7 +312,8 @@ async def test_api_get_task_status(client: AsyncClient):
         json={
             "project_id": str(FAKE_PROJECT_ID),
             "task_type": "single_document",
-            "document_type": "financial_report",
+            "document_types": ["balance_sheet"],
+            "export_year": 2025,
         },
     )
     create_data = create_resp.json()
@@ -292,6 +343,8 @@ async def test_api_get_history(client: AsyncClient):
         json={
             "project_id": str(FAKE_PROJECT_ID),
             "task_type": "full_archive",
+            "document_types": ["balance_sheet"],
+            "export_year": 2025,
         },
     )
 
