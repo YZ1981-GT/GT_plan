@@ -619,6 +619,41 @@
     **回归**：PDF 全选集 **116 passed**。**仍未完成**：PDF 密码（TODO 15.5，需产品
     拍板加密链与前端密码字段语义）、整包 ZIP 与归档全链、独占 PG/端口与 C-V 正式
     Playwright；production writer 台账保持 `PARTIAL_WIRING`。
+  - **2026-11-21 整包 ZIP 与归档全链收口（`[~]` 保持）**：PDF 正式导出链
+    （v1.0.306~308）接通后暴露两类同源缺口，本批收口：
+    ①**整包 ZIP 的审计报告只读旧载体** —— `ExportPackageService._build_audit_report_bytes`
+    原先只读 `paragraphs`：Word 模板模式项目的正文在 `report_body_json.sections`
+    ⇒ 组合包误判「审计报告无段落内容」**整包失败**，而同一项目的 PDF 审计报告
+    能正常导出（双写漂移的真实形态）。修复 = 抽共享正文口径
+    `extract_audit_report_paragraphs`（`report_body_json.sections` 主源按
+    `section_order` 排序 + KAM items 与 `render_docx` 同口径合入 + 旧 `paragraphs`
+    回退，**不做 HTML 转义**——docx 路径吃纯文本），PDF 数据源
+    `build_audit_report_pdf_data` 改为复用它后再做 HTML 转义。
+    ②**归档清单不消费 PDF 交付件** —— `archive_inventory` 只收 Word 交付件
+    （`word_export_task_versions`），PDF 正式件（`export_tasks`）不进归档包。
+    新增 `_pdf_deliverable_entries`：只收 `completed` 且 `file_path` 非空的任务
+    （SQL 层过滤，failed/queued 不入包）；文件缺失 / 大小与任务记录不符 /
+    0 字节 ⇒ `MISSING`（不静默跳过）；evidence 绑定 task_id / export_year /
+    document_types / 实际大小 / 任务级 policy 快照（PDF 链不产 content version
+    —— 那是 workpaper 链的证据，不混绑）；每条 completed 任务是独立正式件
+    （无 version 链，与 Word 交付件「只收最新版本」口径不同）。已接入
+    `build_project_inventory`。
+    **测试**：新增 `test_zip_audit_source_and_archive_pdf.py`（**13 例**：共享口径
+    sections 优先 / KAM 合入 / paragraphs 回退 / 双空空 dict；整包走共享口径 AST 判 /
+    docx 兼容纯文本；归档 PDF 完整绑定 / 缺文件 MISSING / 大小不符 MISSING /
+    0 字节 MISSING / failed 不收 / 空列表 / 组装接线 AST 判）与
+    `test_package_audit_sections.py`（**2 例**，行为级真调 export_package：
+    sections-only 项目产出含两段标题的真 docx / KAM items 进正文 —— 正是「只读
+    paragraphs 会整包失败」的那类项目）。旧 `_Report` 替身补 `report_body_json=None`
+    （共享口径会读它）；归档 world 两个 fixture 补建 `export_tasks` 表
+    （否则 `_pdf_deliverable_entries` 全场景 `no such table`）。
+    **5/5 磁盘变异全 RED**：整包退回只读 paragraphs（等价降级两形态，新行为用例
+    各打红一条）/ 归档不接 PDF 条目 / 大小校验删除 / 0 字节放行。首轮 2 个
+    「整包退回 paragraphs」变异存活 —— 当时整包测试只有「旧载体项目」夹具，
+    sections-only 项目零覆盖，补行为用例后转 RED。
+    **回归**：ZIP/归档/PDF 全选集 **82 passed**；文件行数门 exit 0。
+    **仍未完成**：独占 PG/端口完整 C-V 与正式 Playwright（外部环境）；PDF 密码
+    （15.5）；production writer 台账保持 `PARTIAL_WIRING`。
 
 - [x] 6C. 附注 Word 普通/clone 路径消费 kind/scale（R6、R9；依赖任务 10 的 `ExportUnitRegion`，与其附注路径子项同批）
   - `NoteWordExporter._render_table` 与 `note_template_table_look.render_cloned_table` 接收同一 `ExportUnitRegion + column_kinds + column_ratio_scales`，kind/scale 取自 6A 的 catalog 与稳定 column_id，只有 amount 执行 policy divisor；`note_template_block_fill.rebuild_block` 按 `<section_id>/<table_id>` 取 region 后交给两条内核。

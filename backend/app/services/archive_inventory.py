@@ -316,6 +316,68 @@ async def _deliverable_entries(db: AsyncSession, project_id: UUID, names: _ArcNa
     return out
 
 
+async def _pdf_deliverable_entries(db: AsyncSession, project_id: UUID, names: _ArcNames) -> list[InventoryEntry]:
+    """PDF 导出交付件（``export_tasks``）的归档清单项。
+
+    PDF 正式导出链（spec platform-global-display-settings-closure v1.0.306~308）产出
+    ``export_tasks``（status=completed + file_path + policy snapshot），此前归档清单
+    **只消费 Word 交付件**（`_deliverable_entries`），PDF 件不进归档包 —— 归档完整性
+    缺一类正式件。本函数补上：
+
+    - 只收 ``status='completed'`` 且 ``file_path`` 非空的任务（failed/queued 不入包）；
+    - 文件缺失 / 大小与任务记录不符 ⇒ ``MISSING``（不静默跳过）；
+    - evidence 绑定 task id / 文件大小 / 单位策略快照（PDF 链的任务级快照），
+      不绑 content version（PDF 引擎不产 content version —— 那是 workpaper 链的证据）；
+    - 同一任务多份导出按 created_at 升序全收（与 Word 交付件「只收最新版本」不同：
+      PDF 任务没有 version 链，每条 completed 任务就是一份独立正式件）。
+    """
+    from app.models.report_models import ExportTask, ExportTaskStatus
+    from app.services.attachment_upload_policy import resolve_local_attachment_file
+
+    tasks = (await db.execute(
+        sa.select(ExportTask).where(
+            ExportTask.project_id == project_id,
+            ExportTask.status == ExportTaskStatus.completed,
+            ExportTask.file_path.isnot(None),
+        ).order_by(ExportTask.created_at, ExportTask.id)
+    )).scalars().all()
+
+    out: list[InventoryEntry] = []
+    for task in tasks:
+        label = f"PDF 导出｜{task.export_year or '?'}｜{(task.document_types or [task.document_type] if task.document_type else task.document_types) and '、'.join(task.document_types or []) or (task.document_type or '未知')}"
+        base = dict(category="pdf_deliverable", source_id=str(task.id), label=label)
+        path = resolve_local_attachment_file(task.file_path)
+        if path is None:
+            out.append(InventoryEntry(**base, arcname="", status=MISSING,
+                                      reason="PDF 交付件文件不存在"))
+            continue
+        actual_size = path.stat().st_size
+        recorded_size = task.file_size
+        if recorded_size is not None and int(recorded_size) != actual_size:
+            out.append(InventoryEntry(**base, arcname="", status=MISSING,
+                                      reason=f"PDF 交付件大小不符（记录 {recorded_size} / 实际 {actual_size}）"))
+            continue
+        if actual_size == 0:
+            out.append(InventoryEntry(**base, arcname="", status=MISSING,
+                                      reason="PDF 交付件为 0 字节"))
+            continue
+        arcname = names.take(
+            "50-交付件",
+            f"PDF-{task.export_year or '未知年度'}-{str(task.id)[:8]}",
+            path.suffix.lower() or ".pdf",
+        )
+        evidence = {
+            "task_id": str(task.id),
+            "export_year": task.export_year,
+            "document_types": list(task.document_types or []),
+            "file_size": actual_size,
+            "policy_snapshot": task.unit_policy_snapshot,
+        }
+        out.append(InventoryEntry(**base, arcname=arcname, status=OK, local_path=path,
+                                  evidence=evidence))
+    return out
+
+
 def _file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -413,6 +475,7 @@ async def build_project_inventory(db: AsyncSession, project_id: UUID) -> Project
     inv.entries.extend(await _workpaper_entries(db, project_id, names))
     inv.entries.extend(await _attachment_entries(db, project_id, names))
     inv.entries.extend(await _deliverable_entries(db, project_id, names))
+    inv.entries.extend(await _pdf_deliverable_entries(db, project_id, names))
     inv.entries.extend(await _consol_entries(db, project_id, names))
     return inv
 

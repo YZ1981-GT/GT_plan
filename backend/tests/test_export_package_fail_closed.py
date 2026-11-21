@@ -412,6 +412,9 @@ async def test_audit_report_uses_real_paragraphs_not_placeholder():
     _Gate, _decision = _gate_ok()
 
     class _Report:
+        # 共享正文口径（extract_audit_report_paragraphs）会读 report_body_json：
+        # 无 Word 模板 sections 时回退 paragraphs，替身两者都要有形状。
+        report_body_json = None
         paragraphs = {"审计意见": "我们认为，后附财务报表在所有重大方面公允反映……"}
         year = 2025
 

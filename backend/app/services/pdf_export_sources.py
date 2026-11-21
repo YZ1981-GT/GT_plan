@@ -145,6 +145,47 @@ def _new_audit_service(db: AsyncSession):
     return AuditReportService(db)
 
 
+def extract_audit_report_paragraphs(report: Any) -> dict[str, str]:
+    """从 ``AuditReport`` 提取正文段落（Word 模板主源 + 旧载体回退）。
+
+    正文优先 ``report_body_json.sections``（按 ``section_order`` 排序、KAM
+    ``items`` 与 ``render_docx`` 同口径合入正文），回退旧 ``paragraphs`` 载体
+    （JSON 单阶段模式只写这套）。两套都空返回 ``{}``。
+
+    🔴 为什么抽成公共函数：PDF 数据源（``build_audit_report_pdf_data``）与
+    整包 ZIP（``ExportPackageService._build_audit_report_bytes``）需要**同一份
+    正文口径** —— 只改 PDF 不改整包，Word 模板模式项目的 PDF 能导出、组合包
+    仍误判「无段落内容」整包失败（双写必漂移）。
+
+    注意：本函数**不做 HTML 转义**（docx/纯文本路径不需要）；调用方按输出
+    目的地自行处理。
+    """
+    paragraphs: dict[str, str] = {}
+    body = report.report_body_json if isinstance(report.report_body_json, dict) else {}
+    for section in sorted(
+        body.get("sections") or [], key=lambda s: s.get("section_order", 0)
+    ):
+        name = str(section.get("section_name") or section.get("section_id") or "").strip()
+        if not name:
+            continue
+        content = str(section.get("content") or "")
+        # KAM 多条目段：与 render_docx 同口径合入正文（matter + response）。
+        for item in section.get("items") or []:
+            matter = str(item.get("matter") or "")
+            response = str(item.get("response") or "")
+            content = f"{content}\n\n{matter}\n{response}".strip()
+        if content:
+            paragraphs[name] = content
+
+    if not paragraphs:
+        # 回退旧 paragraphs 载体（JSON 单阶段模式只写这一套）
+        for name, content in (report.paragraphs or {}).items():
+            if content:
+                paragraphs[str(name)] = str(content)
+
+    return paragraphs
+
+
 async def build_audit_report_pdf_data(
     db: AsyncSession,
     *,
@@ -173,28 +214,12 @@ async def build_audit_report_pdf_data(
             f"审计报告状态为 {status_value}，未达可导出状态（需 eqcr_approved 或 final）"
         )
 
-    paragraphs: dict[str, str] = {}
-    body = report.report_body_json if isinstance(report.report_body_json, dict) else {}
-    for section in sorted(
-        body.get("sections") or [], key=lambda s: s.get("section_order", 0)
-    ):
-        name = str(section.get("section_name") or section.get("section_id") or "").strip()
-        if not name:
-            continue
-        content = str(section.get("content") or "")
-        # KAM 多条目段：与 render_docx 同口径合入正文（matter + response）。
-        for item in section.get("items") or []:
-            matter = str(item.get("matter") or "")
-            response = str(item.get("response") or "")
-            content = f"{content}\n\n{matter}\n{response}".strip()
-        if content:
-            paragraphs[name] = html.escape(content).replace("\n", "<br/>")
-
-    if not paragraphs:
-        # 回退旧 paragraphs 载体（JSON 单阶段模式只写这一套）
-        for name, content in (report.paragraphs or {}).items():
-            if content:
-                paragraphs[str(name)] = html.escape(str(content)).replace("\n", "<br/>")
+    # 共享正文口径（Word 模板主源 + 旧载体回退）；PDF 目的地需要 HTML 转义。
+    raw_paragraphs = extract_audit_report_paragraphs(report)
+    paragraphs = {
+        html.escape(name): html.escape(content).replace("\n", "<br/>")
+        for name, content in raw_paragraphs.items()
+    }
 
     if not paragraphs:
         raise PDFSourceUnavailable(
