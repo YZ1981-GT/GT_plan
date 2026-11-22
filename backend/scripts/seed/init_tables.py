@@ -30,6 +30,41 @@ DB_URL = os.environ.get("DATABASE_URL", "postgresql+psycopg2://postgres:postgres
 # asyncpg → psycopg2（同步建表需要同步驱动）
 DB_URL = DB_URL.replace("+asyncpg", "+psycopg2")
 engine = create_engine(DB_URL)
+
+# ── 空库引导：先建 ORM 声明为 create_type=False 的 PG enum 类型 ──
+# 🔴 2026-11-22（CI 空库 bootstrap 实测）：`report_models.py` 等 13 个 `sa.Enum(...,
+#    create_type=False)` 表示「ORM 不建枚举类型」，但**没有任何迁移建它们** ——
+#    它们只存在于历史共享库里。空库直接 create_all 会在 first 张引用表的 CREATE TABLE
+#    处炸 `type "financial_report_type" does not exist`，导致 CI 的 bootstrap step 全红
+#    （13 个 job 共因）。此处从 metadata 自动收集并幂等建类型，不改任何生产迁移/模型。
+def _ensure_pg_enum_types() -> None:
+    if engine.dialect.name != "postgresql":
+        return
+    from sqlalchemy import Enum as SAEnum
+
+    seen: set[str] = set()
+    with engine.begin() as conn:
+        for table in Base.metadata.tables.values():
+            for column in table.columns:
+                col_type = column.type
+                if not isinstance(col_type, SAEnum):
+                    continue
+                name = col_type.name
+                if not name or name in seen:
+                    continue
+                seen.add(name)
+                labels = ", ".join(f"'{v}'" for v in col_type.enums)
+                conn.execute(
+                    text(
+                        f"DO $$ BEGIN "
+                        f"IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = '{name}') THEN "
+                        f"CREATE TYPE {name} AS ENUM ({labels}); "
+                        f"END IF; END $$;"
+                    )
+                )
+
+
+_ensure_pg_enum_types()
 Base.metadata.create_all(engine)
 tables = sorted(Base.metadata.tables.keys())
 print(f"\nCreated {len(tables)} tables:")
