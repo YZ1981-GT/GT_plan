@@ -686,3 +686,15 @@ def test_check_mode_fails_when_a_source_digest_changes(tmp_path: Path) -> None:
     assert GEN.render(fresh) == target.read_bytes(), (
         "同一输入重跑产出不同字节 —— 生成器不幂等（时间戳/随机序进产物？）"
     )
+# ═══════════════════════════════════════════════════════════════════════════
+# provider 型 resolver 的运行时解析（2026-11-16 实补）
+#
+# 背景：`SheetOpenBindingResolver.resolve` 原先对 provider 型只返回
+# `sheet_binding_provider_review_required`，**根本不解析** ⇒ 全库 111 条
+# capability 已终裁（bidirectional / adapter_registered）的 entry 里，
+# provider 型一条都开不了（现算 exact = 0，provider = 110，ambiguous = 1）。
+#
+# 正确语义（design §3.2 / §4.1）：provider 型的 target sheet 由**运行时请求名**
+# 决定（前端 `dualMode.resolveOoSheetName() || props.sheetName`），后端不猜、
+# 不回退父级。请求里的 `sheet_name` 就是 artifact 内的 target sheet 名。
+# ═══════════════════════════════════════════════════════════════════════════
