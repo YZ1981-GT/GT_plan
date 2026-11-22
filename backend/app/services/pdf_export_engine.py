@@ -391,6 +391,32 @@ class PDFExportEngine:
             pdf_file = Path(tmpdir) / "input.pdf"
             return pdf_file.read_bytes() if pdf_file.exists() else None
 
+    @staticmethod
+    def _encrypt_pdf_file(path: Path, password: str) -> None:
+        """给已生成的 PDF 文件加打开密码（TODO 15.5）。
+
+        🔴 失败语义：加密失败**删除半成品并上抛** —— 不产出「文件未加密但任务
+        标 password_protected=True」的错配（那是比不加密更危险的静默撒谎）。
+        用 pypdf 的 RC4-128（``use_128bit=True``，与旧 bulk 导出链一致）；
+        权限保持默认（打印/提取允许，只挡打开）。
+        """
+        from pypdf import PdfReader, PdfWriter
+
+        try:
+            reader = PdfReader(str(path))
+            writer = PdfWriter(clone_from=reader)
+            writer.encrypt(user_password=password, use_128bit=True)
+            encrypted = path.with_suffix(".pdf.enc.tmp")
+            with encrypted.open("wb") as fh:
+                writer.write(fh)
+        except Exception as exc:  # noqa: BLE001 - 加密失败必须整体失败
+            path.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"PDF 加密失败，导出任务未产出文件（不产出未加密文件冒充成功）: {exc}"
+            ) from exc
+        # 原子替换：先写临时文件再覆盖，避免中断留下未加密原文
+        encrypted.replace(path)
+
     # ------------------------------------------------------------------
     # 创建导出任务
     # ------------------------------------------------------------------
@@ -433,13 +459,19 @@ class PDFExportEngine:
     # ------------------------------------------------------------------
     # 执行导出（MVP 同步）
     # ------------------------------------------------------------------
-    async def execute_export(self, task_id: UUID) -> ExportTask:
+    async def execute_export(
+        self,
+        task_id: UUID,
+        *,
+        password: str | None = None,
+    ) -> ExportTask:
         """同步执行导出任务（MVP 无 Celery）。
 
-        Validates: Requirements 7.2, 7.3
-        TODO: 15.3 — xlsx→PDF 转换
-        TODO: 15.4 — PDF 合并与后处理
-        TODO: 15.5 — PDF 密码保护
+        ``password``（TODO 15.5）：非空时产物 PDF 用 pypdf 加密（用户打开需输
+        密码），任务标 ``password_protected=True``。🔴 明文密码**不落库**——
+        ``export_tasks`` 没有密码列是**有意设计**（审计链不留凭据）；
+        ``execute_export`` 与 ``create_export_task`` 在同一请求内由路由串接，
+        密码经参数传递即可。
         """
         result = await self.db.execute(
             sa.select(ExportTask).where(ExportTask.id == task_id)
@@ -493,6 +525,12 @@ class PDFExportEngine:
                     source_data,
                     output_path,
                 )
+
+            if password:
+                # TODO 15.5：加密在产物写入后进行（幂等：覆盖同一文件）；
+                # 失败即整体失败，不产出「未加密文件标 password_protected」的错配。
+                self._encrypt_pdf_file(rendered, password)
+                task.password_protected = True
 
             task.progress_percentage = 100
             task.status = ExportTaskStatus.completed

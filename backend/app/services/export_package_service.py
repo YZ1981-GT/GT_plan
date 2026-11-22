@@ -282,12 +282,14 @@ class ExportPackageService:
 
             # Warnings file (if force_export with failures)
             if warnings_text:
-                zf.writestr("_warnings.txt", warnings_text.encode("utf-8"))
+                warnings_bytes = warnings_text.encode("utf-8")
+                zf.writestr("_warnings.txt", warnings_bytes)
                 manifest_files.append({
                     "filename": "_warnings.txt",
                     "type": "warnings",
                     "format": "txt",
-                    "size_bytes": len(warnings_text.encode("utf-8")),
+                    "size_bytes": len(warnings_bytes),
+                    "sha256": hashlib.sha256(warnings_bytes).hexdigest(),
                 })
 
             # manifest.json

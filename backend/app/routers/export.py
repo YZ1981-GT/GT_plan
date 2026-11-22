@@ -85,8 +85,8 @@ async def create_export_task(
             created_by=current_user.id,
             unit_policy_snapshot=unit_policy_snapshot,
         )
-        # MVP: execute synchronously
-        task = await engine.execute_export(task.id)
+        # MVP: execute synchronously；密码只经参数传递（不落库），加密在引擎内完成
+        task = await engine.execute_export(task.id, password=data.password)
         await db.commit()
         return ExportTaskStatusResponse.model_validate(task)
     except HTTPException:

@@ -783,6 +783,30 @@
     提交前 `git checkout --` 还原（生成文件不取并集）。
     **仍未完成**：任务 13 终验（候选树身份工具 + 独立评审 + 全量门）、PDF 密码
     （15.5）、ZIP 整包浏览器级验证；production writer 台账保持 `PARTIAL_WIRING`。
+  - **2026-11-22 PDF 密码（TODO 15.5）+ ZIP 整包验证（`[~]` 保持）**：
+    ①**PDF 密码**（15.5 收口）：`execute_export` 新增 keyword-only ``password``
+    参数——非空时产物用 pypdf RC4-128 加密（`writer.encrypt(user_password)`），
+    任务标 ``password_protected=True``；路由把 DTO ``password`` 传入
+    （``password=data.password``，AST 守卫钉住断链）。🔴 **明文密码不落库**：
+    `export_tasks` 无密码列是**有意设计**（审计链不留凭据，守卫
+    `test_password_never_persisted_to_model` 断言密码列集合 == `['password_protected']`）。
+    加密失败（pypdf 层）⇒ **删除半成品 + 任务标 failed**（`_encrypt_pdf_file`
+    抛 RuntimeError 走业务失败路径，不产出「未加密文件标已加密」的错配）；
+    🔴 故障注入必须在**内层**（pypdf.PdfReader）而非替换 `_encrypt_pdf_file`
+    整个函数——否则「删半成品」逻辑空转，测试假绿。多文档合并 + 密码 ⇒ 合并产物
+    整体加密（pypdf 真实验证：正确密码 `decrypt != 0`、错误密码 == 0）。
+    **守卫** `test_pdf_password_protection.py` **6 例** + **3/3 磁盘变异全 RED**
+    （不调加密 / 只标 flag 不加密 / 路由丢密码）；PDF 全选集 **114 passed**。
+    ②**ZIP 整包浏览器级验证**（真实项目重药安徽_2025，166 章节附注最全，
+    只读）：`POST /workflow/export-package` ⇒ 200、176,346 B、manifest 1.1、
+    unit_policy（unit/divisor/digest/fallback）+ 逐项 classification=formal +
+    policy_digest；**逐项 sha256 校验一致**；xlsx（4 表 sheet）与 docx
+    （919 段附注）都能打开；**无 placeholder 字节**。🔴 顺带修一个真实缺口：
+    `_warnings.txt` 的 manifest 条目原先**没有 sha256**（其他文件都有）——
+    AC-22「manifest 可审计」要求逐项哈希，已补（非 formal 无 policy_digest
+    是对的，但哈希不能缺）。
+    **仍未完成**：任务 13 终验（候选树身份工具 + 独立评审）；V265 production
+    writer（设计需产品拍板 surface 分类语义，台账保持 `PARTIAL_WIRING`）。
 
 - [x] C-BK. 阶段 C 备份 commit 对象
   - 方法同 A-BK，树内含截至阶段 C 的全部本任务改动块；OID 写入当前工作流目录并核验，随后向父会话发阶段 C 进度消息。
