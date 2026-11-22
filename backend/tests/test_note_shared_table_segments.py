@@ -362,16 +362,17 @@ class TestSharedTableInventory:
     """全库共享表普查（Property 14 的数据基础）。"""
 
     def test_counts_match_measured_baseline(self):
-        """实测基线：listed 24 张 / soe 8 张，共 32 张。
+        """实测基线：listed 24 张 / soe 9 张，共 33 张。
 
         2026-08-12 由 23/6 上调（+3）：K 循环补齐共享表段首码
-        （`fix_note_k_report_row_codes.py`）。理由与逐表清单见
+        （`fix_note_k_report_row_codes.py`）；soe 8→9 同批（生成器
+        `EXPECTED_COUNTS` 一直 24/9，本测试此前漏同步）。理由与逐表清单见
         `gen_note_shared_table_segments.EXPECTED_COUNTS` 注释。
         """
         listed = list(iter_shared_tables(VARIANT_LISTED))
         soe = list(iter_shared_tables(VARIANT_SOE))
         assert len(listed) == 24, f"listed 共享表数变了：{[t[2] for t in listed]}"
-        assert len(soe) == 8, f"soe 共享表数变了：{[t[2] for t in soe]}"
+        assert len(soe) == 9, f"soe 共享表数变了：{[t[2] for t in soe]}"
 
     def test_every_shared_table_has_at_least_two_segments(self):
         for variant in (VARIANT_LISTED, VARIANT_SOE):
@@ -509,7 +510,7 @@ class TestSharedTableInventory:
             for seg in segs
             if seg.data_end != seg.end
         ]
-        assert len(hits) == 18, f"受影响段数变了：{hits}"
+        assert len(hits) == 19, f"受影响段数变了：{hits}"
         for *_x, cut in hits:
             for lab, row_type in cut:
                 assert "计" in lab or row_type == UNOWNED_ROW_TYPE, (
@@ -654,12 +655,8 @@ class TestSharedTableInventory:
         for variant in VARIANTS:
             for num, _t, name, rows, segs in iter_shared_tables(variant):
                 got.append((variant, num, name, [(s.start, s.end, s.data_end) for s in segs]))
-        # 29 → 32（2026-08-12）：K 循环补齐共享表段首码后新增 3 张共享表
-        # （listed `五、42` / soe `八、42` / soe `八、9`）。补码前这 3 张表段数为 0
-        # ⇒ owner 带 `_row_scope` 推送时 `find_segment` 返 None ⇒ 整表 fail-closed
-        # 跳过写入。真源与理由见 `gen_note_shared_table_segments.EXPECTED_COUNTS`
-        # 注释与 `backend/scripts/fix/fix_note_k_report_row_codes.py`。
-        assert len(got) == 32
+        # 29 → 33（K 循环补码 3 张 + soe 侧测试漏同步；理由见生成器 EXPECTED_COUNTS 注释）
+        assert len(got) == 33
         assert got == want, "段区间与清单漂移 → 重跑 gen_note_shared_table_segments.py --write"
 
     def test_unowned_only_narrows_its_own_table(self):
@@ -736,12 +733,13 @@ class TestManifestDrift:
         assert gen.main() == 0, "共享表清单与模板漂移 —— 请重跑 --write"
 
     def test_manifest_counts_match_baseline(self):
-        # 23/6/29 → 24/8/32（2026-08-12，K 循环补段首码），理由见
+        # 23/6/29 → 24/8/32（2026-08-12 K 循环补段首码）→ soe 9/33（生成器
+        # 一直 24/9，本测试 soe 侧漏同步），理由见
         # `gen_note_shared_table_segments.EXPECTED_COUNTS` 注释
         gen = _load_generator()
         payload = json.loads(gen.OUT_PATH.read_text(encoding="utf-8"))
-        assert payload["counts"] == {VARIANT_LISTED: 24, VARIANT_SOE: 8}
-        assert len(payload["tables"]) == 32
+        assert payload["counts"] == {VARIANT_LISTED: 24, VARIANT_SOE: 9}
+        assert len(payload["tables"]) == 33
 
     def test_manifest_segments_wellformed(self):
         """清单里每张表都必须是**真**共享表且段区间自洽。"""
