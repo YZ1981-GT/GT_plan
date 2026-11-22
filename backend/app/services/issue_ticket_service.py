@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.phase15_models import IssueTicket
 from app.models.phase15_enums import IssueStatus, IssueSource
+from app.core.time_utils import ensure_utc_aware
 from app.services.trace_event_service import trace_event_service, generate_trace_id
 
 logger = logging.getLogger(__name__)
@@ -314,7 +315,8 @@ class IssueTicketService:
         - 使用 reason_code 标记逾期状态（'Q_SLA_BREACHED'）
         """
         now = datetime.now(timezone.utc)
-        hours_overdue = (now - ticket.due_at).total_seconds() / 3600 if ticket.due_at else 0
+        due_at = ensure_utc_aware(ticket.due_at)
+        hours_overdue = (now - due_at).total_seconds() / 3600 if due_at else 0
 
         # 标记逾期（用 reason_code 字段，避免新增列）
         if ticket.reason_code != "Q_SLA_BREACHED":

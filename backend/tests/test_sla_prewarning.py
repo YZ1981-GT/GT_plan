@@ -39,6 +39,7 @@ def _make_ticket(
     status: str = "open",
     project_id=None,
     owner_id=None,
+    naive_due_at: bool = False,
 ):
     """Create a mock IssueTicket with due_at offset from now."""
     ticket = MagicMock()
@@ -48,7 +49,8 @@ def _make_ticket(
     ticket.wp_id = uuid4()
     ticket.title = "测试问题单"
     ticket.status = status
-    ticket.due_at = datetime.now(timezone.utc) + timedelta(hours=due_at_offset_hours)
+    due_at = datetime.now(timezone.utc) + timedelta(hours=due_at_offset_hours)
+    ticket.due_at = due_at.replace(tzinfo=None) if naive_due_at else due_at
     return ticket
 
 
@@ -104,6 +106,28 @@ class TestWarningLevelClassification:
                 mock_send.assert_called_once()
                 call_kwargs = mock_send.call_args[1]
                 assert call_kwargs["level"] == "yellow"
+
+    @pytest.mark.asyncio
+    async def test_naive_due_at_is_treated_as_utc(self):
+        """数据库读回的 naive due_at 按 UTC 解释，仍能发送预警。"""
+        ticket = _make_ticket(due_at_offset_hours=4.0, naive_due_at=True)
+
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = [ticket]
+        mock_result.scalars.return_value = mock_scalars
+        mock_db.execute.return_value = mock_result
+
+        with patch(REDIS_PATCH, new_callable=AsyncMock, return_value=None):
+            with patch("app.workers.sla_worker._send_prewarning_notification", new_callable=AsyncMock) as mock_send:
+                count = await _check_prewarning(mock_db)
+
+        assert count == 1
+        mock_send.assert_called_once()
+        call_kwargs = mock_send.call_args[1]
+        assert call_kwargs["level"] == "orange"
+        assert 3.0 < call_kwargs["remaining_hours"] < 5.0
 
     @pytest.mark.asyncio
     async def test_no_warning_when_no_tickets(self):

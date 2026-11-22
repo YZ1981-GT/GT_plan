@@ -20,3 +20,16 @@ def utcnow() -> datetime:
     用于和 PG TIMESTAMP WITHOUT TIME ZONE 列比较。
     """
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def ensure_utc_aware(value: datetime | None) -> datetime | None:
+    """将可能为 naive 的时间归一为 UTC aware datetime。
+
+    数据库读回的 ``TIMESTAMP WITHOUT TIME ZONE`` 按 UTC 解释；带时区的
+    值统一转换到 UTC，便于在 Python 中安全比较或计算。
+    """
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)

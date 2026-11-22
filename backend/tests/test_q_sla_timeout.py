@@ -91,7 +91,7 @@ async def test_q_ticket_overdue_marks_sla_breached(db_session: AsyncSession, pro
         title="质控整改单测试",
         owner_id=user_id,
         status=IssueStatus.open.value,
-        due_at=datetime.now(timezone.utc) - timedelta(hours=50),  # 已逾期
+        due_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=50),  # 数据库读回的 naive UTC
         trace_id=f"trc_{uuid.uuid4().hex[:12]}",
     )
     db_session.add(ticket)

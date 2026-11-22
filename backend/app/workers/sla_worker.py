@@ -22,6 +22,7 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.time_utils import ensure_utc_aware
 from app.workers.worker_helpers import write_heartbeat
 
 logger = logging.getLogger("sla_check")
@@ -38,7 +39,6 @@ async def run(stop_event: asyncio.Event) -> None:
     - 每 15 分钟做一次 SLA 检查 + 前置预警检查
     - stop_event.set() 后退出循环
     """
-    last_check_at = 0.0
     loop_count = 0
     while not stop_event.is_set():
         # 每轮先写心跳
@@ -129,8 +129,14 @@ async def _check_prewarning(db: AsyncSession) -> int:
     warned_count = 0
 
     for ticket in tickets:
+        # SQLite / TIMESTAMP WITHOUT TIME ZONE 读回的 due_at 可能是 naive；
+        # 按 UTC 解释后再进行 Python 层比较，避免 naive/aware 混用。
+        due_at = ensure_utc_aware(ticket.due_at)
+        if due_at is None:
+            continue
+
         # Determine warning level
-        if ticket.due_at <= t_8h:
+        if due_at <= t_8h:
             level = "orange"
         else:
             level = "yellow"
@@ -152,7 +158,7 @@ async def _check_prewarning(db: AsyncSession) -> int:
             continue
 
         # Send notification
-        remaining_hours = (ticket.due_at - now).total_seconds() / 3600
+        remaining_hours = (due_at - now).total_seconds() / 3600
         await _send_prewarning_notification(
             db=db,
             ticket=ticket,
