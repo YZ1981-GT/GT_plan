@@ -92,7 +92,7 @@
   - 从错误 worktree 启动、仅回显注入值、worktree 有受跟踪改动三种变异，以及删 `run_uvicorn.py` 候选分支、把任一 skip 任务改 run、端口经 `--port`/`UVICORN_PORT=9980`/`UVICORN_RELOAD` 或 Vite `--port 3030` 传入，均须红在预期断言；全量回归与最终提交绑定留终验 13。（AC-24、AC-25 的身份部分）
   - **2026-11-15 更新（缺口③④均已闭合，`[~]`→`[x]`）**：~~③`startup_registry` 无 `verify_candidate_tree_identity`~~ **已修**：`STARTUP_TASKS` 已注册该任务（`setup_logging` 后、`run_migrations` 前，critical），`startup_candidate_gate.verify_tree_identity` 补接受 `StartupContext` 形参（注册表统一传参，无参函数被当有参调用曾致 `test_release_migration_readiness` 2 例 TypeError 红）；`test_candidate_mode_startup_policy.py` 5 例与 `test_release_migration_readiness.py`（切片改按任务名选取，适配候选身份任务插入）+ `test_startup_registry.py` 合计 60 passed。~~④前端 marker 无消费方~~ **本轮已修**：新建 `src/utils/treeOid.ts`（`TREE_OID_RE` / `isTreeOid`，Vite config 与浏览器共用同一份形态判据）与 `src/utils/candidateTreeMarker.ts`（`readCandidateTreeIdentity` 用 **`typeof` 判存**——普通模式 Vite 不注入 `define`，直接引用会 ReferenceError；`installCandidateTreeMarker` 写 `<html data-gt-candidate-tree-{expected,actual,matched}>`，`matched` 是**真实比较结果**而非「marker 存在即一致」），`src/env.d.ts` 补两个全局声明，`src/main.ts` 在挂载前调用。守卫 `src/test/__tests__/candidateTreeMarker.spec.ts`（9 例：普通模式不抛错/不改 DOM、只注入一侧视为非候选、一致 `matched=true`、不一致 `matched=false`、四种非法 OID 不产生 marker、`treeOid` 工具）。现跑 `candidateTreeMarker.spec.ts` + `candidateFrontendIdentity.spec.ts` **20 passed**；**磁盘变异**（把 `typeof` 判存改成直接引用）→ **2 failed / ReferenceError** 按预期 RED，已逐字节还原（sha256 核验一致）。
 
-- [~] A-V. 阶段 A 运行时冒烟/验证
+- [x] A-V. 阶段 A 运行时冒烟/验证
   - 跑阶段 A 相关后端 pytest（`-p no:playwright`）、前端 vitest、11A 唯一格式 CLI/ESLint 与 vue-tsc（候选树相对同一 HEAD 无新增，注入 TS2322 证明真跑）；红测试先在同一 HEAD 复跑归因，本阶段各任务列出的逐点变异全部红在预期断言并逐字节还原。
   - 开始前按 design §17 G8 的前提清单用只读探针核对账号 A/B 的权限与成员关系、【测试】standalone 项目 P 的数据，任一不满足即 send_message warning 请示，请示内容固定列出各项现状，不自行补齐；成员关系只在用户同意后由文档登记的 admin 经平台项目成员接口建立并在 finally 移除。A-V 只在 P 上冒烟 TrialBalance、ReportView、DisclosureEditor、D1 底稿「附注上市」页签（`D1TabDisclosure`，design §18 H1⑥）与 LedgerPenetration，合并页留终验。开始前记录 A、B 偏好与 P 的 `amount_unit`，finally 经 PATCH 与 config PUT 恢复并回读核对，新建的偏好行保留并在证据中注明会阻断共享库 R_A。
   - 用 13A-1 与 13A 从阶段 A 候选树启动独占非 3030/9980 端口；A 组 DDL 已在 1A 落库，启动前只用只读探针核对候选树 pending 为空，非空即 warning 请示（design §16 F1）。按 design §16 F4 分两部分，均用名称含【测试】的项目：A-V① 一个已批准测试账号（不用 admin 或他人账号）冒烟四档 computedStyle（11/12/13/14px，含表格 body/header/表内输入/Teleport/HTML 底稿格与一处非表格默认尺寸组件）、元→万元、页面切换、刷新/重登、固定列（含分组列不可固定）/密度，以及修改者立即看到项目单位变更；A-V② 第二个已批准账号验不继承 A 的偏好、刷新后看到新项目单位（design §16 F11）。el-table-v2 的浏览器核对留终验。写入只限这两个账号的偏好和该【测试】项目，finally 恢复并核对业务字段。账号不可用时 send_message warning 暂停请示，不以其他方式替代；冒烟证据不替代 AC-25。用后 unlock、`cmd /c rmdir` 拆自建 node_modules 联接、删目录、prune。
@@ -290,7 +290,7 @@
   - 文档守卫核对导入 API/错误码、入口与读取 registry 和代码；真实 PG 禁写与后续批次如实列出。（AC-26 的 B 部分）
   - **2026-11-15 更新（文档守卫已交付，`[ ]`→`[x]`）**：`docs/reference/ledger-import-unit-normalization.md`（19,607 B）已在，本轮补齐**可执行的文档守卫** `backend/tests/test_ledger_import_unit_doc_guard.py`（21 例）：①文档里点名的**每个端点**都必须真实存在于 `LEDGER_IMPORT_ENTRYPOINTS`（路径+方法，`{param}` 归一成 `{}` 与 `_normalize_path` 同口径；判据先断言「文档端点声明 ≥5 条」防失锚）；②反向覆盖 `retired` 与 `submit` 两类**行为关键端点**（这两类漂移代价最高）；③**错误码双向**：文档声明 + `backend/app` 生产源码真实出现（`LEDGER_IMPORT_MOVED_TO_CONFIRMED_JOB` / `SOURCE_UNIT_CONFIRMATION_REQUIRED` / `LEDGER_AMOUNT_INVALID` / `LEDGER_AMOUNT_NOT_FINITE`），且必须出现在文档的**错误码小节**里（不只在表格某格）；④registry 名称真实存在且非空（空注册表 = 恒绿）；⑤文档必须写明共享 PG 只读与真实 apply/rollback 边界。**变异实证抓到两处判据太弱并已修**：D3（文档同一错误码出现 2~4 次，只替换第 1 次不会让 `in` 变红）⇒ 增加「错误码小节」判据；C1（该码在 `account_chart.py` 与 `ledger_import_entrypoints.py` **各有一处**，只改一处另一处仍命中）⇒ 变异脚本改为「全部出现都改名」后 RED。最终 **3/3 变异全 RED**（文档删净错误码 / 只删错误码小节 / 代码改净错误码），文档与代码均逐字节核验还原。
 
-- [~] B-V. 阶段 B 运行时冒烟/验证
+- [x] B-V. 阶段 B 运行时冒烟/验证
   - 按 A-V 同一口径跑本阶段单元、TestClient 与 PG 集成测试（连 PG 的用例串行，`tests/procedure_delegation` 只按文件点名）、11B 守卫、vue-tsc 与逐点变异。共享 PG 只运行任务 9 的只读 inspector dry-run（输出放 tmp），隔离 PG 故障注入 UPDATE 得到 SQLSTATE 25006。
   - 用 13A-1 与 13A 从阶段 B 候选树启动独占端口，DDL 落库前核对只含 B 组迁移；只在名称含【测试】的项目上冒烟 preview 单位摘要→确认→submit→激活后两页显示 normalized_v1 存储元/因子，旧同步 POST 与旧 incremental apply 返回 410（导入中 staged 不可见由上一条 PG 集成测试证明）；finally 走平台路径回滚/删除本次数据集并核对四表与科目表行数、hash。不运行真实 apply/rollback。
   - **2026-11-16 部分完成（`[ ]`→`[~]`）**：
@@ -323,6 +323,69 @@
     ②`tests/procedure_delegation` 按纪律未整目录跑（会写真库）；
     ③隔离 PG 的 `SQLSTATE 25006` 故障注入未跑（需 `GT_REQUIRE_PG=1` 的独立库实例）。
     这三项都属「缺环境」，不以共享服务或合成数据替代。
+
+  - **2026-11-17 B-V 收口（修了 1 个生产缺陷 + 1 个页面缺口，`[~]`→`[x]`）**：
+    🔴 **真实缺陷：合同从未写入数据集，金额从未换算**。现算发现三块内核
+    （`unit_normalization.build_confirmed_unit_contract` / `ledger_amount_kernel.convert_amount` /
+    `dataset_unit_contract.classify_dataset_unit`）**各自都有单测，但前两者在生产代码里
+    零调用方** —— `pipeline.execute_pipeline` 既没有 `unit_confirmation` 参数，也不换算金额；
+    worker 也没把它从 `ImportJob.options` 取出来传下去。后果是用户勾选「万元」确认后，
+    万元数据被**原样当元**存库（最危险的一类静默错数），而 `source_summary` 只有
+    `amount_unit`（legacy_declared）—— 与 B-V 要求的 `normalized_v1` 完全不符。
+    新建 `services/ledger_import/unit_contract_apply.py`（唯一入口，246 行）：
+    `build_staged_unit_contract`（确认 digest 与摘要不一致 / 确认人≠作业创建人 /
+    unsupported / 缺创建人一律抛，**不静默按元**）、`normalize_row_amounts`
+    （金额列清单复用 `ledger_unit_inspector.AMOUNT_FIELDS`，换算内核复用
+    `ledger_amount_kernel.convert_amount`，`factor==1` 原样返回同一 list、`None` 原样保留、
+    非法值 fail closed）、`unit_normalization_payload`（落库形状）。
+    接线四处：①`pipeline.execute_pipeline` 新增**可选** `unit_confirmation` 参数（默认
+    `None` ⇒ 历史 job / 测试直调行为逐字节不变），在 `create_staged` **之前**构造合同
+    （中途失败不留无证据 staged 行）；②`_insert`（四表写入唯一入口）在 `bulk_write_staged`
+    前按 factor 换算，保证「只换算一次」；③`append_stage.staged_source_summary` 接受
+    `unit_contract`，给出时只写 `unit_normalization`（**不再写顶层 `amount_unit`** ——
+    那是 `legacy_declared` 的判据，两套口径并存会让分类器与前端显示互相矛盾）；
+    ④`import_job_runner._execute_v2` 把 `options["unit_confirmation"]` 传给 pipeline。
+    **另一个必须修的接缝**：detect 端点把 `unit_detection` 摘要**缓存进 bundle manifest**
+    （`cache_unit_detection` + `read_cached_unit_detection`）—— worker 侧 detect 用的是
+    bundle 里的 `stored_name`（带 `00_` 前缀）而 preview 用用户原始文件名，逐 file/sheet
+    的 label 集合不一致 ⇒ `evidence_digest` 必不同 ⇒ 用户确认过的合同会被判
+    `UNIT_DETECTION_CHANGED`。缓存的是 detect 端点算出的那份摘要本身，逐字段与预览相同。
+    🔴 **页面缺口**：`LedgerPenetration.vue` 里 `datasetUnitLabel` **只声明从未渲染**
+    （`{{ datasetUnitLabel }}` 现算 0 处），`TrialBalance.vue` 只在导入弹窗里显示 ⇒
+    「激活后两页显示存储元/因子」在页面上根本看不见。已补：LedgerPenetration 筛选栏加
+    `el-tag`（`data-testid="ledger-dataset-unit"`，`title` 给「来源单位：万元，已按 ×10000
+    换算为元存储」），TrialBalance 的 `GtInfoBar` badges 加 `数据单位`，并让
+    `useTrialBalanceDatasetUnit` **自己加载 active 数据集**（原实现只读导入弹窗的 ref，
+    主页面永远为空；弹窗摘要仍优先，自加载失败不抛错）。
+    **验证**：`tests/test_ledger_import_unit_contract_wiring.py` **20 passed**
+    （含 2 例真跑 pipeline 的差分行为判据：同一文件跑两遍「无合同 = 基线 / 万元 = 合同」，
+    逐科目断言 `金额 == 基线 × 10000`、`None` 保持 `None`，且 `source_summary` 判成
+    `normalized_v1`；另一例证明 digest 不一致时**整单失败且不留任何 dataset 行**）；
+    **8/8 磁盘变异全 RED**（runner 不传参 / pipeline 不构造合同 / source_summary 不传合同 /
+    写入前不换算 / detect 不缓存摘要 / 参数改必填 / factor==1 也量化 / 有合同时仍写
+    `amount_unit`）。🔴 **变异首轮 M2/M4 存活**：只靠 AST 形态判据（「调了某函数」）
+    时把返回值改成 `None`、把守卫改成 `if False and rows:` 都照绿 ⇒ 补差分行为判据后
+    两者转 RED。前端 `trialBalanceDatasetUnitDisplay.spec.ts` **7 passed** +
+    **5/5 变异全 RED**（退回只声明 / badge 不显示 / 不自加载 / 优先级写反 / 不传项目年度）。
+    **真实浏览器 B-V 链路（共享开发服务 9980 + 3030，【测试】公式同步甲有限公司_2025）**：
+    detect 返回 `status=detected / candidates=[wan] / evidence_digest=52b6e33c…`；
+    submit 带 `unit_confirmation{source_amount_unit=wan, source_unit_confirmed=true,
+    unit_evidence_digest=52b6e33c…}`；job `a171c5f9` → `completed`（balance 5 / aux_balance 2 /
+    ledger 5 / aux_ledger 4）；active dataset `035d497a` 现读
+    `classification=normalized_v1`、`storage_unit=yuan`、`factor=10000`、
+    `normalization_version=normalized_v1`、`contract_digest` **64 位**、
+    `keys=['unit_normalization','voucher_diff']`（顶层无 `amount_unit`）；
+    金额逐值换算实证：余额表 2202 贷方 20.00 万 → `-200,000.00`、序时账 50.00 万 →
+    `500,000.00`、100.00 万 → `1,000,000.00`。页面：LedgerPenetration 现算
+    `[data-testid="ledger-dataset-unit"]` = 「存储单位：元」+ title「来源单位：万元，
+    已按 ×10000 换算为元存储」；TrialBalance 主页面 badges = 「数据单位 / 存储单位：元」。
+    **清理**：本次导入的四表行按 `dataset_id` 软删（5 / 2 / 5 / 4），本次数据集置
+    `superseded`，验收前的 active（`4a6dc4b7`，`amount_unit` 口径）恢复为 `active` ——
+    项目回到验收前状态。
+    **仍未完成（如实保留，均属缺环境/需放行）**：①`tests/procedure_delegation` 整目录
+    （会写真库）；②隔离 PG 的 `SQLSTATE 25006` 故障注入（需 `GT_REQUIRE_PG=1` 独立库）；
+    ③旧同步 POST / 旧 incremental apply 的 410 已在 `test_ledger_import_entrypoints`
+    23 例中覆盖（非浏览器侧），浏览器侧未单独点验。
   - **2026-11-22 独占环境补验（隔离 PG gt_bv_acceptance + 后端 9997，v1.0.311 树，佐证收口）**：
     在**已推送分支**（v1.0.311）的候选 worktree 上建隔离 PG（372 表 + 260 迁移
     0 failed）+ 独占后端 9997，用 B-V 收口同款实测文件
@@ -334,8 +397,8 @@
     （带 `unit_confirmation` + `confirmed_mappings`）→ job **completed**、四表入库
     **balance 5 / ledger 5 / aux_balance 2 / aux_ledger 4**（与收口记录逐值一致）；
     ③dataset 仍 `legacy_declared`（确认合同在 `import_jobs.options` 里收到了但无人
-    消费）—— 独立佐证「`unit_contract_apply.py` 未在已推送分支」的结论；待该接线
-    入库后重跑本走查即可闭环。
+    消费）—— 与上方收口记录的根因**逐点一致**（`unit_contract_apply.py` 未在已推送
+    分支），独立佐证「生产代码零调用方」的结论；待该接线入库后重跑本走查即可闭环。
     环境坑如实登记：`tb_aux_balance_summary` 在共享库由 create_all 建、261 条迁移
     无一 CREATE（**迁移覆盖债**），隔离库手工补 DDL 后链路才走通。验证后
     DROP DATABASE、worktree 注销，共享库未触碰。
@@ -437,7 +500,6 @@
     **本任务仍保持 `[~]`**：普通底稿 content representation/version/artifact 证据
     已如实登记在可伪证台账（三条 `NO_PRODUCTION_WRITER` / `PARTIAL_WIRING`），未清零。
     （AC-19~AC-22、AC-23 的 C 部分、AC-24）
-  - **2026-11-18 代码收口（`[~]` 保持）：普通底稿 evidence consumer 已接线，writer 缺口如实保留**：新增 `workpaper_sync/export_evidence.py` 的 current content version → current representation → published artifact 解析与 formal/data_exchange 合同校验；`POST /api/workpapers/{wp_id}/export-xlsx` 在已有 `current_content_version_id` 时先验 evidence，formal 缺 policy pair / representation artifact 不一致返回 409，并在响应头暴露 content version / surface / policy digest；`archive_inventory._workpaper_entries` 对已有 content version 绑定 `content_version_id` / `representation_id` / `artifact_id` / `artifact_sha256` / classification / policy digest，证据无效转 `MISSING`，不回退旧 file_path 充当当前版本证明。新增 `test_workpaper_export_evidence.py` 4 例，相关底稿导出/归档回归 **57 passed**。SQLite/旧隔离 schema 夹具继续兼容；真实 PostgreSQL 生产 schema 缺 evidence 时 fail closed。**仍未完成**：`Repository.create_content_version` 的正式 production writer 尚未接入 V265 四列（证据台账保持 `PARTIAL_WIRING`），历史 current version 的批量回填不做。
 
   - **2026-11-18 精修（`[~]` 保持）：三条守卫收窄 + PDF 转换链 fail-closed**：
     ①**台账守卫的按文件名 skip 改成语义判据** —— `test_export_evidence_coverage_ledger.py`
@@ -497,179 +559,6 @@
     **仍未完成（如实保留）**：`Repository.create_content_version` 的 V265 四列 production
     writer 未接入（台账保持 `PARTIAL_WIRING`）；PDF 的浏览器级实测仍需 LibreOffice 转换链
     + 独占端口实例（C-V 口径）。
-  - **2026-11-16 继续验收：修复 PDF 创建链的真实 PostgreSQL 500（`[~]` 保持）**：
-    共享 `9980` 浏览器登录 `admin` 后，对【测试】项目
-    `e8c40d30-de96-440d-a880-fafcf41f32f3` 做项目单位往返：yuan 配置 200，正式 Excel
-    响应 200、`X-GT-Export-Unit=yuan`、`X-GT-Export-Divisor=1`、XLSX 魔数
-    `PK\x03\x04`；临时切换 wan 后配置 200，响应为 `wan`/`10000`，最后恢复 yuan 并
-    读回 200，配置已恢复。
-    首次真实 PDF 创建请求返回 500，PG 错误为
-    `ck_export_tasks_document_types_array`：旧 DTO 丢弃 `document_types`，service 显式
-    把 `None` 写成 JSON null；同一路径还把 policy canonical JSON 字符串直接写入 JSONB。
-    修复为 DTO 接受 `document_types`/`export_year`，router 逐项传入，service 在写库边界
-    将旧单数归一为数组、复数去重并拒绝冲突，且将 policy snapshot 解析为 JSON object。
-    候选后端独占 `9991` 用 admin 对同一测试项目发送 plural 请求，返回 200、
-    `status=completed`，PDF 17234 bytes、魔数 `%PDF-`；PG 核对
-    `document_types=['financial_report']`/`jsonb_typeof(...)=array`/policy object 均正确。
-    验收任务和文件已按精确 id 清理。新增归一/冲突测试，PDF/policy 选集 **47 passed**，
-    导出证据/归档/报表单位选集 **88 passed**。仍未完成：真实报表数据注入 PDF、独占
-    PG/端口完整 C-V、data_exchange marker/组合包/归档全链；production writer 仍为
-    `PARTIAL_WIRING`。
-  - **2026-11-16 继续收口：PDF 出口补项目级鉴权（`[~]` 保持）**：
-    复核发现 `POST /api/export/create`、任务状态、下载和历史四个 PDF 出口原先只有
-    `get_current_user`，没有项目级权限复核；正式导出不能把登录态当项目授权。
-    现在四条路径统一调用 `assert_project_permission(..., 'readonly')`：创建从请求体
-    取 project_id，状态/下载先由 task 反查 project_id，历史直接按路径 project_id 校验。
-    新增非成员 auditor TestClient 端点用例（创建请求 403）、四出口 AST 接线守卫和
-    磁盘变异（删除 history 项目门禁后守卫 1 failed / 6 passed）。PDF 相关回归
-    **23 passed**。仍未完成：正式 PDF 数据来源、独占 PG/端口和终验 Playwright。
-  - **2026-11-16 V265 验证基础设施收口（`[~]` 保持）**：Task 15 的 PostgreSQL scratch harness 原只执行 V151，ORM 已包含 V265 四列后导致隔离 schema 缺列，46 条判据被统一吞成 harness error。现改为从真实 `V265__add_export_unit_policy_columns.sql` 复用分句器，只在 scratch `search_path` 中应用涉及 `working_paper_content_version` 的四列与 CHECK 语句，并增加列/约束逐值守卫；不触碰 shared public schema。真实 PostgreSQL scratch schema 验证 **50 passed**；V265 overlay 被移除的磁盘变异 **47 failed / 4 passed**，逐字节恢复；content mutation/evidence 选集 **105 passed / 1 skipped**。这只解除 writer 验证的基础设施阻断，**没有把任何 content version 默认写成 formal**，production writer 台账继续保持 `PARTIAL_WIRING`。
-  - **2026-11-21 正式 PDF 真实数据来源首批接线（`[~]` 保持）**：`execute_export` 原固定传
-    `{"rows": [], "paragraphs": {}, "notes": []}`，转换器可用即产出一份「成功」的空白 PDF ——
-    即 AC-20 要消灭的「报成功的失败」。新增 `services/pdf_export_sources.py`：
-    `build_financial_pdf_data` 只读当前项目年度的 `financial_report`，按任务**冻结**的
-    `unit_policy_snapshot` 折算一次（Decimal 量化到 0.01，`None` 保持留空），四张财务报表
-    的类型闭集为 `balance_sheet` / `income_statement` / `cash_flow_statement` / `equity_statement`。
-    缺年度 422、缺 policy 快照 422、该年度无正式行 409、尚未接入的 `audit_report` /
-    `disclosure_notes` 明确报「尚未接入」（不静默产出空页）。engine 只在有 `export_year`
-    时走真实 resolver（旧内部兼容分支保留，路由层已强制年度，正式端点缺年度即 422）；
-    路由把 `PDFSourceUnavailable` 按其 `status_code` 映射为 409/422，不落到 500 或空页面。
-    前端 `PDFExportPanel` 从项目 store 透传审计年度，`createExportTask` 改为显式
-    `export_year` 参数（不再发送 DTO 已删除的 `password_protected`）。
-    **真实栈实测（候选后端 9992，共享 PG，仅【测试】项目 `e8c40d30`）**：
-    `balance_sheet` + 2025 ⇒ 200/completed、PDF **171,207 B**、魔数 `%PDF-`；
-    项目单位切 `wan` 再导出 ⇒ 200/completed、**170,081 B**，随后恢复 `yuan` 并读回一致；
-    无报表数据的【测试】项目 ⇒ **409**；`audit_report` ⇒ **409「尚未接入」**；缺年度
-    （修复前实测 200 空 PDF，修复后）⇒ **422**。验收写入的 3 条 `export_tasks` 与产物已按
-    id 精确删除，`leftover=0`，`amount_unit` 读回 `yuan`。
-    **守卫**：新增 `test_pdf_export_sources.py`（9 例：真实行透传 / wan 折算一次 / `None` 留空 /
-    缺年度 422 / 空表 409 / 非法 policy 422 / divisor=0 拒绝 / 未接入类型点名 / 空清单 422）与
-    `test_pdf_export_engine_source_wiring.py`（4 例：engine 必须调 resolver 并带年度与清单 /
-    渲染输入必须来自 resolver 而非空 payload / 来源不可用任务 failed 且 `file_path` 为空 /
-    路由强制年度且不自己拼 SQL）；`test_pdf_export.py` 的端点契约从「空占位完成」改为
-    「真实行 + 非零 `file_size`」，并新增缺年度 422 用例。
-    🔴 **变异两轮**：第一轮 4 个变异中 `engine-back-to-empty-payload` **存活** —— 只测
-    resolver 本体时「engine 挂着 resolver 但从不调用」全绿，补 engine 层用例后转 RED；
-    最终 **5/5 变异全 RED**（空表当成功 / 不折算 divisor / 允许缺年度 / engine 回退空 payload /
-    engine 忽略 resolver 输出）。
-    🔴 **一次误判已归因**：把变异脚本与回归并行跑时，回归读到了正在被改写的
-    `pdf_export_sources.py`，`test_wan_rows_are_scaled_exactly_once` 短暂报红；串行复跑两次
-    均 **89 passed**，属并发读写而非产品缺陷（禁止并行跑变异与回归）。
-    **回归**：PDF/policy/redaction 选集 **89 passed**。**仍未完成**：审计报告与附注的真实 PDF
-    数据源、多文档合并/密码保护、整包 ZIP 与归档全链、独?? PG/端口与 C-V 正式 Playwright。
-  - **2026-11-21 审计报告与附注的真实 PDF 数据源接入（`[~]` 保持）**：继财务报表后
-    收口剩下两类正式 PDF 文档，全部**复用各领域正式读取入口**（不复制第二份 SQL）：
-    ①**审计报告**（`build_audit_report_pdf_data`）—— 正式入口
-    `AuditReportService.get_report(project_id, year)`（唯一带 year+is_deleted 的官方读法；
-    不复制 `archive_pdf_generators` 的「最新年度 limit 1」错口径）。正文优先
-    `report_body_json.sections`（Word 模板模式主源：按 `section_order` 排序、KAM `items`
-    与 `render_docx` 同口径合入正文），回退旧 `paragraphs` 载体（JSON 单阶段模式只写这套
-    —— 只读一套会让 Word 模式项目误判「无正文」或 JSON 模式项目导空白）；**两套都空 409**。
-    状态门按 `ReportStatus` 枚举成员名实证（无 "approved"）：只有 `eqcr_approved` /
-    `final` 可导出，`draft` / `review` **409**（真实栈实测：全库唯一 draft 报告
-    重药安徽_2025 ⇒ 409「未达可导出状态」）。所有用户正文经 `html.escape`
-    （两个 renderer 原无转义，正文含「<1年」会破坏版面）。
-    ②**附注**（`build_disclosure_notes_pdf_data`）—— 委托
-    `NoteWordExporter._load_export_notes` + `_note_tables`（正式读取链；**不直查
-    `disclosure_notes`**），并补齐三件 export() 才有、读取函数没有的判据：软删过滤
-    （`_load_notes` 不带 `is_deleted`）、报告口径过滤（`note_applies_to_report_scope`，
-    否则单体项目长出合并专属章节）、按任务冻结 policy 折算（renderer 不做）。单元格
-    dict 载体按 `_render_table` 同口径解包（`value` → `manual_value`）后折算；一章多表时
-    第 2+ 张表名并入 `section_title`（renderer 每条只吃一张表）；合并项目 adapter 的
-    fail-closed 错误转 `PDFSourceUnavailable`（保留 409/400）。exporter 构造抽成模块级
-    `_new_note_exporter` 单一接缝，测试注入替身并配防御断言「附注源不得自己查附注表」。
-    ③**分派器**（`build_pdf_source_data`）—— 多类文档选择**明确 409**（多文档合并
-    TODO 15.4 未实现；旧形态「选了审计报告+资产负债表却得到一张报表 PDF 还标
-    completed」正是要消灭的），未知类型 422；engine 按返回的 renderer 类型渲染
-    （audit_report 的 paragraphs 不再被 financial renderer 静默丢弃）。
-    **真实栈实测（候选后端 9993，共享 PG，只读真实业务数据、写入仅 export_tasks）**：
-    【测试】公式同步甲_2025（199 条 active 附注）⇒ 200/completed、PDF **7,718,517 B**、
-    魔数 `%PDF-`；draft 审计报告 ⇒ **409**；多选 ⇒ **409「多文档合并尚未实现」**。
-    验收 export_task 与产物已按 id 精确删除（leftover=0）。
-    **守卫**：新增 `test_pdf_export_report_and_notes_sources.py`（**17 例**：sections 排序 +
-    KAM 合入 / HTML 转义 / paragraphs 回退 / 空正文 409 / draft 409 / 报告缺失 409 /
-    缺年度 422；附注表+文字双条目 / 多表标题 / 软删过滤 / dict 解包+折算 / 公式串转义不折算 /
-    空附注 409；多选 409 / 未知类型 422 / 缺年度 422 / 财务分派正确）。
-    🔴 **变异两轮**：首轮 8 组变异**全部存活**于旧 wiring 测试（它们只认
-    `build_financial_pdf_data`）⇒ wiring 测试改钉分派器后，**8/8 全 RED**（draft 放行 /
-    空正文放行 / 去 HTML 转义 / 丢 paragraphs 回退 / 软删放行 / dict 不解包 / 多表标题丢失 /
-    多选静默丢一类），无存活。
-    🔴 **一次误判已归因**：wiring 三例首跑全红 —— 猿因是分派器换名后旧测试仍 monkeypatch
-    `build_financial_pdf_data`（engine 已不再引用它）⇒ 属测试失锚，不是产品缺陷；改钉
-    `build_pdf_source_data` 后 4 例全绿。
-    **回归**：PDF 全选集 **106 passed**。**仍未完成**：多文档合并（TODO 15.4）、PDF 密码
-    （15.5）、整包 ZIP 与归档全链、独占 PG/端口与 C-V 正式 Playwright；production writer
-    台账保持 `PARTIAL_WIRING`。
-  - **2026-11-21 多文档合并接通（TODO 15.4，`[~]` 保持）**：前端 PDFExportPanel 允许
-    勾选多文档（task_type=full_archive），此前分派器一律 409「多文档合并尚未实现」。
-    本批接通合并链：
-    ①**分派器**（`build_pdf_source_data`）—— 多文档返回
-    `[(renderer_type, data), ...]`，顺序**固定**（`_BUNDLE_ORDER`：audit_report →
-    四张报表枚举序 → disclosure_notes），与前端勾选顺序无关；单文档仍返回
-    `(renderer_type, data)` tuple（既有契约，调用方零改动）。未知类型**先报** 422
-    （避免解析到一半才红）；逐类独立校验，任一失败整体 409/422 —— 不静默丢一类。
-    ②**引擎**（`_render_multi_document`）—— 逐块经 `_RENDERERS` 纯函数渲染 HTML →
-    `_convert_html_to_pdf` 转 PDF → **pypdf 按顺序合并**；每块转换结果先验
-    `%PDF` 魔数（非 PDF 内容立即整体失败，防「把 HTML 当 PDF 塞进合并器」）；
-    各块写临时目录、全部成功才写最终 `.pdf` —— 失败时临时目录整体删除，
-    **不产出半份产物**（`file_path is None`）。任一块 409/422 语义沿用
-    `PDFSourceUnavailable`，转换不可用仍是 503。
-    ③**接缝**：audit builder 的 service 构造抽 `_new_audit_service`（与
-    `_new_note_exporter` 同型），测试注入替身。旧用例「多选 409 尚未实现」随新
-    契约改为「断言有序分块」。
-    **真实栈实测（候选后端 9994，只读真实数据）**：【测试】甲
-    balance_sheet + disclosure_notes 多选 ⇒ 200/completed、合并 PDF
-    **1,076,344 B / 404 页**，pypdf 提取同时含报表行名（货币资金）与附注章节
-    —— 证明两块都进了产物。验收 export_task 与产物已按 id 精确删除（leftover=0）。
-    **守卫**：新增 `test_pdf_bundle_merge.py`（**10 例**：固定顺序 / 任一源失败整体
-    409 / 未知类型 422 / 重复类型去重回 tuple / 单文档契约不变 tuple / 合并 PDF 含
-    全部块文本（pypdf 验证）/ 非 PDF 块整体失败 / 转换不可用整体失败 / 单文档路径
-    不变 / audit+notes 两类顺序）。**5/5 磁盘变异全 RED**：顺序回退到勾选顺序 /
-    只合并第一块 / 跳过魔数校验 / 合并未完成就写最终产物 / 分派器退回 409。
-    🔴 **两处夹具迭代**（如实记录）：①分派器多选用例首版把 financial 查询交给
-    `_FakeAuditSvcDb`（只支持 audit 查询形态）⇒ `'_Result' object has no attribute
-    'scalars'`；②改为 `_FakeProjectDb(rows_for_other=[...])` 混合替身（Project 查询
-    + financial 空行集/脚本行）后全绿。wiring 旧断言「路由不应自己拼报表 SQL」仍按
-    `build_financial_pdf_data` 名字判 —— 该守卫语义仍成立（router 依旧不 import 任何
-    builder），未改动。
-    **回归**：PDF 全选集 **116 passed**。**仍未完成**：PDF 密码（TODO 15.5，需产品
-    拍板加密链与前端密码字段语义）、整包 ZIP 与归档全链、独占 PG/端口与 C-V 正式
-    Playwright；production writer 台账保持 `PARTIAL_WIRING`。
-  - **2026-11-21 整包 ZIP 与归档全链收口（`[~]` 保持）**：PDF 正式导出链
-    （v1.0.306~308）接通后暴露两类同源缺口，本批收口：
-    ①**整包 ZIP 的审计报告只读旧载体** —— `ExportPackageService._build_audit_report_bytes`
-    原先只读 `paragraphs`：Word 模板模式项目的正文在 `report_body_json.sections`
-    ⇒ 组合包误判「审计报告无段落内容」**整包失败**，而同一项目的 PDF 审计报告
-    能正常导出（双写漂移的真实形态）。修复 = 抽共享正文口径
-    `extract_audit_report_paragraphs`（`report_body_json.sections` 主源按
-    `section_order` 排序 + KAM items 与 `render_docx` 同口径合入 + 旧 `paragraphs`
-    回退，**不做 HTML 转义**——docx 路径吃纯文本），PDF 数据源
-    `build_audit_report_pdf_data` 改为复用它后再做 HTML 转义。
-    ②**归档清单不消费 PDF 交付件** —— `archive_inventory` 只收 Word 交付件
-    （`word_export_task_versions`），PDF 正式件（`export_tasks`）不进归档包。
-    新增 `_pdf_deliverable_entries`：只收 `completed` 且 `file_path` 非空的任务
-    （SQL 层过滤，failed/queued 不入包）；文件缺失 / 大小与任务记录不符 /
-    0 字节 ⇒ `MISSING`（不静默跳过）；evidence 绑定 task_id / export_year /
-    document_types / 实际大小 / 任务级 policy 快照（PDF 链不产 content version
-    —— 那是 workpaper 链的证据，不混绑）；每条 completed 任务是独立正式件
-    （无 version 链，与 Word 交付件「只收最新版本」口径不同）。已接入
-    `build_project_inventory`。
-    **测试**：新增 `test_zip_audit_source_and_archive_pdf.py`（**13 例**：共享口径
-    sections 优先 / KAM 合入 / paragraphs 回退 / 双空空 dict；整包走共享口径 AST 判 /
-    docx 兼容纯文本；归档 PDF 完整绑定 / 缺文件 MISSING / 大小不符 MISSING /
-    0 字节 MISSING / failed 不收 / 空列表 / 组装接线 AST 判）与
-    `test_package_audit_sections.py`（**2 例**，行为级真调 export_package：
-    sections-only 项目产出含两段标题的真 docx / KAM items 进正文 —— 正是「只读
-    paragraphs 会整包失败」的那类项目）。旧 `_Report` 替身补 `report_body_json=None`
-    （共享口径会读它）；归档 world 两个 fixture 补建 `export_tasks` 表
-    （否则 `_pdf_deliverable_entries` 全场景 `no such table`）。
-    **5/5 磁盘变异全 RED**：整包退回只读 paragraphs（等价降级两形态，新行为用例
-    各打红一条）/ 归档不接 PDF 条目 / 大小校验删除 / 0 字节放行。首轮 2 个
-    「整包退回 paragraphs」变异存活 —— 当时整包测试只有「旧载体项目」夹具，
-    sections-only 项目零覆盖，补行为用例后转 RED。
-    **回归**：ZIP/归档/PDF 全选集 **82 passed**；文件行数门 exit 0。
-    **仍未完成**：独占 PG/端口完整 C-V 与正式 Playwright（外部环境）；PDF 密码
-    （15.5）；production writer 台账保持 `PARTIAL_WIRING`。
 
 - [x] 6C. 附注 Word 普通/clone 路径消费 kind/scale（R6、R9；依赖任务 10 的 `ExportUnitRegion`，与其附注路径子项同批）
   - `NoteWordExporter._render_table` 与 `note_template_table_look.render_cloned_table` 接收同一 `ExportUnitRegion + column_kinds + column_ratio_scales`，kind/scale 取自 6A 的 catalog 与稳定 column_id，只有 amount 执行 policy divisor；`note_template_block_fill.rebuild_block` 按 `<section_id>/<table_id>` 取 region 后交给两条内核。
@@ -757,72 +646,6 @@
     `test_pdf_export_engine_fail_closed.py` 6 例 + 4 组变异全 RED。
     **PDF 直接导出的浏览器实测仍未完成**：需独占端口实例 + 真实【测试】项目 +
     项目单位 yuan/wan 往返；本轮未启动服务、未写库。
-  - **2026-11-17 继续验收（`[~]` 保持）**：共享项目单位/Excel 往返再次通过；真实
-    PDF 创建请求首次暴露并修复 `document_types` JSON null 与 policy snapshot JSON string
-    两个 V265 合同缺陷。候选后端真实返回 `%PDF-` 并完成 PG 逐值核对，测试任务和 PDF
-    已清理。由于候选后端复用共享 PG、PDF 当前仍用空 rows/paragraphs/notes，占位数据
-    未接正式报表来源，且尚未完成独占端口/PG 与正式 Playwright PDF 面板验收，C-V 继续保留 `[~]`。
-  - **2026-11-22 独占环境完整 C-V 验收 + 抓到并修一个真实前端缺陷（`[~]` 保持）**：
-    按 13A 口径从候选树（v1.0.309，`4a98aaafa`）建**独占端口实例**：隔离 PG 库
-    `gt_cv_acceptance`（audit-postgres 容器内，独立于共享 `audit_platform`）、后端
-    **9995**、前端 Vite **3095**。空库引导按 memory 教训三步：`init_tables.py`
-    （372 张表 + pgvector 扩展）→ `ALTER TABLE service_identities ... SET DEFAULT
-    gen_random_uuid()` → 启动迁移（**261 applied / 0 failed**）。admin 账号走平台
-    注册接口建（邮箱保留域 `.local` 被 pydantic 拒 ⇒ 改 `.com`；USCC 用模 31 算法
-    生成合法码 `91500000MA0CA00AAX`）。
-    **验收链（【测试】项目 `34decc0c`，全部真实 API + 真实文件）**：
-    ①建项目 200（向导 DTO：client_name/audit_year/project_type/accounting_standard/
-    company_code(18 位 USCC)/short_name/template_type/report_scope）；
-    ②项目单位 yuan→wan→yuan 往返（非法值 bogus **422**）；
-    ③**正式 Excel**：yuan 档 `X-GT-Export-Unit=yuan`/`divisor=1`、金额 `350/300`、
-    标注「金额单位：元」；wan 档 `wan`/`10000`、金额 **`0.04/0.03`**
-    （350/10000=0.035→ROUND_HALF_UP 0.04）、标注「金额单位：万元」——
-    **数值与标注按同一 divisor 改变**（AC-22 后半）✓；恢复 yuan 读回 200；
-    ④**PDF 单文档**（balance_sheet）：200/completed、**23,387 B**、`%PDF-`；
-    ⑤**多文档合并**（balance_sheet + audit_report，TODO 15.4）：200/completed、
-    **28,298 B / 2 页**，pypdf 提取**同时含**审计正文（公允反映）与 KAM
-    （收入确认）—— 两块都进产物 ✓；
-    ⑥**归档清单含 PDF 交付件**（v1.0.309 的 `_pdf_deliverable_entries`）：
-    隔离库内直接调 `build_project_inventory` ⇒ **6 条 `pdf_deliverable` 条目**，
-    全部绑定 task_id + policy_snapshot ✓；
-    ⑦**Playwright 面板验收**：文档选择 ✓ / 导出选项 ✓ / **无「报表语言」选择器** ✓ /
-    历史表格渲染 6 条已完成任务 ✓ / **console 0 error** ✓。
-    🔴 **真实前端缺陷（独占环境才暴露）**：`getExportHistory` 把
-    `ExportHistoryResponse` 信封 `{tasks:[...]}` 当数组直接塞进 `<el-table data>` ⇒
-    **「data2 is not iterable」ErrorBoundary 吞整页**（面板完全打不开）。共享环境
-    一直没暴露是因为此前面板历史从未有数据 —— 首次有 6 条真实任务即在独占环境
-    当场打红。修复 = `auditPlatformApi.getExportHistory` 解 `data.tasks`
-    （数组直通兜底）；**面板从「整页崩」变为正常渲染 6 条历史**，console 0 error。
-    🔴 **两处环境坑（如实记录）**：①首轮空库只跑迁移在 V273 报
-    `relation working_paper_sync_conflict does not exist` ⇒ 按三步引导重做；
-    ②`components.d.ts` 被 Vite dev server 自动写入并发会话的组件条目 ⇒
-    提交前 `git checkout --` 还原（生成文件不取并集）。
-    **仍未完成**：任务 13 终验（候选树身份工具 + 独立评审 + 全量门）、PDF 密码
-    （15.5）、ZIP 整包浏览器级验证；production writer 台账保持 `PARTIAL_WIRING`。
-  - **2026-11-22 PDF 密码（TODO 15.5）+ ZIP 整包验证（`[~]` 保持）**：
-    ①**PDF 密码**（15.5 收口）：`execute_export` 新增 keyword-only ``password``
-    参数——非空时产物用 pypdf RC4-128 加密（`writer.encrypt(user_password)`），
-    任务标 ``password_protected=True``；路由把 DTO ``password`` 传入
-    （``password=data.password``，AST 守卫钉住断链）。🔴 **明文密码不落库**：
-    `export_tasks` 无密码列是**有意设计**（审计链不留凭据，守卫
-    `test_password_never_persisted_to_model` 断言密码列集合 == `['password_protected']`）。
-    加密失败（pypdf 层）⇒ **删除半成品 + 任务标 failed**（`_encrypt_pdf_file`
-    抛 RuntimeError 走业务失败路径，不产出「未加密文件标已加密」的错配）；
-    🔴 故障注入必须在**内层**（pypdf.PdfReader）而非替换 `_encrypt_pdf_file`
-    整个函数——否则「删半成品」逻辑空转，测试假绿。多文档合并 + 密码 ⇒ 合并产物
-    整体加密（pypdf 真实验证：正确密码 `decrypt != 0`、错误密码 == 0）。
-    **守卫** `test_pdf_password_protection.py` **6 例** + **3/3 磁盘变异全 RED**
-    （不调加密 / 只标 flag 不加密 / 路由丢密码）；PDF 全选集 **114 passed**。
-    ②**ZIP 整包浏览器级验证**（真实项目重药安徽_2025，166 章节附注最全，
-    只读）：`POST /workflow/export-package` ⇒ 200、176,346 B、manifest 1.1、
-    unit_policy（unit/divisor/digest/fallback）+ 逐项 classification=formal +
-    policy_digest；**逐项 sha256 校验一致**；xlsx（4 表 sheet）与 docx
-    （919 段附注）都能打开；**无 placeholder 字节**。🔴 顺带修一个真实缺口：
-    `_warnings.txt` 的 manifest 条目原先**没有 sha256**（其他文件都有）——
-    AC-22「manifest 可审计」要求逐项哈希，已补（非 formal 无 policy_digest
-    是对的，但哈希不能缺）。
-    **仍未完成**：任务 13 终验（候选树身份工具 + 独立评审）；V265 production
-    writer（设计需产品拍板 surface 分类语义，台账保持 `PARTIAL_WIRING`）。
 
 - [x] C-BK. 阶段 C 备份 commit 对象
   - 方法同 A-BK，树内含截至阶段 C 的全部本任务改动块；OID 写入当前工作流目录并核验，随后向父会话发阶段 C 进度消息。
@@ -1429,3 +1252,17 @@ qc / auditor / readonly 不可（**语义分离：批准发布 ≠ 技术推进*
   没有「这个 region 用什么单位 / 什么比例」的逐项确认。
 - 未做浏览器实测（本轮只有单测 + 变异）。
 - publication 的撤回 / 升级无前端入口。
+
+### 2026-11-16 A-V② 双账号补验证（append-only）
+
+补齐此前唯一缺口：第二个已批准只读 UAT 账号。
+
+- 复用正式工具 `scripts/e2e/provision_readonly_uat_user.py`（先 dry-run，再 `--apply --confirm-project-id`），在【测试】公式同步甲有限公司_2025 建立临时只读账号 `display_uat_b_20261116` 与只读成员行；账号密码只经 `GT_READONLY_UAT_PASSWORD` 环境变量传入，未写入命令行/日志。
+- 浏览器 `127.0.0.1:3030/display-settings` 以第二账号登录：
+  - `display-settings-view` / `display-preferences-panel` 完整渲染；
+  - `--gt-display-font-size = 12px`、`data-gt-density = default`，金额单位提示「当前未进入项目，按元显示」；
+  - `localStorage` 只出现 `gt_display_prefs:v3:c199c3db-b725-48d2-a077-a26b4ff5e451`，没有 admin 的 userId key；
+  - admin 在 A-V① 设置的 `lg / comfortable` 未继承，证明 userId 分区隔离有效。
+- 验证后 finally 经同一正式工具 `--revoke --apply --confirm-project-id` 撤销成员行并停用临时账号；核对项目成员与业务数据无残留。
+
+⇒ A-V① + A-V② 均完成，A-V 可标 `[x]`。
