@@ -682,9 +682,14 @@ def test_check_mode_fails_when_a_source_digest_changes(tmp_path: Path) -> None:
     assert fresh["input_digest"] == baseline["input_digest"], (
         "生成器 build() 的 digest 与磁盘不一致 —— 生成物已过期，先跑 --apply"
     )
-    # 同一份输入重跑必须字节相同（幂等，Requirement 1.4）。
-    assert GEN.render(fresh) == target.read_bytes(), (
-        "同一输入重跑产出不同字节 —— 生成器不幂等（时间戳/随机序进产物？）"
+    # 同一份输入重跑必须内容相同（幂等，Requirement 1.4）。
+    # 🔴 按**行尾归一化后**比较而不是逐字节：`core.autocrlf=true` 下磁盘文件是
+    # CRLF，而 `GEN.render(fresh)` 默认产 LF —— 逐字节比较会把「行尾是检出属性」
+    # 误判成「生成器不幂等」（实测：两边内容逐字段相等，只有 \n vs \r\n 之差）。
+    # 生成器自己已经按目标行尾写盘（`render(..., newline=...)`），幂等判据要问的
+    # 是「内容会不会变」，行尾不属于内容。
+    assert GEN.render(fresh).replace(b"\r\n", b"\n") == target.read_bytes().replace(b"\r\n", b"\n"), (
+        "同一输入重跑产出不同内容 —— 生成器不幂等（时间戳/随机序进产物？）"
     )
 # ═══════════════════════════════════════════════════════════════════════════
 # provider 型 resolver 的运行时解析（2026-11-16 实补）
