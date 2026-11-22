@@ -810,7 +810,7 @@ backend/app/routers/wp_render_strategies/_k1_import_export.py  1482
 #   F-SHELL program generator / guard —— 单文件承载完整跨 spec DAG 投影、输入摘要与行为守卫，
 #   其结构需与生成器的 AST/变异锚点保持同文件可见；拆分会破坏可复现投影和变异判据。
 #   spec: workpaper-page-formula-toolbar-closure Task 13/15
-backend/scripts/gen/generate_workpaper_sync_program_milestones.py  2744
+backend/scripts/gen/generate_workpaper_sync_program_milestones.py  2915
 #   test_workpaper_sync_program_milestones.py —— 2026-11-04：HEAD 已 857 行（> 803 + 5%，触碰即红，
 #     非本次造成）。本次把 BLOCKED / 诊断两条计数上限改成逐条点名、补归档守卫的语义判据与
 #     multi_resolver ⇔ 阻塞互证后到 1051 行；解析层、点名名单与 fixture 已拆到同目录

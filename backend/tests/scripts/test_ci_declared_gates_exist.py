@@ -79,9 +79,9 @@ def _all_declared() -> dict[str, list[str]]:
 #:   2. 登记项所在 job 必须**仍然** `continue-on-error: true`（有人改成 hard fail
 #:      而脚本还没补回 ⇒ 立刻红）；
 #:   3. 白名单不得增长（新出现的缺失一律红，不许往这里加）。
-_KNOWN_MISSING: dict[str, str] = {
-    "backend/scripts/audit_a7_a15_xlsx.py": "audit-xlsx-drift",
-}
+# 2026-11-22 清空：唯一条目 audit_a7_a15_xlsx.py 连同 audit-xlsx-drift job 已一并
+# 从 ci.yml 删除（脚本与引用都不存在），登记前提整体消失。棘轮只许变短。
+_KNOWN_MISSING: dict[str, str] = {}
 
 
 def test_every_declared_path_exists_on_disk() -> None:

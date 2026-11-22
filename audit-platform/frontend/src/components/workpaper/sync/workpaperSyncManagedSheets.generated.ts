@@ -31,7 +31,7 @@ export interface WorkpaperSyncManagedSheetsEntry {
   readonly managedSheets: readonly WorkpaperSyncManagedSheet[]
 }
 
-export const WORKPAPER_SYNC_MANAGED_SHEETS_DIGEST = "8cd0fc0c398a842d6dd121ae66f5902f032f059ef806731d3e7e853e5b32c38e"
+export const WORKPAPER_SYNC_MANAGED_SHEETS_DIGEST = "9ac0480e9fb0671b96e84acf4e3aca8ed84b5f69e076b9f5a4190d25755b0b7a"
 
 export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsEntry[] =
 [
@@ -58,6 +58,17 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "A5-1-3相关报表勾稽关系核对",
         "sheetKey": "a513-reconcile"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "b22a.control_matrix",
+    "entryId": "xlsx/gt-b22-a-control-matrix",
+    "managedSheets": [
+      {
+        "excelName": "B22A-4-1 IT概要",
+        "sheetKey": "b22a41-managed"
       }
     ]
   },
@@ -147,6 +158,41 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "坏账准备明细表D2-3",
         "sheetKey": "d23-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "d2.inspection",
+    "entryId": "xlsx/gt-d2-inspection",
+    "managedSheets": [
+      {
+        "excelName": "预期信用损失的计量测试D2-10",
+        "sheetKey": "d210-managed"
+      },
+      {
+        "excelName": "坏账准备转回（收回）、核销检查表D2-11",
+        "sheetKey": "d211-managed"
+      },
+      {
+        "excelName": "应收账款质押出售情况检查表D2-12",
+        "sheetKey": "d212-managed"
+      },
+      {
+        "excelName": "应收账款业务模式分析D2-13",
+        "sheetKey": "d213-managed"
+      },
+      {
+        "excelName": "关联方及交易检查表D2-6",
+        "sheetKey": "d26-managed"
+      },
+      {
+        "excelName": "应收账款检查表D2-7",
+        "sheetKey": "d27-managed"
+      },
+      {
+        "excelName": "应收坏账准备测算D2-9",
+        "sheetKey": "d29-managed"
       }
     ]
   },
@@ -710,6 +756,17 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
   },
   {
     "adapterRegistered": false,
+    "contractId": "g4.ecl_stage",
+    "entryId": "xlsx/gt-g4-bond-investment-ecl",
+    "managedSheets": [
+      {
+        "excelName": "债权投资三阶段划分G4-9",
+        "sheetKey": "g409-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
     "contractId": "g4.bond_main",
     "entryId": "xlsx/gt-g4-bond-investment-main",
     "managedSheets": [
@@ -727,6 +784,17 @@ export const WORKPAPER_SYNC_MANAGED_SHEETS: readonly WorkpaperSyncManagedSheetsE
       {
         "excelName": "余额明细表G5-2",
         "sheetKey": "g502-managed"
+      }
+    ]
+  },
+  {
+    "adapterRegistered": false,
+    "contractId": "g6.ecl_stage",
+    "entryId": "xlsx/gt-g6-other-bond-investment-ecl",
+    "managedSheets": [
+      {
+        "excelName": "其他债权投资三阶段划分G6-11",
+        "sheetKey": "g611-managed"
       }
     ]
   },

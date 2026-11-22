@@ -22,6 +22,7 @@ from tests.workpaper_sync._test_workpaper_sync_program_milestones_criteria impor
     _CORE,
     _CORE_TASKS_REL,
     _CORE_ACTIVE_TASKS,
+    _CORE_EXPECTED_REL,
     _STATE_NAMES,
     _independent_task_states,
     _independent_state_counts,
@@ -179,8 +180,11 @@ def test_eight_spec_task_and_dependency_denominators_are_exact(source: dict[str,
         "workpaper-guidance-content-closure": 23,
         "workpaper-page-formula-toolbar-closure": 17,
     }
-    assert registry["specs"][_CORE]["path"] == _CORE_TASKS_REL, (
-        "核心 spec 必须读 active tasks.md —— 回退到归档快照会让里程碑追踪一份冻结文档"
+    # 2026-11-22：umbrella 已交接归档，权威主档是 `_archive/180-<spec>/tasks.md`
+    # （INDEX.md 登记）。断言 registry 读的就是这一份（防回退到批次分类快照 17-）。
+    assert registry["specs"][_CORE]["path"] == _CORE_EXPECTED_REL, (
+        f"核心 spec 读的不是归档主档：{registry['specs'][_CORE]['path']!r} "
+        f"≠ {_CORE_EXPECTED_REL!r} —— 平铺编号目录是主档，批次分类目录是历史快照"
     )
     core_states = _independent_task_states(_CORE_ACTIVE_TASKS)
     core_wave_tasks = [

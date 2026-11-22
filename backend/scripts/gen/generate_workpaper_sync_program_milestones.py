@@ -203,17 +203,34 @@ def _with_archive_fallback(path: Path) -> Path:
     if len(rel) < 2 or rel[0] == "_archive":
         return path
     spec_name, tail = rel[0], rel[1:]
-    candidates = sorted(
+    # 归档两种形态：分类嵌套 `_archive/<分类>/<spec>/...` 与编号平铺
+    # `_archive/<N>-<spec>/...`（后者 2026-11 起成为惯例，实测
+    # `180-workpaper-html-onlyoffice-bidirectional-writeback-closure`）。
+    tail_str = "/".join(tail)
+    # 与 _resolve_spec_tasks 同口径：编号平铺是主档，批次分类是快照，平铺优先
+    flat = sorted(
         p
-        for p in _SPECS_ROOT.glob(f"_archive/*/{spec_name}/{'/'.join(tail)}")
+        for p in _SPECS_ROOT.glob(f"_archive/*-{spec_name}/{tail_str}")
         if p.exists()
     )
-    if len(candidates) == 1:
-        return candidates[0]
-    if len(candidates) > 1:
+    if flat:
+        if len(flat) > 1:
+            raise ProgramMilestoneError(
+                f"归档平铺下有多份 {spec_name}/{tail_str}："
+                f"{[_relative(p) for p in flat]} —— 先合并归档副本"
+            )
+        return flat[0]
+    nested = sorted(
+        p
+        for p in _SPECS_ROOT.glob(f"_archive/*/{spec_name}/{tail_str}")
+        if p.exists()
+    )
+    if len(nested) == 1:
+        return nested[0]
+    if len(nested) > 1:
         raise ProgramMilestoneError(
-            f"归档下有多份 {spec_name}/{'/'.join(tail)}："
-            f"{[_relative(p) for p in candidates]} —— 先合并归档副本"
+            f"归档下有多份 {spec_name}/{tail_str}："
+            f"{[_relative(p) for p in nested]} —— 先合并归档副本"
         )
     return path
 
@@ -234,15 +251,32 @@ def _resolve_spec_tasks(spec_name: str) -> Path:
     active = _SPECS_ROOT / spec_name / "tasks.md"
     if active.is_file():
         return active
-    archived = sorted(
+    # 归档两种形态，**编号平铺优先**：
+    #   * `_archive/<N>-<spec>/tasks.md` —— 归档主档（INDEX.md 登记的那一份）
+    #   * `_archive/<批次分类>/<spec>/tasks.md` —— 集体验证批次的历史快照
+    # 实测 2026-11-22：`workpaper-html-onlyoffice-bidirectional-writeback-closure`
+    # 两份并存 —— 平铺 180（50 任务「剩余闭环」，定义 JSON 引用的 1.1/1.7/2.7/6.1/6.2
+    # 只在这份里）与批次 17（76 任务旧 77 版快照）。同一 spec 若两处都有，
+    # 平铺是主档、批次是快照，故平铺优先；仅当无平铺时才回退批次分类。
+    flat = sorted(
+        p for p in _SPECS_ROOT.glob(f"_archive/*-{spec_name}/tasks.md") if p.is_file()
+    )
+    nested = sorted(
         p for p in _SPECS_ROOT.glob(f"_archive/*/{spec_name}/tasks.md") if p.is_file()
     )
-    if len(archived) == 1:
-        return archived[0]
-    if len(archived) > 1:
+    if flat:
+        if len(flat) > 1:
+            raise ProgramMilestoneError(
+                f"spec {spec_name!r} 在 _archive 平铺下有多份 tasks.md："
+                f"{[_relative(p) for p in flat]} —— 取哪一份都可能错，先合并归档副本"
+            )
+        return flat[0]
+    if len(nested) == 1:
+        return nested[0]
+    if len(nested) > 1:
         raise ProgramMilestoneError(
             f"spec {spec_name!r} 在 _archive 下有多份 tasks.md："
-            f"{[_relative(p) for p in archived]} —— 取哪一份都可能错，先合并归档副本"
+            f"{[_relative(p) for p in nested]} —— 取哪一份都可能错，先合并归档副本"
         )
     # 两处都没有：让 `_record_input` 抛出原来那条带路径的错（信息量更高）
     return active

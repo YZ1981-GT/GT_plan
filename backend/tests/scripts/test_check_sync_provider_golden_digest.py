@@ -309,13 +309,13 @@ def test_main_fails_when_a_registered_provider_has_no_baseline_entry(monkeypatch
 def test_store_item_id_dispatch_keys_on_parameter_kind_not_name() -> None:
     """🔴 变异反证③：`store_item_id` 的分派必须按参数 **kind**，不能只看名字在不在。
 
-    现算 24 家里 **15 家**把 `store_item_id` 声明为 `KEYWORD_ONLY`，只有 f1 把它放在
-    首位位置。按「名字在不在」分派会给那 15 家多传一个位置参数 —— 实测当场把 8 家
-    打成 TypeError（而在旧实现下它们会被静默 SKIP，等于把一个洞换成八个洞）。
+    现算全部家把 `store_item_id` 声明为 `KEYWORD_ONLY`（f1 曾是唯一的首位位置
+    形态，签名已统一）。按「名字在不在」分派会给 KEYWORD_ONLY 家多传位置参数 ——
+    实测曾把 8 家打成 TypeError（在旧实现下它们会被静默 SKIP，等于把一个洞
+    换成八个洞）。
 
-    本判据不复刻分派逻辑，而是锁住**分组事实**：两类都非空，且首位位置参数是
-    `store_item_id` 的恰好只有 f1。分组一变（比如有人把 f1 的签名统一了）本条会红，
-    届时应连带简化门里的分派分支。
+    本判据不复刻分派逻辑，而是锁住**分组事实**：首位位置参数类为空（2026-11-22
+    起 f1 已统一）。分组一变本条会红，届时应连带简化门里的分派分支。
     """
     import importlib
     import inspect
@@ -338,9 +338,12 @@ def test_store_item_id_dispatch_keys_on_parameter_kind_not_name() -> None:
         elif "store_item_id" in params:
             keyword_only.append(label)
 
-    assert positional_first == ["f1"], (
-        f"首位位置参数是 store_item_id 的不再只有 f1，而是 {positional_first} —— "
-        "门里的分派分支需要跟着重判"
+    # 2026-11-22：f1 签名已统一为 KEYWORD_ONLY 形态（首位位置参数类为空），
+    # 门里「首位位置参数」分派分支成为防御性死代码。若未来出现新的位置形态
+    # 家，须重新评估该分支并在此登记。
+    assert positional_first == [], (
+        f"首位位置参数是 store_item_id 的出现了 {positional_first} —— "
+        "门里的分派分支需要跟着重判（f1 曾是唯一一家，现已统一）"
     )
     assert len(keyword_only) >= 10, (
         f"把 store_item_id 声明为 KEYWORD_ONLY 的只有 {len(keyword_only)} 家 "

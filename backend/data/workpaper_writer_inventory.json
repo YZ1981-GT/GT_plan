@@ -1105,7 +1105,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 1295,
+      "line": 1303,
       "module": "app.routers.deliverable",
       "qualname": "download_trio_item",
       "resolver_identities": [],
@@ -4273,7 +4273,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 1061,
+      "line": 1071,
       "module": "app.routers.wp_editor_router",
       "qualname": "parse_workpaper",
       "resolver_identities": [],
@@ -4329,7 +4329,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 1022,
+      "line": 1032,
       "module": "app.routers.wp_editor_router",
       "qualname": "prefill_workpaper",
       "resolver_identities": [],
@@ -7496,7 +7496,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 999,
+      "line": 1049,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "get_sheet_wopi_contents",
       "resolver_identities": [
@@ -7612,7 +7612,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 911,
+      "line": 961,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "get_whole_excel_grid",
       "resolver_identities": [
@@ -7654,7 +7654,7 @@
         "artifact_write_targets": [
           {
             "attr": "write_bytes",
-            "line": 1774,
+            "line": 1829,
             "target": "unclassified"
           }
         ],
@@ -7677,10 +7677,10 @@
           "checklist_responses.remark"
         ],
         "swallowed_exception_lines": [
-          1788,
-          1805,
-          1852,
-          1872
+          1843,
+          1860,
+          1907,
+          1927
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -7688,7 +7688,7 @@
       },
       "is_async": true,
       "kind": "writer_resolver",
-      "line": 1702,
+      "line": 1757,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "import_structured_docx",
       "resolver_identities": [
@@ -7733,7 +7733,7 @@
         "artifact_write_targets": [
           {
             "attr": "write_bytes",
-            "line": 1451,
+            "line": 1506,
             "target": "unclassified"
           }
         ],
@@ -7759,16 +7759,16 @@
           "checklist_responses.remark"
         ],
         "swallowed_exception_lines": [
-          1332,
-          1372,
-          1441,
-          1472,
-          1540,
-          1573,
-          1617,
-          1629,
+          1387,
+          1427,
+          1496,
+          1527,
+          1595,
+          1628,
           1672,
-          1680
+          1684,
+          1727,
+          1735
         ],
         "unified_commit_calls": [],
         "version_fields_read": [
@@ -7780,7 +7780,7 @@
       },
       "is_async": true,
       "kind": "writer_resolver",
-      "line": 1227,
+      "line": 1277,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "post_sheet_onlyoffice_callback",
       "resolver_identities": [
@@ -13928,7 +13928,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 1227,
+      "line": 1292,
       "module": "app.routers.wp_sync_router",
       "qualname": "adopt_substrate",
       "resolver_identities": [],
@@ -15640,7 +15640,7 @@
       "facts": {
         "ad_hoc_paths": [
           {
-            "line": 90,
+            "line": 93,
             "literal": "wp_templates"
           }
         ],
@@ -15662,7 +15662,7 @@
       },
       "is_async": false,
       "kind": "resolver",
-      "line": 87,
+      "line": 90,
       "module": "app.services.archive_inventory",
       "qualname": "_template_root",
       "resolver_identities": [
@@ -15718,7 +15718,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 101,
+      "line": 104,
       "module": "app.services.archive_inventory",
       "qualname": "_workpaper_entries",
       "resolver_identities": [
@@ -20159,7 +20159,7 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          337
+          407
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -20167,7 +20167,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 293,
+      "line": 353,
       "module": "app.services.pdf_export_engine",
       "qualname": "PDFExportEngine.execute_export",
       "resolver_identities": [],
@@ -25989,7 +25989,7 @@
       "writer_id": "app.services.wp_xlsx_export_service::_sync_export_workpaper_xlsx"
     }
   ],
-  "inventory_digest": "c59ddd1098b1c5d06964a54cbc8a23fb99db3c179a5e392560875d96bddb6303",
+  "inventory_digest": "46aba23c9629c6fce4ea2a2ab316fbcf7deb5410abb95e903fafbd567aaf22a9",
   "overlay_digest": "261853b1787b6951b1ea67d10b02f5e73b8462d54ce4d79e451a8fe4063482c2",
   "representation_upgrade_lane": [
     {
@@ -26308,7 +26308,7 @@
     }
   ],
   "schema_version": 1,
-  "source_digest": "d08e261e3658ed44cfabed48ebee94e28e3dee305eab9015490367613ddf5417",
+  "source_digest": "a1275c206257811eae2cdf31f4786834eff8ea08e312370dd93fd56a13c2540b",
   "stats": {
     "artifact_snapshot_only_count": 1,
     "by_content_store": {

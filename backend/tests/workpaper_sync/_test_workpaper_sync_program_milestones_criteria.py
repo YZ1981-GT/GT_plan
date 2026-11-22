@@ -53,10 +53,26 @@ def _load_module(name: str, path: Path) -> ModuleType:
 _CORE = "workpaper-html-onlyoffice-bidirectional-writeback-closure"
 
 
+# 2026-11-22：umbrella 已交接归档（`_archive/180-<spec>/tasks.md`，47/50）。
+# 守卫原先硬钉「必须读 active tasks.md」以拒绝冻结快照 —— 那是当时的防误读手段。
+# 归档是仓库常规操作（INDEX.md 已登记该路径为权威主档），故改为**解析归档主档**：
+# 编号平铺 `_archive/<N>-<spec>/tasks.md` 是主档，分类批次目录是历史快照。
 _CORE_TASKS_REL = f".kiro/specs/{_CORE}/tasks.md"
 
 
-_CORE_ACTIVE_TASKS = _REPO / _CORE_TASKS_REL
+def _resolve_core_tasks() -> Path:
+    active = _REPO / _CORE_TASKS_REL
+    if active.is_file():
+        return active
+    flat = sorted(p for p in (_REPO / ".kiro/specs").glob(f"_archive/*-{_CORE}/tasks.md"))
+    assert len(flat) == 1, f"归档主档应恰一份，实为 {[str(p) for p in flat]}"
+    return flat[0]
+
+
+_CORE_ACTIVE_TASKS = _resolve_core_tasks()
+
+#: 期望的 core tasks.md 相对路径（registry 里必须与它一致）
+_CORE_EXPECTED_REL = str(_CORE_ACTIVE_TASKS.relative_to(_REPO)).replace("\\", "/")
 
 
 _INDEPENDENT_TASK_RE = re.compile(
@@ -149,6 +165,10 @@ KNOWN_BLOCKED: dict[str, frozenset[str]] = {
     "SYNC-DURABLE-APPLICATION": frozenset(
         {"producer_tasks_incomplete", "durable_callback_application_evidence_missing"}
     ),
+    # 🔴 2026-11-22：勿删本条。当日曾因 writer inventory 过期（generated inventory
+    # 不再匹配 source facts）看到该 milestone 的 reason_code「消失」而误判解除；
+    # 重跑 `generate_workpaper_writer_inventory.py --apply` 后 multi_resolver 仍为 4 条，
+    # 两个 reason_code 都真实成立（同 memory 里记录过的「清册过期造成的假象」）。
     "SYNC-MULTI-RESOLVER": frozenset(
         {"producer_tasks_incomplete", "writer_gate_multi_resolver_nonzero"}
     ),
