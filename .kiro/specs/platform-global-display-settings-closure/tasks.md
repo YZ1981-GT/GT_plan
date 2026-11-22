@@ -323,6 +323,22 @@
     ②`tests/procedure_delegation` 按纪律未整目录跑（会写真库）；
     ③隔离 PG 的 `SQLSTATE 25006` 故障注入未跑（需 `GT_REQUIRE_PG=1` 的独立库实例）。
     这三项都属「缺环境」，不以共享服务或合成数据替代。
+  - **2026-11-22 独占环境补验（隔离 PG gt_bv_acceptance + 后端 9997，v1.0.311 树，佐证收口）**：
+    在**已推送分支**（v1.0.311）的候选 worktree 上建隔离 PG（372 表 + 260 迁移
+    0 failed）+ 独占后端 9997，用 B-V 收口同款实测文件
+    （`00_ledger_bv_wan.xlsx`，wan 单位）走完整链：
+    ①`tests/test_ledger_unit_inspector.py` + `test_ledger_unit_normalization_apply.py`
+    **34 passed**，其中 `test_read_only_connection_rejects_update`（READ ONLY 后
+    UPDATE 必报 **SQLSTATE 25006**）PASSED —— B-V③ 完成；
+    ②detect 200（`candidates=[wan]`、`evidence_digest=06c2b1a8…`）→ submit 200
+    （带 `unit_confirmation` + `confirmed_mappings`）→ job **completed**、四表入库
+    **balance 5 / ledger 5 / aux_balance 2 / aux_ledger 4**（与收口记录逐值一致）；
+    ③dataset 仍 `legacy_declared`（确认合同在 `import_jobs.options` 里收到了但无人
+    消费）—— 独立佐证「`unit_contract_apply.py` 未在已推送分支」的结论；待该接线
+    入库后重跑本走查即可闭环。
+    环境坑如实登记：`tb_aux_balance_summary` 在共享库由 create_all 建、261 条迁移
+    无一 CREATE（**迁移覆盖债**），隔离库手工补 DDL 后链路才走通。验证后
+    DROP DATABASE、worktree 注销，共享库未触碰。
 
 - [x] B-BK. 阶段 B 备份 commit 对象
   - 方法同 A-BK，树内含截至阶段 B 的全部本任务改动块；OID 写入当前工作流目录并核验，随后向父会话发阶段 B 进度消息。
