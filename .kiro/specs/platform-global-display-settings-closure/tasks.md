@@ -746,6 +746,43 @@
     两个 V265 合同缺陷。候选后端真实返回 `%PDF-` 并完成 PG 逐值核对，测试任务和 PDF
     已清理。由于候选后端复用共享 PG、PDF 当前仍用空 rows/paragraphs/notes，占位数据
     未接正式报表来源，且尚未完成独占端口/PG 与正式 Playwright PDF 面板验收，C-V 继续保留 `[~]`。
+  - **2026-11-22 独占环境完整 C-V 验收 + 抓到并修一个真实前端缺陷（`[~]` 保持）**：
+    按 13A 口径从候选树（v1.0.309，`4a98aaafa`）建**独占端口实例**：隔离 PG 库
+    `gt_cv_acceptance`（audit-postgres 容器内，独立于共享 `audit_platform`）、后端
+    **9995**、前端 Vite **3095**。空库引导按 memory 教训三步：`init_tables.py`
+    （372 张表 + pgvector 扩展）→ `ALTER TABLE service_identities ... SET DEFAULT
+    gen_random_uuid()` → 启动迁移（**261 applied / 0 failed**）。admin 账号走平台
+    注册接口建（邮箱保留域 `.local` 被 pydantic 拒 ⇒ 改 `.com`；USCC 用模 31 算法
+    生成合法码 `91500000MA0CA00AAX`）。
+    **验收链（【测试】项目 `34decc0c`，全部真实 API + 真实文件）**：
+    ①建项目 200（向导 DTO：client_name/audit_year/project_type/accounting_standard/
+    company_code(18 位 USCC)/short_name/template_type/report_scope）；
+    ②项目单位 yuan→wan→yuan 往返（非法值 bogus **422**）；
+    ③**正式 Excel**：yuan 档 `X-GT-Export-Unit=yuan`/`divisor=1`、金额 `350/300`、
+    标注「金额单位：元」；wan 档 `wan`/`10000`、金额 **`0.04/0.03`**
+    （350/10000=0.035→ROUND_HALF_UP 0.04）、标注「金额单位：万元」——
+    **数值与标注按同一 divisor 改变**（AC-22 后半）✓；恢复 yuan 读回 200；
+    ④**PDF 单文档**（balance_sheet）：200/completed、**23,387 B**、`%PDF-`；
+    ⑤**多文档合并**（balance_sheet + audit_report，TODO 15.4）：200/completed、
+    **28,298 B / 2 页**，pypdf 提取**同时含**审计正文（公允反映）与 KAM
+    （收入确认）—— 两块都进产物 ✓；
+    ⑥**归档清单含 PDF 交付件**（v1.0.309 的 `_pdf_deliverable_entries`）：
+    隔离库内直接调 `build_project_inventory` ⇒ **6 条 `pdf_deliverable` 条目**，
+    全部绑定 task_id + policy_snapshot ✓；
+    ⑦**Playwright 面板验收**：文档选择 ✓ / 导出选项 ✓ / **无「报表语言」选择器** ✓ /
+    历史表格渲染 6 条已完成任务 ✓ / **console 0 error** ✓。
+    🔴 **真实前端缺陷（独占环境才暴露）**：`getExportHistory` 把
+    `ExportHistoryResponse` 信封 `{tasks:[...]}` 当数组直接塞进 `<el-table data>` ⇒
+    **「data2 is not iterable」ErrorBoundary 吞整页**（面板完全打不开）。共享环境
+    一直没暴露是因为此前面板历史从未有数据 —— 首次有 6 条真实任务即在独占环境
+    当场打红。修复 = `auditPlatformApi.getExportHistory` 解 `data.tasks`
+    （数组直通兜底）；**面板从「整页崩」变为正常渲染 6 条历史**，console 0 error。
+    🔴 **两处环境坑（如实记录）**：①首轮空库只跑迁移在 V273 报
+    `relation working_paper_sync_conflict does not exist` ⇒ 按三步引导重做；
+    ②`components.d.ts` 被 Vite dev server 自动写入并发会话的组件条目 ⇒
+    提交前 `git checkout --` 还原（生成文件不取并集）。
+    **仍未完成**：任务 13 终验（候选树身份工具 + 独立评审 + 全量门）、PDF 密码
+    （15.5）、ZIP 整包浏览器级验证；production writer 台账保持 `PARTIAL_WIRING`。
 
 - [x] C-BK. 阶段 C 备份 commit 对象
   - 方法同 A-BK，树内含截至阶段 C 的全部本任务改动块；OID 写入当前工作流目录并核验，随后向父会话发阶段 C 进度消息。

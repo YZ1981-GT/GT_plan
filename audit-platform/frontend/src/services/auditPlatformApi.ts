@@ -1111,7 +1111,13 @@ export function getExportDownloadUrl(taskId: string): string {
 
 export async function getExportHistory(projectId: string): Promise<ExportTaskData[]> {
   const { data } = await http.get(P_exp.history(projectId))
-  return data
+  // 后端返回 ExportHistoryResponse 信封 {tasks: [...]}；http 拦截器已解一层，
+  // 这里的 data = {tasks: [...]}。解错成数组会让 el-table 拿到对象而崩
+  // （实测：独占环境有历史数据时 ErrorBoundary 吞整页）。
+  if (Array.isArray(data)) return data
+  return Array.isArray((data as { tasks?: ExportTaskData[] })?.tasks)
+    ? (data as { tasks: ExportTaskData[] }).tasks
+    : []
 }
 
 
