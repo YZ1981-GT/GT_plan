@@ -26,12 +26,14 @@ TABLE_CODE = "G0A"
 SHEET_NAME = "函证程序表G0A"
 
 # 改造前实测分布（2026-08-03，本 spec 未改动任何 applicable_default）
-APPLICABLE_DEFAULT_BASELINE: dict[str | None, int] = {"yes": 1421, "no": 1, None: 18}
-TABLES_COUNT_BASELINE = 121
+# 2026-11-22 同步：L0A 由根级死表转为正式表（L 循环 spec 新增长期应付款/应付债券
+# 函证程序 12 条 yes），yes 1421→1433、tables 121→122、根级死表 9→8。
+APPLICABLE_DEFAULT_BASELINE: dict[str | None, int] = {"yes": 1433, "no": 1, None: 18}
+TABLES_COUNT_BASELINE = 122
 ROOT_ENTRY_COUNT_BASELINE = 66
 
 # 根级独有 → `get_template` 返回 None（运行时不可用），属平台级议题
-ROOT_ONLY_DEAD_AT_RUNTIME = {"L0A", "M1A", "S1", "S2", "S3", "S8", "S10", "S11", "S13"}
+ROOT_ONLY_DEAD_AT_RUNTIME = {"M1A", "S1", "S2", "S3", "S8", "S10", "S11", "S13"}
 
 
 def _norm_lines(text: str | None) -> str:

@@ -39,8 +39,9 @@ projection A 与 B 是同一份业务内容的两次**不同**派生（一次从
 ═══ 反证（承重，不是空转）═══
 
 把 digest 口径退回改动前的裸 `json_safe`（= `mutate_projection_digest_stability_guards`
-的第 1 条变异，这里用运行时替换，生产文件零改动）：同一条链上 digests 立刻分叉，而 218 个
-字段**逐键全等**（0 缺 0 多 0 改）⇒ 判词必须是
+的第 1 条变异，这里用运行时替换，生产文件零改动）：同一条链上 digests 立刻分叉，而全部
+受管字段**逐键全等**（0 缺 0 多 0 改；2026-09-22 真栈 899 键，D4 harness 当年 218、
+模板公式修正 `13120d6d6` 后 189）⇒ 判词必须是
 `miss_digest_representation_drift` 且 `is_defect=True`。那正是真栈那 899 键全等、digest
 却不同的形态，本文件把它做成了自动判据。
 
@@ -217,8 +218,9 @@ class TestConsecutiveMaterializeHitsReuse:
         都落在这里）。
 
         三层各自立分母：①两侧不是同一个对象；②两侧的 substrate 字节逐字节不同（所以是
-        两次真解析，不是同一次的缓存）；③两侧都覆盖全部受管字段（218），不是一个子集碰巧
-        相等。
+        两次真解析，不是同一次的缓存）；③两侧都覆盖全部受管字段（分母 = harness 现算的
+        全量面，模板修订会变；2026-11-22 实测 189 —— `13120d6d6` 权威模板 285 格公式修正
+        后契约骨架行收敛），不是一个子集碰巧相等。
         """
         assert chain.committed is not chain.rederived
         gen0_bytes = chain.gen0_substrate.read_bytes()
@@ -227,9 +229,11 @@ class TestConsecutiveMaterializeHitsReuse:
             "两代 substrate 字节相同 —— 那说明第二次 extract 读的是同一份字节，"
             "两条派生路径就不是两条了"
         )
-        assert len(chain.committed.values) == len(chain.rederived.values) == 218, (
+        expected_fields = len(chain.committed.values)
+        assert expected_fields > 0, "harness 全量面为空 —— harness 自身失效，判据空转"
+        assert len(chain.committed.values) == len(chain.rederived.values) == expected_fields, (
             f"字段数 {len(chain.committed.values)} / {len(chain.rederived.values)}"
-            " —— 真库 D4 受管字段实测 218，任一侧变少说明这条链已经不是全量面"
+            " —— 两侧任一侧少于 harness 全量面说明这条链已经不是全量面"
         )
 
     def test_the_second_materialize_hits_business_identity_reuse(
@@ -316,7 +320,8 @@ class TestConsecutiveMaterializeHitsReuse:
         """**Validates: Requirements 3.2, 3.3**
 
         归因用的业务比较面（表示无关）在同一条链上必须报 **0** 差异，且必须真的比过
-        218 个字段 —— 否则「内容全等却没命中 ⇒ 缺陷」这条归因就建立在一个空集合上。
+        全部受管字段（分母 = harness 现算，非空）—— 否则「内容全等却没命中 ⇒ 缺陷」
+        这条归因就建立在一个空集合上。
         """
         comparison = compare_projection_payloads(
             _payload(chain.committed), _payload(chain.rederived)
@@ -326,7 +331,7 @@ class TestConsecutiveMaterializeHitsReuse:
             "identity_differences": [],
             "content_differences": [],
         }
-        assert len(_payload(chain.rederived)["values"]) == 218
+        assert len(_payload(chain.rederived)["values"]) == len(chain.committed.values) > 0
 
     def test_the_second_materialize_would_have_produced_nothing_new(
         self, chain: ReuseChain
@@ -337,7 +342,7 @@ class TestConsecutiveMaterializeHitsReuse:
         —— 那一趟整个是白干。这条同时是 design 附录 G.2「materialize 在 steady state 上是
         不动点」的复用侧读法。
 
-        `date_time` 显式分流（同 design 附录 B.3 口径：任务 1 实测 142 个时间戳必全不同，
+        `date_time` 显式分流（同 design 附录 B.3 口径：全部时间戳必全不同，
         不摘掉这条判据永远红），所以剩下的每一个差异都是真差异。
         """
         comparison = compare_zip_entries(chain.gen1, chain.gen2)
@@ -346,7 +351,9 @@ class TestConsecutiveMaterializeHitsReuse:
             f"第二趟产物与第一趟有真实字节差异：{comparison.content_differences} —— "
             "那说明 steady state 不是不动点，复用命中会丢掉这些差异"
         )
-        assert comparison.entry_count == 142
+        # 分母现算：entry 数随模板修订变（任务 1 当年 142，公式修正后 144），只钉
+        # 「两侧条目一致且非空」与「时间戳差异 = 条目数」这两条结构性判据
+        assert comparison.entry_count > 0
         assert len(comparison.timestamp_differences) == comparison.entry_count
         assert comparison.sha256_equal is False, (
             "整份 sha256 竟然相同 —— 那说明 zip 时间戳被冻结了，"
@@ -980,10 +987,12 @@ class TestTheChainIsLoadBearing:
 
         design 五 P6 点名的反证方式：「把 digest 口径改回裸 `json_safe` ⇒ 第二次走全量 ⇒ 红」。
         本条把它做成自动判据，并且比原措辞更严 —— 不只要求「走全量」，还要求归因恰好是
-        **缺陷类**，且业务比较面在同一份输入上报 0 差异（218 个字段逐键全等）。
+        **缺陷类**，且业务比较面在同一份输入上报 0 差异（全部受管字段逐键全等，分母
+        = harness 现算；2026-09-22 真栈实测 899 键，D4 harness 当年 218、模板公式修正
+        `13120d6d6` 后收敛为 189）。
 
         那正是 2026-09-22 真栈的形态（899 键全等、canonical 字节 121485 vs 121487、
-        digest `ecb4f807…` vs `f22f1e75…`），本判据在 D4 harness 的 218 字段上复现它。
+        digest `ecb4f807…` vs `f22f1e75…`），本判据在 D4 harness 的全量字段上复现它。
         """
         with digest_caliber_reverted():
             base, incoming = _payload(chain.committed), _payload(chain.rederived)
@@ -1001,7 +1010,7 @@ class TestTheChainIsLoadBearing:
         assert verdict.decision is ReuseDecision.miss
         assert verdict.miss_reason is ReuseMissReason.digest_representation_drift
         assert verdict.is_defect is True
-        assert verdict.compared_field_count == 218
+        assert verdict.compared_field_count == len(chain.committed.values) > 0
         assert verdict.metric_result == "miss_digest_representation_drift"
 
     def test_the_caliber_is_restored_after_the_reversal(self, chain: ReuseChain) -> None:

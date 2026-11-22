@@ -187,6 +187,9 @@ def test_digest_is_stable_across_repeated_calls() -> None:
         (ValueType.json, {"b": 2, "a": [1, {"c": 3}]}),
         (ValueType.rate, "0.0325"),
         (ValueType.ratio, "0.6180"),
+        # FC-10 percent_points：store 存百分数（3.5 = 3.5%）、Excel/投影存小数（0.035），
+        # canonical 路径上它按 Decimal 处理（与 rate/ratio 同族，见 merge._DECIMAL_TYPES）
+        (ValueType.percent_points, 0.035),
     ],
     ids=lambda v: getattr(v, "value", str(v))[:18],
 )
@@ -219,6 +222,7 @@ def test_no_value_type_is_left_untested_by_the_full_path_matrix() -> None:
         ValueType.json,
         ValueType.rate,
         ValueType.ratio,
+        ValueType.percent_points,
     }
     missing = sorted(m.value for m in ValueType if m not in covered)
     assert missing == [], f"这些 value_type 没进 canonical 路径矩阵：{missing}"

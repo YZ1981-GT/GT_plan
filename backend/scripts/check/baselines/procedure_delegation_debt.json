@@ -21,8 +21,8 @@
       "path": "audit-platform/frontend/src/layouts/DefaultLayout.vue",
       "symbol": "component:DefaultLayout",
       "rule": "parallel-my-procedure-tasks-page-route",
-      "fingerprint": "sha256:4f5f559624a887eae850edb4010a74749e1eab0a36bc789c9e4ec92fb8dbb0ae",
-      "reason": "DefaultLayout sidebar renders a '程序任务' nav item linking to the canonical MyProcedureTasks route; it is a navigation entry, not a parallel task page."
+      "fingerprint": "sha256:5521d3add67a8d07a368acbe8e1e351a746ef84e776373cb592b0fa0ddfc96a7",
+      "reason": "DefaultLayout.vue 于 v1.0.226 (7039f37d5) 修改但基线未同步；2026-11-22 归因后按 --write-candidate 实测指纹重登记（v1.0.226 前指纹 4f5f5596）"
     },
     {
       "path": "audit-platform/frontend/src/services/commonApi.ts",

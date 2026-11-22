@@ -88,7 +88,8 @@
         "audit-platform/frontend/src/views/**/project/**",
         "audit-platform/frontend/src/views/**/Project*.vue",
         "audit-platform/frontend/src/stores/*project*",
-        "audit-platform/frontend/src/services/*project*"
+        "audit-platform/frontend/src/services/*project*",
+        "backend/app/services/export_unit_policy_resolver.py"
       ],
       "may_depend_on": [
         "backend-services",

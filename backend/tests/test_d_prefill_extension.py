@@ -32,7 +32,8 @@ NEW_SHEET_NAMES = [
     "营业收入截止测试（账到单据）D4-17",
 ]
 
-VALID_FORMULA_TYPES = {"TB", "TB_SUM", "ADJ", "PREV", "WP", "AUX", "LEDGER", "LEDGER_DETAIL"}
+# PLACEHOLDER：本期核销等无法用单条 LEDGER() 表达的格（见 prefill_formula_mapping D2-3「本期核销」与 test_h0_prefill_presets 的登记理由表）
+VALID_FORMULA_TYPES = {"TB", "TB_SUM", "ADJ", "PREV", "WP", "AUX", "LEDGER", "LEDGER_DETAIL", "PLACEHOLDER"}
 
 
 @pytest.fixture
@@ -86,7 +87,7 @@ def test_d2_3_has_5_cells(prefill_data):
     cells = d2_3[0]["cells"]
     assert len(cells) == 5, f"Expected 5 cells for D2-3, got {len(cells)}"
     types = {c["formula_type"] for c in cells}
-    assert types.issubset({"LEDGER", "PREV", "TB"}), f"Unexpected formula types in D2-3: {types}"
+    assert types.issubset({"LEDGER", "PREV", "TB", "PLACEHOLDER"}), f"Unexpected formula types in D2-3: {types}"
 
 
 def test_d4_2_has_8_cells(prefill_data):

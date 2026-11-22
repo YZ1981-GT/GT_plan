@@ -1034,8 +1034,13 @@ describe('披露 columns 全 Tab 契约扫描', () => {
 
       const bad: string[] = []
       for (const r of model.payloadResults) {
-        // columns 必须与 sub_table_data 同行（成对进出，design T3）
-        if (!r.columnKeys.length) bad.push(`${r.fn}：携带 sub_table_data 但 columns 为空`)
+        // columns 必须与 sub_table_data 同行（成对进出，design T3）。
+        // sweep 平凡入参可能零表命中：sub_table_data 只剩 _note_texts/_removed_table_keys
+        // 这类 _ 前缀元数据（dataKeys 过滤后为空）⇒ columns 空是「没推表」不是「推表丢列」，
+        // 只有存在有效数据键时 columns 为空才是缺陷（2026-11-22 buildH3SyncPayload 10 例假红）。
+        if (!r.columnKeys.length && r.dataKeys.length) {
+          bad.push(`${r.fn}：携带 sub_table_data 但 columns 为空`)
+        }
         const orphan = r.dataKeys.filter(k => !r.columnKeys.includes(k))
         if (orphan.length) bad.push(`${r.fn}：数据键无 columns 落点 ${JSON.stringify(orphan)}`)
       }

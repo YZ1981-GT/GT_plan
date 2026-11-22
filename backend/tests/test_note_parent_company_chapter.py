@@ -1883,6 +1883,15 @@ class TestTableLevelAliasHasNoConsumerYet:
         "app/services/note_word_exporter.py": "section 级 section_code 别名 join",
         # disclosure-note-doc-upload-and-batch-fill：variant matrix 账户级**章节号**旧码（跨变体匹配，不看表名）
         "app/services/note_text_batch_service.py": "variant matrix 账户级章节号别名（不看表名）",
+        # 2026-11-22 登记（全部 section 级 / 程序表列，与表级映射无关）：
+        "app/services/consol_note_export_adapter.py": "合并附注导出 section 级章节码别名（不看表名）",
+        "app/services/note_deliverable_outline.py": "交付件大纲编码 → 索引 legacy_aliases → section_id（section 级）",
+        "app/services/note_template_export_fill.py": "模板导出填充按编码经 section 级别名定位",
+        "app/services/procedure_row_definitions.py": "程序表行定义列透传（与附注表名无关）",
+        "app/services/procedure_row_trim_service.py": "程序表裁剪行定义列透传（与附注表名无关）",
+        # 附件域同名概念（_delete_legacy_aliases 删的是附件旧别名，与附注模板无关）：
+        # 函数名里的 legacy_aliases 是标识符子串，code-level 扫描按词命中，登记防误报
+        "app/services/attachment_permanent_delete_service.py": "附件域同名概念（函数名 _delete_legacy_aliases，与附注模板无关）",
     }
 
     #: 只在注释/docstring 里**提到**该字段名的文件（不是消费方，不需登记进 allowlist）。
@@ -1894,6 +1903,9 @@ class TestTableLevelAliasHasNoConsumerYet:
     #: 该文件因此从 raw 2 处 → code 0 处。
     DOCSTRING_ONLY_MENTIONS: dict[str, str] = {
         "app/services/note_conversion_service.py": "docstring 说明 disclosure_notes 无该列",
+        # 2026-11-22：note_word_exporter 的 alias 读取已重构（section_code 索引由
+        # note_deliverable_outline / note_template_export_fill 承接），本体仅剩 docstring 提及
+        "app/services/note_word_exporter.py": "docstring 提及 section_code（含 legacy_aliases）join；消费方已移交 outline/fill",
     }
 
     def _scan(self) -> tuple[dict[str, int], dict[str, int]]:
@@ -1947,10 +1959,12 @@ class TestTableLevelAliasHasNoConsumerYet:
         """反向自检：``_py_code_only`` 不得剥掉普通字符串字面量。
 
         真消费方多是 ``entry.get("legacy_aliases")`` 形态；若连普通字符串一起剥，
-        ``note_word_exporter`` 的 code 命中会由 5 → 0，整条判据静默失效。
+        活性样本的 code 命中会归零，整条判据静默失效。
+        2026-11-22 活性样本由 note_word_exporter（已重构为 docstring-only）
+        换为现役承接方 note_deliverable_outline。
         """
         _, code = self._scan()
-        rel = "app/services/note_word_exporter.py"
+        rel = "app/services/note_deliverable_outline.py"
         assert code.get(rel, 0) > 0, (
             f"{rel} 的 code-level 命中为 {code.get(rel)} —— "
             "剥离器把字符串键名也剥掉了，判据已失效"
@@ -1979,26 +1993,30 @@ class TestTableLevelAliasHasNoConsumerYet:
         assert not stale, f"allowlist 出现过期条目，请清理: {stale}"
 
     def test_note_word_exporter_alias_read_is_section_level(self) -> None:
-        """精确断言 ``note_word_exporter`` 读的是 section 级而非表级别名。
+        """精确断言 section 级 alias 读取仍是主流形态（非表级）。
 
-        判据 = 该处 alias 读取取自 ``_load_section_code_index`` 的条目并映射到
-        ``section_code``；若哪天改成遍历 ``tables[].legacy_aliases``，本条打红。
+        2026-11-22 重定位：note_word_exporter 的 alias 读取已重构移交
+        ``note_deliverable_outline`` / ``note_template_export_fill``
+        （本体仅剩 docstring 提及）。本条改锚到现役承接方：
+        alias 读取取自 section 级条目（``e.get("legacy_aliases")``），
+        表级读取的特征形态一律不得出现。
         """
-        src = (
-            REPO_ROOT / "backend" / "app" / "services" / "note_word_exporter.py"
-        ).read_text(encoding="utf-8")
-        assert 'for alias in entry_s.get("legacy_aliases", []) or []:' in src, (
-            "note_word_exporter 的 alias 读取形态已变，需重新确认它仍是 section 级"
-        )
-        assert "alias_to_code[a] = code" in src, "alias → section_code 映射形态已变"
-        # 表级读取的特征形态一律不得出现
-        for bad in (
-            'tbl.get("legacy_aliases"',
-            'table.get("legacy_aliases"',
-            't.get("legacy_aliases"',
-            'tables[].legacy_aliases',
+        for rel in (
+            "app/services/note_deliverable_outline.py",
+            "app/services/note_template_export_fill.py",
         ):
-            assert bad not in src, f"出现表级 legacy_aliases 读取形态: {bad}"
+            src = (REPO_ROOT / "backend" / rel).read_text(encoding="utf-8")
+            assert 'e.get("legacy_aliases"' in src, (
+                f"{rel} 的 alias 读取形态已变，需重新确认它仍是 section 级"
+            )
+            # 表级读取的特征形态一律不得出现
+            for bad in (
+                'tbl.get("legacy_aliases"',
+                'table.get("legacy_aliases"',
+                't.get("legacy_aliases"',
+                'tables[].legacy_aliases',
+            ):
+                assert bad not in src, f"{rel} 出现表级 legacy_aliases 读取形态: {bad}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2032,10 +2050,11 @@ TASK6_ISOMORPHIC_SOURCE: dict[str, dict[str, str]] = {
 
 # 合并章源侧**预存在**的 markdown 粗体（2026-08-06 实测，属另一半径不修）。
 # 键 = (variant, 合并章 section_number, 表名)
-MERGED_CHAPTER_BOLD_TABLES: dict[tuple[str, str], str] = {
-    ("listed", "五、8"): "应收政府补助情况",
-    ("soe", "八、9"): "按账龄披露其他应收款项",
-}
+# 2026-11-22 清空：两份模板全部表的 guidance 粗体已被后续模板对齐 spec 修订掉
+# （现扫 0 命中），原 2 处锚点（listed 五、8 应收政府补助情况 / soe 八、9
+# 按账龄披露其他应收款项）不再成立。正面断言随登记表为空自动跳过；
+# 若未来再次出现合并章粗体，把表登记回本表即可恢复正向守卫。
+MERGED_CHAPTER_BOLD_TABLES: dict[tuple[str, str], str] = {}
 
 # Task 6 替换后各同构子节的 `_removed_table_keys` 条数（2026-08-06 apply 后实测）
 TASK6_REMOVED_KEY_COUNT: dict[str, dict[str, int]] = {

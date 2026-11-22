@@ -474,9 +474,14 @@ class TestProperty9SubAccountFormula:
             "112401" in f or "112402" in f for f in all_formulas
         )
         has_single_1124 = any("1124" in f for f in all_formulas)
+        # 2026-11-22：D5 预设改 PLACEHOLDER —— 应收款项融资(1124)在活体
+        # account_chart 两个 source 零命中，TB/LEDGER 表达不了（登记理由见
+        # test_h0_prefill_presets 的 _PLACEHOLDER_REGISTRY["D5"]）
+        has_placeholder = any("PLACEHOLDER" in f for f in all_formulas)
 
-        assert has_sub_accounts or has_single_1124, (
-            "D5 should have sub-account formulas (112401/112402) or single TB('1124',...)"
+        assert has_sub_accounts or has_single_1124 or has_placeholder, (
+            "D5 should have sub-account formulas (112401/112402), single TB('1124',...), "
+            "or PLACEHOLDER (1124 zero-hit in live account_chart)"
         )
 
 
@@ -651,10 +656,15 @@ class TestJSONSchemaValidation:
         d_cycle_ref_ids = []
         for ref in references:
             ref_id = ref["ref_id"]
-            if ref_id.startswith("CW-"):
-                num = int(ref_id.split("-")[1])
-                if 21 <= num <= 38:
-                    d_cycle_ref_ids.append(ref_id)
+            if not ref_id.startswith("CW-"):
+                continue
+            # CW-<数字> 与 CW-D424-E131 这类语义化 ID 并存，只数纯数字段
+            first_seg = ref_id.split("-")[1]
+            if not first_seg.isdigit():
+                continue
+            num = int(first_seg)
+            if 21 <= num <= 38:
+                d_cycle_ref_ids.append(ref_id)
 
         # Verify no duplicates
         assert len(d_cycle_ref_ids) == len(set(d_cycle_ref_ids)), (

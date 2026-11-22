@@ -70,13 +70,15 @@ test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncSession:
-    """SQLite 内存库，建 users / projects / audit_log_entries / cross_module_conflicts 4 表。"""
+    """SQLite 内存库，建 users / projects / audit_log_entries / audit_chain_head /
+    cross_module_conflicts 5 表（audit_chain_head 是审计链尾权威表，hook 链路写审计时必查）。"""
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         tables_to_create = [
             Base.metadata.tables["users"],
             Base.metadata.tables["projects"],
             Base.metadata.tables["audit_log_entries"],
+            Base.metadata.tables["audit_chain_head"],
             Base.metadata.tables["cross_module_conflicts"],
         ]
         await conn.run_sync(Base.metadata.create_all, tables=tables_to_create)
@@ -312,6 +314,18 @@ class _DiscFakeDB:
         # hook 调用 _get_prev_hash → select(AuditLogEntry.entry_hash)，需返回 None
         # 用一个 default scalar_one_or_none=None 的 result 兜底
 
+    def get_bind(self) -> Any:
+        """审计链 lock_chain 经 _dialect_name(db) 读方言：返回真 sqlite bind，
+        使 PG advisory lock 分支跳过（与真 SQLite 内存库同路径）。"""
+        from sqlalchemy import create_engine
+
+        return create_engine("sqlite://")  # 每次新内存引擎只为读 dialect.name
+
+    async def get(self, model: Any, key: Any) -> Any:
+        """审计链 read_head 用 db.get(AuditChainHead, key)：FakeDB 无链尾行 → None
+        （走「空链」分支，prev_hash=GENESIS_HASH，与新建链一致）。"""
+        return None
+
     async def execute(self, stmt: Any) -> Any:
         # disclosure_notes 路径：根据 (project_id, year, note_section) 匹配 preset_note
         try:
@@ -344,6 +358,9 @@ class _DiscFakeDB:
             return inner
 
         result.scalars = MagicMock(side_effect=_scalars)
+        # 审计链 read_head / _dead_entry_ids 直接在 execute(...) 上调 .all()：
+        # 空列表 = 空链（read_head 返回 None → GENESIS 起点）
+        result.all = MagicMock(return_value=[])
         return result
 
     def add(self, obj: Any) -> None:

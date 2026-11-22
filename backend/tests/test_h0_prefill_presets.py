@@ -132,8 +132,12 @@ def test_no_tb_formula_consumes_primary_code(h0_block: dict):
 
 
 def test_only_h0_block_touched(data: dict):
-    """块总数与 H0 之外的块结构不变（258 块，H0 恰 1 个）."""
-    assert len(data["mappings"]) == 258
+    """块总数与 H0 之外的块结构不变（306 块，H0 恰 1 个）.
+
+    258 → 306：其他 spec 往 prefill_formula_mapping.json 追加预设（D5 应收款项融资 / K0·L0 矩阵品种 / L7 其他非流动负债 / G7 1511 子科目等），
+    本测试只守「H0 恰 1 个」这一结构不变量，不守块总数。
+    """
+    assert len(data["mappings"]) == 306
     assert sum(1 for m in data["mappings"] if str(m.get("wp_code")) == "H0") == 1
 
 
@@ -221,6 +225,12 @@ _PLACEHOLDER_REGISTRY: dict[str, str] = {
     "H0": "H0-1 账面金额是九品种逐品种口径，真源 four_table/h0_book_amounts 语义定位",
     "G0": "并发 spec g0-confirmation-source-alignment 的同款九/多品种口径",
     "N5": "利润总额等派生行由 ROW()/REPORT() 组合，prefill 引擎无该解析器",
+    "D5": "应收款项融资(1124)在活体 account_chart 两个 source 零命中，TB/LEDGER 表达不了",
+    "D2": "本期核销无法用单条 LEDGER() 表达（resolve_ledger_formula 是按发生方向取数）",
+    "G7": "1511 子科目(按明细科目名归类)在 TB 里恒 0 且不带子级归层，语义定位替换",
+    "K0": "K0-1 矩阵品种「其他应收款/其他应付款」账面金额走语义定位（同 H0 九品种口径）",
+    "L0": "L0-1 矩阵品种「长期应付款/应付债券」账面金额走语义定位（矩阵 8 指标唯一无公式行）",
+    "L7": "其他非流动负债在 CAS 科目表无专属科目，须按实际情况手工填列",
 }
 
 

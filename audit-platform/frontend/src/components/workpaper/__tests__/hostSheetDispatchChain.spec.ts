@@ -43,6 +43,7 @@ const REPO_ROOT = path.resolve(__dirname, '../../../../../..')
 const WP_DIR = path.join(REPO_ROOT, 'audit-platform/frontend/src/components/workpaper')
 
 /** 分发变量名（各宿主统一用它做 sheet 分发） */
+
 const DISPATCH_VAR = 'currentSheet'
 
 interface DirectiveTag {
@@ -330,7 +331,9 @@ describe('HiFourTableSourcePanel 放置形态', () => {
         problems.push(`${h}（未使用溯源面板，清单已过时）`)
         continue
       }
-      const before = src.slice(Math.max(0, idx - 300), idx)
+      // 先剥 HTML 注释再取窗口：面板上方常带说明注释（H10 的口径修正说明 230+ 字符），
+      // 不剥会把真正的包裹标签挤出 300 字符窗口 → 假红（2026-11-22 H10 实测）
+      const before = stripHtmlComments(src.slice(Math.max(0, idx - 2000), idx)).slice(-300)
       if (!/<template v-(?:else-)?if=/.test(before)) {
         problems.push(`${h}（面板未被 <template v-else-if> 包裹 → 会打断 sheet 分发链）`)
       }
@@ -346,7 +349,7 @@ describe('HiFourTableSourcePanel 放置形态', () => {
       const src = fs.readFileSync(p, 'utf-8')
       const idx = src.indexOf('<HiFourTableSourcePanel')
       if (idx < 0) continue
-      const before = src.slice(Math.max(0, idx - 300), idx)
+      const before = stripHtmlComments(src.slice(Math.max(0, idx - 2000), idx)).slice(-300)
       const m = [...before.matchAll(/<template v-(?:else-)?if="([^"]*)"/g)].pop()
       if (!m || !m[1].includes(DISPATCH_VAR)) {
         problems.push(`${h}（包裹条件 "${m?.[1] ?? '无'}" 未按 ${DISPATCH_VAR} 分发）`)
