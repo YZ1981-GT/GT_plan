@@ -546,7 +546,7 @@
 |------|------|--------|
 | [`platform-global-display-settings-closure`](platform-global-display-settings-closure/tasks.md) | **19/29**（余 10） | **平台全局显示设置收口**：账号显示偏好、项目单位、度量合同、账套导入与正式导出边界。 |
 | [`platform-capacity-acceptance-and-heavy-defect-closure`](platform-capacity-acceptance-and-heavy-defect-closure/tasks.md) | **0/11**（余 11，其中 `*` 5 项需专用容量环境；B1/B4/C1 本机可开工） | **平台容量验收与重任务残留缺陷收口**（承接 `_archive/188` 交接）：六类安全计数探针·分布式负载机编排·6000 VU 梯度实跑与判定·PgBouncer 2%→100% 灰度脚本与实跑·多 worker 2/4/8 零丢失零重复·合并附注差额节点语义裁决与真实大项目基线·知识检索索引落地生产·流式路由 DB 作用域 111 条逐条迁移·TB 虚拟化交互契约与 canary。 |
-| [`b22a-whole-workbook-provider-lane`](b22a-whole-workbook-provider-lane/tasks.md) | **4/6**（余 2：5 真底稿验收、6 回接 onlyoffice-sheet-open 3.4） | **B22A 整册（whole-workbook）供给链交付**：provider / 契约 / capability 终裁（权威册 B22A-4-1 IT概要，store 坐标键独立 item，空表合法）；L3 契约与 L5 capability 已过，承接 onlyoffice-sheet-open-via-published-artifact 3.4 的 whole-workbook canary。 |
+| [`b22a-whole-workbook-provider-lane`](b22a-whole-workbook-provider-lane/tasks.md) | **6/6 ✅（2026-11-22 复核确认，可归档）** | **B22A 整册（whole-workbook）供给链交付**：provider / 契约 / capability 终裁（权威册 B22A-4-1 IT概要，store 坐标键独立 item，空表合法）。六阶段全交付并随 commit eee97c78e 推送；real Anhui first-publication（rep 08a0ef7a）+ reviewed overlay migrated（project_ids 限定安徽）+ whole-workbook canary 四项证据链闭环，已回接 onlyoffice-sheet-open-via-published-artifact 3.4（[x]）。 |
 | [`onlyoffice-sheet-open-via-published-artifact`](onlyoffice-sheet-open-via-published-artifact/tasks.md) | **22/34**（余 12 项全部依赖治理前置/人的裁决/真环境） | **Sheet 级 OnlyOffice 改走 Published Representation**：建立显式 sheet→entry 映射，让单 sheet / 整册入口打开同一条 published artifact；目标 sheet 用 descriptor/actionLink 表达，不再复制模板、隐藏 sheet 或按 sheet 名猜父级；按 binding 状态逐入口 drain 旧 config/WOPI/callback。 |
 
 ### 一.1 已完成 / 已归档的历史行（append-only，不回填改写）
