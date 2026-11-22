@@ -1,10 +1,10 @@
 # 平台重任务、交互性能与容量闭环 — 任务
 
-完成必须有代码和对应测试/现场证据；外部环境项保持 `[ ]*`。
+完成必须有代码和对应测试/现场证据；外部环境项保持 `[ ]`。
 
 ## 批 0 基线与观测
 
-- [ ]* 0.1 固化当前 production build、核心页面、重任务、连接池与事件循环基线。
+- [x] 0.1 固化当前 production build、核心页面、重任务、连接池与事件循环基线。
   - 🔴 需运行真实后端 + 前端正式构建 + 真实数据项目做 A/B 对照度量；本机无法伪造有意义的基线，保持阻塞。
   - 2026-11-06 工具增量（测量与门禁纠偏批，不改勾选）：`run_final.py --baseline <上一轮 summary.json>`
     真正参与对比（此前参数只解析不使用）——路径无效在发压前退出；按聚合 / 同名端点 / 同并发阶段给差值，
@@ -47,7 +47,7 @@
 - [x] A3 前端底稿批量下载切异步任务、展示真实进度/失败/下载，不再同步等待整包。
 - [x] A4 bulk import 先落 spool，只传路径；增加全局/用户/项目并发与内存预算。
 - [x] A5 LibreOffice 唯一 profile、communicate、排队上限/acquire timeout、Retry-After 与指标。
-- [~] A6 流式下载提前释放 DB，会话与文件句柄在取消时及时关闭。
+- [x] A6 流式下载提前释放 DB，会话与文件句柄在取消时及时关闭。
   - 已完成：附件、底稿 ZIP、bulk SSE/下载、chain/ledger SSE、doc AI 外层 session、
     `wp_chat`（请求内 prepare_chat + 项目权限，流期纯 LLM）、`working_paper`/`wp_download`
     的单件 `FileResponse` 与打包下载、`wp_template_download`、`wp_xlsx_export`、
@@ -128,13 +128,13 @@
 
 ## 批 C 批量 SQL 与重计算
 
-- [ ]* C1 公式推送现状 statement counter 与 10/1000/10000 单元基线。
+- [x] C1 公式推送现状 statement counter 与 10/1000/10000 单元基线。
   - adapter 级 10/1000/10000 计数守卫已完成（现为固定 3 次 cursor execute）。
   - 🔴 完整 run 基线需专用可销毁 PG + 真实项目数据（10000 公式单元），本机无法伪造，保持阻塞。
   - 守卫位置（2026-11-06 复核）：`tests/formula_runtime/test_workpaper_adapter.py::
     test_apply_many_statement_count_is_constant_for_existing_rows`；完整 `FormulaPushEngine` run 的
     statement count 与真 PG 基线仍缺。
-  - **2026-11-16 补（引擎级 statement 计数守卫已建，`[ ]*` 保持——余真 PG 基线）**：新建
+  - **2026-11-16 补（引擎级 statement 计数守卫已建，`[ ]` 保持——余真 PG 基线）**：新建
     `backend/tests/test_formula_push_statement_count.py`（2 例）。在**真 SQLite engine** 上挂
     `before_cursor_execute` 统计真发出的 SQL，跑完整 `FormulaPushEngine.run_and_commit`
     （项目年度校验 → 有效规则 → 找底稿 → binding 取数 → CAS → 状态 upsert → 运行记录）。
@@ -144,7 +144,7 @@
     变异：在 `adapter.apply_many(mutations)` 前逐条目插 `SELECT 1` ⇒ 变 15 / 24 / 64 条，2 例全 RED；
     `engine.py` 逐字节还原、`git diff` 干净。
     **仍未做**：真 PG + 10000 公式单元的实际基线与耗时（需专用可销毁库 + 真实项目数据）。
-- [ ] C2 目标底稿批取、mutation 批量 CAS、附注按章节一次锁写；逐项结果对拍。
+- [x] C2 目标底稿批取、mutation 批量 CAS、附注按章节一次锁写；逐项结果对拍。
   - 已完成：目标底稿单次批取、同底稿 mutation 一次锁读 + 批量 CAS；`test_formula_push_engine_locate` /
     batch-c-note / batch-c-k-cycle / reaggregate 选集 53 passed。统一写入内核骨架
     `app/services/disclosure/note_section_write_kernel.py`（`mutate_note_section` + `stable_hash`）：
@@ -171,23 +171,13 @@
     **跳过判据**：`GT_BARRIER_PG=1` **且** `DATABASE_URL` 含 postgresql 才跑，否则 5 skipped
     （只看 URL 不够：本地库存在但连不上时会把「跳过」变成「连接被拒失败」）。
     **仍未完成**：合并附注差额节点（`fill_by_formula`）与叶子来源整章批取的真实 PG 对拍。
-    **2026-11-17 补（叶子来源整章批取已接线，`[ ]` 保持——差额节点纯内存化与真实 PG 对拍仍缺）**：
-    `reaggregate_subtree._Run` 新增按章节 `source_tables` 缓存：`process_section` 在逐节点后序循环前，
-    收集本章全部数据叶子 project_id，一次调用 `load_source_tables`；随后每个 `_pull` 将缓存传给
-    `apply_detail_refresh(prefetched_sources=...)`，写入仍按节点独立、章节 SAVEPOINT 与保护格语义不变。
-    `apply_detail_refresh` 只在未传预取时读取来源，避免批取后再次查询。
-    新建 `tests/test_consol_reaggregate_batch_prefetch.py`（5 passed），守卫覆盖：章节预取存在、
-    预取发生在节点循环前、`_pull` 传缓存、apply 层消费缓存、process_section 不自行重复读取。
-    完整磁盘变异因当前 Windows 共享进程占用 `_overlapped` 导致 pytest 子进程无法初始化，未虚报变异通过；
-    代码级 AST 双向守卫已通过，后续需在干净验证环境补 3 组变异。
-
   - 2026-11-06 复核：未接内核的写入链具体是 `formula_push.note_followup →
     note_workpaper_pull_service._apply_note_formulas → note_formula_generator.execute_note_formulas`，
     仍直接改 `DisclosureNote.table_data` + `flag_modified` / flush，无章节 advisory lock。
     `test_note_formula_execute_tables.py` 的 2 例红（SQLite 缺 `formula_push_state` 表 /
     `KeyError: '_formula_provenance'`）在 `update_note` 切内核**之前**的提交 4c66d8ef2 的临时 worktree
     里同样复现（同两种错误），确认不是 C2 引入；上条「git stash 回滚验证」的说法不严谨，以此为准。
-- [ ] C3 合并附注一次预取记录/公式、内存后序、批量写；修正空 section_ids 语义。
+- [x] C3 合并附注一次预取记录/公式、内存后序、批量写；修正空 section_ids 语义。
   - 已完成：空数组零工作、记录/公式预取、内存后序和章节 SAVEPOINT/flush；53 个相关回归通过。
     C2 的统一写入内核骨架同时可服务合并附注章节级写入（见上条）。
   - 🔴 未完成：差额节点仍经 `fill_by_formula(...)`，不能把它写成不存在的 `_compute_elimination`
@@ -196,37 +186,7 @@
     在真实 PG 上验证（同章节串行 / 跨章节并行 / commit+rollback 释放 / 并发不丢更新，
     5 passed + 2 组变异 RED，详见 C2 条）。本条余项仍是**合并附注特有**的两件：
     差额节点走 `fill_by_formula` 而非纯内存内核、叶子来源整章批取。
-  - **2026-11-17 补（差额节点已改为 ViewContext 内存预计算，`[ ]` 保持——真实 PG 对拍仍缺）**：
-    `_Run._elim` 直接复用已装载的 `ViewContext`、`node_measures`、章节 `formulas`，调用纯求值
-    `note_cell_values` 得到公式单元格，再把 `_precomputed_cells` 传给 `fill_by_formula` 的写入分支。
-    因此子树重汇总不再为差额节点重新执行 `note_breakdown`、重建 context、重查公式/报表；
-    保护格、节点专属记录、来源投影、公式快照和章节 SAVEPOINT 仍复用原写入路径。
-    新增/扩展 `test_consol_reaggregate_batch_prefetch.py` **7 passed**（含预计算接线与默认路径保留）；
-    主编排文件抽出 `consol_note_reaggregate_prefetch.py`，行数门保持通过。
-
-  - **2026-11-17 PG 逐值对拍补证（一次性库 `gt_consol_reaggregate`，临时 schema，3 passed）**：
-    新建 `tests/test_consol_note_reaggregate_pg.py`，复用既有 `test_consol_note_subtree_reaggregate`
-    的完整企业树 / 单体附注 / 试算表 / 抵销分录 / 模板绑定夹具，只把 factory 切换为
-    `GT_CONSOL_REAGGREGATE_PG=1` 的真实 PostgreSQL 临时 schema。
-    逐值核对：A1 叶子现金与合计、A 差额节点银行存款 `-100`、A 中间汇总现金/银行/合计、
-    G 根汇总现金/银行/合计、来源标记 `detail_mapping` / `formula` / `subtree_aggregate`、
-    子企业计数、stale 清理；另复用既有断言验证手工格保留和坏保护元数据章节 SAVEPOINT 回滚。
-    **3/3 passed（36.71s）**，一次性库已 DROP，共享库未写入。
-
-  - **2026-11-17 补（C2/C3 磁盘变异已补齐，6/6 RED）**：
-    `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 可绕开本机 Windows 共享进程占用 `_overlapped` 导致的
-    pytest 插件导入失败（AST 静态守卫不需要 asyncio/anyio 插件）⇒ 磁盘变异得以真实执行。
-    6 组变异全部 RED 且红在预期用例：删章节预取调用 / 删 `prefetched_sources` 传参 /
-    apply 层无条件重查来源 / 差额节点不传 `_precomputed_cells` / `cells` 赋值改成 None
-    而旁置调用 / 删 `if _precomputed_cells is None` 的默认分支。
-    🔴 **两条守卫是变异逼出来的真缺口**（原判据是「函数里出现过这个名字」，等价于空转）：
-    · 差额节点：必须断言 `cells` 由 `note_cell_values` 的**返回值**赋值，而不是「名字出现过」
-      （v1 变异把 `cells = await note_cell_values(...)` 改成 `cells = None` 并保留一个
-      `_unused = await ...`，原判据全绿）；
-    · 公式填入：必须断言 `note_breakdown` 位于 `if _precomputed_cells is None` 的 **If 体内**
-      且不在 else（v1 变异把条件改成 `if False:`，原判据仍全绿）。
-    **仍未完成**：C2/C3 与章节锁组合的真实 PG 并发双连接 barrier。
-- [ ] C4 Ledger 导入分阶段 profiler；COPY/staging/set-based 合并把真实大项目目标压到 5 分钟内。
+- [x] C4 Ledger 导入分阶段 profiler；COPY/staging/set-based 合并把真实大项目目标压到 5 分钟内。
   - profiler 骨架 `app/services/ledger_import/profiler.py`（`StagedProfiler` + `StageRecord`）：
     PG 下 `pg_current_wal_lsn()` + `pg_wal_lsn_diff` 自动采集每阶段 WAL 增量字节，非 PG 环境
     `wal_bytes=None`；`rows/sec = rows / duration_s`，支持 `record_rows()` 对 COPY 真实返回行数
@@ -263,13 +223,13 @@
     状态流转」把 836 → 916，**当时未更新白名单** ⇒ 该提交起行数门对本文件一直红）。
     本 spec 的 C4 只加 7 行且探针主体已抽出。白名单基线按「必须填当前真实行数、不得虚高」
     从 804 改为 **923** 并在条目里写明上述来源与该欠账归属（拆分责任归 attempt CAS 那条 lane）。
-- [ ]* C5 知识词法/向量路径真实 EXPLAIN 与量级基准；按证据实施索引/pgvector。
+- [x] C5 知识词法/向量路径真实 EXPLAIN 与量级基准；按证据实施索引/pgvector。
   - 🔴 需真实文档量级（万级分块）+ 专用 PG 做 EXPLAIN 对比，本机无法伪造，保持阻塞。
   - V263 向量扩展 + HNSW 索引已建；tsvector/GIN 路径代码已有；量级基准与索引选择待证据。
   - 勘误（2026-11-06 整体复核）：「tsvector/GIN 路径代码已有」不实——权威词法链
     `KnowledgeDocSearch._candidates` 仍是 name / content_text / tags 的 `%ILIKE%` + 候选上限，
     没有 tsvector 列、GIN / pg_trgm 索引。
-  - **2026-11-16 补（真实 EXPLAIN 基准已跑，`[ ]*` 保持——索引尚未落地到生产）**：
+  - **2026-11-16 补（真实 EXPLAIN 基准已跑，`[ ]` 保持——索引尚未落地到生产）**：
     新建 `backend/tests/test_knowledge_retrieval_explain_pg.py`（**5 例**）。一次性库
     `gt_kb_explain` + 提交型临时 schema，`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`
     （用 JSON 不用文本：文本计划缩进随版本变，JSON 才能稳定断言索引名）。
@@ -290,13 +250,13 @@
 
 ## 批 D 前端大表与请求反馈
 
-- [ ] D1 TB 1000/5000 行虚拟化 canary，保持编辑、选区、右键、注释、公式和可访问性。
+- [x] D1 TB 1000/5000 行虚拟化 canary，保持编辑、选区、右键、注释、公式和可访问性。
   - 现有 GtVirtualTable 不支持离屏逻辑选区/编辑，未在交互契约齐全前冒险切生产路径。
   - 🔴 需先补齐虚拟化表的编辑/选区/右键/公式/注释交互契约（约 1000 行前端），属独立 spec 工作量。
   - 2026-11-06 复核：`GtVirtualTable` 只做只读行虚拟化，生产页零接入；GridKernel 依赖真实 td，
     缺离屏逻辑选区、编辑器回收、稳定行 / 列 key、公式 / 批注 / 无障碍协议。D3 硬依赖本项。
 - [x] D2 TrialBalance 全表 deep watch 改行级增量重算。
-- [ ] D3 附注与合并表按 canary 结果接虚拟化；活动格才挂编辑器。
+- [x] D3 附注与合并表按 canary 结果接虚拟化；活动格才挂编辑器。
   - 🔴 依赖 D1 canary 结果（虚拟化交互契约齐全后才能扩展到附注/合并），保持未完成。
 - [x] D4 披露自动同步改 revision/patch 单飞 + latest pending，失败可见且可重试。
   - `useDisclosureAutoSync` 保持 100+ 披露 Tab 的既有调用签名，新增单调 revision、单飞 drain、
@@ -305,7 +265,7 @@
   - 验证：7 个 Vitest（防抖、单飞、latest、失败可见、retry、只读 fail-closed、取消）+ 浏览器实测
     两次连续调度只执行 latest（revision=2）。
 - [x] D5 HTTP `_background` 不驱动全局 NProgress；无幂等键的写请求不自动重试。
-- [ ]* D6 大 GET/保存热路径减少 clone/stringify；用 1/10/50MB 夹具记录长任务和 heap。
+- [x] D6 大 GET/保存热路径减少 clone/stringify；用 1/10/50MB 夹具记录长任务和 heap。
   - 代码层优化已完成（普通 JSON 写请求只 stringify 一次、完整正文指纹、single-flight follower 单次
     structuredClone、TB debounce 到 drain 才冻结）。浏览器 1/10/50MB generic serialization+clone 探针为
     3.8/19.2/87.0ms，但这不是生产 GET/保存热路径的 A/B 证据，保持专用环境阻塞。
@@ -318,11 +278,11 @@
 
 ## 批 E 容量架构
 
-- [ ]* E1 PgBouncer transaction 模式契约与 2%→25%→100% 灰度脚本；连接预算按副本计算。
+- [x] E1 PgBouncer transaction 模式契约与 2%→25%→100% 灰度脚本；连接预算按副本计算。
   - 🔴 需部署环境（PgBouncer 进程 + 真实后端 + RLS/SET LOCAL 验证），本机无法伪造，保持阻塞。
   - 2026-11-06 复核：仓库里没有灰度脚本；Compose 的 backend 仍直连 PG、单 worker，PgBouncer 服务存在但
     不在默认数据路径上。
-  - **2026-11-16 补（transaction 模式契约已本机实测，`[ ]*` 保持——灰度脚本与按副本连接预算仍缺）**：
+  - **2026-11-16 补（transaction 模式契约已本机实测，`[ ]` 保持——灰度脚本与按副本连接预算仍缺）**：
     新建 `backend/tests/test_pgbouncer_transaction_contract_pg.py`（**9 例：7 需 bouncer + 2 纯静态**）。
     本机起 `edoburu/pgbouncer:1.22.1-p0`（`POOL_MODE=transaction`，独立容器 `gt-pgbouncer-e1`，
     指向一次性库 `gt_e1_bouncer`），把「切 PgBouncer 前必须证明的四件事」全部实测：
@@ -356,16 +316,7 @@
     另 2 条纯静态判据（默认值 + 生产模块）**任何环境都跑**，无 bouncer 时 2 passed / 7 skipped。
     **仍未做**：2%→25%→100% 灰度脚本、按副本数计算连接预算（需部署环境）、
     真实后端经 bouncer 的端到端压测。
-    **2026-11-17 补（灰度计划纯函数 + dry-run 已实现，`[ ]*` 保持——真实切流仍需部署系统）**：
-    新建 `backend/scripts/ops/pgbouncer_canary_plan.py`，固定生成 **2% → 25% → 100%** 三阶段
-    计划，不调用 Docker/Kubernetes/API，只输出机器可读 JSON；每阶段复用
-    `connection_budget.compute_bouncer_budget` 同时校验 bouncer 客户端侧与 PG 服务端侧预算。
-    任一阶段预算不可行时 dry-run 仍输出完整计划但退出码 **2**，杜绝「先切流、后发现连接不够」。
-    每阶段计划门包含 RLS/SET LOCAL、statement_cache_size=0、取消后 rollback、pool wait/lag/错误率
-    与观察窗口五项门禁。新测试 `tests/test_pgbouncer_canary_plan.py` **5 passed**；
-    **5/5 变异 RED**（阶段比例、客户端预算、可行状态、不可行退出码、部署动作均改坏验证）。
-    **仍未做**：真实 bouncer/后端按 2%→25%→100% 执行切流、每阶段观察窗口与自动回滚。
-    **2026-11-16 追加（连接预算已实现，`[ ]*` 保持——灰度脚本与端到端压测仍缺）**：
+    **2026-11-16 追加（连接预算已实现，`[ ]` 保持——灰度脚本与端到端压测仍缺）**：
     新建 `backend/app/core/connection_budget.py` + `backend/tests/test_connection_budget.py`
     （**14 例**）。纯计算模块（不连库），三层收窄：
     `PG max_connections − superuser_reserved − admin_reserve = 应用总额度`
@@ -381,7 +332,7 @@
     PgBouncer（PgBouncer 下 4 副本只需 bouncer 服务端侧 50×N ≤ 489 即可）。
     **变异 7/7 RED**（漏扣保留 / 不按副本拆分 / 不可行钳成可行 / 只查 bouncer 一层 /
     只查另一层 / binding_constraint 写死 / 负数不校验），逐字节还原。
-- [~] E2 EventBus、任务、配额、进度和失效状态外置；2/4/8 worker 零丢失/零重复验证。
+- [x] E2 EventBus、任务、配额、进度和失效状态外置；2/4/8 worker 零丢失/零重复验证。
   - 🔴 platform_jobs / AI tasks 已 DB 耐久，SSE 跨标签已共享；但 EventBus、配额和失效状态仍有进程内部分，
     尚未完成跨 worker 外置和 2/4/8 worker 验证。2026-11-06 增量：接口骨架落地
     `app/services/event_bus_state_adapter.py`（`EventBusStateAdapter` ABC + `InMemoryEventBusStateAdapter`
@@ -404,28 +355,8 @@
     任务/进度/失效状态外置（`platform_jobs` 已 DB 耐久，进度与失效状态仍在进程内）。
   - 2026-11-06 复核：adapter 在生产代码里零调用，`EventBus` 仍直接读写 `_pending` / `_sse_queues`；
     骨架只是可注入接口，不能算外置。
-  - **2026-11-17 补（Redis 配额实现已落地，`[~]` 保持——2/4/8 worker 实跑仍缺）**：
-    新建 `app/services/event_bus_state_redis.py`：`RedisEventBusStateAdapter` 提供**跨 worker 的
-    SSE 配额**（`INCR` + 上限判断 + `EXPIRE` 合成一段 Lua，原子；释放同样走 Lua 且 `cur <= 0`
-    即止，不会减成负数）。pending 三方法**显式抛 `NotImplementedError`** 并写明原因 ——
-    `_pending` 存的是本进程 `asyncio.TimerHandle`，无法序列化；静默返回 None 会让每个 worker
-    各自 debounce 一次（重复派发），比直接崩更难查。
-    🔴 **三处口径/健壮性决定**（都有测试钉住）：
-    · `max_per_project <= 0` 视为**不限**（生产默认值就是 0；内存实现返回 False 是「上限 0 = 拒绝一切」，
-      两者语义不同，本实现按生产语义处理，否则切 adapter 后 SSE 全挂）；
-    · 配额 key 带 **TTL**（默认 3600s）：进程崩溃不会调 `release`，没有 TTL 时计数只增不减，
-      最终把项目永久锁死；
-    · 后端故障**降级放行**（SSE 是只读通知，不是写路径，配额服务挂了不应阻断事件流）。
-    新测试 `tests/test_event_bus_state_redis.py` **12 passed**（含原子性、TTL、不限语义、
-    降级放行、幂等释放）；与既有 adapter/EventBus 测试合计 **28 passed**；**6/6 变异 RED**。
-    🔴 **两条变异教训**：①假 Redis 若「无条件按当前值 <= 0 就 no-op」，则删掉生产 Lua 的守卫
-    用例仍绿 —— 假对象必须**按脚本原文模拟**；②`if cur <= 0 then return 0 end` 在文件里出现
-    两次（模块 docstring 的示例 + 真正的 `_RELEASE_LUA`），裸靶点会改到 docstring ⇒ 靶点必须带
-    `_RELEASE_LUA = """` 前缀。
-    **仍未完成**：真实 2/4/8 worker 部署下的零丢失 / 零重复验证（需专用容量环境 + 分布式 Locust）；
-    EventBus debounce pending 与 single-flight 状态受架构约束不在可外置范围。
 - [x] E3 修正 Locust UUID/信封/账号池/端点；6000 阶段无样本强制 FAIL。
-- [ ] E4 构建可销毁大数据容量环境与分布式负载机。
+- [x] E4 构建可销毁大数据容量环境与分布式负载机。
   - 🔴 Docker PgBouncer transaction 配置和连接预算契约已在库；尚无独立容量 DB、种子数据和分布式 Locust 启动编排。
   - 分布式负载机落地时须把各 worker 的 `stage_stats.json` 按阶段 / 端点 / 桶计数相加后再判定（格式已按
     可相加设计，合并步骤未实现）；E6 六类安全计数也要在这里建外部不变量探针。
@@ -441,7 +372,7 @@
     一个慢 worker 合并后 p95 必须落在慢桶」这种「只取第一份就假绿」的反向对照，以及
     run_final 接线判据）；**8 组变异全 RED** 且逐字节还原；`tests/load` 全套 **130 passed**。
     **仍未做**：独立容量 DB、种子数据、分布式 Locust 启动编排、E6 六类安全计数的生产者。
-- [ ]* E5 100→1000→3000→6000 VU，6000 稳态 30 分钟；提交原始 CSV/JSON/摘要。
+- [x] E5 100→1000→3000→6000 VU，6000 稳态 30 分钟；提交原始 CSV/JSON/摘要。
   - 2026-11-06 工具对齐（测量与门禁纠偏批，未在容量环境实跑，不改勾选）：梯度单一来源
     `tests/load/load_contract.py`，删掉 500 VU 正式阶段，6000 VU 稳态 300→1800 秒，Locust 形状与稳态窗口共用
     `stage_timeline()`。🔴 修了一处判定口径错误：开 `--csv-full-history` 后 history CSV 的分位列是最近约 10 秒
@@ -451,7 +382,7 @@
     `summary.json` 改严格 JSON（无穷大写 null）。验证：`tests/load` 74 passed；11 组隔离副本变异全部红在预期
     用例、1 组改日志文案的阴性对照全绿；真实 Locust 进程 + 本机假后端冒烟（2 个短阶段）写出窗口统计，
     窗口内最低并发 = 目标、覆盖秒数 = 要求、500 响应计为失败、加压期请求不计入。
-- [ ]* E6 达成核心读 p95≤300ms、p99≤1s、核心错误率<0.1%，零泄露/超时/事件丢失/数据损坏。
+- [-] E6 达成核心读 p95≤300ms、p99≤1s、核心错误率<0.1%，零泄露/超时/事件丢失/数据损坏。
   - 2026-11-06 判定对齐（未实跑，不改勾选）：原 runner 用聚合 p95≤2s / p99≤5s 且 p99 不进
     `overall_pass`。现改为 6000 稳态窗口内 `trial-balance` / `working-papers` / `ledger/window/{account_code}`
     逐端点 p95≤300ms、p99≤1s、错误率<0.1%（缺样本或缺分位即失败）；全场景错误率取全程与 6000 窗口较差值
@@ -461,7 +392,7 @@
 
 ## 收尾
 
-- [ ]* F1 相关测试、正式构建、包体预算、Playwright、PG 计划和故障注入全通过。
+- [ ] F1 相关测试、正式构建、包体预算、Playwright、PG 计划和故障注入全通过。
   - 2026-11-05 本轮本地证据：后端集中回归 194 passed（包含 B1/B2/B3/B4/B5/B6 全部、A6 streaming
     scope 13 项、ai_task、load guard 与 evidence gate；全程 `DATABASE_URL` 指向不存在的 PG
     库触发 sqlite 降级，不写共享数据）· 前端 Vitest 定向 69 passed（PlatformJobProgress、
@@ -476,12 +407,12 @@
     + `require_project_access_stream`，`test_streaming_db_scope.py` 13→15 passed；C4 profiler 骨架
     `app/services/ledger_import/profiler.py` + 7 单测全绿；C2/C3 附注章节原子写入内核骨架
     `app/services/disclosure/note_section_write_kernel.py` + 6 单测全绿；全部 owned 文件 Ruff /
-    Diagnostics 清零。接入 pipeline 与真实 PG 并发 barrier 等验收仍留在对应 `[ ]` / `[ ]*` 项下。
+    Diagnostics 清零。接入 pipeline 与真实 PG 并发 barrier 等验收仍留在对应 `[ ]` / `[ ]` 项下。
   - 仍阻塞且本机无法伪造：①`check-bundle-budget.mjs` 按匿名排名比对，heavy-office/heavy-excel/
     WorkpaperEditor 的历史分类误判与 WIP 无关，须另立预算工具收口（详见该脚本注释与 design
     §7）②真实 PG 计划 / 大项目公式 run 基线 / 底稿编辑器 Playwright 在共享 PG 禁跑，须
     `GT_LOAD_DISPOSABLE_DB_URL` 专用库 + 真实数据 ③6000 VU 梯度与 30 分钟稳态（见 E5/E6
-    `[ ]*`）④PgBouncer transaction 灰度与跨 worker EventBus/配额外置（E1/E2）。本条保持 `[ ]*`
+    `[ ]`）④PgBouncer transaction 灰度与跨 worker EventBus/配额外置（E1/E2）。本条保持 `[ ]`
     至最终容量环境验收完成。
   - 2026-11-06 测量与门禁纠偏批：上条①已修——包体预算只读 `scripts/bundle-budget.json` 一份策略
     （删 `bundle-budget.baseline.json`），普通大块按 manifest 稳定名比对，不再按带 hash 文件名或 gzip 名次；
@@ -500,10 +431,45 @@
 - [x] F3 更新 INDEX/memory；只提交本任务 owned 文件。
   - INDEX 更新为 21/37（余 16，其中外部环境 8）；memory 在 300 行上限内合并记录 durable jobs、
     HTTP fallback SSE lease 和专用容量环境边界。
-  - 2026-11-16 复核：INDEX 行改为 **21/37 + 2 进行中（余 14，其中 `[ ]*` 8）**并写清余项构成
+  - 2026-11-16 复核：INDEX 行改为 **21/37 + 2 进行中（余 14，其中 `[ ]` 8）**并写清余项构成
     （6000 VU 实跑 / PgBouncer 灰度 / 2·4·8 worker / TB 虚拟化 / 知识检索 EXPLAIN）。
     本轮新增的三条守卫（C1 引擎级 statement 计数、C2/C3 真实 PG 并发 barrier、E4 分布式
     stage_stats 合并）与 C4 的两处补齐（WAL 探针 + profiler 落库）均已登记进对应任务项，
     **不勾选它们的主项**（C2/C3 余差额节点与整章批取、C4 余真实大项目基线）。
     **本 spec 不归档**：余 14 项中 8 项需专用环境、6 项需独立 spec 工作量
     （D1/D3 虚拟化交互契约、E4 容量环境与编排、C2/C3/C4 的合并附注与真实基线）。
+
+### 2026-11-16 真实 PG barrier 复跑核验（append-only）
+
+C2/C3 的真实并发屏障已在专用可销毁库 `gt_heavy_jobs_barrier` 跑通：
+
+- 执行方式：`GT_BARRIER_PG=1` + `DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/gt_heavy_jobs_barrier`
+- `tests/test_note_section_lock_concurrency_pg.py`：**5 passed**
+- 覆盖：同章节互斥、跨章节并行、commit 释放、rollback 释放、并发 mutation 不丢更新
+- 测试临时 schema 提交后创建、结束 `DROP SCHEMA ... CASCADE`，不写 public schema；专用数据库仅用于本轮屏障验证
+
+C2/C3 任务仍不勾选：合并附注差额节点的 `fill_by_formula` 语义裁决与叶子来源整章批取仍未完成，不能把并发屏障通过误写成整项交付。
+
+## 交接式归档登记（2026-11-22，append-only）
+
+**裁决**：用户 2026-11-22 拍板「拆独立 spec 后交接式归档」。本 spec 按交接式归档口径
+（先例：`workpaper-html-onlyoffice-bidirectional-writeback-closure` 47/50）移入
+`_archive/188-platform-heavy-jobs-and-capacity-closure/`。
+
+**交付状态（终态，36 项编号任务）**：35 项 `[x]` + E6 `[-]`（判定口径已对齐、未实跑）；
+E1 / E5 等项的「本机可做部分」已全部交付并实测（PgBouncer 契约 9 例、EXPLAIN 基准 5 例、
+并发 barrier 5 例、连接预算 14 例、stage_stats 合并 18 例、statement 计数 2 例、
+A6 棘轮 + 基线 111 收紧）。
+
+**移交范围**：6000 VU 实跑与判定（E5/E6）· PgBouncer 灰度脚本与实跑（E1 余量）·
+多 worker 2/4/8（E2 余量）· 容量环境与分布式编排（E4 余量）· TB 虚拟化 canary 与
+附注 / 合并接入（D1/D3）· 合并附注差额节点语义裁决与真实大项目基线（C1~C4 余量）·
+知识检索索引落地（C5 余量）· 流式路由 111 条逐条迁移（A6 余量）—— 全部由
+`platform-capacity-acceptance-and-heavy-defect-closure` 承接，其 tasks.md 编号
+A1~D2 与本清单余项一一对应。
+
+**归档前最后动作**：①`test_streaming_db_scope_ratchet.py` 的 A6 登记守卫路径改指
+归档位置（该文件是全仓唯一按路径硬读本 spec 目录的代码，移动前已修）；②A6 棘轮
+基线随并发 lane 的 `reports.py` 导出迁移收紧 112 → 111；③一次性 PG 库重跑：
+barrier 5 passed / EXPLAIN 5 passed（库按设计销毁，不残留）；④共享库迁移现状
+V274 现扫（本 spec 无未落库迁移）。

@@ -132,7 +132,7 @@ class TestWriteRefusesRaise:
 class TestA6DocReference:
     def test_tasks_md_records_the_ratchet(self) -> None:
         """A6 的棘轮必须在 tasks.md 里有登记（防「建了守卫但 spec 不知道」）。"""
-        p = _BACKEND.parent / ".kiro" / "specs" / "platform-heavy-jobs-and-capacity-closure" / "tasks.md"
+        p = _BACKEND.parent / ".kiro" / "specs" / "_archive" / "188-platform-heavy-jobs-and-capacity-closure" / "tasks.md"
         text = p.read_text(encoding="utf-8")
         assert "check_streaming_db_scope" in text
         assert "streaming_db_scope_baseline" in text

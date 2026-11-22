@@ -2,17 +2,17 @@
   "schema_version": 1,
   "_source": "scripts/check/check_streaming_db_scope.py",
   "criteria": "路由返回 StreamingResponse/FileResponse 且 db 为请求级 Depends(get_db)（未带 scope='function'）",
-  "count": 112,
+  "count": 111,
   "candidates": [
     {
       "file": "backend/app/routers/adjustments.py",
       "function": "export_adjustment_summary",
-      "lineno": 916
+      "lineno": 924
     },
     {
       "file": "backend/app/routers/adjustments.py",
       "function": "export_adjustment_template",
-      "lineno": 963
+      "lineno": 971
     },
     {
       "file": "backend/app/routers/archive.py",
@@ -87,17 +87,17 @@
     {
       "file": "backend/app/routers/deliverable.py",
       "function": "download_trio_item",
-      "lineno": 1295
+      "lineno": 1303
     },
     {
       "file": "backend/app/routers/deliverable.py",
       "function": "download_package",
-      "lineno": 1670
+      "lineno": 1678
     },
     {
       "file": "backend/app/routers/deliverable.py",
       "function": "signed_download_version",
-      "lineno": 1909
+      "lineno": 1917
     },
     {
       "file": "backend/app/routers/disclosure_notes.py",
@@ -117,7 +117,7 @@
     {
       "file": "backend/app/routers/export.py",
       "function": "download_export",
-      "lineno": 76
+      "lineno": 106
     },
     {
       "file": "backend/app/routers/export_integrity.py",
@@ -405,11 +405,6 @@
       "lineno": 47
     },
     {
-      "file": "backend/app/routers/reports.py",
-      "function": "export_report_excel",
-      "lineno": 403
-    },
-    {
       "file": "backend/app/routers/review_prompt.py",
       "function": "export_review_report",
       "lineno": 557
@@ -467,7 +462,7 @@
     {
       "file": "backend/app/routers/wp_onlyoffice_router.py",
       "function": "get_sheet_wopi_contents",
-      "lineno": 970
+      "lineno": 1049
     },
     {
       "file": "backend/app/routers/wp_render_strategies/_c24_import_export.py",
@@ -562,7 +557,7 @@
     {
       "file": "backend/app/routers/wp_sync_router.py",
       "function": "get_room_contents",
-      "lineno": 1465
+      "lineno": 1638
     }
   ]
 }
