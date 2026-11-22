@@ -421,33 +421,41 @@ class TestH112AllVersions:
 # ─── Test 12: H2-2 有 AUX entries（1604 在建工程）────────────────────────────
 
 
-class TestH22AuxEntries:
-    """H2-2 明细表H2-2 应有 =AUX 公式（1604 在建工程按项目辅助核算）"""
+class TestH22FormulaEntries:
+    """H2-2 明细表H2-2 的四条取数如实断言 TB(1604) —— 不是 AUX。
 
-    def test_h2_2_has_aux_entries(self, prefill_data):
-        """明细表H2-2 至少有 1 个 =AUX 公式"""
+    2026-11-22 勘误：原类 `TestH22AuxEntries` 断言「必须有 =AUX 公式且引用 1604」
+    是编造的设计。现算历史：`git show 64e82545a^:backend/data/prefill_formula_mapping.json`
+    里 H2-2 早已是四条 TB（期初/期末/本期借方/本期贷方），从无 AUX；更早的
+    `873ee7dce` 整批清除虚构 AUX 维度值（TOP1~3/A类/B类）也印证同一条纪律。
+    按 `test_d_prefill_extension.py` 的既有先例（「编造的取数说明，删除比保留更诚实」），
+    改为断言真实形态：四条 TB 且全部引用 1604（在建工程）。
+    """
+
+    def test_h2_2_has_four_tb_entries(self, prefill_data):
+        """明细表H2-2 恰好四条 TB 取数（期初/期末/本期借方/本期贷方）。"""
         h_entries = _h_entries(prefill_data)
         h2_2 = [m for m in h_entries if m.get("sheet") == "明细表H2-2"]
         assert h2_2, "明细表H2-2 prefill entry 缺失"
-        has_aux = any(
-            cell.get("formula_type") == "AUX"
-            for m in h2_2
-            for cell in m.get("cells", [])
-        )
-        assert has_aux, "明细表H2-2 应包含 =AUX 公式（1604 在建工程按项目辅助核算）"
+        cells = [c for m in h2_2 for c in m.get("cells", [])]
+        assert len(cells) == 4, f"明细表H2-2 应有 4 条取数，实为 {len(cells)}"
+        types = {c.get("formula_type") for c in cells}
+        assert types == {"TB"}, f"明细表H2-2 应全部为 TB 取数，实为 {sorted(types)}"
 
-    def test_h2_2_aux_uses_1604(self, prefill_data):
-        """明细表H2-2 的 =AUX 公式引用 1604 科目"""
+    def test_h2_2_tb_uses_1604(self, prefill_data):
+        """明细表H2-2 的 TB 公式全部引用 1604（在建工程）。"""
         h_entries = _h_entries(prefill_data)
         h2_2 = [m for m in h_entries if m.get("sheet") == "明细表H2-2"]
-        aux_pattern = re.compile(r"=AUX\s*\(\s*'(\d+)'", re.IGNORECASE)
-        found_1604 = False
+        tb_pattern = re.compile(r"=TB\s*\(\s*'(\d+)'", re.IGNORECASE)
+        codes = set()
         for m in h2_2:
             for cell in m.get("cells", []):
-                if cell.get("formula_type") != "AUX":
+                if cell.get("formula_type") != "TB":
                     continue
-                mm = aux_pattern.search(cell.get("formula", ""))
-                if mm and mm.group(1) == "1604":
-                    found_1604 = True
-                    break
-        assert found_1604, "明细表H2-2 =AUX 应引用 1604（在建工程）"
+                mm = tb_pattern.search(cell.get("formula", ""))
+                if mm:
+                    codes.add(mm.group(1))
+        assert codes == {"1604"}, (
+            f"明细表H2-2 TB 应只引用 1604（在建工程），实为 {sorted(codes)}"
+        )
+
