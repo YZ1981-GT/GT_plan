@@ -1504,10 +1504,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install Python dependencies
+        run: python -m pip install -r backend/requirements.txt
       - name: Check D4 store item ids fully wired (strict)
         run: python backend/scripts/check/check_store_item_ids_fully_wired.py
-      - name: Install governance self-test dependency
-        run: python -m pip install -r backend/requirements.txt
       - name: Run store-item-ids guard self-tests
         run: python -m pytest backend/tests/scripts/test_check_store_item_ids_fully_wired.py -q
 
@@ -1951,6 +1951,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install Python dependencies
+        run: python -m pip install -r backend/requirements.txt
       - name: Run G5 four-table extraction guards
         run: python -m pytest backend/tests/four_table/test_g5_account_scope.py backend/tests/test_g5_formula_presets.py -q
 
@@ -5978,6 +5980,8 @@ jobs:
       - name: Install frontend deps
         working-directory: audit-platform/frontend
         run: npm ci
+      - name: Install Python dependencies
+        run: python -m pip install -r backend/requirements.txt
       - name: Dangling reference / missing export gate
         run: python backend/scripts/check/check_frontend_dangling_reference_gate.py
       - name: Mutation anchors static self-check (M01-M16)
@@ -6061,6 +6065,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install Python dependencies
+        run: python -m pip install -r backend/requirements.txt
       - name: "[b60-gate] 权威模板外部链接普查（死元数据上限 1，只读）"
         # 🔴 2026-11-14 ：期望值 0 -> 1。唯一命中的 `D/D4 收入底稿.xlsx`
         #    里有两个**空目录**条目 `xl/externalLinks/` 与 `xl/externalLinks/_rels/`
