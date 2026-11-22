@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -100,7 +101,18 @@ def _display_path(path: Path) -> str:
 
 
 def digest_bytes(raw: bytes) -> str:
-    return hashlib.sha256(raw).hexdigest()
+    """对**内容**算 sha256（行尾归一化为 LF）。
+
+    🔴 为什么必须归一化：本仓 `core.autocrlf=true`，同一份文件在主工作区是 LF、
+    在干净检出（CI / 新 clone / 临时 worktree）是 CRLF —— 逐字节 sha256 会因此不同，
+    后果是**干净检出上 `--check` 恒红**（实测：`manifest_digest` 1401511B/LF vs
+    1438333B/CRLF，JSON 解析后逐条相等、`entries differ: 0`，但 digest 不同 ⇒
+    生成物被判 stale ⇒ task 5.6 的 clean checkout 总验必挂）。
+
+    行尾是**检出属性**而不是内容，不该进内容摘要。归一化只碰 `\r\n` → `\n`，
+    不动其它字节（BOM / 缩进 / 顺序都仍参与摘要）。
+    """
+    return hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
 
 
 def read_json(path: Path) -> tuple[Any, str]:
@@ -165,6 +177,26 @@ def load_reviewed() -> tuple[dict[str, dict[str, Any]], str | None]:
             )
         if entry_id in by_entry:
             raise RuntimeError(f"{REVIEWED.name} 里 entry_id={entry_id!r} 重复出现")
+
+        # project_ids(可选)：把审核限定到指定项目。缺省 = 全局生效（与旧记录兼容）。
+        # 写空数组等于「哪儿都不生效」—— 无意义声明，直接拒，避免静默失效。
+        pids = item.get("project_ids")
+        if pids is not None:
+            if not isinstance(pids, list) or not pids:
+                raise RuntimeError(
+                    f"{REVIEWED.name} reviews[{i}] 的 project_ids 必须是非空数组"
+                )
+            for raw in pids:
+                s = str(raw or "").strip()
+                if not s:
+                    raise RuntimeError(f"{REVIEWED.name} reviews[{i}] 的 project_ids 含空值")
+                try:
+                    uuid.UUID(s)
+                except ValueError as exc:
+                    raise RuntimeError(
+                        f"{REVIEWED.name} reviews[{i}] 的 project_ids 值 {s!r} 不是 UUID"
+                    ) from exc
+
         by_entry[entry_id] = item
     return by_entry, source_digest(REVIEWED)
 
@@ -283,6 +315,7 @@ def binding_for(
             "reviewed_at": review.get("reviewed_at"),
             "decision_basis": review.get("decision_basis"),
             "published_artifact_evidence": review.get("published_artifact_evidence"),
+            "project_ids": review.get("project_ids"),
         }
     else:
         row["reviewed"] = None

@@ -1164,6 +1164,8 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.pilot_d2_large_json",
         "app.services.workpaper_sync.pilot_h1_grouped_dynamic",
         "app.services.workpaper_sync.pilot_g7_two_level_dynamic",
+        # ── B22A whole-workbook canary (spec b22a-whole-workbook-provider-lane)
+        "app.services.workpaper_sync.phase5_b22a_control_matrix",
         # ── G5-1 追加（Phase 5 canary，harness 无关的独立 entry 双向路径）──────
         "app.services.workpaper_sync.phase5_d1_notes_receivable",
         "app.services.workpaper_sync.phase5_d7_contract_liabilities",

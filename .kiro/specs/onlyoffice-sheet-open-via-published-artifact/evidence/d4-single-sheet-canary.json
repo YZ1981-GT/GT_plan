@@ -1,0 +1,114 @@
+{
+  "schema_version": "sheet-single-canary-evidence:v1",
+  "captured_at": "2026-11-17",
+  "state": "blocked",
+  "task": "3.3",
+  "scope": {
+    "project_id": "e8c40d30-de96-440d-a880-fafcf41f32f3",
+    "project_name": "【测试】公式同步乙有限公司_2025",
+    "wp_id": "d7fa0522-12b3-4e43-b7d4-5242562e6fd3",
+    "wp_code": "D4",
+    "html_sheet_code": "D4-2",
+    "target_sheet": "主营业务收入明细表D4-2",
+    "write_scope": "测试项目"
+  },
+  "binding": {
+    "binding_id": "sha256:2808812015c46aa62ed70bea3df5d691e3519ffdb6db0417ab2017443e89f056",
+    "entry_id": "xlsx/gt-d4-operating-revenue",
+    "effective_entry_id": "xlsx/gt-d4-operating-revenue",
+    "source_wp_code": "D4",
+    "mapping_kind": "provider",
+    "document_scope": "single_sheet",
+    "status": "migrated",
+    "resolver_identity": "provider:70aa0edae04eb926",
+    "manifest_entry_digest": "131ae011b33a074b97c7d209ecfab41fc91f591d457f8c66fe40a5f4b47f6454",
+    "input_digest": "2c93d3fe583edf4b37f1fc86deafe979679bd60a05318be9b7135119c0972631",
+    "source_ref": "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue"
+  },
+  "entry_identity_probe": {
+    "url": "http://127.0.0.1:3030/api/projects/e8c40d30-de96-440d-a880-fafcf41f32f3/workpapers/d7fa0522-12b3-4e43-b7d4-5242562e6fd3/sync/entry-identity?sheet_name=%E4%B8%BB%E8%90%A5%E4%B8%9A%E5%8A%A1%E6%94%B6%E5%85%A5%E6%98%8E%E7%BB%86%E8%A1%A8D4-2",
+    "http_status": 200,
+    "status": "migrated",
+    "room_ready": true,
+    "allowed_modes": ["html", "oo"],
+    "entry_id": "xlsx/gt-d4-operating-revenue",
+    "effective_entry_id": "xlsx/gt-d4-operating-revenue",
+    "target_sheet": "主营业务收入明细表D4-2",
+    "representation": {
+      "id": "a4fe664c-3596-4229-8d02-64ff41e06198",
+      "generation": 5,
+      "artifact_sha256": "7c652c8b33ed67bf5cac351c26a97c8d8e660f5361bfb211bef1b187be4ae621",
+      "artifact_size_bytes": 245774,
+      "artifact_relative_path": "storage/e8c40d30-de96-440d-a880-fafcf41f32f3/workpapers/.versions/d7fa0522-12b3-4e43-b7d4-5242562e6fd3/representations/xlsx/gt-d4-operating-revenue/000000005-7c652c8b33ed67bf5cac351c26a97c8d8e660f5361bfb211bef1b187be4ae621.xlsx",
+      "definition_bundle_id": "649af940-5099-4b32-8795-893bc27f4cbd",
+      "definition_bundle_sha256": "0a6cc67ab675b091e0501090a88827355a4dcb5290589d14500682649ba53696",
+      "adapter_id": "d4.revenue_detail",
+      "document_type": "xlsx"
+    },
+    "target_sheet_present": true,
+    "sheet_count": 46
+  },
+  "legacy_url_probe": {
+    "request_url": "http://127.0.0.1:3030/api/workpapers/d7fa0522-12b3-4e43-b7d4-5242562e6fd3/sheets/%E4%B8%BB%E8%90%A5%E4%B8%9A%E5%8A%A1%E6%94%B6%E5%85%A5%E6%98%8E%E7%BB%86%E8%A1%A8D4-2/onlyoffice-config?project_id=e8c40d30-de96-440d-a880-fafcf41f32f3",
+    "http_status": 200,
+    "response_sync_mode": "independent",
+    "response_binding_status": null,
+    "document_url": "http://host.docker.internal:9980/api/workpapers/d7fa0522-12b3-4e43-b7d4-5242562e6fd3/sheets/主营业务收入明细表D4-2/wopi/contents?whole=0&token=<redacted>",
+    "interpretation": "ONLYOFFICE_LEGACY_URL_ISSUE=true 是当前全局回滚开关，旧式端点仍签发；本次 D4-2 前端分支不再调用它。候选码集 gate 的静态回归已补，但关闭全局开关的运行态 409 未执行。"
+  },
+  "room_descriptor": {
+    "status": "not_produced",
+    "endpoint": "POST /api/projects/e8c40d30-de96-440d-a880-fafcf41f32f3/workpapers/d7fa0522-12b3-4e43-b7d4-5242562e6fd3/sync/entries/xlsx/gt-d4-operating-revenue/materialize-from-store",
+    "request": {
+      "sheet_key": "d42-managed",
+      "client_edit_epoch": 0,
+      "idempotency_key": "redacted-per-attempt"
+    },
+    "http_status": 500,
+    "error_code": "adapter_unmanaged_region_drift",
+    "message": "未管理区域在 roundtrip 后发生变化，首个差异: workbook_and_styles（before 覆盖 4 项，after 覆盖 4 项）",
+    "earlier_blocker_fixed": "roundtrip_equivalence.py 缺少 contracts.is_template_skeleton_identity 导入，曾抛 NameError；已修复并有回归测试。"
+  },
+  "html_readback": {
+    "endpoint": "GET /api/projects/e8c40d30-de96-440d-a880-fafcf41f32f3/workpapers/d7fa0522-12b3-4e43-b7d4-5242562e6fd3/sync/entries/xlsx/gt-d4-operating-revenue/store-projection",
+    "before": {
+      "http_status": 200,
+      "expected_revision": 3,
+      "row_count": 58,
+      "field_count": 377,
+      "projection_digest": "35a40ce763beb1e151867ff6deeadbdedcbf7ba5f7305e4b81230f121e81999d"
+    },
+    "after_failed_materialize": {
+      "http_status": 200,
+      "expected_revision": 3,
+      "row_count": 58,
+      "field_count": 377,
+      "projection_digest": "35a40ce763beb1e151867ff6deeadbdedcbf7ba5f7305e4b81230f121e81999d"
+    },
+    "readback_interpretation": "materialize 在发布边界前失败，未执行 HTML→OO→HTML 往返；两次只读 store projection 一致，未发生业务数据写入。"
+  },
+  "database_after_failed_attempt": {
+    "entry_state_current_representation_id": "a4fe664c-3596-4229-8d02-64ff41e06198",
+    "representation_generation": 5,
+    "artifact_sha256": "7c652c8b33ed67bf5cac351c26a97c8d8e660f5361bfb211bef1b187be4ae621",
+    "definition_bundle_id": "649af940-5099-4b32-8795-893bc27f4cbd",
+    "adapter_id": "d4.revenue_detail",
+    "task33_pending_mutations_after_cleanup": 0
+  },
+  "verification": {
+    "binding_generator_check": "python backend/scripts/gen/generate_workpaper_sync_sheet_open_bindings.py --check: passed, 197 bindings",
+    "backend_targeted": "70 passed: binding, legacy gate, entry identity, published artifact unit suites",
+    "backend_new_regressions": "3 passed: project pin, provider legacy candidate codes, roundtrip skeleton runtime",
+    "frontend_canary_wiring": "2 passed: d4SingleSheetCanaryHost.spec.ts",
+    "ruff": "not clean due 7 pre-existing unused imports in wp_onlyoffice_router.py/wp_sync_router.py; no new diagnostic was introduced by the added lines",
+    "browser": "Chrome DevTools probes on http://127.0.0.1:3030; entry identity and store projection succeeded, materialize failed with the recorded typed error"
+  },
+  "acceptance": {
+    "ordinary_single_sheet_host": "GtD4OperatingRevenue D4-2 branch uses WorkpaperSyncEditorHost with d42-managed and no GtOnlyOfficeSheet in that branch",
+    "target_sheet": "verified by entry-identity and published artifact reader",
+    "descriptor": "blocked before descriptor because materialize returned adapter_unmanaged_region_drift",
+    "forcesave": "not_run because no descriptor/room was legitimately produced",
+    "html_roundtrip": "not_claimed",
+    "final_status": "not complete; keep task 3.3 open until D4 materialize unmanaged-region drift is fixed and the real room/forcesave/HTML roundtrip is rerun"
+  }
+}

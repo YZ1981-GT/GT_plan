@@ -215,7 +215,7 @@ backend/tests/test_snapshot_writer.py  1230
 backend/app/models/audit_platform_schemas.py  1088
 backend/app/models/workpaper_models.py  1116
 backend/app/models/workpaper_sync_models.py  1152
-backend/app/routers/wp_onlyoffice_router.py  1820
+backend/app/routers/wp_onlyoffice_router.py  1933
 # 🔴 2026-09-19 登记既存欠账：基线 2341 定于 42d2f6e6f(09-02)，此后 82f58ea44(09-13,
 # D4 IPO 综合交付) 一跃到 2635 就已破门（>2458），e59e93718→2723、da57bad76→2727 继续增长，
 # 三次都未同步本条 —— 即门禁对本文件事实上已失效。本次「整册打开即定位」只加 37 行（materialize

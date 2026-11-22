@@ -2205,6 +2205,32 @@
       "wp_codes": [
         "D2"
       ]
+    },
+    {
+      "entry_id": "xlsx/gt-b22-a-control-matrix",
+      "contract_id": "b22a.control_matrix",
+      "wp_codes": [
+        "B22A"
+      ],
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "basis": {
+        "heuristic_would_say": [
+          "B22A"
+        ],
+        "heuristic_is_wrong_because": "B22A 宿主 GtB22AControlMatrix.vue 的 sheet_name 表达式是 props.wpCode||B22A 且 whole-workbook=true；权威册按用户裁决 2026-11-21 冻结为 B/B22A-4-1 IT概要.xlsx（与安徽 54d2cd18 实际 sheet 结构逐字同构），wp_code 族直接以 B22A 为准无启发式回落",
+        "managed_excel_name": "B22A-4-1 IT概要",
+        "template_relative_path": "B/B22A-4-1 IT概要.xlsx",
+        "wp_index_evidence": "wp_code=B22A 两行未删除（安徽 0ec33ac9/54d2cd18、宜宾 c8621493/be2fdc3f），安徽版 file_version=2 与模板 2-sheet 结构一致；宿主 6-Tab COSO 结构与 IT 概要册为不同数据面（store 坐标键独立 item，B22A41-rows）"
+      },
+      "store_payload_evidence": {
+        "store_item_id": "B22A41-rows",
+        "max_payload_bytes": 0,
+        "measured_at": "2026-11-21",
+        "why_null": "store 型 entry（宿主 flushHtml 返回空 projection，后端 adapter 从 checklist_responses 读）；空表单合法（EMPTY_STORE_PAYLOAD=[]，用户 2026-11-21 裁决）",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      }
     }
   ],
   "basis_rule": "真源 = 契约里**冻结**的 `template.relative_path`（其文件名前缀即 wp_code）+ 受管 sheet 的 `excel_name`（它是该工作簿里的一个 tab，不是独立底稿）。这两个字段都进了 contract definition 的 sha256，改不了；比「文件名 CamelCase 反推」可靠得多。",

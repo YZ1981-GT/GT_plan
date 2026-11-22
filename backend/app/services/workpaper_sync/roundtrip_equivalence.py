@@ -18,7 +18,11 @@ from __future__ import annotations
 from typing import Any
 
 from app.services.workpaper_sync.adapters.base import Projection
-from app.services.workpaper_sync.contracts import FieldMode, SyncContract
+from app.services.workpaper_sync.contracts import (
+    FieldMode,
+    SyncContract,
+    is_template_skeleton_identity,
+)
 from app.services.workpaper_sync.merge import (
     PROTECTED_MODES,
     values_equal,

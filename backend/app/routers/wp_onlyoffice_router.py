@@ -775,9 +775,32 @@ async def get_sheet_onlyoffice_config(
             project_id=project_id,
             entry_id=_room_entry_id,
             source_wp_code=_sheet_wp_code,
+            source_wp_codes=(_sheet_wp_code, wp_code),
             sheet_name=sheet_name,
             whole_workbook=whole_workbook,
         )
+    else:
+        # 4.2 (EQCR condition): when the switch is OFF (legacy URLs still
+        # issued), the drain ledger must still carry the binding snapshot,
+        # otherwise per-binding issuance counts (Requirement 6.4) are not
+        # traceable under the default deployment (observed: 4 issued rows with
+        # binding fields null). _binding_verdict is a pure read and returns
+        # (unresolved, None) on error; used here ONLY for ledger bookkeeping,
+        # never to change gate refusals (refusal logic stays byte-identical
+        # in the ON branch above).
+        _bv_status, _bv_binding = _binding_verdict(
+            source_wp_code=_sheet_wp_code,
+            source_wp_codes=(_sheet_wp_code, wp_code),
+            sheet_name=sheet_name,
+            whole_workbook=whole_workbook,
+            project_id=project_id,
+        )
+        if _bv_binding:
+            legacy_verdict = {
+                "entry_id": _bv_binding.get("effective_entry_id")
+                or _bv_binding.get("entry_id"),
+                "binding_status": _bv_binding.get("status"),
+            }
 
     doc_key = await _room_identity.resolve_room_doc_key(db, wp_id=wp_id, entry_id=_room_entry_id)
 
@@ -901,6 +924,19 @@ async def get_sheet_onlyoffice_config(
 
     # 9. JWT 签名
     token = _sign_jwt(config)
+
+    # 9.5 旧式 drain ledger 记账（任务 4.2）。点在 _sign_jwt 之后：上面任一步抛
+    # 409/404/429 都不算签发，提前记会让 4.4 的「旧签发数」把被拒请求也数进去。
+    # 失败不阻断签发 —— 决策与回滚都在 record_issuance_quietly 里，只此一份。
+    from app.services.workpaper_sync import legacy_drain_ledger as _drain
+
+    await _drain.record_issuance_quietly(
+        db, entry_id=_room_entry_id, wp_id=wp_id, project_id=project_id,
+        binding_id=legacy_verdict.get("entry_id"),
+        binding_status=legacy_verdict.get("binding_status"),
+        source_wp_code=_sheet_wp_code, sheet_name=sheet_name,
+        whole_workbook=whole_workbook, doc_key=doc_key,
+    )
 
     return {
         "config": config,
@@ -1293,6 +1329,11 @@ async def post_sheet_onlyoffice_callback(
     status = body.get("status")
     doc_key = body.get("key")
     user_id = _extract_user_id_from_callback(body)
+
+    # 2.5 4.3：draining 下只接受已签发且未结算的 callback（判据全在 ledger 模块）。
+    from app.services.workpaper_sync import legacy_drain_ledger as _drain
+    if not (await _drain.verify_draining_callback(db, wp_id=wp_id, sheet_name=sheet_name, doc_key=doc_key or ""))[0]:
+        return {"error": 1}
 
     # 3. status=2/6: 保存 — 下载写回后释放席位
     if status in _SAVE_STATUSES:

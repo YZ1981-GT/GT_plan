@@ -1,0 +1,568 @@
+{
+  "schema_version": "five-role-proxy-review:v1",
+  "spec": "onlyoffice-sheet-open-via-published-artifact",
+  "task": "0.4",
+  "task_title": "完成五角色范围复核（合伙人 / 项目经理 / 质控 / 审计助理 / EQCR）",
+  "review_mode": "user_authorized_ai_proxy",
+  "authorization_source": "user approved AI proxy role review in session 2026-11-21",
+  "human_signoff": false,
+  "reviewed_at": "2026-11-21",
+  "reviewed_by": "AI 代理（按用户 2026-11-21 明确授权，代表五角色做范围预审）",
+  "not_a_human_signature": "本文件不构成任何真人签字；五个角色的结论均为 AI 代理按证据推出的判断，human_signoff=false。",
+  "evidence_snapshot": {
+    "captured_at": "2026-11-21",
+    "worktree_head": "7f6bf39a3",
+    "bindings_worktree": {
+      "path": "backend/data/workpaper_sync_sheet_open_bindings.json",
+      "schema_version": "sheet-open-binding:v1",
+      "binding_count": 197,
+      "input_digest": "2c93d3fe583edf4b37f1fc86deafe979679bd60a05318be9b7135119c0972631",
+      "status_counts": { "pending": 189, "out_of_scope": 7, "migrated": 1 },
+      "mapping_kind_counts": { "provider": 173, "whole_workbook": 10, "ambiguous": 6, "exact": 1, "out_of_scope": 7 },
+      "reason_counts": {
+        "runtime_sheet_name_requires_provider_binding": 172,
+        "whole_workbook_target_requires_reviewed_binding": 10,
+        "document_type_out_of_scope": 7,
+        "ambiguous_sheet_target": 6,
+        "exact_candidate_requires_published_artifact_review": 1,
+        "null_migrated_no_reason": 1
+      },
+      "document_type_counts": { "xlsx": 190, "docx": 7 },
+      "migrated_entry": "xlsx/gt-d4-operating-revenue",
+      "migrated_is_project_scoped": true,
+      "migrated_project_ids": ["e8c40d30-de96-440d-a880-fafcf41f32f3"],
+      "owner_coverage": { "pending_without_owner": 189, "pending_total": 189, "out_of_scope_with_owner": 0 },
+      "source_digests_present": [
+        "manifest_digest",
+        "overlay_digest",
+        "adjudication_digest",
+        "wp_code_adjudication_digest",
+        "reviewed_digest"
+      ]
+    },
+    "bindings_head": {
+      "input_digest": "b55b41cd75b7eec9d060344fe611833b5e3cb99bd40725d60301a08f2300257b",
+      "migrated_entry": "xlsx/b60/gt-b60-bundle",
+      "reviewed_overlay_reviews": 1,
+      "reviewed_overlay_withdrawn": 0
+    },
+    "reviewed_overlay_worktree": {
+      "path": "backend/data/workpaper_sync_sheet_open_reviewed_bindings.json",
+      "schema_version": "sheet-open-reviewed-binding:v1",
+      "decision_closed_set": ["ready", "migrated", "draining", "retired"],
+      "reviews": [{ "entry_id": "xlsx/gt-d4-operating-revenue", "decision": "migrated", "project_ids": ["e8c40d30-de96-440d-a880-fafcf41f32f3"] }],
+      "withdrawn_reviews": [{ "entry_id": "xlsx/b60/gt-b60-bundle", "previous_decision": "migrated", "withdrawn_at": "2026-11-16" }]
+    },
+    "legacy_gate_runtime": {
+      "switch_field": "ONLYOFFICE_LEGACY_URL_ISSUE",
+      "switch_default": true,
+      "gate_runs_only_when": "settings.ONLYOFFICE_LEGACY_URL_ISSUE == False（wp_onlyoffice_router.py:771 `if not settings.ONLYOFFICE_LEGACY_URL_ISSUE:`）",
+      "consequence": "默认配置下 binding 级状态机不执行 ⇒ migrated binding 仍会签发旧式 config / wopi / callback URL",
+      "declared_sync_modes": ["bound", "independent"]
+    },
+    "legacy_caller_ledger": {
+      "path": "backend/data/workpaper_sync_legacy_onlyoffice_callers.json",
+      "caller_files": 22,
+      "caller_sites": 27,
+      "legit_entrypoint_files": 3,
+      "migrated_binding_callers": 0,
+      "generator_check": "OK（27 处调用 / 22 文件，逐条 owner+reason+next）"
+    },
+    "frontend_unified_entry_coverage": {
+      "composables_using_probeOnlyOfficeEntryConfig": ["useG9DualMode.ts"],
+      "composables_still_building_own_onlyoffice_config_url": 21,
+      "note": "唯一入口已建立，但改线覆盖率现算 1/21；其余 21 个仍自拼 /onlyoffice-config（均在 3.7 ledger 登记过 owner/reason/next）"
+    },
+    "frontend_copy_state": {
+      "head_has_independent_hint": true,
+      "head_hint_locator": "GtOnlyOfficeSheet.vue:29-35（el-alert type=info「独立在线编辑（不同步）」+「各自保存 / 改动不会自动互相同步」）",
+      "head_guard_tests": 12,
+      "worktree_has_independent_hint": false,
+      "worktree_file_matches_old_commit": "3f7d857d242a28dd57257e4c134172408d904575（feat: close procedure chain and frontend type errors）",
+      "worktree_spec_matches_old_commit": "09b0c40d5f37e1323096b0e8fd535f1cd2ef8102（feat(onlyoffice): 集成优化 ...）",
+      "assertive_已同步_or_双向回写_in_5_in_scope_files": 0,
+      "syncStateTag_files_returning_已同步_and_not_reading_binding": [
+        "useA51SyncMode.ts:158",
+        "useB1OrphanSyncMode.ts:112",
+        "useB22ASyncMode.ts:142",
+        "useB22BSyncMode.ts:110",
+        "useHSyncMode.ts:302"
+      ]
+    },
+    "drain_ledger_shared_pg": {
+      "read_only": true,
+      "table": "working_paper_legacy_drain_ledger",
+      "migration": "V274__workpaper_legacy_drain_ledger.sql",
+      "migration_applied_at": "2026-11-16T12:28:39Z",
+      "schema_version_row": "274",
+      "drain_metrics": { "open_issuances": 4, "expired_unsettled": 4, "callback_in_flight": 0 },
+      "issuance_rows": [
+        { "entry_id": "xlsx-sheet/D1-1/审定表D1-1", "binding_id": null, "binding_status": null, "issued_at": "2026-11-16T15:45:38Z", "settled_at": null },
+        { "entry_id": "xlsx-sheet/D4-2/主营业务收入明细表D4-2", "binding_id": null, "binding_status": null, "issued_at": "2026-11-17T09:19:44Z", "settled_at": null },
+        { "entry_id": "xlsx-sheet/D4-2/主营业务收入明细表D4-2", "binding_id": null, "binding_status": null, "issued_at": "2026-11-17T09:23:35Z", "settled_at": null },
+        { "entry_id": "xlsx-sheet/D4-2/主营业务收入明细表D4-2", "binding_id": null, "binding_status": null, "issued_at": "2026-11-17T09:23:48Z", "settled_at": null }
+      ],
+      "gate_behaviour_now": "删除门禁按设计**正确拒绝**（三判据非 0），不是缺陷"
+    },
+    "untracked_modules_referenced_by_tracked_files_in_worktree": {
+      "untracked": [
+        "backend/app/services/workpaper_sync/frozen_contract_reader.py",
+        "backend/app/services/workpaper_sync/frozen_definition_blob.py",
+        "backend/app/services/workpaper_sync/conflict_preview_contract.py",
+        "backend/app/services/workpaper_sync/legacy_drain_ledger.py",
+        "backend/app/models/workpaper_legacy_drain_ledger.py",
+        "backend/migrations/V274__workpaper_legacy_drain_ledger.sql"
+      ],
+      "worktree_reference_sites": [
+        "published_identity_observer.py:91（模块顶层 import frozen_definition_blob）",
+        "conflict_resolution.py:159（模块顶层 import conflict_preview_contract）",
+        "wp_onlyoffice_router.py:909, 1312（函数内 import legacy_drain_ledger）"
+      ],
+      "head_reference_sites": 0,
+      "head_ast_scan": "8314 个已跟踪 py 在 HEAD 版本上 AST 扫描，命中 0 ⇒ HEAD 干净检出导入不受影响"
+    }
+  },
+  "roles": [
+    {
+      "role": "partner",
+      "role_zh": "业务合伙人",
+      "review_question": "打开的到底是哪一个对象？它的业务含义是否等同于「当前已发布的审计底稿」？",
+      "findings": [
+        "打开对象 = current published representation 的 immutable artifact，不是模板副本、不是 OO 缓存副本：读取顺序固定为 current pointer → representation/artifact row → canonical visibility/path → sha256/size → OOXML target sheet，任一失败抛 typed error 且**不回退模板**。",
+        "业务含义等价性由真实数据支撑：D4 单 sheet canary 的 entry-identity 返回 representation id / generation=5 / artifact_sha256 / artifact_relative_path / definition_bundle_id / adapter_id，target_sheet 在 artifact 内存在（sheet_count=46）。",
+        "身份命名空间已不再混淆：manifest 的 `xlsx-sheet/*` entry 现算为 0，旧式 `sheet_entry_id()` 派生形态与 manifest entry 形态 same_namespace=false ⇒ 必须走显式 binding，不能把派生名当 entry。",
+        "单 sheet 视图不靠隐藏其它 sheet 表达：target sheet 只在 descriptor / actionLink 上表达（工作树实测 workpaperSyncEditorHostRuntime.ts:254-279 只在 single_sheet 且 targetSheet 非空时注入，whole_workbook 明确不注入）。"
+      ],
+      "evidence_refs": [
+        { "file": ".kiro/specs/onlyoffice-sheet-open-via-published-artifact/design.md", "field": "§4.2 Published artifact 读取 / §3 目标架构" },
+        { "file": ".kiro/specs/onlyoffice-sheet-open-via-published-artifact/requirements.md", "field": "Requirement 2.1 / 2.2 / 2.3 / 2.4" },
+        { "file": ".kiro/specs/onlyoffice-sheet-open-via-published-artifact/evidence/entry-and-representation-baseline.json", "field": "manifest.xlsx_sheet_namespace_entry_count=0 · identity_comparison.same_namespace=false" },
+        { "file": ".kiro/specs/onlyoffice-sheet-open-via-published-artifact/evidence/d4-single-sheet-canary.json", "field": "entry_identity_probe.representation{id,generation,artifact_sha256,definition_bundle_id} · entry_identity_probe.target_sheet_present=true · sheet_count=46" },
+        { "file": "backend/data/workpaper_sync_sheet_open_bindings.json", "field": "bindings[].mapping_kind / status / reason / document_scope / target_sheet（197 条逐条可裁）" },
+        { "file": "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncEditorHostRuntime.ts", "field": "254-279 actionLink 注入与 whole_workbook 互斥" }
+      ],
+      "conclusion": "conditional_pass",
+      "conclusion_zh": "有条件通过",
+      "conditions": [
+        "Requirement 10.1 的 owner 覆盖尚未满足：现算 189 条 pending 的 owner 全为 null（生成器只在 reviewed 记录存在时写 owner）⇒ 完成门前必须为每条 pending 补 owner/reason/next，否则「有 owner 的 pending」这条判据空分母。",
+        "所有 pending / out_of_scope 入口必须继续按「独立在线编辑（不同步）」呈现，任何一条被改成 room 协议前必须有该 binding 的 reviewed 记录 + 真实 published artifact。"
+      ],
+      "residual_risks": [
+        "197 条里只有 1 条 migrated，且被 project_ids 限定到单个【测试】项目 ⇒ 生产口径下「已迁移入口」在业务上仍是空集（不影响打开对象语义，但影响「这次迁移对真实业务意味着什么」的结论强度）。",
+        "provider 型 binding 的 target_sheet 在生成物里恒为 null，运行时由请求 sheet 名回填（sheet_open_bindings.py 的 provider 分支）⇒ 「打开的是哪张 sheet」在生成物里没有冻结值，只能靠 resolver 现算。"
+      ],
+      "next_step": "把 owner 覆盖列进完成门（10.1）；3.3 / 3.4 / 3.5 真浏览器取证时以「artifact sha256 + target_sheet 在 artifact 内存在」为打开对象的验收判据。"
+    },
+    {
+      "role": "project_manager",
+      "role_zh": "现场项目经理",
+      "review_question": "rollout 顺序是否安全？逐入口切换能否回滚？现在能不能对真实项目放量？",
+      "findings": [
+        "状态机封闭且逐入口：pending → ready → migrated → draining → retired，另有 out_of_scope 作为「不适用本迁移」的终态；晋级只能由 reviewed overlay 的 decision（ready/migrated/draining/retired 四值封闭集）给出，生成器不自行晋级。",
+        "不搞大爆炸：旧式调用面现算 22 文件 / 27 处调用全部登记 owner+reason+next（3.7 ledger），`--check` 幂等通过；未迁移调用方允许存在但必须登记。",
+        "回滚路径存在但有边界：design §6.2 规定全局开关只能当紧急总开关，binding 回滚只允许 migrated → draining / pending，已 retired 不得通过开关恢复 direct-write。",
+        "前端改线仍处灰度早期：现算只有 useG9DualMode.ts 接了唯一入口 probeOnlyOfficeEntryConfig，21 个 composable 仍自拼 /onlyoffice-config ⇒ rollout 实际进度是「机制就绪、改线 1/21」。"
+      ],
+      "evidence_refs": [
+        { "file": ".kiro/specs/onlyoffice-sheet-open-via-published-artifact/design.md", "field": "§6.1 分阶段状态 / §6.2 回滚" },
+        { "file": ".kiro/specs/onlyoffice-sheet-open-via-published-artifact/requirements.md", "field": "Requirement 6.1 / 6.2 / 6.3 / 6.4" },
+        { "file": "backend/data/workpaper_sync_legacy_onlyoffice_callers.json", "field": "summary{caller_files:22, caller_sites:27, legit_entrypoint_files:3, migrated_binding_callers:0}" },
+        { "file": "backend/data/workpaper_sync_sheet_open_reviewed_bindings.json", "field": "schema.reviews（1 条 D4 / project_ids 限定）· _withdrawn_reviews（B60 已于 2026-11-16 撤回）" },
+        { "file": "backend/app/routers/_wp_onlyoffice_legacy_url_gate.py", "field": "_BINDING_STATES_REFUSING_LEGACY / _BINDING_STATES_KEEPING_INDEPENDENT / draining 独立文案 / unresolved 中间档" },
+        { "file": "tmp_five_role_review/probes/p20_source_digests_and_owner.py 输出", "field": "使用统一入口的 composable = [onlyOfficeEntryConfig.ts, useG9DualMode.ts]；仍自拼 URL 的 composable 21 个" }
+      ],
+      "conclusion": "conditional_pass",
+      "conclusion_zh": "有条件通过",
+      "conditions": [
+        "不得对真实业务项目放量：现算 migrated=1 且被 project_ids 限定到【测试】乙项目（e8c40d30…），drain ledger 里 4 条未结算签发全部来自测试项目 D4-2 / 生产口径未验证。",
+        "滚到 draining/retired 前必须先有真实 drain 观测：现算 drain_metrics={open_issuances:4, expired_unsettled:4, callback_in_flight:0}，删除门禁当下**正确拒绝**；三个判据连续为 0 才有资格删旧分支。",
+        "前端改线覆盖率必须显式推进（1/21 → 全量），每改一处删一条 ledger 条目；不能以「统一入口已存在」当作已迁移。"
+      ],
+      "residual_risks": [
+        "全局开关 ONLYOFFICE_LEGACY_URL_ISSUE 默认 True，而 wp_onlyoffice_router.py:771 是 `if not settings.ONLYOFFICE_LEGACY_URL_ISSUE:` ⇒ 默认配置下 binding 级状态机**根本不执行**，migrated binding 仍会签发旧式 URL。rollout 的真实生效前提是把这个开关置 False，而这一步从未在真环境验证过（d4 canary 证据里 response_sync_mode=independent、response_binding_status=null）。",
+        "drain ledger 的 issued 行 binding_id / binding_status 全为 null（4/4）⇒ 签发时没有记录当时的 binding 快照，回头无法按 binding 维度统计「旧签发数」。",
+        "3.4 whole_workbook 的 10 条 binding 全 pending，且检查的 10 个 whole entry 在共享库里 entry_state 与 published canonical representation 均为 0 ⇒ 无任何可放量的整册入口。"
+      ],
+      "next_step": "先做 3.3 的真浏览器闭环（含把 ONLYOFFICE_LEGACY_URL_ISSUE 置 False 后实测 409），再逐入口推进前端改线与 4.1~4.4 的 drain 观测。"
+    },
+    {
+      "role": "quality_control",
+      "role_zh": "质量控制复核合伙人",
+      "review_question": "平台会不会在任何地方向用户声称「双向回写 / 已同步」，而实际走的是旧式独立在线编辑？",
+      "findings": [
+        "本 spec 范围内 5 个关键文件（onlyOfficeEntryConfig.ts / onlyOfficeSheetConfig.ts / WorkpaperSyncEditorHost.vue / GtOnlyOfficeSheet.vue / workpaperSyncPresentation.ts）**现算肯定式「已同步」「双向回写」命中 0**（剔除注释行后逐行扫描）。",
+        "唯一入口的 syncMode 是封闭两值 bound / independent，未知 binding 状态归 null（不静默当 pending）；pending / out_of_scope 一律标 independent，判为「可用」而不是「不可用」。",
+        "「独立在线编辑（不同步）」提示条 + 「各自保存 / 改动不会自动互相同步」文案在 HEAD 上是活的（GtOnlyOfficeSheet.vue:29-35），并有 12 例守卫（含「默认缺 sync_mode 必须显示」「config 请求失败仍显示」「sync_mode=bound 不显示」「用户可见文案不得出现已同步/双向回写」）。",
+        "桌面上真正会渲染「已同步」的地方是 room 协议宿主（如 GtD2AccountsReceivable.vue:33 的 success tag），它的显示受 syncFeedbackOk（桥回执 kind==='success'）门控，而不是无条件断言。"
+      ],
+      "evidence_refs": [
+        { "file": "tmp_five_role_review/probes/p8_oo_copy_scope.py 输出", "field": "5 个 in-scope 文件 ASSERTIVE 命中 0（NEG-LITERAL 亦 0，因为提示条只在 HEAD 版本）" },
+        { "file": "tmp_five_role_review/probes/p6_owner_and_text.py 输出", "field": "全站扫描 291 条命中，但逐条查看后均属业务语义（附注同步 / 审定数同步 / H9 联动），非在线编辑同步态" },
+        { "file": "audit-platform/frontend/src/components/workpaper/composables/__tests__/onlyOfficeEntryConfigContract.spec.ts", "field": "判据 3「不允许在唯一入口之外声称已同步」+ 判据 2「唯一 binding 状态解析点」+ 判据 4「模式集合封闭」" },
+        { "file": "audit-platform/frontend/src/components/workpaper/__tests__/GtOnlyOfficeSheet.spec.ts", "field": "HEAD 版本:287-381 的 task 3.6 四例（默认 / 失败 / bound / 文案不得声称）" },
+        { "file": "audit-platform/frontend/src/components/workpaper/sync/entrySyncPresentation.ts", "field": "ENTRY_SYNC_NOTICE_LABEL='两侧数据未互通' / canClaimBidirectional 只在 runtime.ready 且 acceptance.state='verified' 时为 true" },
+        { "file": "backend/app/routers/_wp_onlyoffice_legacy_url_gate.py", "field": "SYNC_MODE_INDEPENDENT / SYNC_MODE_BOUND 封闭值 + pending/out_of_scope 返回 independent" }
+      ],
+      "conclusion": "conditional_pass",
+      "conclusion_zh": "有条件通过",
+      "conditions": [
+        "🔴 必须先处置「3.6 实现在 HEAD、但主工作树是两个旧提交的整文件副本」：GtOnlyOfficeSheet.vue（工作树 == 3f7d857d2，454 行；HEAD 489 行）与 GtOnlyOfficeSheet.spec.ts（工作树 == 09b0c40d5，269 行；HEAD 381 行）。若按当前工作树提交，3.6 的提示条与 12 例守卫会被静默回退成「不提示不同步」= Requirement 4.2 违规复活。",
+        "5 个 useXSyncMode 仍在非 OO 模式下无条件返回「已同步」文案（useA51SyncMode:158 / useB1OrphanSyncMode:112 / useB22ASyncMode:142 / useB22BSyncMode:110 / useHSyncMode:302），且都不读 binding 状态。它们对应的 entry 现算全部 pending（A51 / B1 / B22A / B22B / H1）。这属于范围外但同型缺陷，须在完成门里显式裁决（改文案 / 或确认这些入口已由 room 协议接管）。",
+        "workbookSyncEditorHost 的 actionLink 注入必须保持「whole_workbook 不注入」的互斥判据（已有 8 例 workpaperSyncEditorHostRuntime.spec.ts 覆盖）。"
+      ],
+      "residual_risks": [
+        "GtOnlyOfficeSheet.spec.ts 工作树版本还退化了 el-alert 桩（只渲染默认插槽 ⇒ `wrapper.text()` 拿不到 `<template #title>` 的内容）⇒ 即使把那 12 例补回，桩也会让断言恒空（首版正是这样假绿）。",
+        "legacy caller ledger 的 GtOnlyOfficeSheet 行号随文件回退而漂移：工作树 ledger 记 line 190（工作树第 190 行确含 onlyoffice-config），而 HEAD 对应行是 215 ⇒ ledger 与 HEAD 版本不一致。现算 `generate_legacy_onlyoffice_caller_ledger.py --check` 在工作树通过，但干净 HEAD 检出的 ledger 行号指向 HEAD 第 190 行（该行是 `}`），需核实 HEAD 侧 ledger 是否正确。",
+        "「已同步」文案在 room 协议侧由 syncBridge.feedback 决定，其中反馈内容来自后端回执；若后端在未真正落库时回 success，界面仍会显示已同步（该层不在本 spec 判据内，属 writer 侧）。"
+      ],
+      "next_step": "把 GtOnlyOfficeSheet.vue / 其 spec 从 HEAD 版本恢复（不许整文件 checkout 旧版），补齐 12 例守卫后再谈 3.3 的浏览器取证；同时对 5 个 useXSyncMode 的「已同步」文案单独立项裁决。"
+    },
+    {
+      "role": "audit_assistant",
+      "role_zh": "审计助理",
+      "review_question": "我在界面上看到的每一句提示，是否都能对上我此刻真实的处境？我会不会被引导去点一个点了没反应的入口？",
+      "findings": [
+        "三态判定已区分「能切 / 不能切但能独立编辑 / 供给不就绪」：pending / out_of_scope → legacy + syncMode=independent（**不是不可用**）；migrated / ready → room，供给不就绪时给中文原因且**不回退旧式**（否则会造第二个 doc key）。",
+        "不可用原因有层层来源且可内联展开：GtEntrySyncCapabilityNotice 用真按钮（aria-expanded / aria-controls + role=note）展开原因，不把原因只放在 hover tooltip（触屏 / 窄屏拿不到）。文案来自 entrySyncPresentation 的封闭分支（正在核验 / 两侧数据未互通 / 首次在线编辑将发布版本 / 在线编辑不可用 / 验收证据待更新）。",
+        "「首次在线编辑将发布版本」是显式的：capability=bidirectional 且 reason.code=REPRESENTATION_MISSING 时同时放开 HTML 与 OO 并标 warning，说明「切换后将先创建首版」，而不是藏掉入口让首版路径不可达。",
+        "3.3 的实况与界面提示一致：D4-2 entry-identity 返回 migrated + room_ready=true + target_sheet 存在，但 materialize 返回 `adapter_unmanaged_region_drift`（首个差异 workbook_and_styles）⇒ 用户此刻会看到可归因的失败，而不是「已同步」或空白。"
+      ],
+      "evidence_refs": [
+        { "file": "audit-platform/frontend/src/components/workpaper/sync/entrySyncPresentation.ts", "field": "deriveEntrySyncPresentation 全量分支 + ENTRY_SYNC_NOTICE_LABEL / ENTRY_SYNC_NOTICE_SUMMARY 单一声明点" },
+        { "file": "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue", "field": "reason 内联渲染 + aria-expanded / 键盘焦点可见 + loadState==='error' 时「重试」" },
+        { "file": "audit-platform/frontend/src/components/workpaper/composables/onlyOfficeEntryConfig.ts", "field": "279-286 三态判定表注释 + BINDING_STATUSES 未知值归 null" },
+        { "file": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue", "field": "17-35 能力提示 + 同步中 / 不可用（带 content tooltip）/ 已同步（feedbackOk 门控）" },
+        { "file": ".kiro/specs/onlyoffice-sheet-open-via-published-artifact/evidence/d4-single-sheet-canary.json", "field": "room_descriptor{http_status:500, error_code:adapter_unmanaged_region_drift, message 中文} · html_readback 两次 projection_digest 相同" }
+      ],
+      "conclusion": "conditional_pass",
+      "conclusion_zh": "有条件通过",
+      "conditions": [
+        "必须保留 3.6 的「独立在线编辑（不同步）」提示条与「各自保存 / 改动不会自动互相同步」说明 —— 审计助理所在入口（pending / out_of_scope / custom / Word）全部走它；当前工作树版本已把它删掉，恢复前不得宣言 4.2 满足。",
+        "凡是「点了没反应」的可能都要有原因：3.3 的 materialize 500 必须透出中文 error_code + message（现已有）。3.4 的 whole_workbook 返回 pending + `whole_workbook_target_requires_reviewed_binding` 时，界面必须显示 pending 原因而不是空白编辑器。",
+        "任何界面不得用「已同步」表达「本入口尚未迁移」。"
+      ],
+      "residual_risks": [
+        "5 个 useXSyncMode（A51 / B1 / B22A / B22B / H1）在非 OO 模式下仍返回「已同步」，而这些 entry 的 binding 现算全部 pending ⇒ 这些循环的审计助理会看到与实际不符的「已同步」。这是角色 C 与角色 D 共同指出的同一处风险。",
+        "3.4 的 whole-workbook 候选（B22A / B22B / B22C 等）都还没发布首版，审计助理点了「在线编辑」只会看到 pending 原因；这不是缺陷，但需要界面明说「整册映射待审核」，否则会被读成「系统坏了」。",
+        "provider 型入口（173 条）在生成物里 target_sheet 恒 null，运行时才回填；若请求 sheet 名为空会退到 artifact 默认 sheet（resolver 已显式挡：`sheet_binding_provider_sheet_name_missing`，但该分支缺少界面侧文案映射需核实）。"
+      ],
+      "next_step": "恢复 GtOnlyOfficeSheet 的 3.6 实现与守卫 → 用【测试】项目在浏览器里走一遍「pending 入口显示独立在线编辑提示 + migrated 入口给可归因失败」两条路径。"
+    },
+    {
+      "role": "eqcr",
+      "role_zh": "项目质量控制复核人（EQCR）",
+      "review_question": "历史 operation 与已发布 artifact 的审计边界在哪里？我能不能回溯「这次打开用的是哪份 artifact、由哪条 binding 决定、旧链路签发了什么」？",
+      "findings": [
+        "artifact 侧可回溯：entry-identity 响应带 representation id / generation / artifact_sha256 / artifact_size_bytes / artifact_relative_path / definition_bundle_id / definition_bundle_sha256 / adapter_id / document_type，且读取前先校验 bundle digest（`definition_bundle_drift` 在读文件**之前**拒）。",
+        "binding 侧可回溯：每条 binding 带 binding_id（内容摘要）、manifest_entry_digest、input_digest，生成物顶层带 5 个源摘要（manifest / overlay / adjudication / wp_code_adjudication / reviewed）⇒ 改任一源都会让 input_digest 变（Requirement 8.1 / 8.3）。",
+        "旧链路留痕已落地：V274 建 `working_paper_legacy_drain_ledger`（append-only，issued / settled 两态；doc_key 只存 sha256 不存明文；settled 行必带 issuance_id + terminal_state + settled_at + 非空原因），迁移已在共享库应用（schema_version 274，2026-11-16T12:28:39Z）；ledger 提供 drain_metrics 三判据（open_issuances / expired_unsettled / callback_in_flight）与 assert_drain_complete_for_delete。",
+        "历史 operation / 冻结 contract 明确不在本 spec 重组：design §2.2 与 §8 把「旧 operation 冻结旧 contract」交 `frozen-contract-read-path-and-legacy-operation-settlement`（已归档于 `_archive/185-…`），本 spec 不重组历史 operation。"
+      ],
+      "evidence_refs": [
+        { "file": ".kiro/specs/onlyoffice-sheet-open-via-published-artifact/design.md", "field": "§2.2 非目标（冻结 contract 读侧重建另立 spec）· §8 风险表「旧 operation 冻结旧 contract」" },
+        { "file": ".kiro/specs/onlyoffice-sheet-open-via-published-artifact/requirements.md", "field": "Requirement 8.1 / 8.2 / 8.3 · Requirement 6.3 / 6.4" },
+        { "file": "backend/data/workpaper_sync_sheet_open_bindings.json", "field": "source{manifest_digest,overlay_digest,adjudication_digest,wp_code_adjudication_digest,reviewed,reviewed_digest} + input_digest + bindings[].binding_id" },
+        { "file": "backend/migrations/V274__workpaper_legacy_drain_ledger.sql", "field": "event_kind issued/settled · doc_key_sha256 · binding_id/binding_status 快照列 · ck_wpldl_* 四组形状约束 · TTL 顺序约束" },
+        { "file": "backend/app/services/workpaper_sync/legacy_drain_ledger.py", "field": "drain_metrics / DRAIN_DELETE_GATE_KEYS / assert_drain_complete_for_delete / verify_draining_callback" },
+        { "file": "tmp_five_role_review/probes/p9_eqcr_boundary.py + p26/p29 输出", "field": "V274 已应用 · drain_metrics={4,4,0} · 4 条 issued 行 binding_id/binding_status 均为 null" },
+        { "file": ".kiro/specs/_archive/185-frozen-contract-read-path-and-legacy-operation-settlement/design.md", "field": "历史 operation 归属该 spec（已归档）" }
+      ],
+      "conclusion": "conditional_pass",
+      "conclusion_zh": "有条件通过",
+      "conditions": [
+        "🔴 审计边界的三个模块当前**未入库**（untracked）：legacy_drain_ledger.py / workpaper_legacy_drain_ledger.py / V274__workpaper_legacy_drain_ledger.sql / frozen_definition_blob.py / frozen_contract_reader.py / conflict_preview_contract.py。工作树里已有已跟踪文件在模块顶层 import 它们（published_identity_observer.py:91 → frozen_definition_blob；conflict_resolution.py:159 → conflict_preview_contract）。虽然 HEAD 侧 AST 扫描 8314 个已跟踪 py 命中 0（干净检出可导入），但只要把这些改动提交而漏掉上述模块，干净检出就会 import 失败、审计链整段不可用。",
+        "🔴 干净 HEAD 检出的生成物 `--check` 现算**恒红**：在 `tmp_five_role_review/verify_wt`（HEAD 7f6bf39a3）里跑 generate_workpaper_sync_sheet_open_bindings.py --check 返回 FAIL；根因是 HEAD 版生成器 digest_bytes 未做 CRLF 归一（`hashlib.sha256(raw)`），而干净检出是 CRLF（1438333 B）⇒ manifest_digest 与已入库值不同 ⇒ input_digest 不同 ⇒ 197 条 binding_id 全不同。归一化修复只在工作树未提交。这意味着 Requirement 10.4「clean checkout 验证」目前**不成立**。",
+        "drain ledger 的 issued 行 binding_id / binding_status 全为 null（4/4）⇒ 「按 binding 维度统计旧签发数」（Requirement 6.4）现在无法从台账回溯，需要签发侧补写 binding 快照。",
+        "审计结论必须明确本 spec **不**重组历史 operation；EQCR 对历史 operation 的复核仍走 `_archive/185` 那条链。"
+      ],
+      "residual_risks": [
+        "4 条未结算签发里 1 条来自 D1-1（2026-11-16，项目 4c77f3e8…），3 条来自 D4-2（2026-11-17，测试项目 e8c40d30…），且都已过期（expires_at < now）⇒ expired_unsettled=4。这是真实待结算数据，不是缺陷，但会让 4.4 的删除门禁持续拒绝。",
+        "旧式 config 端点在默认开关下仍签发 URL（ONLYOFFICE_LEGACY_URL_ISSUE 默认 True，gate 只在 False 时执行）⇒ 「migrated binding 不再签旧 URL」这条审计断言在默认部署配置下**没有被执行**，台账里 migrated_binding_callers=0 是「未执行」而非「已证明为 0」。",
+        "HEAD 侧 reviewed overlay 记录的 B60 migrated 依据（2026-11-16 写入）已被工作树的 `_withdrawn_reviews` 证伪（B60 主底稿实为 .docx、无名为 B60 的 sheet、capability=None 致 lane_undecided）⇒ 审计结论必须以工作树的撤回记录为准，HEAD 版本的那条 migrated 不可作为有效审核依据。"
+      ],
+      "next_step": "①提交时把 6 个未跟踪模块与 V274 一并入库（否则干净检出导入失败）；②把生成器的 CRLF 归一化提交，让 clean-checkout `--check` 真的能绿；③签发侧补记 binding 快照到 drain ledger；④drain 三判据收敛到 0 之前，不允许执行 4.4 的按 binding 删旧分支。"
+    }
+  ],
+  "known_blockers": [
+    {
+      "task": "3.3",
+      "blocker_kind": "real_environment_acceptance_evidence",
+      "status": "open_preserved_verbatim",
+      "registered_as_is": "3.3 的 D4-2 canary：materialize-from-store 返回 `adapter_unmanaged_region_drift`（首个差异 workbook_and_styles）",
+      "detail": {
+        "source_evidence_file": ".kiro/specs/onlyoffice-sheet-open-via-published-artifact/evidence/d4-single-sheet-canary.json",
+        "state": "blocked",
+        "room_descriptor_status": "not_produced",
+        "materialize_endpoint": "POST /api/projects/e8c40d30-de96-440d-a880-fafcf41f32f3/workpapers/d7fa0522-12b3-4e43-b7d4-5242562e6fd3/sync/entries/xlsx/gt-d4-operating-revenue/materialize-from-store",
+        "http_status": 500,
+        "error_code": "adapter_unmanaged_region_drift",
+        "message": "未管理区域在 roundtrip 后发生变化，首个差异: workbook_and_styles（before 覆盖 4 项，after 覆盖 4 项）",
+        "forcesave": "not_run（无合法 descriptor/room）",
+        "html_roundtrip": "not_claimed（两次只读 store projection 一致，未发生业务写入）",
+        "acceptance_final_status": "not complete; keep task 3.3 open until D4 materialize unmanaged-region drift is fixed and the real room/forcesave/HTML roundtrip is rerun"
+      },
+      "note_2026-11-17_batch2": "同 spec 的 tasks.md「2026-11-17 批 2」实测已证伪「boolean 归一化不一致」这一归因（gen=5 上 missing=0、4 个键提交侧为 True），并把 3.3 的阻断类别更正为「真实验收取证（无已知代码缺陷）」。本预审**同时保留** 2026-11-17 的 500 记录与上述更正，不把两者合并成一句「已修/未修」。",
+      "impact_on_task_graph": "3.3 保持未完成；4.2 / 4.3 / 4.4 / 5.2 / 5.5 全部以 3.3 为前置，5.7 完成门未满足，本 spec 不得归档。"
+    },
+    {
+      "task": "3.4",
+      "blocker_kind": "governance_precondition_reviewed_binding",
+      "status": "open_preserved_verbatim",
+      "registered_as_is": "3.4 的 whole-workbook：10 条 binding 全部 pending，reason `whole_workbook_target_requires_reviewed_binding`，对应 entry 无 entry_state / published representation",
+      "detail": {
+        "source_evidence_file": ".kiro/specs/onlyoffice-sheet-open-via-published-artifact/evidence/whole-workbook-canary.json",
+        "state": "blocked",
+        "completion_claim": false,
+        "whole_workbook_binding_count": 10,
+        "active_whole_workbook_bindings": 0,
+        "all_whole_workbook_status": "pending",
+        "all_whole_workbook_reason": "whole_workbook_target_requires_reviewed_binding",
+        "checked_entry_ids": [
+          "xlsx/cash-flow-verification",
+          "xlsx/gt-a112-dual-checklist",
+          "xlsx/gt-a115-disclosure-checklist",
+          "xlsx/gt-a38-goodwill-impairment",
+          "xlsx/gt-b22-a-control-matrix",
+          "xlsx/gt-b22-b-control-matrix",
+          "xlsx/gt-b22-b-deficiency-evaluation",
+          "xlsx/gt-b22-c-design-effectiveness",
+          "xlsx/gt-b23-process-control",
+          "xlsx/gt-wp-renderer"
+        ],
+        "db_preflight": {
+          "current_entry_state_rows_for_checked_entries": 0,
+          "published_canonical_representation_rows_for_checked_entries": 0,
+          "published_artifact_digest_matches_for_checked_entries": 0
+        },
+        "browser_preflight": "HTTP 200 且 status=pending（端点 /sync/entry-identity?whole_workbook=true 返回 pending + room_ready=false + allowed_modes=['html']）",
+        "blocking_reason_message": "所有 whole-workbook binding 仍为 pending，且检查的 10 个 whole entry 没有 current entry_state 或 published canonical representation；没有符合要求的活动【测试】项目可安全执行迁移和写入验收。",
+        "next_owner_action": "先由治理/产品 owner 审核一个 whole-workbook binding，并在【测试】项目上完成合法首版发布；随后重跑 task 3.4 的 descriptor、artifact、OnlyOffice 和 HTML 回读验收。"
+      },
+      "reverified_this_review": {
+        "checked_at": "2026-11-21",
+        "binding_count_confirmed": 10,
+        "status_all_pending_confirmed": true,
+        "reason_all_identical_confirmed": true,
+        "every_row_reason": "whole_workbook_target_requires_reviewed_binding",
+        "also_note": "tasks.md 里 3.4 的 checkbox 当前是 [x]，但其正文自述「阻断类别：治理前置（binding 审核）」且「全为 pending」⇒ 勾选与正文自相矛盾，本预审按正文与 evidence 文件为准，登记为未完成。"
+      },
+      "impact_on_task_graph": "3.4 按正文与 evidence 判为未完成（checkbox 的 [x] 与正文冲突，须由 orchestrator 裁决修正）；5.5 的 whole workbook 场景不可执行。"
+    },
+    {
+      "task": "clean_checkout_generated_projection",
+      "blocker_kind": "repair_present_but_uncommitted",
+      "status": "open_preserved_verbatim",
+      "registered_as_is": "干净 HEAD 检出（7f6bf39a3）上 `generate_workpaper_sync_sheet_open_bindings.py --check` 返回 FAIL（generated binding projection is stale or missing）",
+      "detail": {
+        "reproduced_in": "tmp_five_role_review/verify_wt（git worktree add --detach HEAD）",
+        "command": "D:\\GT_plan\\.venv\\Scripts\\python.exe scripts/gen/generate_workpaper_sync_sheet_open_bindings.py --check（cwd=verify_wt/backend）",
+        "exit_code": 1,
+        "root_cause": "HEAD 版生成器的 digest_bytes 为 `hashlib.sha256(raw).hexdigest()`（未归一化 CRLF）；干净检出 manifest 为 CRLF（1438333 B）而主工作树为 LF（1401511 B）⇒ manifest_digest 由 6de06c2f… 变成 414c03b8… ⇒ input_digest 由 b55b41cd… 变成 de6df64c… ⇒ 197 条 binding_id 全部不同。",
+        "fix_location": "修复只在工作树（digest_bytes 已改为 `hashlib.sha256(raw.replace(b'\\r\\n', b'\\n')).hexdigest()`），未提交 ⇒ HEAD 侧仍恒红。",
+        "clean_wt_test_result": {
+          "command": "pytest tests/workpaper_sync/test_sheet_open_bindings.py test_sheet_legacy_gate_binding_states.py test_sheet_open_binding_resolver.py test_sheet_entry_identity_endpoint.py test_sheet_published_artifact.py test_sheet_open_unit_contract.py",
+          "result": "2 failed, 86 passed",
+          "failed_nodes": [
+            "test_sheet_open_bindings.py::test_generated_projection_is_current",
+            "test_sheet_open_bindings.py::test_check_mode_fails_when_a_source_digest_changes"
+          ],
+          "interpretation": "两条失败都指向「干净检出的生成物过期」，不是实现错误；与 tasks.md 5.6 声称的「7/7 全过」不一致（5.6 的通过记录来自主工作树（LF），不是干净检出（CRLF））。"
+        }
+      },
+      "impact_on_task_graph": "Requirement 10.4 / 5.6「clean checkout 验证」在当前 HEAD 上不成立；5.7 归档门不得通过。修复提交后需在干净检出复跑。"
+    },
+    {
+      "task": "worktree_file_reverted_to_old_commit",
+      "blocker_kind": "local_working_tree_regression",
+      "status": "open_preserved_verbatim",
+      "registered_as_is": "主工作树的 GtOnlyOfficeSheet.vue 与 GtOnlyOfficeSheet.spec.ts 是旧提交的整文件副本，3.6 的实现与 12 例守卫在工作树里不存在（只在 HEAD 存在）",
+      "detail": {
+        "GtOnlyOfficeSheet.vue": {
+          "worktree_lines": 454,
+          "head_lines": 489,
+          "worktree_matches_commit": "3f7d857d242a28dd57257e4c134172408d904575",
+          "head_contains_independent_hint": true,
+          "worktree_contains_independent_hint": false
+        },
+        "GtOnlyOfficeSheet.spec.ts": {
+          "worktree_lines": 269,
+          "head_lines": 381,
+          "worktree_matches_commit": "09b0c40d5f37e1323096b0e8fd535f1cd2ef8102",
+          "head_contains_task36_tests": true,
+          "worktree_contains_task36_tests": false
+        },
+        "knock_on": "ledger 行号随之漂移：worktree ledger 记 line 190（working tree 第 190 行确含 onlyoffice-config）；HEAD 对应行是 215，HEAD 第 190 行是 `}`。"
+      },
+      "impact_on_task_graph": "若以当前工作树提交，Requirement 4.2 的「独立在线编辑（不同步）」会被静默回退；3.6 的完成claim与12例守卫同时失效。"
+    },
+    {
+      "task": "untracked_modules_used_by_tracked_code",
+      "blocker_kind": "delivery_boundary",
+      "status": "open_preserved_verbatim",
+      "registered_as_is": "6 个与旧 operation / 冻结 contract / drain 台账相关的模块在当前工作树未入库；其中 3 处被已跟踪文件 import（工作树）",
+      "detail": {
+        "untracked": [
+          "backend/app/services/workpaper_sync/frozen_contract_reader.py",
+          "backend/app/services/workpaper_sync/frozen_definition_blob.py",
+          "backend/app/services/workpaper_sync/conflict_preview_contract.py",
+          "backend/app/services/workpaper_sync/legacy_drain_ledger.py",
+          "backend/app/models/workpaper_legacy_drain_ledger.py",
+          "backend/migrations/V274__workpaper_legacy_drain_ledger.sql"
+        ],
+        "worktree_import_sites": [
+          "backend/app/services/workpaper_sync/published_identity_observer.py:91（模块顶层 from …frozen_definition_blob import …）",
+          "backend/app/services/workpaper_sync/conflict_resolution.py:159（模块顶层 from …conflict_preview_contract import …）",
+          "backend/app/routers/wp_onlyoffice_router.py:909 / 1312（函数内 from … import legacy_drain_ledger）"
+        ],
+        "head_ast_scan": "8314 个已跟踪 py 在 HEAD 版本上 AST 扫描 import（不看注释）⇒ 命中 0，干净检出导入不受影响",
+        "risk": "提交这些改动而漏提交上述模块 ⇒ 干净检出 import 失败（本仓 2026-09-30 抓到过 20 处同型事故）"
+      },
+      "impact_on_task_graph": "不阻塞 0.4，但阻塞 5.6 / 5.7 与任何提交动作；须与改动同批入库。"
+    },
+    {
+      "task": "legacy_gate_switch_default",
+      "blocker_kind": "runtime_config_not_exercised",
+      "status": "open_preserved_verbatim",
+      "registered_as_is": "`ONLYOFFICE_LEGACY_URL_ISSUE` 默认 True，而 gate 只在 `if not settings.ONLYOFFICE_LEGACY_URL_ISSUE:` 时执行 ⇒ 默认部署下 binding 级状态机不运行，migrated binding 仍签发旧式 URL",
+      "detail": {
+        "config_default": "backend/app/core/config.py:84 ONLYOFFICE_LEGACY_URL_ISSUE: bool = True",
+        "gate_call_site": "backend/app/routers/wp_onlyoffice_router.py:771 if not settings.ONLYOFFICE_LEGACY_URL_ISSUE:",
+        "observed_effect": "evidence/d4-single-sheet-canary.json 的 legacy_url_probe: http_status=200, response_sync_mode='independent', response_binding_status=null, interpretation 明写「ONLYOFFICE_LEGACY_URL_ISSUE=true 是当前全局回滚开关，旧式端点仍签发」",
+        "ledger_significance": "legacy ledger 的 summary.migrated_binding_callers=0 是「gate 未执行」而非「已证明为 0」"
+      },
+      "impact_on_task_graph": "Requirement 6.2（migrated 不得签旧 URL）在默认配置下未被验证；4.3 的完成claim需要「开关置 False 后实测 409」这一条证据。"
+    },
+    {
+      "task": "pending_binding_owner_coverage",
+      "blocker_kind": "completion_gate_data_gap",
+      "status": "open_preserved_verbatim",
+      "registered_as_is": "Requirement 10.1「所有 binding 必须是 migrated、明确 out_of_scope 或有 owner 的 pending」：现算 189 条 pending 的 owner 全为 null",
+      "detail": {
+        "pending_without_owner": 189,
+        "pending_total": 189,
+        "out_of_scope_with_owner": 0,
+        "owner_written_only_for": "reviewed 记录（现算 1 条 → D4）",
+        "generator_behaviour": "generate_workpaper_sync_sheet_open_bindings.py:311 `row['owner'] = str(review.get('reviewed_by') or '').strip() or None`（仅 reviewed 分支）"
+      },
+      "impact_on_task_graph": "10.1 与 5.7 完成门不满足；「有 owner 的 pending」当前是空分母。"
+    }
+  ],
+  "verification_runs": [
+    {
+      "kind": "read_only_generator_check",
+      "command": "python scripts/gen/generate_workpaper_sync_sheet_open_bindings.py --check",
+      "cwd": "backend（主工作树）",
+      "result": "[OK] 197 bindings",
+      "read_only": true
+    },
+    {
+      "kind": "read_only_generator_check",
+      "command": "python scripts/gen/generate_legacy_onlyoffice_caller_ledger.py --check",
+      "cwd": "backend（主工作树）",
+      "result": "[OK] {'caller_files': 22, 'caller_sites': 27, 'legit_entrypoint_files': 3, 'migrated_binding_callers': 0}",
+      "read_only": true
+    },
+    {
+      "kind": "backend_targeted_tests",
+      "command": "python -m pytest tests/workpaper_sync/test_sheet_open_bindings.py test_sheet_open_binding_resolver.py test_sheet_open_binding_resolver_runtime.py test_sheet_legacy_gate_binding_states.py test_sheet_legacy_gate_provider_scope.py test_sheet_entry_identity_endpoint.py test_sheet_entry_identity_project_pin.py test_sheet_published_artifact.py test_sheet_legacy_caller_ledger.py test_sheet_open_unit_contract.py test_sheet_descriptor_view_identity.py -q -p no:playwright",
+      "cwd": "backend（主工作树）",
+      "result": "142 passed, 1 skipped",
+      "read_only": true,
+      "note": "这 11 个文件里 7 个与 HEAD 不同（工作树版本），因此结果只对工作树成立。"
+    },
+    {
+      "kind": "frontend_targeted_tests",
+      "command": "npx vitest run src/components/workpaper/composables/__tests__/onlyOfficeEntryConfig.spec.ts onlyOfficeEntryConfigContract.spec.ts src/components/workpaper/sync/__tests__/workpaperSyncEditorHostRuntime.spec.ts src/components/workpaper/__tests__/GtOnlyOfficeSheet.spec.ts d4SingleSheetCanaryHost.spec.ts --maxWorkers=1 --minWorkers=1",
+      "cwd": "audit-platform/frontend（主工作树）",
+      "result": "5 files passed / 44 tests passed",
+      "read_only": true,
+      "note": "GtOnlyOfficeSheet.spec.ts 只有 8 例（工作树旧版本），HEAD 版本是 12 例 + task 3.6 四例。"
+    },
+    {
+      "kind": "clean_checkout_generator_check",
+      "command": "D:\\GT_plan\\.venv\\Scripts\\python.exe scripts/gen/generate_workpaper_sync_sheet_open_bindings.py --check",
+      "cwd": "tmp_five_role_review/verify_wt/backend（git worktree --detach HEAD 7f6bf39a3）",
+      "result": "FAIL: generated binding projection is stale or missing（exit 1）",
+      "read_only": true,
+      "note": "根因 = HEAD 版生成器未归一化 CRLF；修复只在工作树未提交。"
+    },
+    {
+      "kind": "clean_checkout_backend_tests",
+      "command": "D:\\GT_plan\\.venv\\Scripts\\python.exe -m pytest tests/workpaper_sync/{test_sheet_open_bindings,test_sheet_legacy_gate_binding_states,test_sheet_open_binding_resolver,test_sheet_entry_identity_endpoint,test_sheet_published_artifact,test_sheet_open_unit_contract}.py -q -p no:playwright",
+      "cwd": "tmp_five_role_review/verify_wt/backend",
+      "result": "2 failed, 86 passed",
+      "read_only": true,
+      "failed": [
+        "test_sheet_open_bindings.py::test_generated_projection_is_current",
+        "test_sheet_open_bindings.py::test_check_mode_fails_when_a_source_digest_changes"
+      ]
+    },
+    {
+      "kind": "clean_checkout_frontend_tests",
+      "command": "npx vitest run GtOnlyOfficeSheet.spec.ts onlyOfficeEntryConfig.spec.ts onlyOfficeEntryConfigContract.spec.ts workpaperSyncEditorHostRuntime.spec.ts --maxWorkers=1 --minWorkers=1",
+      "cwd": "tmp_five_role_review/verify_wt/audit-platform/frontend（npm ci 后独立 node_modules）",
+      "result": "4 files passed / 45 tests passed",
+      "read_only": true,
+      "note": "HEAD 版本 GtOnlyOfficeSheet.spec.ts 是 12 例（含 task 3.6 四例），比工作树多 4 例。"
+    },
+    {
+      "kind": "shared_pg_read_only",
+      "queries": [
+        "SELECT version, filename, applied_at FROM schema_version WHERE version::int >= 268 ⇒ V274 已应用（2026-11-16T12:28:39Z）",
+        "SELECT event_kind, count(*), ... FROM working_paper_legacy_drain_ledger ⇒ issued=4 全未结算",
+        "drain_metrics 三判据 ⇒ open_issuances=4 / expired_unsettled=4 / callback_in_flight=0"
+      ],
+      "read_only": true,
+      "writes": "none"
+    }
+  ],
+  "no_writes_assertion": {
+    "production_code_modified": false,
+    "shared_pg_written": false,
+    "tasks_3_3_3_4_or_later_executed": false,
+    "only_files_written": [
+      ".kiro/specs/onlyoffice-sheet-open-via-published-artifact/evidence/five-role-proxy-review.json",
+      ".kiro/specs/onlyoffice-sheet-open-via-published-artifact/tasks.md（仅 0.4 行的完成依据说明）",
+      "tmp_five_role_review/**（一次性只读探针，已 gitignore）"
+    ],
+    "temporary_worktree": "tmp_five_role_review/verify_wt（git worktree --detach HEAD，独立 npm ci；用完须 worktree remove + prune）"
+  },
+  "proxy_review_valid_for_task_graph": true,
+  "proxy_review_validity_scope": "本次 AI 代理预审足以支撑「0.4 的范围裁决已作出、且已知阻断已如实登记并传递」这一结论；它**不**构成角色对 3.3 / 3.4 / 5.5 真实验收的签署，那三项仍需真人 / 真实环境。",
+  "all_roles_at_least_conditional_pass": true,
+  "role_conclusion_summary": {
+    "partner": "conditional_pass",
+    "project_manager": "conditional_pass",
+    "quality_control": "conditional_pass",
+    "audit_assistant": "conditional_pass",
+    "eqcr": "conditional_pass"
+  },
+  "blocking_conclusions": [],
+  "task_0_4_verdict": {
+    "can_mark_completed": true,
+    "basis": "用户授权的 AI 代理预审（human_signoff=false）",
+    "required_markup_in_tasks_md": "完成依据 = 用户授权的 AI 代理预审，非真人签字，human_signoff=false",
+    "does_not_close": [
+      "3.3 真浏览器取证",
+      "3.4 治理审核 + 首版发布",
+      "5.5 Playwright 五场景",
+      "5.7 完成门与归档"
+    ]
+  },
+  "impact_on_downstream_tasks": {
+    "task_3_3": "保持未完成（阻断类别 = 真实验收取证）。本预审新增两条必须一并处置的前置：①恢复 GtOnlyOfficeSheet 的 3.6 实现与 12 例守卫；②把 ONLYOFFICE_LEGACY_URL_ISSUE 置 False 后实测 409。",
+    "task_3_4": "保持未完成（阻断类别 = 治理前置 binding 审核）。10 条 whole_workbook binding 全 pending 且 10 个 entry 无 entry_state / published representation，这一点在工作树与 HEAD 两个口径下现算一致。tasks.md 该行 checkbox 为 [x] 与正文自相矛盾，须由 orchestrator 裁决改回 [ ]。",
+    "task_4_1_to_4_4": "被 3.3 前置；且 drain 三判据现算 {4,4,0} ⇒ 删除门禁当下正确拒绝。",
+    "task_5_2": "被 3.3 前置（真实 published artifact 端到端）。",
+    "task_5_5": "被 3.3 / 3.4 前置；pending fallback 场景代码已就绪但未在真浏览器取证。",
+    "task_5_6": "🔴 现算不成立：干净 HEAD 检出生成物 --check 恒红 + 2 条后端守卫红。5.6 标 [x] 的「7/7 全过」只在主工作树（LF 行尾）口径成立。",
+    "task_5_7": "完成门未满足（34 项里 25 项 [x] / 9 项 [~] / 2 项 [-]；按正文口径 3.4 实为未完成）⇒ 不得归档。"
+  },
+  "task_count_snapshot": {
+    "captured_at": "2026-11-21",
+    "top_level_tasks": 36,
+    "mark_counts": { "x": 25, "-": 2, "~": 9 },
+    "not_x_lines": [42, 182, 207, 229, 235, 240, 245, 250, 267, 291, 308],
+    "note": "tasks.md 头部写「23/34」，现算顶层 36 项 / 25 项 [x]；两个口径不一致，本预审只登记现算值，不改头部计数。"
+  }
+}

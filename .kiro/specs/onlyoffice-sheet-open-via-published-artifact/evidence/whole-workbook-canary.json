@@ -1,0 +1,126 @@
+{
+  "schema_version": "whole-workbook-canary:v1",
+  "snapshot_date": "2026-11-17",
+  "task_id": "3.4",
+  "status": "blocked",
+  "completion_claim": false,
+  "spec_config": {
+    "path": ".kiro/specs/onlyoffice-sheet-open-via-published-artifact/.config",
+    "status": "missing",
+    "interpretation": "未发现 bugfix 配置；按普通 spec 处理"
+  },
+  "candidate_selection": {
+    "binding_source": "backend/data/workpaper_sync_sheet_open_bindings.json",
+    "whole_workbook_binding_count": 10,
+    "active_whole_workbook_bindings": 0,
+    "all_whole_workbook_status": "pending",
+    "all_whole_workbook_reason": "whole_workbook_target_requires_reviewed_binding",
+    "selected_entry_for_read_only_preflight": "xlsx/gt-b22-a-control-matrix",
+    "selected_binding": {
+      "binding_id": "sha256:a28dd33343f76894a59b16983031996beb0275919c05167d5b4a7abf29ca5d72",
+      "entry_id": "xlsx/gt-b22-a-control-matrix",
+      "effective_entry_id": "xlsx/gt-b22-a-control-matrix",
+      "source_wp_code": "B22A",
+      "document_scope": "whole_workbook",
+      "target_sheet": null,
+      "mapping_kind": "whole_workbook",
+      "status": "pending",
+      "reason": "whole_workbook_target_requires_reviewed_binding",
+      "manifest_entry_digest": "96dc2e965160e5f8dbc8c6580038d58ccb112d11bd267c180ec0a914b240d2cc",
+      "input_digest": "2c93d3fe583edf4b37f1fc86deafe979679bd60a05318be9b7135119c0972631"
+    }
+  },
+  "database_preflight": {
+    "database": "audit_platform shared PostgreSQL",
+    "read_only": true,
+    "whole_workbook_entry_ids_checked": [
+      "xlsx/cash-flow-verification",
+      "xlsx/gt-a112-dual-checklist",
+      "xlsx/gt-a115-disclosure-checklist",
+      "xlsx/gt-a38-goodwill-impairment",
+      "xlsx/gt-b22-a-control-matrix",
+      "xlsx/gt-b22-b-control-matrix",
+      "xlsx/gt-b22-b-deficiency-evaluation",
+      "xlsx/gt-b22-c-design-effectiveness",
+      "xlsx/gt-b23-process-control",
+      "xlsx/gt-wp-renderer"
+    ],
+    "current_entry_state_rows_for_checked_entries": 0,
+    "published_canonical_representation_rows_for_checked_entries": 0,
+    "published_artifact_digest_matches_for_checked_entries": 0,
+    "active_test_project_with_candidate": false,
+    "read_only_reference_workpaper": {
+      "project_name": "重药控股安徽有限公司_2025",
+      "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+      "wp_code": "B22A",
+      "wp_id": "54d2cd18-7231-4e1a-bb96-f0122717a97e",
+      "file_path": "D:\\GT_plan\\backend\\wp_storage\\0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49\\54d2cd18-7231-4e1a-bb96-f0122717a97e.xlsx",
+      "use": "只读 binding preflight；不是【测试】项目，未执行任何写入"
+    },
+    "first_publication": {
+      "attempted": false,
+      "reason": "没有活动【测试】项目的 whole-workbook 候选；不能对真实项目调用写入端点。候选 manifest capability=null 且被 BP 阻断，不能合法发布首版。"
+    }
+  },
+  "browser_preflight": {
+    "base_url": "http://127.0.0.1:3030",
+    "authenticated_as": "admin（仅用于只读请求）",
+    "endpoint": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/54d2cd18-7231-4e1a-bb96-f0122717a97e/sync/entry-identity?sheet_name=B22A&whole_workbook=true",
+    "http_status": 200,
+    "response": {
+      "status": "pending",
+      "reason": "whole_workbook_target_requires_reviewed_binding",
+      "binding_id": "sha256:a28dd33343f76894a59b16983031996beb0275919c05167d5b4a7abf29ca5d72",
+      "entry_id": "xlsx/gt-b22-a-control-matrix",
+      "effective_entry_id": "xlsx/gt-b22-a-control-matrix",
+      "source_wp_code": "B22A",
+      "document_scope": "whole_workbook",
+      "target_sheet": null,
+      "mapping_kind": "whole_workbook",
+      "room_ready": false,
+      "allowed_modes": ["html"]
+    },
+    "console_errors": "未进入编辑器，未产生 whole-workbook room console 证据",
+    "network_errors": "未进入编辑器，未产生 descriptor/OnlyOffice 网络证据"
+  },
+  "required_evidence_not_obtained": [
+    "reviewed decision=migrated/ready",
+    "current representation id and generation",
+    "definition bundle id/digest",
+    "published canonical artifact path, sha256 and size",
+    "all published workbook sheet names and visibility",
+    "whole-workbook descriptor with target sheet semantics",
+    "OnlyOffice sheet tabs and target sheet browser evidence",
+    "forcesave callback and HTML/API readback equality",
+    "before/after full data snapshot and restore receipt"
+  ],
+  "blocking_reason": {
+    "error_code": "whole_workbook_target_requires_reviewed_binding",
+    "message": "所有 whole-workbook binding 仍为 pending，且检查的 10 个 whole entry 没有 current entry_state 或 published canonical representation；没有符合要求的活动【测试】项目可安全执行迁移和写入验收。",
+    "next_owner_action": "先由治理/产品 owner 审核一个 whole-workbook binding，并在【测试】项目上完成合法首版发布；随后重跑 task 3.4 的 descriptor、artifact、OnlyOffice 和 HTML 回读验收。"
+  },
+  "validation": {
+    "frontend": {
+      "command": "rtk npx vitest run src/components/workpaper/composables/__tests__/onlyOfficeEntryConfig.spec.ts --maxWorkers=1 --minWorkers=1",
+      "result": "16 passed"
+    },
+    "backend_unit": {
+      "command": "rtk ..\\.venv\\Scripts\\python.exe -m pytest tests/workpaper_sync/test_sheet_open_binding_resolver.py tests/workpaper_sync/test_sheet_published_artifact.py -q -p no:playwright",
+      "result": "21 passed, 1 warning"
+    },
+    "backend_pg_attempt": {
+      "command": "GT_REQUIRE_PG=1 rtk ..\\.venv\\Scripts\\python.exe -m pytest tests/workpaper_sync/test_sheet_published_artifact_pg.py -q -p no:playwright",
+      "result": "not executed: local test settings resolved DATABASE_URL as sqlite; GT_REQUIRE_PG correctly failed closed before tests",
+      "note": "PG read-only preflight itself was executed through the PostgreSQL MCP and is recorded above"
+    },
+    "browser": {
+      "command": "Chrome DevTools evaluate fetch on http://127.0.0.1:3030 with the logged-in session token",
+      "result": "HTTP 200 pending; exact typed reason recorded above"
+    }
+  },
+  "changes_in_this_attempt": [
+    "新增前端回归测试：wholeWorkbook=true 必须透传 whole_workbook=true 查询参数",
+    "新增本证据文件",
+    "未修改 reviewed overlay、binding 状态、数据库、模板文件或生产 artifact"
+  ]
+}

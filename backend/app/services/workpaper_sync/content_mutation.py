@@ -1846,6 +1846,52 @@ class ContentMutationService:
                     f"adapter.materialize 必须返回 MaterializeResult，实得 {type(materialized)!r}"
                 )
 
+            # 3.3 (2026-11-21): substrate workbook/styles steady-state probe.
+            # Non-first-publication paths assume the published substrate was
+            # already normalized by THIS adapter build. When it was produced by
+            # an older adapter (observed: D4-2 gen5 differs in 4/4 parts of the
+            # workbook_and_styles bucket), verify_unmanaged_regions would fail
+            # closed forever on bytes this adapter never managed. Reuse the
+            # first-publication normalization kernel: probe the 4 bucket parts
+            # (sha256, milliseconds), and only when they differ run one zero
+            # business overlay materialize as the before baseline.
+            if not plan.normalize_unmanaged_baseline:
+                from app.services.workpaper_sync.steady_state_probe import workbook_styles_bucket_matches
+
+                if not workbook_styles_bucket_matches(
+                    substrate=plan.substrate_path, artifact=output
+                ):
+                    from app.services.workpaper_sync.projection_first_publication import (
+                        overlay_store_on_baseline_projection,
+                    )
+
+                    raw_baseline_projection = adapter.extract(
+                        artifact=plan.substrate_path, contract=plan.contract
+                    )
+                    baseline_projection = overlay_store_on_baseline_projection(
+                        baseline=raw_baseline_projection,
+                        store_projection=Projection(
+                            contract_id=raw_baseline_projection.contract_id,
+                            semantic_version=raw_baseline_projection.semantic_version,
+                            document_type=raw_baseline_projection.document_type,
+                            values={},
+                        ),
+                    )
+                    unmanaged_baseline = output.with_name(
+                        f'{output.stem}.unmanaged-baseline{output.suffix}'
+                    )
+                    normalized_probe = adapter.materialize(
+                        substrate=plan.substrate_path,
+                        projection=baseline_projection,
+                        output=unmanaged_baseline,
+                        contract=plan.contract,
+                    )
+                    if not isinstance(normalized_probe, MaterializeResult):
+                        raise ContentMutationError(
+                            f'adapter.materialize must return MaterializeResult, real {type(normalized_probe)!r}'
+                        )
+                    before_for_unmanaged = unmanaged_baseline
+
             # 骨架槽位复用退役的身份只在本次反读里豁免保留门；非空才传，
             # 未复用路径与 Word adapter 的调用形态不变。
             retired = tuple(getattr(materialized, "retired_row_identities", ()) or ())

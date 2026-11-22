@@ -5,45 +5,130 @@
     "生成器读本文件；没有记录的 entry 一律保持 pending / out_of_scope（spec 1.4）。",
     "decision 必须在封闭集合 {ready, migrated, draining, retired} 内，且只有本文件能给出。",
     "entry_id / effective_entry_id 必须逐字等于 manifest 里的值 —— 拼错会让记录静默无效（守卫钉住）。",
-    "改本文件会改变生成物的 input_digest，因此必须重跑 --apply，再由 --check 打红发现遗漏。"
+    "改本文件会改变生成物的 input_digest，因此必须重跑 --apply，再由 --check 打红发现遗漏。",
+    "撤回审核 = 删除该条记录（不留 decision=pending，否则无法区分「没审过」与「审过但决定不迁」）。",
+    "🔴 2026-11-16 撤回 `xlsx/b60/gt-b60-bundle` 的 migrated：核查发现该 canary 的三项依据全部不成立，详见 `_withdrawn_reviews`。"
   ],
   "reviews": [
     {
+      "entry_id": "xlsx/gt-d4-operating-revenue",
+      "effective_entry_id": "xlsx/gt-d4-operating-revenue",
+      "decision": "migrated",
+      "project_ids": [
+        "e8c40d30-de96-440d-a880-fafcf41f32f3"
+      ],
+      "reviewed_by": "本会话：真实【测试】乙项目 canary 复核",
+      "reviewed_at": "2026-11-17",
+      "decision_basis": {
+        "document_type": "xlsx",
+        "capability": "bidirectional",
+        "adjudication_state": "terminal",
+        "lane_verdict": "projection",
+        "mapping_kind": "provider",
+        "resolver_identity": "provider:70aa0edae04eb926",
+        "target_sheet": "D4",
+        "source_ref": "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue",
+        "published_artifact": "真实 PG entry_state + published canonical artifact + sha 一致",
+        "scope": "仅【测试】乙项目，避免影响 4 个真实业务项目"
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-b22-a-control-matrix",
+      "effective_entry_id": "xlsx/gt-b22-a-control-matrix",
+      "decision": "migrated",
+      "project_ids": [
+        "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49"
+      ],
+      "reviewed_by": "user adjudication 2026-11-21 (build full B22A supply chain; phases 1-5 of b22a-whole-workbook-provider-lane delivered)",
+      "reviewed_at": "2026-11-21",
+      "decision_basis": {
+        "document_type": "xlsx",
+        "capability": "bidirectional",
+        "adjudication_state": "terminal",
+        "mapping_kind": "whole_workbook",
+        "adapter_id": "b22a.control_matrix",
+        "definition_bundle_id": "64a9c3de-ccf6-47cb-a98b-859c3aec480e",
+        "definition_bundle_sha256": "13113423a737ecd5334e1ab11cfad28d408e724acfb816c7e8a77ee331a9ec13",
+        "published_representation": "08a0ef7a-966f-4f73-940d-47835b1a54aa (gen1, Anhui wp 54d2cd18)",
+        "runtime_ready": true,
+        "typed_slots_complete": true,
+        "source_spec": "b22a-whole-workbook-provider-lane phases 1-5 all checked",
+        "scope": "only Anhui project 0ec33ac9 (user adjudicated real-project acceptance)"
+      }
+    }
+  ],
+  "_withdrawn_reviews": [
+    {
       "entry_id": "xlsx/b60/gt-b60-bundle",
       "effective_entry_id": "xlsx/b60/gt-b60-bundle",
-      "decision": "migrated",
-      "decision_basis": "唯一 exact 候选：单个 sheet_literal（B60）+ 单个 wp_code（B60-1），无运行时 sheet 表达式，无多 wp_code 歧义",
-      "published_artifact_evidence": {
-        "representation_rows": 7,
-        "artifact_state": "published",
-        "bundle_state": "approved",
-        "artifact_sha256_matches_row": true,
-        "artifact_file_present": true,
-        "storage_base": "backend/",
-        "sample_wp_id": "afb9201a-5989-4c3f-b79f-e1a950e53be9",
-        "sample_project": "重药控股安徽有限公司_2025",
-        "probed_at": "2026-11-16",
-        "probe": "tmp_probe_b60_final.py（只读，READ COMMITTED 独立事务）"
-      },
-      "reviewed_by": "用户（2026-11-16 指令「按建议来」：授权把 gt-b60-bundle 审核为 migrated）",
-      "reviewed_at": "2026-11-16",
-      "open_items": [
-        "task 3.3 的四项取证（old URL / descriptor / target sheet / HTML 回读）尚未做",
-        "🔴 端点实测 `GET /sync/entry-identity?sheet_name=B60` 返回 `error_code=current_representation_missing` —— binding 解析链已通（binding_id / entry_id / target_sheet 全部命中），但 `working_paper_sync_entry_state` 里没有 B60 的行 ⇒ room 打开仍不可用。representation 表有 7 行历史数据（artifact published / 文件在盘），但没有任何一行被 entry_state 指向。",
-        "要真正打开还需要「在结构化视图里保存一次以发布首版」（这正是端点 reason 文案给用户的下一步）—— 那属于真实用户操作，不是审核能代替的"
+      "previous_decision": "migrated",
+      "withdrawn_at": "2026-11-16",
+      "withdrawn_by": "本会话（用户指令「环境都在，自己来，逐一验证确认」下的实测核查）",
+      "withdraw_reasons": [
+        "① manifest 声明 `document_type = xlsx` + `sheet_expressions = [\"sheet-name=\\\"B60\\\"\"]`，但真实 B60 主底稿（安徽 8c258d1c）是 **.docx**，不是 xlsx。",
+        "② 唯一候选底稿 B60-1（安徽 afb9201a）的 xlsx 实际 sheet 是 ['底稿目录', 'B60-1工时预算与控制表', 'B60-1工时预算与控制板（按阶段）', 'GT_Custom'] —— **没有**名为「B60」的 sheet ⇒ `sheet-name=\"B60\"` 恒匹配不到。",
+        "③ manifest 的 `capability = None` / `capability_verdict_stage = counterpart_pending` / `html_counterpart_verdict = None` / `adjudication_state = pending` ⇒ projection lane 判据 L4 恒 `undecided` ⇒ `POST …/sync/entries/{entry_id}/first-publication` 恒 422 `lane_undecided`（实测），room 永远打不开。"
       ],
-      "probe_results": {
-        "endpoint": "GET /api/projects/{pid}/workpapers/{wp_id}/sync/entry-identity?sheet_name=B60",
-        "http_status": 200,
-        "binding_matched": true,
-        "binding_id": "sha256:7e95a48dfa45ab6fc36030b2c2980fa3211e475559a58ac86a87bec551e8a285",
-        "entry_id": "xlsx/b60/gt-b60-bundle",
-        "target_sheet": "B60",
-        "downstream_error_code": "current_representation_missing",
-        "downstream_reason": "该底稿还没有已发布的在线编辑版本 —— 请先在结构化视图里保存一次以发布首版",
-        "entry_state_rows_for_entry": 0,
-        "representation_rows_for_entry": 7,
-        "probed_at": "2026-11-16"
+      "evidence": {
+        "probe": "tmp_specs/probe_b60_canary_verdict.py（只读：manifest 声明 / 真实模板 sheet 名 / lane 判据）",
+        "probed_at": "2026-11-16",
+        "manifest_entry": {
+          "document_type": "xlsx",
+          "sheet_literals": [
+            "B60"
+          ],
+          "sheet_expressions": [
+            "sheet-name=\"B60\""
+          ],
+          "wp_code_patterns": [
+            "B60-1"
+          ],
+          "capability": null,
+          "capability_verdict_stage": "counterpart_pending",
+          "capability_target_blocked_by": [
+            "html_counterpart_investigation"
+          ],
+          "html_counterpart_verdict": null,
+          "adjudication_state": "pending",
+          "migration_state": "legacy_fake_bidirectional"
+        },
+        "real_workpapers": {
+          "B60": {
+            "wp_id": "8c258d1c-be69-4623-aaef-140e3001123d",
+            "file": "8c258d1c-be69-4623-aaef-140e3001123d.docx",
+            "document_type": "docx",
+            "verdict": "与 manifest 的 document_type=xlsx 不符"
+          },
+          "B60-1": {
+            "wp_id": "afb9201a-5989-4c3f-b79f-e1a950e53be9",
+            "file": "afb9201a-5989-4c3f-b79f-e1a950e53be9.xlsx",
+            "document_type": "xlsx",
+            "sheet_names": [
+              "底稿目录",
+              "B60-1工时预算与控制表",
+              "B60-1工时预算与控制板（按阶段）",
+              "GT_Custom"
+            ],
+            "has_sheet_named_B60": false,
+            "verdict": "没有名为 B60 的 sheet ⇒ sheet-name=\"B60\" 恒匹配不到"
+          }
+        },
+        "endpoint_probes": {
+          "entry_identity": {
+            "endpoint": "GET /api/projects/{pid}/workpapers/{wp_id}/sync/entry-identity?sheet_name=B60",
+            "http_status": 200,
+            "binding_matched": true,
+            "downstream_error_code": "current_representation_missing",
+            "note": "binding 解析链本身是通的（binding_id / entry_id / target_sheet 都命中），卡在下游供给"
+          },
+          "first_publication": {
+            "endpoint": "POST /api/projects/{pid}/workpapers/{wp_id}/sync/entries/{entry_id}/first-publication",
+            "http_status": 422,
+            "error_code": "lane_undecided",
+            "detail": "L4 [L4: capability 已终裁]：entry_id 'xlsx/b60/gt-b60-bundle' 仍为 pending：stage='counterpart_pending'，target='single_onlyoffice'"
+          }
+        },
+        "conclusion": "该 canary 的 binding 依据（document_type / target sheet / capability 终裁）三项全部不成立 ⇒ 原 `migrated` 属假迁移，按 spec「不伪造迁移完成」语义撤回。canary 需重新选一个 manifest document_type 与真实模板 sheet 名都对得上、且 capability 已终裁的 entry。"
       }
     }
   ]

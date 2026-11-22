@@ -2973,4 +2973,21 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
         ),
     },
 
+    # ── B22A whole-workbook canary（spec b22a-whole-workbook-provider-lane Phase 3）─────
+    {
+        'contract_id': 'b22a.control_matrix',
+        'provider_module': 'app.services.workpaper_sync.phase5_b22a_control_matrix',
+        'delivered_by_task': 'B22A-canary',
+        'pilot_class': 'b22a_whole_workbook',
+        'entry_id': 'xlsx/gt-b22-a-control-matrix',
+        'document_type': 'xlsx',
+        'authority_model': 'projection_contract',
+        'template_relative_path': 'B/B22A-4-1 IT概要.xlsx',
+        'adapter_registered': False,
+        'reason': (
+            'B22A-4-1 IT概要 whole-workbook canary: reviewed contract + provider in tree; '
+            'runtime registration waits for manifest capability adjudication (phase 4), '
+            'published representation and real OO evidence per AC 1.3.'
+        ),
+    },
 )
