@@ -1058,9 +1058,15 @@ def _run_live(coro_factory):
         return asyncio.run(coro_factory())
     except Exception as e:  # noqa: BLE001
         text = repr(e)
+        # 🔴 2026-11-22：补 Windows 侧不可达形态（`OSError: Multiple exceptions:
+        #    [WinError 5] 拒绝访问 / [WinError 1225] 远程计算机拒绝网络连接`）。
+        #    原先只列 POSIX/asyncpg 文案 ⇒ 在 Windows 上跑「库指向不存在端口」时
+        #    判成 FAILED 而非 skip，让连库判据在无库环境里假红。
         if any(k in text for k in (
             "could not connect", "Connect call failed", "does not exist",
             "password authentication", "Connection refused", "OperationalError",
+            "WinError 5", "WinError 1225", "Multiple exceptions",
+            "TargetServerAttributeNotMatched", "ConnectionRefusedError",
         )):
             pytest.skip(f"真实库不可达（本条为连库判据）: {e!r}")
         raise

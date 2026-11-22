@@ -2009,3 +2009,7 @@ audit-platform/frontend/src/views/KnowledgeBase.vue  1733
 #   ledger_import_application_service.py — 历史大文件（HEAD 已 883 行超 800 上限且此前未登记），
 #     本次账簿导入确认门与分段校验逻辑接线。拆分方向：确认门/编排/查询三块拆模块。
 backend/app/services/ledger_import_application_service.py  883
+# 2026-11-22 登记：HEAD 已 1131 行（本文件超 800 上限，非本轮引入）。本轮仅补
+# _run_live 的 Windows 不可达形态（+8 行，Windows 侧 WinError 5/1225 应 skip 而非 fail）。
+# 拆分方向：连库判据组（_live_engine/_run_live/5 条 test_live_*）抽 _completeness_scope_live.py。
+backend/tests/procedure_trim/test_completeness_scope_override.py  1139
