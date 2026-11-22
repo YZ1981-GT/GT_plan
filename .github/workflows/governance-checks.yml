@@ -906,6 +906,11 @@ jobs:
           set -euo pipefail
           psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
           python backend/scripts/seed/init_tables.py
+          # 🔴 空库引导必须补这句：ORM create_all 建的 service_identities.id 没有
+          #    DEFAULT，V106 的 CREATE TABLE IF NOT EXISTS 因此不生效，随后的
+          #    INSERT 撞「id 无默认值」⇒ V106 报错 + run_pending 留下 failed
+          #    （2026-11-22 实测：无这句 executed 260 failed [106]；加这句 261/[]）。
+          psql -h localhost -U postgres -d audit_platform -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
       - name: Run F1 four-table extraction guards
         run: python -m pytest backend/tests/test_f1_four_table_extraction.py backend/tests/four_table -q
@@ -1420,6 +1425,11 @@ jobs:
           set -euo pipefail
           psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
           python backend/scripts/seed/init_tables.py
+          # 🔴 空库引导必须补这句：ORM create_all 建的 service_identities.id 没有
+          #    DEFAULT，V106 的 CREATE TABLE IF NOT EXISTS 因此不生效，随后的
+          #    INSERT 撞「id 无默认值」⇒ V106 报错 + run_pending 留下 failed
+          #    （2026-11-22 实测：无这句 executed 260 failed [106]；加这句 261/[]）。
+          psql -h localhost -U postgres -d audit_platform -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
       - name: Run four_table shared services tests (aux_aggregation / k1_aux_detail / k1_detail_seed)
         run: python -m pytest backend/tests/four_table -q
@@ -1773,6 +1783,11 @@ jobs:
           set -euo pipefail
           psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
           python scripts/seed/init_tables.py
+          # 🔴 空库引导必须补这句：ORM create_all 建的 service_identities.id 没有
+          #    DEFAULT，V106 的 CREATE TABLE IF NOT EXISTS 因此不生效，随后的
+          #    INSERT 撞「id 无默认值」⇒ V106 报错 + run_pending 留下 failed
+          #    （2026-11-22 实测：无这句 executed 260 failed [106]；加这句 261/[]）。
+          psql -h localhost -U postgres -d audit_platform -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
         working-directory: backend
       - name: Coverage/drift guard (bidirectional HTTP + worker ⇔ ledger, no fake-pass + native_authz audited)
@@ -2162,6 +2177,11 @@ jobs:
           set -euo pipefail
           psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
           python backend/scripts/seed/init_tables.py
+          # 🔴 空库引导必须补这句：ORM create_all 建的 service_identities.id 没有
+          #    DEFAULT，V106 的 CREATE TABLE IF NOT EXISTS 因此不生效，随后的
+          #    INSERT 撞「id 无默认值」⇒ V106 报错 + run_pending 留下 failed
+          #    （2026-11-22 实测：无这句 executed 260 failed [106]；加这句 261/[]）。
+          psql -h localhost -U postgres -d audit_platform -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
       - name: Run I-cycle extraction closure guards
         run: python -m pytest backend/tests/four_table/test_i_cycle_row_code_evidence.py backend/tests/four_table/test_i_cycle_accounts.py backend/tests/four_table/test_i5_absent_account.py backend/tests/test_i_cycle_formula_presets.py -q
@@ -3032,6 +3052,11 @@ jobs:
           set -euo pipefail
           psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
           python scripts/seed/init_tables.py
+          # 🔴 空库引导必须补这句：ORM create_all 建的 service_identities.id 没有
+          #    DEFAULT，V106 的 CREATE TABLE IF NOT EXISTS 因此不生效，随后的
+          #    INSERT 撞「id 无默认值」⇒ V106 报错 + run_pending 留下 failed
+          #    （2026-11-22 实测：无这句 executed 260 failed [106]；加这句 261/[]）。
+          psql -h localhost -U postgres -d audit_platform -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
         working-directory: backend
       - name: Legacy encoding balances stay zero (live DB, read-only)
@@ -3106,6 +3131,11 @@ jobs:
           set -euo pipefail
           psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
           python scripts/seed/init_tables.py
+          # 🔴 空库引导必须补这句：ORM create_all 建的 service_identities.id 没有
+          #    DEFAULT，V106 的 CREATE TABLE IF NOT EXISTS 因此不生效，随后的
+          #    INSERT 撞「id 无默认值」⇒ V106 报错 + run_pending 留下 failed
+          #    （2026-11-22 实测：无这句 executed 260 failed [106]；加这句 261/[]）。
+          psql -h localhost -U postgres -d audit_platform -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
         working-directory: backend
       - name: report_config account-code integrity (live DB, read-only)
@@ -3328,6 +3358,11 @@ jobs:
           set -euo pipefail
           psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
           python backend/scripts/seed/init_tables.py
+          # 🔴 空库引导必须补这句：ORM create_all 建的 service_identities.id 没有
+          #    DEFAULT，V106 的 CREATE TABLE IF NOT EXISTS 因此不生效，随后的
+          #    INSERT 撞「id 无默认值」⇒ V106 报错 + run_pending 留下 failed
+          #    （2026-11-22 实测：无这句 executed 260 failed [106]；加这句 261/[]）。
+          psql -h localhost -U postgres -d audit_platform -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
       - name: Run dataset binding guard (own process, DB-touching)
         run: python -m pytest backend/tests/test_sampling_dataset_binding.py -q -rs --tb=short
@@ -4392,6 +4427,11 @@ jobs:
           set -euo pipefail
           psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
           python scripts/seed/init_tables.py
+          # 🔴 空库引导必须补这句：ORM create_all 建的 service_identities.id 没有
+          #    DEFAULT，V106 的 CREATE TABLE IF NOT EXISTS 因此不生效，随后的
+          #    INSERT 撞「id 无默认值」⇒ V106 报错 + run_pending 留下 failed
+          #    （2026-11-22 实测：无这句 executed 260 failed [106]；加这句 261/[]）。
+          psql -h localhost -U postgres -d audit_platform -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
         working-directory: backend
       - name: Anchor map guards (Property 3/4/5/6/7/8/13/14/15/16)
@@ -4535,6 +4575,11 @@ jobs:
           set -euo pipefail
           psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
           python scripts/seed/init_tables.py
+          # 🔴 空库引导必须补这句：ORM create_all 建的 service_identities.id 没有
+          #    DEFAULT，V106 的 CREATE TABLE IF NOT EXISTS 因此不生效，随后的
+          #    INSERT 撞「id 无默认值」⇒ V106 报错 + run_pending 留下 failed
+          #    （2026-11-22 实测：无这句 executed 260 failed [106]；加这句 261/[]）。
+          psql -h localhost -U postgres -d audit_platform -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
         working-directory: backend
       - name: Diff data integrity (Property 1~4；is_mock / 落盘↔实时逐条相等 / format_diff 可定位)
@@ -5111,6 +5156,11 @@ jobs:
           set -euo pipefail
           psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
           python scripts/seed/init_tables.py
+          # 🔴 空库引导必须补这句：ORM create_all 建的 service_identities.id 没有
+          #    DEFAULT，V106 的 CREATE TABLE IF NOT EXISTS 因此不生效，随后的
+          #    INSERT 撞「id 无默认值」⇒ V106 报错 + run_pending 留下 failed
+          #    （2026-11-22 实测：无这句 executed 260 failed [106]；加这句 261/[]）。
+          psql -h localhost -U postgres -d audit_platform -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', len(r.failed)); assert not r.failed, [f.version for f in r.failed]"
         working-directory: backend
       - name: 边① 源 xlsx ↔ 附注 seed 列结构对齐（须 0 欠账 + 39 项自检全过）
@@ -5712,6 +5762,11 @@ jobs:
           set -euo pipefail
           psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
           python scripts/seed/init_tables.py
+          # 🔴 空库引导必须补这句：ORM create_all 建的 service_identities.id 没有
+          #    DEFAULT，V106 的 CREATE TABLE IF NOT EXISTS 因此不生效，随后的
+          #    INSERT 撞「id 无默认值」⇒ V106 报错 + run_pending 留下 failed
+          #    （2026-11-22 实测：无这句 executed 260 failed [106]；加这句 261/[]）。
+          psql -h localhost -U postgres -d audit_platform -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           psql -h localhost -U postgres -d audit_platform -c "DROP TABLE IF EXISTS ai_chat_action_receipts, ai_chat_tool_calls, ai_chat_attachments, ai_chat_runs CASCADE;"
           python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', [f.version for f in r.failed])"
       - name: Assert V147 constraints actually landed
@@ -5872,6 +5927,11 @@ jobs:
           set -euo pipefail
           psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
           python scripts/seed/init_tables.py
+          # 🔴 空库引导必须补这句：ORM create_all 建的 service_identities.id 没有
+          #    DEFAULT，V106 的 CREATE TABLE IF NOT EXISTS 因此不生效，随后的
+          #    INSERT 撞「id 无默认值」⇒ V106 报错 + run_pending 留下 failed
+          #    （2026-11-22 实测：无这句 executed 260 failed [106]；加这句 261/[]）。
+          psql -h localhost -U postgres -d audit_platform -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           psql -h localhost -U postgres -d audit_platform -c "DROP TABLE IF EXISTS ai_chat_action_receipts, ai_chat_tool_calls, ai_chat_attachments, ai_chat_runs CASCADE;"
           python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', [f.version for f in r.failed])"
       - name: MCP tool data-flow guards (non-empty / no-placeholder / authz / masking)
@@ -6213,6 +6273,11 @@ jobs:
           set -euo pipefail
           psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
           python scripts/seed/init_tables.py
+          # 🔴 空库引导必须补这句：ORM create_all 建的 service_identities.id 没有
+          #    DEFAULT，V106 的 CREATE TABLE IF NOT EXISTS 因此不生效，随后的
+          #    INSERT 撞「id 无默认值」⇒ V106 报错 + run_pending 留下 failed
+          #    （2026-11-22 实测：无这句 executed 260 failed [106]；加这句 261/[]）。
+          psql -h localhost -U postgres -d audit_platform -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           psql -h localhost -U postgres -d audit_platform -c "DROP TABLE IF EXISTS ai_chat_action_receipts, ai_chat_tool_calls, ai_chat_attachments, ai_chat_runs CASCADE;"
           python -c "import asyncio,sys; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', [f.version for f in r.failed]); sys.exit(1 if r.failed else 0)"
       - name: Recompute and byte-check program milestone registry
