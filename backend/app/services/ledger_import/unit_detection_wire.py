@@ -22,7 +22,9 @@ preview / detect 的 `unit_detection` 接线（从 router 与 application_servic
 
 from __future__ import annotations
 
+import json
 import logging
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -88,4 +90,20 @@ def build_unit_detection_payload(
     return detection.summary.model_dump(mode="json")
 
 
-__all__ = ["build_unit_detection_payload", "detection_diagnostics"]
+def read_cached_unit_detection(bundle_dir: Path) -> dict[str, Any] | None:
+    """读 detect 阶段缓存在 bundle manifest 里的 `unit_detection`（worker 侧使用）。
+
+    返回 `None` 表示「没有缓存」（旧 bundle / 测试直调）—— 调用方按同一 builder
+    现算即可。缓存存在但损坏时也返回 `None`（由调用方决定是否记录日志），
+    不在这里抛：缓存缺失与缓存损坏对调用方是同一个处置（现算）。
+    """
+    manifest_path = Path(bundle_dir) / "manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 - 缺文件 / 坏 JSON 都视为无缓存
+        return None
+    cached = manifest.get("unit_detection")
+    return cached if isinstance(cached, dict) else None
+
+
+__all__ = ["build_unit_detection_payload", "detection_diagnostics", "read_cached_unit_detection"]

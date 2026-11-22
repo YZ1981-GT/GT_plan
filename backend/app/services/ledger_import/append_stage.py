@@ -15,9 +15,24 @@ _TABLES = ("tb_balance", "tb_aux_balance", "tb_ledger", "tb_aux_ledger")
 def staged_source_summary(
     amount_unit: str | None,
     append_options: dict[str, Any] | None,
+    *,
+    unit_contract: Any | None = None,
 ) -> dict[str, Any] | None:
+    """构造 staged 数据集的 `source_summary`。
+
+    R8 / AC-14：`unit_contract` 给出时写入 `unit_normalization`（normalized_v1
+    的完整证据）。此时**不再写顶层 `amount_unit`** —— 顶层那个键是
+    `legacy_declared` 的判据（`dataset_unit_contract.classify_dataset_unit`），
+    同时写会让同一份数据集带两套互相竞争的口径。
+    """
     summary: dict[str, Any] = {}
-    if amount_unit:
+    if unit_contract is not None:
+        from app.services.ledger_import.unit_contract_apply import (
+            unit_normalization_payload,
+        )
+
+        summary["unit_normalization"] = unit_normalization_payload(unit_contract)
+    elif amount_unit:
         summary["amount_unit"] = amount_unit
     if append_options:
         summary["append_request"] = dict(append_options)

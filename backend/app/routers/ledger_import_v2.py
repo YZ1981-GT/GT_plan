@@ -219,6 +219,13 @@ async def detect_files(
         upload_token=upload_token,
     )
 
+    # 🔴 缓存这份摘要本身（不是行数）：worker 侧 detect 用的是 bundle 里的
+    # stored_name（带 `00_` 前缀）而 preview 用用户原始文件名 ⇒ 重新检测出的
+    # evidence_digest 必不同 ⇒ 用户确认过的合同会被判 UNIT_DETECTION_CHANGED。
+    LedgerImportUploadService.cache_unit_detection(
+        project_id, upload_token, response["unit_detection"],
+    )
+
     # 缓存 total_rows_estimate 到 bundle manifest，submit 复用避免重新 detect（优化点）
     LedgerImportUploadService.cache_detection_meta(
         project_id, upload_token, total_rows_estimate

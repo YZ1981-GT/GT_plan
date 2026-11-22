@@ -233,6 +233,7 @@ async def execute_pipeline(
     phase_marker: PhaseMarker | None = None,
     append_options: dict[str, Any] | None = None,
     attempt_id: UUID | None = None,
+    unit_confirmation: dict[str, Any] | None = None,
 ) -> PipelineResult:
     """v2 引擎纯数据管线（detect → parse → convert → validate → write → activate）。
 
@@ -252,6 +253,11 @@ async def execute_pipeline(
         attempt_id: 账套导入 attempt UUID（spec platform-global-display-settings-closure
             任务 8）。为 None 时跳过 attempt 状态流转（旧 job / 兼容路径），
             **不阻断导入**——attempt 是新增的恢复证据，不能让历史 job 失败。
+        unit_confirmation: 用户确认的单位合同 wire dict（`ImportJob.options`
+            原样传入）。为 None 时**不构造合同、不换算金额**（旧作业 / 测试直调
+            ⇒ 既有行为逐字节不变）；给出时在写入 staged 前构造不可变合同、
+            写入 `source_summary.unit_normalization`，并按合同 factor 换算
+            金额列（`unit_contract_apply.py`）。
 
     Returns:
         PipelineResult
@@ -423,6 +429,19 @@ async def execute_pipeline(
     async with async_session() as stage_db:
         from .append_stage import staged_source_summary
 
+        # R8 / AC-14~AC-17：构造不可变单位合同（**写入前** fail closed）。
+        # 🔴 必须在 create_staged 之前：合同要么随 staged 一起落库，要么整单失败，
+        #    不允许「先建 staged 再补合同」——中途失败会留下没有单位证据的 staged 行。
+        from .unit_contract_apply import build_staged_unit_contract
+
+        unit_contract = build_staged_unit_contract(
+            detections=detections,
+            file_sources=file_sources,
+            unit_confirmation=unit_confirmation,
+            created_by=created_by,
+            job_id=job_id,
+        )
+
         staged = await DatasetService.create_staged(
             stage_db,
             project_id=project_id,
@@ -430,7 +449,9 @@ async def execute_pipeline(
             source_type="ledger_import_v2",
             job_id=job_id,
             created_by=created_by,
-            source_summary=staged_source_summary(_amount_unit, append_options),
+            source_summary=staged_source_summary(
+                _amount_unit, append_options, unit_contract=unit_contract,
+            ),
         )
         staging_dataset_id = staged.id
         await stage_db.commit()
@@ -443,7 +464,21 @@ async def execute_pipeline(
     await _wal.start()
 
     # S7-2 + B2: bulk_write_staged 智能派发（小批 INSERT / 大批 COPY，COPY 失败自动降级）
+    # R8 / AC-17：金额换算**唯一入口** —— 四张表的每一批写入都经这里，
+    # 保证「只换算一次」（换算后写入 staged，读路径不再二次换算）。
+    # unit_contract 为 None（旧作业 / 测试直调）时 factor 恒 1，原样返回同一 list。
+    from .unit_contract_apply import normalize_row_amounts
+
+    _amount_factor = unit_contract.factor if unit_contract is not None else None
+
     async def _insert(table_model, rows: list[dict]) -> None:
+        if _amount_factor is not None and rows:
+            rows = normalize_row_amounts(
+                rows,
+                table_name=table_model.__tablename__,
+                factor=_amount_factor,
+                job_id=job_id,
+            )
         await bulk_write_staged(
             async_session, table_model, rows,
             project_id=project_id, year=import_year,

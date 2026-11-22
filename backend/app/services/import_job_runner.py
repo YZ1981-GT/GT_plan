@@ -791,6 +791,9 @@ class ImportJobRunner:
                 phase_marker=_phase_marker,
                 append_options=options.get("append"),
                 attempt_id=_attempt_id,
+                # R8 / AC-14：用户确认的单位合同（submit 落进 options）。
+                # 历史 job 没有该键 ⇒ None ⇒ pipeline 不构造合同、不换算（行为不变）。
+                unit_confirmation=options.get("unit_confirmation"),
             )
 
             # ── Phase 5: writing → activating → completed（对齐状态机）──
