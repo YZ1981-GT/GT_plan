@@ -1280,6 +1280,27 @@ def test_multi_resolver_stays_in_has_debt_even_when_other_criteria_cleared(
     # handlers (umbrella task 2.8) + `wp_generation_staging::_source_paths` (8ffdb1f7f). `== 3` would
     # also go red the day 2.8 clears them ⇒ two-way ratchet over a named set (new row red, cleared
     # row left here red -- shrink the set in the change that clears it).
+    #
+    # 🔴 2026-11-15 尝试过把 `wp_generation_staging::_source_paths` 收敛掉（4 -> 3），
+    # **已撤回**。当时的理由是「`resolve_wp_file` 的模板回退内部就是调
+    # `find_template_file_any` ⇒ 同一能力写了两遍」，且在真实模板库上逐码比对
+    # `same=9 diff=0`（G1 / D2-1 / F2-22 / K11-1 / K11 / A16-1 / B22A / S33-REV /
+    # NONEXISTENT，含两处 None -> `<empty>`）。
+    #
+    # 但 `test_wp_generation_staging.py` 当场打红两条：它把模板 monkeypatch 到
+    # `tmp_path`，而 `resolve_wp_file` 多一层 `is_within_any_legacy_root` 安全边界
+    # （Property 42，roots = `backend/` 与仓库根）⇒ 临时目录里的模板被判越界拒绝 ⇒
+    # 快照恒空、digest 不随字节变化、原子物化的「来源已变化」拒绝也不再触发。
+    #
+    # 结论：两者**不等价** —— 差别不在「模板在哪」，而在 `resolve_wp_file` 是**带安全门**
+    # 的公开 resolver、`find_template_file_any` 是不带门的内层查找。staging 要的是
+    # 「拿到模板字节做指纹」，换过去会静默改变安全语义与失败形态。
+    # ⇒ 这一行保持现状，不为过判据而合并。要真收敛，得先决定 staging 是否也该受
+    #   Property 42 约束（那是语义决策，不是接线）。
+    #
+    # 另 3 条 legacy OnlyOffice handler 同样不能靠换 resolver 清零：实测 2026-11-15
+    # 它们派生的 `xlsx-sheet/*` entry id 在 manifest 里出现 **0 次**，换 resolver 解析不到
+    # 任何东西。清零它们需要「sheet 级 OO 打开改走 entry 的 published artifact」，另立 spec。
     multi_resolver_debt = {
         "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config",
         "app.routers.wp_onlyoffice_router::get_sheet_wopi_contents",

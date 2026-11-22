@@ -11,14 +11,12 @@ Validates: Requirements 7.1, 7.2, 7.3, 7.7
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import subprocess
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -28,11 +26,6 @@ from app.models.report_models import (
     ExportTask,
     ExportTaskStatus,
     ExportTaskType,
-)
-from app.services.pdf_export_sources import (
-    PDFSourceUnavailable,
-    build_financial_pdf_data,
-    build_pdf_source_data,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,7 +58,7 @@ tr.total td {{ font-weight: bold; border-top: 1pt solid #000; }}
 
 
 def _render_audit_report_html(data: dict) -> str:
-    """渲染审计报告 HTML（真实正文，已按段名转义）"""
+    """渲染审计报告 HTML"""
     paragraphs = data.get("paragraphs", {})
     body_parts = [f'<div class="header">审计报告</div>']
     for section_name, content in paragraphs.items():
@@ -75,50 +68,35 @@ def _render_audit_report_html(data: dict) -> str:
 
 
 def _render_financial_report_html(data: dict) -> str:
-    """渲染真实财务报表数据（支持单表或多个 section）。"""
+    """渲染财务报表 HTML"""
     report_type = data.get("report_type", "financial_report")
-    unit_label = data.get("unit_label")
-    sections = data.get("sections")
-    if not sections:
-        sections = [{"report_type": report_type, "rows": data.get("rows", [])}]
+    rows = data.get("rows", [])
     body_parts = [f'<div class="header">{report_type}</div>']
-    if unit_label:
-        body_parts.append(f'<div class="footer">金额单位：{unit_label}</div>')
-    for section in sections:
-        section_type = section.get("report_type", report_type)
-        rows = section.get("rows", [])
-        if len(sections) > 1:
-            body_parts.append(f"<h3>{section_type}</h3>")
-        body_parts.append("<table><tr><th>项目</th><th>期末余额</th><th>年初余额</th></tr>")
-        for row in rows:
-            cls = ' class="total"' if row.get("is_total") else ""
-            body_parts.append(
-                f"<tr{cls}><td>{row.get('row_name', '')}</td>"
-                f"<td>{row.get('current_period_amount') or ''}</td>"
-                f"<td>{row.get('prior_period_amount') or ''}</td></tr>"
-            )
-        body_parts.append("</table>")
+    body_parts.append("<table><tr><th>项目</th><th>期末余额</th><th>年初余额</th></tr>")
+    for row in rows:
+        cls = ' class="total"' if row.get("is_total") else ""
+        body_parts.append(
+            f"<tr{cls}><td>{row.get('row_name', '')}</td>"
+            f"<td>{row.get('current_period_amount', 0)}</td>"
+            f"<td>{row.get('prior_period_amount', 0)}</td></tr>"
+        )
+    body_parts.append("</table>")
     return _BASE_HTML.format(title=report_type, body="\n".join(body_parts))
 
 
 def _render_disclosure_notes_html(data: dict) -> str:
-    """渲染附注 HTML（真实附注读取链产出）"""
+    """渲染附注 HTML"""
     notes = data.get("notes", [])
-    unit_label = data.get("unit_label")
     body_parts = ['<div class="header">财务报表附注</div>']
-    if unit_label:
-        body_parts.append(f'<div class="footer">金额单位：{unit_label}</div>')
     for note in notes:
         body_parts.append(f"<h3>{note.get('note_section', '')} {note.get('section_title', '')}</h3>")
-        td = note.get("table_data")
-        if td:
+        if note.get("table_data"):
+            td = note["table_data"]
             headers = td.get("headers", [])
             body_parts.append("<table><tr>" + "".join(f"<th>{h}</th>" for h in headers) + "</tr>")
             for row in td.get("rows", []):
                 cls = ' class="total"' if row.get("is_total") else ""
-                vals = "".join(
-                    f"<td>{'' if v is None else v}</td>" for v in row.get("values", [])
-                )
+                vals = "".join(f"<td>{v}</td>" for v in row.get("values", []))
                 body_parts.append(f"<tr{cls}><td>{row.get('label', '')}</td>{vals}</tr>")
             body_parts.append("</table>")
         if note.get("text_content"):
@@ -228,33 +206,6 @@ def render_with_ai_statement(html_content: str, reviewer: str = "审计师") -> 
     return html_content
 
 
-def _normalize_document_types(
-    document_type: str | None,
-    document_types: list[str] | None,
-) -> list[str]:
-    """把旧单数/新复数导出合同归一成数据库要求的 JSON 数组。"""
-    if not document_types:
-        return [document_type] if document_type else []
-    normalized = list(dict.fromkeys(str(item) for item in document_types if item))
-    if document_type and document_type not in normalized:
-        raise ValueError(
-            "document_type 与 document_types 不一致，不能静默选择其中一套"
-        )
-    return normalized
-
-
-def _normalize_policy_snapshot(
-    snapshot: str | dict[str, Any] | None,
-) -> dict[str, Any] | None:
-    """把 resolver 的 canonical JSON 转成 JSONB object，禁止写入 JSON 字符串。"""
-    if snapshot is None:
-        return None
-    parsed: Any = json.loads(snapshot) if isinstance(snapshot, str) else snapshot
-    if not isinstance(parsed, dict):
-        raise ValueError("unit_policy_snapshot 必须是 JSON object")
-    return parsed
-
-
 class PDFConversionUnavailable(RuntimeError):
     """PDF 转换链不可用（WeasyPrint 未安装且 LibreOffice 不可用）。
 
@@ -307,46 +258,6 @@ class PDFExportEngine:
         logger.info("Rendered PDF: %s", pdf_path)
         return pdf_path
 
-    def _render_multi_document(
-        self,
-        parts: list[tuple[str, dict[str, Any]]],
-        output_path: Path,
-    ) -> Path:
-        """多文档合并（TODO 15.4）：逐块渲染 PDF 后按给定顺序 pypdf 合并。
-
-        失败语义：
-        - 任一块的 HTML renderer 抛错（源数据问题）→ 原样上抛（409/422）；
-        - 任一块转换不可用 → `PDFConversionUnavailable`（503，环境问题）；
-        - 合并前**逐块落临时文件**，全部成功才写最终 `.pdf` —— 不产出半份产物
-          （失败时临时目录整体删除，最终输出路径不残留旧内容）。
-        """
-        from pypdf import PdfWriter
-
-        writer = PdfWriter()
-        with tempfile.TemporaryDirectory(prefix="tmp_pdf_bundle_") as tmpdir:
-            for index, (renderer_type, data) in enumerate(parts):
-                block_html = _RENDERERS.get(renderer_type, _render_financial_report_html)(data)
-                block_bytes = self._convert_html_to_pdf(block_html)
-                if block_bytes is None:
-                    raise PDFConversionUnavailable(
-                        f"多文档合并的第 {index + 1} 块（{renderer_type}）转换失败："
-                        "WeasyPrint 未安装且 LibreOffice 不可用。"
-                    )
-                if not block_bytes.startswith(b"%PDF"):
-                    raise PDFConversionUnavailable(
-                        f"多文档合并的第 {index + 1} 块（{renderer_type}）输出不是 PDF"
-                        "（转换器返回了非 PDF 内容），已放弃合并"
-                    )
-                block_path = Path(tmpdir) / f"block_{index:02d}.pdf"
-                block_path.write_bytes(block_bytes)
-                writer.append(str(block_path))
-
-            final_path = output_path.with_suffix(".pdf")
-            with final_path.open("wb") as fh:
-                writer.write(fh)
-        logger.info("Rendered multi-document PDF (%s blocks): %s", len(parts), final_path)
-        return final_path
-
     @staticmethod
     def _convert_html_to_pdf(html_content: str) -> bytes | None:
         """HTML → PDF bytes；两条链都不可用返回 ``None``（不写 HTML 冒充）。"""
@@ -391,32 +302,6 @@ class PDFExportEngine:
             pdf_file = Path(tmpdir) / "input.pdf"
             return pdf_file.read_bytes() if pdf_file.exists() else None
 
-    @staticmethod
-    def _encrypt_pdf_file(path: Path, password: str) -> None:
-        """给已生成的 PDF 文件加打开密码（TODO 15.5）。
-
-        🔴 失败语义：加密失败**删除半成品并上抛** —— 不产出「文件未加密但任务
-        标 password_protected=True」的错配（那是比不加密更危险的静默撒谎）。
-        用 pypdf 的 RC4-128（``use_128bit=True``，与旧 bulk 导出链一致）；
-        权限保持默认（打印/提取允许，只挡打开）。
-        """
-        from pypdf import PdfReader, PdfWriter
-
-        try:
-            reader = PdfReader(str(path))
-            writer = PdfWriter(clone_from=reader)
-            writer.encrypt(user_password=password, use_128bit=True)
-            encrypted = path.with_suffix(".pdf.enc.tmp")
-            with encrypted.open("wb") as fh:
-                writer.write(fh)
-        except Exception as exc:  # noqa: BLE001 - 加密失败必须整体失败
-            path.unlink(missing_ok=True)
-            raise RuntimeError(
-                f"PDF 加密失败，导出任务未产出文件（不产出未加密文件冒充成功）: {exc}"
-            ) from exc
-        # 原子替换：先写临时文件再覆盖，避免中断留下未加密原文
-        encrypted.replace(path)
-
     # ------------------------------------------------------------------
     # 创建导出任务
     # ------------------------------------------------------------------
@@ -429,18 +314,24 @@ class PDFExportEngine:
         *,
         export_year: int | None = None,
         document_types: list[str] | None = None,
-        unit_policy_snapshot: str | dict[str, Any] | None = None,
+        unit_policy_snapshot: str | None = None,
     ) -> ExportTask:
         """创建导出任务记录。
 
-        旧调用方只传 `document_type` 时归一为单元素数组；新调用方传
-        `document_types` 时保留去重后的顺序。`unit_policy_snapshot` 在
-        JSONB 写入边界统一解析为 object，避免 PostgreSQL CHECK 收到 JSON 字符串。
+        Validates: Requirements 7.2, 7.7
+
+        spec platform-global-display-settings-closure 任务 10 / AC-21：新增三个可选字段
+        落 `unit_policy_snapshot` 证据（V265 已建列）。**全部默认 None**，
+        既有调用方行为逐字节不变。
+
+        - `export_year`：导出年度（V265 的 `export_year` 列）。缺失时保持 None
+          （不猜当前年——猜出来的年度会让「按年度取数」的验收误判）。
+        - `document_types`：多文档类型列表（V265 的 `document_types` 列）。
+          单文档时调用方仍可只传 `document_type`（旧契约保持）。
+        - `unit_policy_snapshot`：`ExportUnitPolicy` 的 canonical JSON
+          （含 `unit` / `divisor` / `canonical_digest`）——**这是正式导出的单位证据**，
+          缺它则无法审计「这份交付件是按哪个单位出的」。
         """
-        normalized_document_types = _normalize_document_types(
-            document_type, document_types
-        )
-        normalized_policy_snapshot = _normalize_policy_snapshot(unit_policy_snapshot)
         task = ExportTask(
             project_id=project_id,
             task_type=task_type,
@@ -449,8 +340,8 @@ class PDFExportEngine:
             progress_percentage=0,
             created_by=created_by,
             export_year=export_year,
-            document_types=normalized_document_types,
-            unit_policy_snapshot=normalized_policy_snapshot,
+            document_types=document_types,
+            unit_policy_snapshot=unit_policy_snapshot,
         )
         self.db.add(task)
         await self.db.flush()
@@ -459,19 +350,13 @@ class PDFExportEngine:
     # ------------------------------------------------------------------
     # 执行导出（MVP 同步）
     # ------------------------------------------------------------------
-    async def execute_export(
-        self,
-        task_id: UUID,
-        *,
-        password: str | None = None,
-    ) -> ExportTask:
+    async def execute_export(self, task_id: UUID) -> ExportTask:
         """同步执行导出任务（MVP 无 Celery）。
 
-        ``password``（TODO 15.5）：非空时产物 PDF 用 pypdf 加密（用户打开需输
-        密码），任务标 ``password_protected=True``。🔴 明文密码**不落库**——
-        ``export_tasks`` 没有密码列是**有意设计**（审计链不留凭据）；
-        ``execute_export`` 与 ``create_export_task`` 在同一请求内由路由串接，
-        密码经参数传递即可。
+        Validates: Requirements 7.2, 7.3
+        TODO: 15.3 — xlsx→PDF 转换
+        TODO: 15.4 — PDF 合并与后处理
+        TODO: 15.5 — PDF 密码保护
         """
         result = await self.db.execute(
             sa.select(ExportTask).where(ExportTask.id == task_id)
@@ -489,48 +374,17 @@ class PDFExportEngine:
         try:
             # Ensure export directory exists
             EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+
+            # Generate a simple placeholder file
             output_path = EXPORT_DIR / f"export_{task.id}"
+            doc_type = task.document_type or "financial_report"
 
-            # 先解析任务冻结的文档清单；只有带年度的正式请求进入真实数据源。
-            # 旧内部调用没有年度时保留兼容状态，后续正式出口批次会移除该兼容路径。
-            document_types = list(task.document_types or [])
-            if not document_types and task.document_type:
-                document_types = [task.document_type]
-            if task.export_year is not None:
-                resolved = await build_pdf_source_data(
-                    self.db,
-                    project_id=task.project_id,
-                    year=task.export_year,
-                    document_types=document_types,
-                    unit_policy_snapshot=task.unit_policy_snapshot,
-                )
-            else:
-                renderer_type = task.document_type or "financial_report"
-                resolved = (renderer_type, {
-                    "report_type": task.document_type or "financial_report",
-                    "rows": [],
-                    "paragraphs": {},
-                    "notes": [],
-                })
-
-            # Render the resolved source data; the formal path must not invent rows.
-            if isinstance(resolved, list):
-                # 多文档合并（TODO 15.4）：逐块渲染为 PDF 后按固定顺序 pypdf 合并；
-                # 任一块转换失败即整体失败（不产出半份产物）。
-                rendered = self._render_multi_document(resolved, output_path)
-            else:
-                renderer_type, source_data = resolved
-                rendered = self.render_document(
-                    renderer_type,
-                    source_data,
-                    output_path,
-                )
-
-            if password:
-                # TODO 15.5：加密在产物写入后进行（幂等：覆盖同一文件）；
-                # 失败即整体失败，不产出「未加密文件标 password_protected」的错配。
-                self._encrypt_pdf_file(rendered, password)
-                task.password_protected = True
+            # Render a minimal document
+            rendered = self.render_document(
+                doc_type,
+                {"report_type": doc_type, "rows": [], "paragraphs": {}, "notes": []},
+                output_path,
+            )
 
             task.progress_percentage = 100
             task.status = ExportTaskStatus.completed
@@ -546,14 +400,6 @@ class PDFExportEngine:
             logger.error("Export task %s: PDF 转换链不可用: %s", task_id, e)
             task.status = ExportTaskStatus.failed
             task.error_message = str(e)
-            task.completed_at = datetime.now(timezone.utc)
-            await self.db.flush()
-            raise
-
-        except PDFSourceUnavailable as exc:
-            logger.warning("Export task %s source unavailable: %s", task_id, exc)
-            task.status = ExportTaskStatus.failed
-            task.error_message = str(exc)
             task.completed_at = datetime.now(timezone.utc)
             await self.db.flush()
             raise

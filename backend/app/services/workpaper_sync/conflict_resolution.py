@@ -156,6 +156,10 @@ from app.services.workpaper_sync.content_mutation import (
     ContentMutationService,
     projection_canonical_digest,
 )
+from app.services.workpaper_sync.conflict_preview_contract import (
+    contract_source_fields,
+    resolve_preview_contract,
+)
 from app.services.workpaper_sync.contracts import SyncContract
 from app.services.workpaper_sync.merge import ContractIndex
 from app.services.workpaper_sync.models import (
@@ -785,6 +789,8 @@ class ConflictPreview:
     authority_model_definition_sha256: str
     contract_id: str
     contract_semantic_version: str
+    #: 契约来源（`frozen`/`explicit`）+ digest。**只作标注**，不得门控按钮（R2.3）。
+    contract_source: Mapping[str, Any]
     groups: tuple[ConflictPreviewGroup, ...]
 
     @property
@@ -813,6 +819,7 @@ class ConflictPreview:
             "authority_model_definition_sha256": self.authority_model_definition_sha256,
             "contract_id": self.contract_id,
             "contract_semantic_version": self.contract_semantic_version,
+            **dict(self.contract_source),
             "conflict_count": self.conflict_count,
             "groups": [group.as_dict() for group in self.groups],
         }
@@ -959,7 +966,7 @@ class ConflictResolutionService:
         declared_project_id: uuid.UUID,
         declared_wp_id: uuid.UUID,
         declared_entry_id: str,
-        contract: SyncContract,
+        contract: SyncContract | None = None,
         authorize: Any = None,
         include_superseded: bool = False,
     ) -> ConflictPreview:
@@ -982,11 +989,16 @@ class ConflictResolutionService:
         assert application_id is not None  # require_application=True 已保证
         app = await self._load_application(application_id)
         bundle = await self._resolution.load_bundle_snapshot(app.definition_bundle_id)
-        assert_frozen_contract_matches_bundle(
-            contract=contract,
-            slot_digest=bundle.slots[BundleSlot.contract].slot_digest,
+        # 省略 ⇒ 读冻结那份（新增行为）；显式传入 ⇒ 原判据原样跑（ADR-FC-003）。
+        resolved = await resolve_preview_contract(
+            session=self._session,
+            artifacts=getattr(self._resolution, "_artifacts", None),
+            bundle=bundle,
+            provided=contract,
+            assert_matches_bundle=assert_frozen_contract_matches_bundle,
             where=f"conflict preview of application {application_id}",
         )
+        contract = resolved.contract
         rows = await self._repo.load_conflicts(
             operation_id=canonical.canonical_operation.id,
             include_superseded=include_superseded,
@@ -1017,6 +1029,7 @@ class ConflictResolutionService:
             ),
             contract_id=contract.contract_id,
             contract_semantic_version=contract.semantic_version,
+            contract_source=contract_source_fields(resolved),
             groups=tuple(
                 ConflictPreviewGroup(
                     sheet_key=key[0],

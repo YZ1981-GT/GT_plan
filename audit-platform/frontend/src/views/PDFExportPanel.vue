@@ -112,13 +112,9 @@ import {
   type ExportTaskData,
 } from '@/services/auditPlatformApi'
 import { EXPORT_TASK_STATUS } from '@/constants/statusEnum'
-import { useProjectStore } from '@/stores/project'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
-// 正式 PDF 导出必须带审计年度：只有后端能按 project_id + year 取真实报表，
-// 前端不从项目名猜年度。
-const exportYear = computed(() => useProjectStore().year)
 
 const selectedDocs = ref<string[]>([])
 const passwordProtected = ref(false)
@@ -157,7 +153,7 @@ async function onExport() {
   try {
     const taskType = selectedDocs.value.length > 1 ? 'full_archive' : 'single_document'
     const result = await createExportTask(
-      projectId.value, taskType, selectedDocs.value, exportYear.value,
+      projectId.value, taskType, selectedDocs.value,
       passwordProtected.value, passwordProtected.value ? password.value : undefined,
     )
     currentTask.value = result

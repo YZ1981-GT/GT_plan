@@ -282,14 +282,12 @@ class ExportPackageService:
 
             # Warnings file (if force_export with failures)
             if warnings_text:
-                warnings_bytes = warnings_text.encode("utf-8")
-                zf.writestr("_warnings.txt", warnings_bytes)
+                zf.writestr("_warnings.txt", warnings_text.encode("utf-8"))
                 manifest_files.append({
                     "filename": "_warnings.txt",
                     "type": "warnings",
                     "format": "txt",
-                    "size_bytes": len(warnings_bytes),
-                    "sha256": hashlib.sha256(warnings_bytes).hexdigest(),
+                    "size_bytes": len(warnings_text.encode("utf-8")),
                 })
 
             # manifest.json
@@ -337,17 +335,14 @@ class ExportPackageService:
         数据模型，不是文件）。组合包要的是可放进 zip 的**文件**，
         所以走已有的 Word 导出链路 `word-exports/audit-report/generate` 的 service 层。
 
-        当前实现：读库里已生成的 `AuditReport` → 经共享正文口径
-        （``extract_audit_report_paragraphs``：Word 模板模式主源
-        `report_body_json.sections` + 旧 `paragraphs` 回退，与 PDF 数据源同一份）
-        → python-docx 落成 docx。正文缺失 ⇒ 抛（不产出 placeholder）。
+        当前实现：读库里已生成的 `AuditReport` 段落 → 用 python-docx 落成 docx。
+        段落缺失 ⇒ 抛（不产出 placeholder）。
         """
         import sqlalchemy as sa
         from docx import Document
         from io import BytesIO
 
         from app.models.report_models import AuditReport
-        from app.services.pdf_export_sources import extract_audit_report_paragraphs
 
         result = await self.db.execute(
             sa.select(AuditReport).where(
@@ -363,11 +358,10 @@ class ExportPackageService:
                 "（不产出 placeholder）。请先调 audit-report/generate。"
             )
 
-        paragraphs = extract_audit_report_paragraphs(report)
-        if not paragraphs:
+        paragraphs = getattr(report, "paragraphs", None) or {}
+        if not isinstance(paragraphs, dict) or not paragraphs:
             raise ExportPackageBuildError(
-                "审计报告无段落内容（report_body_json.sections 与 paragraphs 均为空），"
-                "组合包未生成（不产出 placeholder）"
+                "审计报告无段落内容，组合包未生成（不产出 placeholder）"
             )
 
         doc = Document()

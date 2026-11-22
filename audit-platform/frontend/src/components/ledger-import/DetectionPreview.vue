@@ -25,6 +25,33 @@
       </el-tag>
     </div>
 
+    <!-- 单位确认（R8 / AC-14）：预览摘要与提交合同使用同一 evidence_digest。
+         旧后端没有 unit_detection 时不渲染，兼容 bundle-only 旧响应；当前 detect 正式响应必带。 -->
+    <section v-if="unitDetection" class="unit-confirmation" data-testid="ledger-unit-confirmation">
+      <div class="unit-confirmation__title">金额单位确认</div>
+      <div class="unit-confirmation__summary">
+        检测结果：<strong>{{ unitDetectionLabel }}</strong>
+        <span v-if="unitDetection?.candidates?.length">（候选：{{ unitDetection.candidates.join('、') }}）</span>
+      </div>
+      <label class="unit-confirmation__field">
+        来源金额单位
+        <select v-model="selectedUnit" data-testid="ledger-source-unit">
+          <option value="">请选择</option>
+          <option value="yuan">元</option>
+          <option value="qian">千元</option>
+          <option value="wan">万元</option>
+        </select>
+      </label>
+      <label class="unit-confirmation__check">
+        <input v-model="unitConfirmed" type="checkbox" data-testid="ledger-unit-confirmed" />
+        我已核对文件中的金额单位，并确认按此单位导入
+      </label>
+      <label v-if="needsUnitReason" class="unit-confirmation__field">
+        确认说明（检测结果缺失、冲突或覆盖建议时必填）
+        <textarea v-model="unitReason" maxlength="200" data-testid="ledger-unit-reason" />
+      </label>
+    </section>
+
     <!-- 10.45: 规模警告横幅 -->
     <el-alert
       v-if="scaleWarnings.length > 0"
@@ -214,8 +241,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import type { LedgerDetectionResult, SheetDetection } from './LedgerImportDialog.vue'
+import { ref, computed, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import type { LedgerDetectionResult, SheetDetection, UnitDetectionSummary } from './LedgerImportDialog.vue'
 
 // ─── Props & Emits ──────────────────────────────────────────────────────────
 
@@ -224,15 +252,50 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  confirm: [sheets: SheetDetection[], forceSubmit?: boolean]
+  confirm: [sheets: SheetDetection[], forceSubmit?: boolean, unitConfirmation?: UnitConfirmationInput]
   back: []
 }>()
+
+interface UnitConfirmationInput {
+  source_amount_unit: 'yuan' | 'qian' | 'wan'
+  source_unit_confirmed: true
+  unit_evidence_digest: string
+  unit_confirmation_reason?: string
+}
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
 const previewVisible = ref(false)
 const previewSheet = ref<SheetDetection | null>(null)
 const yearConflictVisible = ref(false)
+const unitDetection = computed<UnitDetectionSummary | null>(() => props.detectionResult?.unit_detection ?? null)
+const selectedUnit = ref<'yuan' | 'qian' | 'wan' | ''>('')
+const unitConfirmed = ref(false)
+const unitReason = ref('')
+
+// 当前 detect 返回后组件才挂载，首次计算时可以安全采用 suggested_unit；
+// 用户仍须勾选确认，不能把机器建议当成人工确认。
+const unitDetectionLabel = computed(() => {
+  const summary = unitDetection.value
+  if (!summary) return ''
+  if (summary.status === 'detected') return `已识别：${summary.suggested_unit || '未指定'}`
+  if (summary.status === 'conflict') return '检测到多个单位，请人工确认'
+  if (summary.status === 'unsupported') return '检测到不支持的单位标签，请人工确认'
+  return '未检测到单位，请人工确认'
+})
+const needsUnitReason = computed(() => {
+  const summary = unitDetection.value
+  return Boolean(summary && (
+    summary.status !== 'detected' ||
+    (summary.suggested_unit && selectedUnit.value && summary.suggested_unit !== selectedUnit.value)
+  ))
+})
+
+watch(unitDetection, (summary) => {
+  if (summary?.suggested_unit && !selectedUnit.value) {
+    selectedUnit.value = summary.suggested_unit
+  }
+}, { immediate: true })
 
 // ─── Computed ───────────────────────────────────────────────────────────────
 
@@ -373,7 +436,28 @@ function confirmYearConflict() {
 
 function doConfirm(forceSubmit: boolean) {
   const sheets = sheetRows.value.filter(r => r.table_type !== 'unknown')
-  emit('confirm', sheets, forceSubmit)
+  const summary = unitDetection.value
+  let unitConfirmation: UnitConfirmationInput | undefined
+
+  if (summary) {
+    const sourceUnit = selectedUnit.value || summary.suggested_unit
+    if (!sourceUnit || !unitConfirmed.value) {
+      ElMessage.warning('请先确认文件中的金额单位')
+      return
+    }
+    if (needsUnitReason.value && !unitReason.value.trim()) {
+      ElMessage.warning('检测结果缺失、冲突或覆盖建议时，请填写单位确认说明')
+      return
+    }
+    unitConfirmation = {
+      source_amount_unit: sourceUnit,
+      source_unit_confirmed: true,
+      unit_evidence_digest: summary.evidence_digest,
+      ...(unitReason.value.trim() ? { unit_confirmation_reason: unitReason.value.trim() } : {}),
+    }
+  }
+
+  emit('confirm', sheets, forceSubmit, unitConfirmation)
 }
 
 /** Task 6.1: 用户手动更改 unknown sheet 类型时标记 manually_selected */

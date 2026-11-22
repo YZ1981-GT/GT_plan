@@ -55,6 +55,7 @@ binding 层没有结论时才用它，语义与 2.8 第 ① 步完全一致。
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from typing import Any
 from uuid import UUID
 
@@ -89,7 +90,9 @@ _BINDING_STATES_KEEPING_INDEPENDENT = frozenset({"pending", "out_of_scope"})
 
 
 def _binding_verdict(
-    *, source_wp_code: str, sheet_name: str, whole_workbook: bool
+    *, source_wp_code: str, sheet_name: str, whole_workbook: bool,
+    project_id: UUID | None = None,
+    source_wp_codes: Iterable[str] | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
     """binding 层结论。
 
@@ -105,9 +108,11 @@ def _binding_verdict(
     try:
         resolution = SheetOpenBindingResolver().resolve(
             source_wp_code=source_wp_code,
+            source_wp_codes=source_wp_codes,
             sheet_name=sheet_name,
             whole_workbook=whole_workbook,
             manifest=_manifest(),
+            project_id=str(project_id) if project_id is not None else None,
         )
     except Exception as exc:  # noqa: BLE001 — 见 docstring：不拒，但要报警
         logger.error(
@@ -143,6 +148,7 @@ async def evaluate_legacy_issue_verdict(
     project_id: UUID,
     entry_id: str,
     source_wp_code: str = "",
+    source_wp_codes: Iterable[str] | None = None,
     sheet_name: str = "",
     whole_workbook: bool = False,
 ) -> dict[str, Any]:
@@ -158,6 +164,8 @@ async def evaluate_legacy_issue_verdict(
         source_wp_code=source_wp_code,
         sheet_name=sheet_name,
         whole_workbook=whole_workbook,
+        project_id=project_id,
+        source_wp_codes=source_wp_codes,
     )
     binding_status = str(binding.get("status")) if binding and binding.get("status") else None
 
@@ -293,6 +301,7 @@ async def refuse_legacy_url_when_room_ready(
     project_id: UUID,
     entry_id: str,
     source_wp_code: str = "",
+    source_wp_codes: Iterable[str] | None = None,
     sheet_name: str = "",
     whole_workbook: bool = False,
 ) -> dict[str, Any]:
@@ -307,6 +316,7 @@ async def refuse_legacy_url_when_room_ready(
         project_id=project_id,
         entry_id=entry_id,
         source_wp_code=source_wp_code,
+        source_wp_codes=source_wp_codes,
         sheet_name=sheet_name,
         whole_workbook=whole_workbook,
     )

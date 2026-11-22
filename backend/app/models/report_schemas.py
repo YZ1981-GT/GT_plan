@@ -404,16 +404,10 @@ class AuditReportTemplateResponse(BaseModel):
 
 
 class ExportTaskCreate(BaseModel):
-    """创建导出任务。
-
-    `document_type` 保留兼容旧调用方；`document_types` 是正式的多文档合同。
-    服务层会把两种形态归一成数据库约束要求的 JSON 数组。
-    """
+    """创建导出任务"""
     project_id: UUID
     task_type: ExportTaskType = ExportTaskType.full_archive
     document_type: str | None = None
-    document_types: list[str] | None = None
-    export_year: int | None = None
     password: str | None = None
 
 

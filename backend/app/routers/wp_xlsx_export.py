@@ -73,24 +73,6 @@ async def export_xlsx(
     if wp_index is None:
         raise HTTPException(status_code=404, detail="底稿索引不存在")
 
-    # AC-22：只要底稿已经进入 immutable content version 链，就必须验证
-    # current version / representation / artifact / policy evidence；历史旧底稿
-    # 没有 current_content_version_id 时仍走兼容路径，但归档会如实标 MISSING。
-    export_evidence = None
-    current_content_version_id = getattr(working_paper, "current_content_version_id", None)
-    if isinstance(current_content_version_id, UUID):
-        from app.services.workpaper_sync.export_evidence import (
-            WorkpaperExportEvidenceError,
-            resolve_current_content_export_evidence,
-        )
-
-        try:
-            export_evidence = await resolve_current_content_export_evidence(
-                db, project_id=working_paper.project_id, wp_id=working_paper.id
-            )
-        except WorkpaperExportEvidenceError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-
     wp_code = wp_index.wp_code
 
     # ─── Step 2.5: custom 底稿走独立导出路径 ─────────────────────────────
@@ -208,11 +190,6 @@ async def export_xlsx(
     headers = {
         "Content-Disposition": content_disposition,
     }
-    if export_evidence is not None:
-        headers["X-GT-Content-Version-ID"] = str(export_evidence.content_version_id)
-        headers["X-GT-Export-Surface"] = export_evidence.export_surface_class
-        if export_evidence.unit_policy_digest:
-            headers["X-GT-Policy-Digest"] = export_evidence.unit_policy_digest
 
     return StreamingResponse(
         content=xlsx_buf,

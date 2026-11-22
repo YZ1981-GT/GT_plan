@@ -1267,6 +1267,7 @@ declare module 'vue' {
     GtM7SpecialReserve: typeof import('./components/workpaper/GtM7SpecialReserve.vue')['default']
     GtM8GeneralRiskReserve: typeof import('./components/workpaper/GtM8GeneralRiskReserve.vue')['default']
     GtM9OtherComprehensiveIncome: typeof import('./components/workpaper/GtM9OtherComprehensiveIncome.vue')['default']
+    GtMCycleDetailTable: typeof import('./components/workpaper/m-cycle/GtMCycleDetailTable.vue')['default']
     GtMeasureCell: typeof import('./components/common/GtMeasureCell.vue')['default']
     GtMisstatementWorkpaper: typeof import('./components/workpaper/GtMisstatementWorkpaper.vue')['default']
     GtN1DeferredTaxAssets: typeof import('./components/workpaper/GtN1DeferredTaxAssets.vue')['default']

@@ -17,7 +17,7 @@ def _manifest(*entry_ids: str) -> dict:
     return {"entries": [{"entry_id": entry_id} for entry_id in entry_ids]}
 
 
-def test_provider_binding_does_not_guess_sheet_name(tmp_path: Path) -> None:
+def test_provider_binding_without_identity_is_refused(tmp_path: Path) -> None:
     resolver = _resolver(tmp_path, [{
         "entry_id": "xlsx/gt-k11-asset-impairment-loss",
         "effective_entry_id": "xlsx/gt-k11-asset-impairment-loss",
@@ -35,7 +35,10 @@ def test_provider_binding_does_not_guess_sheet_name(tmp_path: Path) -> None:
     )
     assert result.binding is None
     assert result.status == "pending"
-    assert result.reason == "sheet_binding_provider_review_required"
+    # 批 2 起 provider 型**会**解析（取运行时请求名作 target sheet），但缺
+    # `resolver_identity` 时仍必须拒 —— 没有稳定身份就无法审核这条 binding。
+    # 旧的 `sheet_binding_provider_review_required` 是「一律不解析」时代的码，已不存在。
+    assert result.reason == "sheet_binding_provider_identity_missing"
 
 
 def test_exact_binding_resolves_only_when_target_sheet_matches(tmp_path: Path) -> None:

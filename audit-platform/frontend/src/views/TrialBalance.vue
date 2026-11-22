@@ -14,6 +14,7 @@
           :badges="[
             { value: rows.length + ' 个科目' },
             { label: '单位', value: displayPrefs.unitSuffix },
+            { label: '数据单位', value: datasetUnitLabel },
             ...(lastRecalcAt ? [{ label: '数据', value: isStale ? '⚠ 待重算' : `✓ ${freshnessText}` }] : []),
             ...(isFrozen ? [{ label: '🔒', value: '已锁定' }] : []),
           ]"
@@ -2237,7 +2238,7 @@ const tbImportVisible = ref(false)
 const checkingData = ref(false)
 const existingDataSummary = ref<TrialBalanceDataSummary | null>(null)
 // ─── 数据集单位三态 presenter ──────────────────────────────────────────
-const { label: datasetUnitLabel } = useTrialBalanceDatasetUnit(existingDataSummary)
+const { label: datasetUnitLabel } = useTrialBalanceDatasetUnit(existingDataSummary, selectedProjectId, selectedYear)
 
 // 打开弹窗时检查是否已有数据
 watch(tbImportVisible, async (visible) => {

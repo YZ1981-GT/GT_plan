@@ -48,13 +48,13 @@ export interface WorkpaperSyncManifestEntry {
   hasBrowserEvidence: boolean
 }
 
-export const WORKPAPER_SYNC_MANIFEST_DIGEST = "4244bc53d4fc6661fa579ca61e0de8f332a999b0feceb12dd58e2480c593de79"
+export const WORKPAPER_SYNC_MANIFEST_DIGEST = "36b4cec6cbd0680e5b37cadcc2db40a4eceeb0421f2aa036dd407521e23e5740"
 
 export const WORKPAPER_SYNC_ADJUDICATION_SOURCE_DIGEST = "d51c5dfd2b3cdd806b8d179ea3ffe6cae6ef0707bc2f7e561e19d33d68b26c1b"
 
 export const WORKPAPER_SYNC_WP_CODE_ADJUDICATION_DIGEST = "26708767e63fd645ad049562b3609f99fee21c32ec075291fb6e70f4b9da4ad9"
 
-export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "70b18cafe6720a54a5249518c5cbc2159795d73ad3ebb04a12d4639987903d39"
+export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "ab4391050529ae1fd598952aed539dffda07c59adeac89e0335fceaba8457a6f"
 
 export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "by_component": {
@@ -64,7 +64,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
     "WorkpaperWordEditor": 4
   },
   "capability_counts": {
-    "bidirectional": 111
+    "bidirectional": 112
   },
   "dispatcher_count": 1,
   "editability_counts": {
@@ -73,7 +73,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "entry_count": 197,
   "host_count": 195,
   "independent_entry_count": 145,
-  "legacy_fake_bidirectional_count": 59,
+  "legacy_fake_bidirectional_count": 58,
   "mount_count": 338,
   "parent_duplicate_count": 52,
   "room_model_counts": {
@@ -88,7 +88,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
     "xlsx.editable.shared.none.room_service_wired.v1": 1,
     "xlsx.editable.shared.single.room_service_wired.v1": 189
   },
-  "unadjudicated_count": 78,
+  "unadjudicated_count": 77,
   "unreachable_count": 0
 } as const
 
@@ -2954,19 +2954,11 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "adjudicationState": "pending",
-    "capability": null,
-    "capabilityTarget": "bidirectional",
-    "capabilityTargetBlockedBy": [
-      "BP-1",
-      "BP-2",
-      "BP-3",
-      "BP-4",
-      "BP-5",
-      "BP-7",
-      "BP-8"
-    ],
-    "capabilityVerdictStage": "step_4_blocked_by_step_3_result_exists",
+    "adjudicationState": "terminal",
+    "capability": "bidirectional",
+    "capabilityTarget": null,
+    "capabilityTargetBlockedBy": [],
+    "capabilityVerdictStage": null,
     "documentType": "xlsx",
     "editability": "editable",
     "effectiveEntryId": "xlsx/gt-b22-a-control-matrix",
@@ -2980,13 +2972,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     ],
     "htmlCounterpartVerdict": "exists",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",

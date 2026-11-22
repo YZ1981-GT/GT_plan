@@ -3606,7 +3606,7 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          331
+          336
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -3614,7 +3614,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 169,
+      "line": 174,
       "module": "app.routers.review_prompt",
       "qualname": "review_workpaper",
       "resolver_identities": [],
@@ -3720,10 +3720,10 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          206,
           209,
-          242,
-          246
+          212,
+          245,
+          249
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -3731,7 +3731,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 179,
+      "line": 182,
       "module": "app.routers.trial_balance",
       "qualname": "recalc_trial_balance",
       "resolver_identities": [],
@@ -7347,7 +7347,7 @@
         "artifact_write_targets": [
           {
             "attr": "copy2",
-            "line": 282,
+            "line": 289,
             "target": "unclassified"
           }
         ],
@@ -7365,8 +7365,8 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          258,
-          277
+          265,
+          284
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -7374,7 +7374,7 @@
       },
       "is_async": false,
       "kind": "writer_resolver",
-      "line": 221,
+      "line": 228,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "_resolve_wp_file",
       "resolver_identities": [
@@ -7434,7 +7434,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 649,
+      "line": 656,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "get_sheet_onlyoffice_config",
       "resolver_identities": [
@@ -7496,7 +7496,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 970,
+      "line": 999,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "get_sheet_wopi_contents",
       "resolver_identities": [
@@ -7548,7 +7548,7 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          611
+          618
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -7556,7 +7556,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 555,
+      "line": 562,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "get_template_structure",
       "resolver_identities": [
@@ -7612,7 +7612,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 882,
+      "line": 911,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "get_whole_excel_grid",
       "resolver_identities": [
@@ -7654,7 +7654,7 @@
         "artifact_write_targets": [
           {
             "attr": "write_bytes",
-            "line": 1745,
+            "line": 1774,
             "target": "unclassified"
           }
         ],
@@ -7677,10 +7677,10 @@
           "checklist_responses.remark"
         ],
         "swallowed_exception_lines": [
-          1759,
-          1776,
-          1823,
-          1843
+          1788,
+          1805,
+          1852,
+          1872
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -7688,7 +7688,7 @@
       },
       "is_async": true,
       "kind": "writer_resolver",
-      "line": 1673,
+      "line": 1702,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "import_structured_docx",
       "resolver_identities": [
@@ -7733,7 +7733,7 @@
         "artifact_write_targets": [
           {
             "attr": "write_bytes",
-            "line": 1422,
+            "line": 1451,
             "target": "unclassified"
           }
         ],
@@ -7759,16 +7759,16 @@
           "checklist_responses.remark"
         ],
         "swallowed_exception_lines": [
-          1303,
-          1343,
-          1412,
-          1443,
-          1511,
-          1544,
-          1588,
-          1600,
-          1643,
-          1651
+          1332,
+          1372,
+          1441,
+          1472,
+          1540,
+          1573,
+          1617,
+          1629,
+          1672,
+          1680
         ],
         "unified_commit_calls": [],
         "version_fields_read": [
@@ -7780,7 +7780,7 @@
       },
       "is_async": true,
       "kind": "writer_resolver",
-      "line": 1198,
+      "line": 1227,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "post_sheet_onlyoffice_callback",
       "resolver_identities": [
@@ -8000,27 +8000,24 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          673,
-          680,
-          692,
-          698,
-          731,
-          870,
-          878,
-          883,
-          889,
-          948,
-          956,
-          974,
-          992,
-          1008,
-          1018,
-          1028,
-          1065,
-          1067,
-          1072,
-          1093,
-          1116
+          686,
+          693,
+          705,
+          711,
+          744,
+          884,
+          945,
+          953,
+          971,
+          989,
+          1005,
+          1015,
+          1025,
+          1062,
+          1064,
+          1069,
+          1090,
+          1113
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -8028,7 +8025,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 629,
+      "line": 642,
       "module": "app.routers.wp_render_config",
       "qualname": "_get_render_config_impl",
       "resolver_identities": [
@@ -8084,7 +8081,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 553,
+      "line": 566,
       "module": "app.routers.wp_render_config",
       "qualname": "export_template",
       "resolver_identities": [
@@ -13061,7 +13058,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 1278,
+      "line": 1297,
       "module": "app.routers.wp_render_strategies._j1_import_export",
       "qualname": "_upsert_items",
       "resolver_identities": [],
@@ -13113,8 +13110,8 @@
           "checklist_responses.remark"
         ],
         "swallowed_exception_lines": [
-          935,
-          994
+          954,
+          1013
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -13122,7 +13119,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 796,
+      "line": 815,
       "module": "app.routers.wp_render_strategies._j1_import_export",
       "qualname": "import_data",
       "resolver_identities": [],
@@ -13931,7 +13928,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 1123,
+      "line": 1227,
       "module": "app.routers.wp_sync_router",
       "qualname": "adopt_substrate",
       "resolver_identities": [],
@@ -17733,7 +17730,7 @@
       },
       "is_async": false,
       "kind": "writer",
-      "line": 349,
+      "line": 371,
       "module": "app.services.custom_query.query_artifacts",
       "qualname": "SealResult.__init__",
       "resolver_identities": [],
@@ -19988,7 +19985,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 612,
+      "line": 634,
       "module": "app.services.n2_taxes_payable_service",
       "qualname": "import_data",
       "resolver_identities": [],
@@ -20040,7 +20037,7 @@
           "checklist_responses.remark"
         ],
         "swallowed_exception_lines": [
-          590
+          612
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -20048,7 +20045,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 520,
+      "line": 542,
       "module": "app.services.n3_deferred_tax_liabilities_service",
       "qualname": "import_data",
       "resolver_identities": [],
@@ -20162,7 +20159,7 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          318
+          337
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -20170,7 +20167,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 274,
+      "line": 293,
       "module": "app.services.pdf_export_engine",
       "qualname": "PDFExportEngine.execute_export",
       "resolver_identities": [],
@@ -20226,7 +20223,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 885,
+      "line": 883,
       "module": "app.services.prefill_engine",
       "qualname": "ParseService.parse_workpaper",
       "resolver_identities": [],
@@ -20280,7 +20277,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 765,
+      "line": 763,
       "module": "app.services.prefill_engine",
       "qualname": "PrefillService.batch_prefill",
       "resolver_identities": [],
@@ -20334,7 +20331,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 762,
+      "line": 760,
       "module": "app.services.prefill_engine",
       "qualname": "PrefillService.prefill_workpaper",
       "resolver_identities": [],
@@ -20394,7 +20391,7 @@
       },
       "is_async": false,
       "kind": "writer",
-      "line": 987,
+      "line": 985,
       "module": "app.services.prefill_engine",
       "qualname": "_write_cell_provenance",
       "resolver_identities": [],
@@ -20442,8 +20439,8 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          844,
-          870
+          842,
+          868
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -20451,7 +20448,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 780,
+      "line": 778,
       "module": "app.services.prefill_engine",
       "qualname": "batch_prefill_ordered",
       "resolver_identities": [],
@@ -20503,13 +20500,13 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          405,
-          420,
-          468,
-          486,
-          495,
-          512,
-          522
+          403,
+          418,
+          466,
+          484,
+          493,
+          510,
+          520
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -20517,7 +20514,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 383,
+      "line": 381,
       "module": "app.services.prefill_engine",
       "qualname": "parse_workpaper_real",
       "resolver_identities": [],
@@ -20572,11 +20569,11 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          189,
-          206,
-          308,
-          325,
-          367
+          188,
+          205,
+          306,
+          323,
+          365
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -20584,7 +20581,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 178,
+      "line": 177,
       "module": "app.services.prefill_engine",
       "qualname": "prefill_workpaper_real",
       "resolver_identities": [],
@@ -20632,7 +20629,7 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          682
+          680
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -20640,7 +20637,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 648,
+      "line": 646,
       "module": "app.services.prefill_engine",
       "qualname": "resolve_stale_after_recalc",
       "resolver_identities": [],
@@ -22036,7 +22033,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 206,
+      "line": 211,
       "module": "app.services.word_template_filler",
       "qualname": "WordTemplateFiller.fill_audit_report",
       "resolver_identities": [],
@@ -22091,8 +22088,8 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          382,
-          388
+          387,
+          393
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -22100,7 +22097,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 355,
+      "line": 360,
       "module": "app.services.word_template_filler",
       "qualname": "WordTemplateFiller.fill_disclosure_notes",
       "resolver_identities": [],
@@ -22160,7 +22157,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 278,
+      "line": 283,
       "module": "app.services.word_template_filler",
       "qualname": "WordTemplateFiller.fill_financial_reports",
       "resolver_identities": [],
@@ -22212,8 +22209,8 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          489,
-          515
+          494,
+          520
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -22221,7 +22218,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 449,
+      "line": 454,
       "module": "app.services.word_template_filler",
       "qualname": "WordTemplateFiller.fill_full_package",
       "resolver_identities": [],
@@ -25992,7 +25989,7 @@
       "writer_id": "app.services.wp_xlsx_export_service::_sync_export_workpaper_xlsx"
     }
   ],
-  "inventory_digest": "d41118332be5e966333c4ec61b366108e03bf74dbea42620f4a93ae5c5e002e4",
+  "inventory_digest": "c59ddd1098b1c5d06964a54cbc8a23fb99db3c179a5e392560875d96bddb6303",
   "overlay_digest": "261853b1787b6951b1ea67d10b02f5e73b8462d54ce4d79e451a8fe4063482c2",
   "representation_upgrade_lane": [
     {
@@ -26311,7 +26308,7 @@
     }
   ],
   "schema_version": 1,
-  "source_digest": "ff6beab37c9e90a4a36b7aceb8254e5f286e5cda390b7e8f73c7e96a9a718d08",
+  "source_digest": "d08e261e3658ed44cfabed48ebee94e28e3dee305eab9015490367613ddf5417",
   "stats": {
     "artifact_snapshot_only_count": 1,
     "by_content_store": {

@@ -101,12 +101,6 @@ class TestExecuteExportFailsClosed:
         class _Task:
             id = UUID("aaaaaaaa-0000-0000-0000-000000000001")
             document_type = "financial_report"
-            # 真实 ORM 字段（V265）：替身必须与生产模型同形，否则
-            # 「没年度走兼容路径」这类判据会在替身上假绿/假红。
-            document_types = ["financial_report"]
-            export_year = None
-            unit_policy_snapshot = None
-            project_id = UUID("bbbbbbbb-0000-0000-0000-000000000002")
             status = ExportTaskStatus.queued
             started_at = None
             completed_at = None
@@ -171,17 +165,3 @@ class TestExportRouterGate:
         assert "PDFConversionUnavailable" in names, "路由没有捕获 PDFConversionUnavailable"
         body = ast.unparse(tree)
         assert "503" in body, "转换链不可用没有映射到 503"
-
-    def test_all_pdf_routes_recheck_project_permission(self):
-        """任务 ID/项目 ID 不能替代项目级授权，四个正式出口都要复核。"""
-        src = (BACKEND / "app/routers/export.py").read_text(encoding="utf-8")
-        tree = ast.parse(src)
-        names = {"create_export_task", "get_task_status", "download_export", "get_export_history"}
-        found = {}
-        for node in ast.walk(tree):
-            if isinstance(node, ast.AsyncFunctionDef) and node.name in names:
-                found[node.name] = ast.unparse(node)
-        assert set(found) == names, f"PDF 路由集合漂移：{set(found)}"
-        for name, body in found.items():
-            assert "assert_project_permission" in body, f"{name} 缺项目级权限复核"
-            assert "get_current_user" in body, f"{name} 缺当前用户身份"

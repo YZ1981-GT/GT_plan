@@ -92,13 +92,30 @@ def file_sha256(path: Path) -> str:
 
 
 def _source_paths(wp_code: str, scenario: str, library_file: str | None) -> list[Path]:
-    if library_file:
-        from app.services.wp_export.wp_file_resolver import resolve_wp_file
+    from app.services.wp_export.wp_file_resolver import resolve_wp_file
 
+    if library_file:
+        # 显式指定的库文件：**不允许**回退模板库（哈希 / 校验场景，模板哈希不等于底稿哈希）。
         resolved = resolve_wp_file(library_file, wp_code=None, allow_template_fallback=False).path
         if resolved is not None:
             return [resolved.resolve()]
 
+    # 🔴 2026-11-15 实测：**不能**把下面这句换成 `resolve_wp_file(None, wp_code)`。
+    #
+    # 我原本以为两者等价 —— 因为 `resolve_wp_file` 的模板库回退内部就是调
+    # `find_template_file_any`（见 `_template_fallback`），且在**真实模板库**上逐码比对
+    # 确实 `same=9 diff=0`（G1 / D2-1 / F2-22 / K11-1 / K11 / A16-1 / B22A / S33-REV /
+    # NONEXISTENT）。
+    #
+    # 但 `test_wp_generation_staging.py` 立刻打红两条：它把模板 monkeypatch 到
+    # `tmp_path`，而 `resolve_wp_file` 多一层 `is_within_any_legacy_root` 安全边界
+    # （Property 42，roots = `backend/` 与仓库根）⇒ 系统临时目录里的模板被判
+    # `模板库返回越界路径被拒` ⇒ 快照恒空、digest 不随字节变化。
+    #
+    # 也就是说：两者的差别不在「模板在哪」，而在 **`resolve_wp_file` 是带安全门的
+    # 公开 resolver，`find_template_file_any` 是不带门的内层查找**。staging 要的是
+    # 「拿到模板字节做指纹」，不是「校验某个路径是否在允许根内」—— 换过去会静默改变
+    # 安全语义与失败形态。所以 `multi_resolver` 这一行**保持现状**，不为过判据而合并。
     main = _init.find_template_file_any(wp_code)
     if main is None:
         return []

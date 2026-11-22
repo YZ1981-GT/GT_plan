@@ -34,28 +34,17 @@ import pytest
 from app.services.workpaper_sync import entry_readiness as R
 
 ROOT = Path(__file__).resolve().parents[3]
-#: 证据文件所在 spec 目录。原 umbrella spec 已归档到 `_archive/180-…`（2026-11-16 交接式
-#: 归档），本路径随之更新 —— 归档只搬目录、不改证据内容。
-#:
-#: 🔴 路径失效必须是**明确**的失败，不是 FileNotFoundError 冒到 collect 阶段（那样整份
-#: 文件所有用例都 ERROR，看起来像「测试坏了」而不是「证据不见了」）。
-_EVIDENCE_SPEC_DIR = (
-    ROOT
-    / ".kiro/specs/_archive/180-workpaper-html-onlyoffice-bidirectional-writeback-closure"
+# 🔴 证据文件会随 spec 归档搬家（写就时它在活跃目录，现在已移到 `_archive/180-*`）。
+# 只钉一个路径的后果是**整个目录采集直接挂**（`FileNotFoundError` 发生在 parametrize
+# 求值时 = collection error，不是某一条用例红），同目录其余守卫会一起消失。
+# 按「活跃 → 归档」两个候选找；找不到时保留第一个候选，让下面的读取抛原始错误并带路径。
+EVIDENCE_CANDIDATES = (
+    ROOT / ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure"
+    "/evidence/phase4-pending-runtime-readiness.json",
+    ROOT / ".kiro/specs/_archive/180-workpaper-html-onlyoffice-bidirectional-writeback-closure"
+    "/evidence/phase4-pending-runtime-readiness.json",
 )
-EVIDENCE = _EVIDENCE_SPEC_DIR / "evidence/phase4-pending-runtime-readiness.json"
-
-
-def test_evidence_file_exists_after_spec_archival() -> None:
-    """证据文件必须真的在（归档只搬目录，不得顺手丢证据）。
-
-    单独一条用例承担「路径错」的可归因性：其余用例读不到证据时会 fail，而这条直接
-    指名哪个路径不见了、归档目录在哪。
-    """
-    assert _EVIDENCE_SPEC_DIR.is_dir(), (
-        f"归档 spec 目录不存在：{_EVIDENCE_SPEC_DIR} —— 归档动作可能改了编号或名字"
-    )
-    assert EVIDENCE.is_file(), f"证据文件不在归档目录里：{EVIDENCE}"
+EVIDENCE = next((p for p in EVIDENCE_CANDIDATES if p.is_file()), EVIDENCE_CANDIDATES[0])
 
 
 def _observed_error_codes() -> set[str]:

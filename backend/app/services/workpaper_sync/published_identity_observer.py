@@ -58,7 +58,6 @@ child inventory、correlation id）。**绝不**降级成 ``None`` / 空 identit
 from __future__ import annotations
 
 import asyncio
-import json
 import re
 import uuid
 from collections.abc import Mapping as AbcMapping
@@ -89,6 +88,11 @@ from app.services.workpaper_sync.contracts import (
     parse_a1_range,
 )
 from app.services.workpaper_sync.definitions import canonical_digest
+from app.services.workpaper_sync.frozen_definition_blob import (
+    FrozenDefinitionBlobError,
+    decode_and_verify_definition_payload,
+    resolve_definition_blob_path,
+)
 from app.services.workpaper_sync.excel_entry_gate import (
     AdapterBuild,
     EntryIdentityInventory,
@@ -915,66 +919,64 @@ class PublishedIdentityObserver:
         self, *, child: WorkpaperSyncDefinitionArtifact,
         context: Mapping[str, Any],
     ) -> Mapping[str, Any]:
-        """读 child definition 的 canonical payload 字节并按 digest 复核。"""
+        """读 child definition 的 canonical payload 字节并按 digest 复核。
+
+        实现已提取到 :func:`~app.services.workpaper_sync.frozen_definition_blob.read_definition_payload`
+        （spec frozen-contract-read-path ADR-FC-002：字节读取与 digest 复核全仓唯一实现）。
+        本方法**保留同名同签名**作薄壳委派 —— 它有 3 个外部调用方
+        （`publish_time_structure_hash.load_frozen_structure_anchors`、
+        `scripts/fix/finalize_ready_candidate_representation_only`、本模块 L873）与 5 个
+        测试文件 monkeypatch 它，删名即断。
+
+        错误语义保持不变：公共模块的四类错误在这里**逐类映射**回
+        ``FrozenChildUnusableError``（stage 恒 ``frozen_children``），不降级诊断。
+
+        🔴 路径解析仍走 ``self._resolve_definition_blob``（而不是直接调公共模块）：
+        那一层是既有调用方与 5 个测试文件 monkeypatch 的接缝，绕过它等于让那些测试
+        改测一条不再是生产路径的分支。
+        """
         ctx = {**dict(context), "definition_id": str(child.id)}
         path = await self._resolve_definition_blob(child=child, context=ctx)
-        raw = self._read_bytes(path, stage=ObservationStage.frozen_children, context=ctx)
+        raw = self._read_bytes(
+            path, stage=ObservationStage.frozen_children, context=ctx
+        )
         try:
-            payload = json.loads(raw.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            return decode_and_verify_definition_payload(
+                raw=raw, child=child, path=path, diagnostics=ctx
+            )
+        except FrozenDefinitionBlobError as exc:
             raise FrozenChildUnusableError(
-                f"definition {child.id} 的 canonical payload 不是合法 UTF-8 JSON: {exc}",
+                str(exc),
                 stage=ObservationStage.frozen_children,
-                context=ctx,
+                context={**ctx, **dict(exc.diagnostics)},
             ) from exc
-        if not isinstance(payload, AbcMapping):
-            raise FrozenChildUnusableError(
-                f"definition {child.id} 的 canonical payload 根不是对象，实得 "
-                f"{type(payload).__name__}",
-                stage=ObservationStage.frozen_children,
-                context=ctx,
-            )
-        if canonical_digest(payload) != str(child.sha256).strip():
-            raise FrozenChildUnusableError(
-                f"definition {child.id} 的 payload canonical digest 与 row 上冻结的 "
-                f"{child.sha256!r} 不一致 —— 已 approved 的 definition 不可被改写",
-                stage=ObservationStage.frozen_children,
-                context=ctx,
-            )
-        return payload
 
     async def _resolve_definition_blob(
         self, *, child: WorkpaperSyncDefinitionArtifact, context: Mapping[str, Any]
     ) -> Path:
         """definition blob 的物理路径：按冻结 FK 读 artifact row，再交仓储解析相对路径。
 
+        实现已提取到
+        :func:`~app.services.workpaper_sync.frozen_definition_blob.resolve_definition_blob_path`
+        （ADR-FC-002）。本方法保留同名同签名作薄壳委派，理由同上一条。
+
         **不自拼** ``definition_store/{kind}/…`` 布局：那是 ``ArtifactStorageLayout`` 的
         领地，抄一份就是第二真源（布局一改，观测器会安静地读到不存在的路径）。
         """
-        from app.models.workpaper_sync_models import WorkpaperArtifact
-
-        artifacts = getattr(self._resolution, "_artifacts", None)
-        if artifacts is None:
+        base = dict(context)
+        try:
+            return await resolve_definition_blob_path(
+                session=self._session,
+                artifacts=getattr(self._resolution, "_artifacts", None),
+                child=child,
+                diagnostics=base,
+            )
+        except FrozenDefinitionBlobError as exc:
             raise FrozenChildUnusableError(
-                "resolution service 未装配 artifact 仓储 —— 观测器不得自拼 definition "
-                "store 布局（那是第二真源）",
+                str(exc),
                 stage=ObservationStage.frozen_children,
-                context=dict(context),
-            )
-        row = (
-            await self._session.execute(
-                sa.select(WorkpaperArtifact).where(
-                    WorkpaperArtifact.id == child.blob_artifact_id
-                )
-            )
-        ).scalar_one_or_none()
-        if row is None:
-            raise FrozenChildUnusableError(
-                f"definition {child.id} 的 blob artifact {child.blob_artifact_id} 不存在",
-                stage=ObservationStage.frozen_children,
-                context=dict(context),
-            )
-        return artifacts.resolve_relative_path(str(row.relative_path))
+                context={**base, **dict(exc.diagnostics)},
+            ) from exc
 
     # ─── stage 6 ─────────────────────────────────────────────────────
 

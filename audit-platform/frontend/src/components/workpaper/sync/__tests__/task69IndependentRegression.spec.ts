@@ -496,6 +496,11 @@ function conflictPreviewWire(): Record<string, unknown> {
     authority_model_definition_sha256: DIGEST(2),
     contract_id: 'd4.detail',
     contract_semantic_version: '1.2.0',
+    // spec frozen-contract-read-path：`contract_source` 是 `parseConflictPreview`
+    // 的**必需**字段（缺失即拒，见 `conflict_preview_contract_source_missing`）。
+    contract_source: 'explicit',
+    frozen_digest: DIGEST(3),
+    provided_digest: DIGEST(3),
     groups: [
       {
         sheet_key: '明细表',

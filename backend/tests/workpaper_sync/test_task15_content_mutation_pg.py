@@ -132,11 +132,14 @@ class _HarnessError(RuntimeError):
 def _d(label: str) -> str:
     return hashlib.sha256(label.encode("utf-8")).hexdigest()
 
+
 def _err(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {exc}"
 
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
 
 def _ooxml(document_type: str, *, extra: dict[str, bytes] | None = None) -> bytes:
     marker = "xl/workbook.xml" if document_type == "xlsx" else "word/document.xml"
@@ -147,6 +150,7 @@ def _ooxml(document_type: str, *, extra: dict[str, bytes] | None = None) -> byte
         for name, payload in (extra or {}).items():
             zf.writestr(name, payload)
     return buf.getvalue()
+
 
 def _enum_ddl(tables: list[sa.Table]) -> list[str]:
     seen: dict[str, tuple[str, ...]] = {}
@@ -164,12 +168,14 @@ def _enum_ddl(tables: list[sa.Table]) -> list[str]:
         for name, labels in sorted(seen.items())
     ]
 
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 契约与 adapter 桩（真写真读的载体替身）
 # ═══════════════════════════════════════════════════════════════════════════
 
 PERIOD = "header_block/period_label"
 TOTAL = "header_block/total_amount"
+
 
 def _contract_payload() -> dict[str, Any]:
     from app.services.workpaper_sync import contracts as C
@@ -348,9 +354,6 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
 
     from app.core.config import settings
     from app.core.migration_runner import MigrationRunner
-    from tests.workpaper_sync.task15_v265_schema import (
-        apply_v265_content_evidence_overlay,
-    )
     from app.models.audit_platform_schemas import EventType
     from app.models.dataset_models import ImportEventConsumption, ImportEventOutbox
     from app.services import event_bus as event_bus_module
@@ -449,8 +452,6 @@ async def _collect() -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 - 一次
                 )
         if snap["apply_errors"]:
             raise _HarnessError(f"V151 应用失败: {snap['apply_errors'][:3]}")
-
-        await apply_v265_content_evidence_overlay(engine, backend_root=_BACKEND)
 
         outbox_tables = [ImportEventOutbox.__table__, ImportEventConsumption.__table__]
         async with engine.begin() as conn:

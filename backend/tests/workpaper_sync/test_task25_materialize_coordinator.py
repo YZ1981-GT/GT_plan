@@ -135,9 +135,6 @@ def _descriptor(**over: object) -> mc.EditorLaunchDescriptor:
             "contract": {"type": "definition", "sha256": _d("contract")},
         },
         document_type="xlsx",
-        # spec `onlyoffice-sheet-open-via-published-artifact` 2.4：视图身份是 descriptor 契约的一部分。
-        target_sheet=None,
-        document_scope="single_sheet",
         mode="edit",
         onlyoffice_config={"document": {"key": "wpsync-abc123-g1"}},
     )

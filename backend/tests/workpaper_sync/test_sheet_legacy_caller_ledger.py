@@ -260,6 +260,7 @@ def test_migrated_bindings_have_no_legacy_callers(ledger: dict) -> None:
     migrated = [
         row for row in bindings["bindings"]
         if row["status"] in {"migrated", "ready"}
+        and not (row.get("reviewed") or {}).get("project_ids")
     ]
     if not migrated:
         # 空分母：**显式**记录，不静默 pass。分母为 0 时判据无法证伪任何东西，

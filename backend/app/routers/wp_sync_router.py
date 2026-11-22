@@ -163,6 +163,9 @@ from app.services.workpaper_sync.sync_timing import timing_scope
 from app.services.workpaper_sync.target_bound_registration import (
     bind_registration_to_target,
 )
+from app.services.workpaper_sync.projection_target_resolution import (
+    pin_representation_target,
+)
 from app.services.workpaper_sync.first_publication_on_demand import (
     classify_first_publication_rejection,
     current_publication,
@@ -1109,6 +1112,7 @@ async def resolve_entry_identity(
         sheet_name=sheet_name,
         whole_workbook=whole_workbook,
         manifest=load_entry_manifest(),
+        project_id=str(project_id),
     )
     body = resolution.as_dict()
     body.update({
@@ -1118,17 +1122,19 @@ async def resolve_entry_identity(
     })
     binding = resolution.binding
     entry_id = str(binding.get("entry_id")) if binding else None
-    if entry_id is None:
+    # 未审核 / 已下线 / 不适用 只回 binding 事实，不跑 room readiness。
+    # 判据与理由住 `SheetOpenBindingResolution.allows_room_readiness`（单一来源）。
+    if entry_id is None or not resolution.allows_room_readiness:
         return body
 
+    # 走到这里 binding 一定允许 room readiness（上面那道门已保证），
+    # 所以下面**不再**重复判一次 —— 重复判会恒真，成为变异测不到的死代码。
     try:
-        # 已审核/迁移 binding 才走 artifact reader；当前首版生成物全部 pending，
-        # 不会把未审核入口误读成 ready。
-        sync_services = None
-        if resolution.status in {"ready", "migrated"}:
-            sync_services = build_sync_services(db, current_user)
-            binding = resolution.binding or {}
-            try:
+        sync_services = build_sync_services(db, current_user)
+        binding = resolution.binding or {}
+        try:
+            artifact = None
+            with pin_representation_target(wp_id):
                 artifact = await read_current_published_sheet_artifact(
                     session=db,
                     artifact_repository=sync_services.artifacts,
@@ -1138,24 +1144,24 @@ async def resolve_entry_identity(
                     target_sheet=binding.get("target_sheet"),
                     whole_workbook=binding.get("document_scope") == "whole_workbook",
                 )
-                body["representation"] = {
-                    "id": str(artifact.representation_id),
-                    "generation": artifact.generation,
-                    "artifact_sha256": artifact.artifact_sha256,
-                    "target_sheet": artifact.target_sheet,
-                    "sheet_names": list(artifact.sheet_names),
-                    "document_type": artifact.document_type,
-                }
-            except PublishedSheetArtifactError as exc:
-                # typed reason（task 2.5）：code 供调用方分支，reason 供直接展示，两者都回。
-                body["status"] = "pending"
-                body["reason"] = exc.reason
-                body["error_code"] = exc.error_code
-                return body
+            body["representation"] = {
+                "id": str(artifact.representation_id),
+                "generation": artifact.generation,
+                "artifact_sha256": artifact.artifact_sha256,
+                "target_sheet": artifact.target_sheet,
+                "sheet_names": list(artifact.sheet_names),
+                "document_type": artifact.document_type,
+            }
+        except PublishedSheetArtifactError as exc:
+            # typed reason（task 2.5）：code 供调用方分支，reason 供直接展示，两者都回。
+            body["status"] = "pending"
+            body["reason"] = exc.reason
+            body["error_code"] = exc.error_code
+            return body
 
         readiness = await evaluate_entry_readiness(
             session=db,
-            registry=sync_services.registry if sync_services is not None else build_production_registry(),
+            registry=sync_services.registry,
             project_id=project_id,
             wp_id=wp_id,
             entry_id=entry_id,

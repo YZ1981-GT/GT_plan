@@ -104,48 +104,17 @@ def _paperless_doc_id(att) -> int | None:
 async def _workpaper_entries(db: AsyncSession, project_id: UUID, names: _ArcNames) -> list[InventoryEntry]:
     from app.models.workpaper_models import WorkingPaper, WpIndex
     from app.services.wp_export.wp_file_resolver import VERDICT_LABELS, resolve_wp_file
-    from app.services.workpaper_sync.export_evidence import (
-        WorkpaperExportEvidenceError,
-        resolve_current_content_export_evidence,
-    )
 
     rows = (await db.execute(
-        sa.select(
-            WorkingPaper.id,
-            WorkingPaper.file_path,
-            WorkingPaper.current_content_version_id,
-            WpIndex.wp_code,
-            WpIndex.wp_name,
-        )
+        sa.select(WorkingPaper.id, WorkingPaper.file_path, WpIndex.wp_code, WpIndex.wp_name)
         .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
         .where(WorkingPaper.project_id == project_id, WorkingPaper.is_deleted == sa.false())
         .order_by(WpIndex.wp_code, WorkingPaper.id)
     )).all()
     templates = _template_root()
     out: list[InventoryEntry] = []
-    for wp_id, file_path, current_content_version_id, wp_code, wp_name in rows:
-        # 版本链存在时，归档必须绑定 current content evidence；不回退旧 file_path
-        # 作为「当前版本」的证明。历史没有 content version 的底稿仍走兼容路径，
-        # 但该条会在后续 evidence ledger / archive policy 守卫中如实被标记。
-        content_evidence = None
-        if current_content_version_id is not None:
-            try:
-                content_evidence = await resolve_current_content_export_evidence(
-                    db, project_id=project_id, wp_id=wp_id
-                )
-            except WorkpaperExportEvidenceError as exc:
-                out.append(
-                    InventoryEntry(
-                        category="workpaper_file",
-                        source_id=str(wp_id),
-                        label=f"{wp_code} {(wp_name or '').strip()}".strip(),
-                        wp_code=wp_code or "",
-                        arcname="",
-                        status=MISSING,
-                        reason=f"当前底稿内容版本证据无效：{exc}",
-                    )
-                )
-                continue
+    for wp_id, file_path, wp_code, wp_name in rows:
+        # 名称首尾空白先去掉（模板名带前导空格，如「 管理层声明书程序表」⇒ 包内名出现双空格）
         label = f"{wp_code} {(wp_name or '').strip()}".strip()
         base = dict(category="workpaper_file", source_id=str(wp_id), label=label, wp_code=wp_code or "")
         res = resolve_wp_file(file_path, wp_code=None, allow_template_fallback=False)
@@ -154,33 +123,7 @@ async def _workpaper_entries(db: AsyncSession, project_id: UUID, names: _ArcName
                 out.append(InventoryEntry(**base, arcname="", status=SKIPPED, reason="未生成底稿文件（指向模板库），仅收数据快照"))
                 continue
             arcname = names.take("10-底稿", safe_name(label), res.path.suffix.lower())
-            evidence = None
-            if content_evidence is not None:
-                evidence = {
-                    "content_version_id": str(content_evidence.content_version_id),
-                    "representation_id": (
-                        str(content_evidence.representation_id)
-                        if content_evidence.representation_id else None
-                    ),
-                    "artifact_id": (
-                        str(content_evidence.artifact_id)
-                        if content_evidence.artifact_id else None
-                    ),
-                    "artifact_sha256": content_evidence.artifact_sha256,
-                    "classification": content_evidence.export_surface_class,
-                    "policy_digest": content_evidence.unit_policy_digest,
-                    "policy_snapshot": content_evidence.unit_policy_snapshot,
-                    "source_storage_unit": content_evidence.source_storage_unit,
-                }
-            out.append(
-                InventoryEntry(
-                    **base,
-                    arcname=arcname,
-                    status=OK,
-                    local_path=res.path,
-                    evidence=evidence or {},
-                )
-            )
+            out.append(InventoryEntry(**base, arcname=arcname, status=OK, local_path=res.path))
         elif res.verdict == "empty":
             out.append(InventoryEntry(**base, arcname="", status=SKIPPED, reason="未生成底稿文件，仅收数据快照"))
         else:
@@ -316,68 +259,6 @@ async def _deliverable_entries(db: AsyncSession, project_id: UUID, names: _ArcNa
     return out
 
 
-async def _pdf_deliverable_entries(db: AsyncSession, project_id: UUID, names: _ArcNames) -> list[InventoryEntry]:
-    """PDF 导出交付件（``export_tasks``）的归档清单项。
-
-    PDF 正式导出链（spec platform-global-display-settings-closure v1.0.306~308）产出
-    ``export_tasks``（status=completed + file_path + policy snapshot），此前归档清单
-    **只消费 Word 交付件**（`_deliverable_entries`），PDF 件不进归档包 —— 归档完整性
-    缺一类正式件。本函数补上：
-
-    - 只收 ``status='completed'`` 且 ``file_path`` 非空的任务（failed/queued 不入包）；
-    - 文件缺失 / 大小与任务记录不符 ⇒ ``MISSING``（不静默跳过）；
-    - evidence 绑定 task id / 文件大小 / 单位策略快照（PDF 链的任务级快照），
-      不绑 content version（PDF 引擎不产 content version —— 那是 workpaper 链的证据）；
-    - 同一任务多份导出按 created_at 升序全收（与 Word 交付件「只收最新版本」不同：
-      PDF 任务没有 version 链，每条 completed 任务就是一份独立正式件）。
-    """
-    from app.models.report_models import ExportTask, ExportTaskStatus
-    from app.services.attachment_upload_policy import resolve_local_attachment_file
-
-    tasks = (await db.execute(
-        sa.select(ExportTask).where(
-            ExportTask.project_id == project_id,
-            ExportTask.status == ExportTaskStatus.completed,
-            ExportTask.file_path.isnot(None),
-        ).order_by(ExportTask.created_at, ExportTask.id)
-    )).scalars().all()
-
-    out: list[InventoryEntry] = []
-    for task in tasks:
-        label = f"PDF 导出｜{task.export_year or '?'}｜{(task.document_types or [task.document_type] if task.document_type else task.document_types) and '、'.join(task.document_types or []) or (task.document_type or '未知')}"
-        base = dict(category="pdf_deliverable", source_id=str(task.id), label=label)
-        path = resolve_local_attachment_file(task.file_path)
-        if path is None:
-            out.append(InventoryEntry(**base, arcname="", status=MISSING,
-                                      reason="PDF 交付件文件不存在"))
-            continue
-        actual_size = path.stat().st_size
-        recorded_size = task.file_size
-        if recorded_size is not None and int(recorded_size) != actual_size:
-            out.append(InventoryEntry(**base, arcname="", status=MISSING,
-                                      reason=f"PDF 交付件大小不符（记录 {recorded_size} / 实际 {actual_size}）"))
-            continue
-        if actual_size == 0:
-            out.append(InventoryEntry(**base, arcname="", status=MISSING,
-                                      reason="PDF 交付件为 0 字节"))
-            continue
-        arcname = names.take(
-            "50-交付件",
-            f"PDF-{task.export_year or '未知年度'}-{str(task.id)[:8]}",
-            path.suffix.lower() or ".pdf",
-        )
-        evidence = {
-            "task_id": str(task.id),
-            "export_year": task.export_year,
-            "document_types": list(task.document_types or []),
-            "file_size": actual_size,
-            "policy_snapshot": task.unit_policy_snapshot,
-        }
-        out.append(InventoryEntry(**base, arcname=arcname, status=OK, local_path=path,
-                                  evidence=evidence))
-    return out
-
-
 def _file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -475,7 +356,6 @@ async def build_project_inventory(db: AsyncSession, project_id: UUID) -> Project
     inv.entries.extend(await _workpaper_entries(db, project_id, names))
     inv.entries.extend(await _attachment_entries(db, project_id, names))
     inv.entries.extend(await _deliverable_entries(db, project_id, names))
-    inv.entries.extend(await _pdf_deliverable_entries(db, project_id, names))
     inv.entries.extend(await _consol_entries(db, project_id, names))
     return inv
 

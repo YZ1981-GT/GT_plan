@@ -25,7 +25,9 @@ import {
   WP_SYNC_ACTION_HINT,
   WP_SYNC_BULK_SCOPES,
   WP_SYNC_BULK_SCOPE_LABEL,
+  WP_SYNC_EXPLICIT_CONTRACT_NOTICE,
   WP_SYNC_FENCE_MISSING_TEXT,
+  WP_SYNC_FROZEN_CONTRACT_NOTICE,
   WP_SYNC_RECOVERY_REASON_TEXT,
   WP_SYNC_RECOVERY_STATE_TEXT,
   WP_SYNC_STATE_TONE,
@@ -722,5 +724,77 @@ describe('两条 timeline 各自投影', () => {
     expect(projected.claimedApplicationId).toBeNull()
     expect(projected.recoveryRequestId).toBeNull()
     expect(projected.hasThreeEntities).toBe(false)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 契约来源标注（spec frozen-contract-read-path 任务 6 / R2.3）
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('冲突预览的 contract_source：必需字段 + 只作标注', () => {
+  const DIGEST_A = DIGEST(7)
+
+  it('合同来源缺失 ⇒ 具体码，不得静默默认成「当前契约」', () => {
+    const wire = conflictPreviewWire([], {})
+    delete (wire as Record<string, unknown>).contract_source
+    expectRefusal(
+      () => parseConflictPreview(wire),
+      'conflict_preview_contract_source_missing',
+    )
+  })
+
+  it('合同来源是未知字面量 ⇒ 同样拒绝（不得当成任一侧）', () => {
+    const wire = conflictPreviewWire([], { contract_source: 'current' })
+    expectRefusal(
+      () => parseConflictPreview(wire),
+      'conflict_preview_contract_source_missing',
+    )
+  })
+
+  it('frozen 来源 ⇒ 解析出 frozen + frozenDigest，providedDigest 为 null', () => {
+    const wire = conflictPreviewWire([], {
+      contract_source: 'frozen',
+      frozen_digest: DIGEST_A,
+      provided_digest: null,
+      contract_definition_id: 'definition-id',
+    })
+    const preview = parseConflictPreview(wire)
+    expect(preview.contractSource).toBe('frozen')
+    expect(preview.frozenDigest).toBe(DIGEST_A)
+    expect(preview.providedDigest).toBeNull()
+    expect(preview.contractDefinitionId).toBe('definition-id')
+  })
+
+  it('explicit 来源 ⇒ 解析出 providedDigest，definitionId 为 null', () => {
+    const wire = conflictPreviewWire([], {
+      contract_source: 'explicit',
+      frozen_digest: DIGEST_A,
+      provided_digest: DIGEST_A,
+    })
+    const preview = parseConflictPreview(wire)
+    expect(preview.contractSource).toBe('explicit')
+    expect(preview.providedDigest).toBe(DIGEST_A)
+    expect(preview.contractDefinitionId).toBeNull()
+  })
+
+  it('frozen_digest 缺失 ⇒ 拒绝（标注要说得出冻结的是哪一版）', () => {
+    const wire = conflictPreviewWire([], { contract_source: 'frozen' })
+    delete (wire as Record<string, unknown>).frozen_digest
+    expectRefusal(
+      () => parseConflictPreview(wire),
+      'conflict_preview_field_missing',
+    )
+  })
+
+  it('两条横幅文案都存在且区分得开（历史契约 vs 显式传入）', () => {
+    expect(WP_SYNC_FROZEN_CONTRACT_NOTICE).toContain('冻结')
+    expect(WP_SYNC_EXPLICIT_CONTRACT_NOTICE).toContain('显式')
+    expect(WP_SYNC_FROZEN_CONTRACT_NOTICE).not.toBe(
+      WP_SYNC_EXPLICIT_CONTRACT_NOTICE,
+    )
+    // 🔴 历史契约的文案**不得**暗示「不能操作」（那是本能力的反面）
+    for (const forbidden of ['不可', '禁止', '无法操作', '只读']) {
+      expect(WP_SYNC_FROZEN_CONTRACT_NOTICE).not.toContain(forbidden)
+    }
   })
 })

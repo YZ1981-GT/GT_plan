@@ -86,6 +86,15 @@ import type { ConfirmedMapping } from '@/types/ledger-import'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
+export interface UnitDetectionSummary {
+  status: 'detected' | 'missing' | 'conflict' | 'unsupported'
+  candidates: string[]
+  unsupported_labels: string[]
+  suggested_unit: 'yuan' | 'qian' | 'wan' | null
+  detector_version: string
+  evidence_digest: string
+}
+
 export interface LedgerDetectionResult {
   upload_token: string
   files: FileDetection[]
@@ -101,6 +110,8 @@ export interface LedgerDetectionResult {
   estimated_duration_seconds?: number | null
   total_rows_estimate?: number | null
   size_bucket?: 'S' | 'M' | 'L' | 'XL' | null
+  /** R8/AC-14：预览与提交共用的不可变单位检测摘要 */
+  unit_detection?: UnitDetectionSummary | null
   // F42: scale warnings
   scale_warnings?: Array<{ code: string; message: string }>
 }

@@ -1,0 +1,180 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "0.1 固化当前 production build、核心页面、重任务、连接池与事件循环基线。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795281957286
+      },
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795282405728
+      }
+    ],
+    "A6 流式下载提前释放 DB，会话与文件句柄在取消时及时关闭。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795282422796
+      },
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795282580843
+      }
+    ],
+    "C1 公式推送现状 statement counter 与 10/1000/10000 单元基线。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795282595356
+      },
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795282740843
+      }
+    ],
+    "C2 目标底稿批取、mutation 批量 CAS、附注按章节一次锁写；逐项结果对拍。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795282757413
+      },
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795283039465
+      }
+    ],
+    "C3 合并附注一次预取记录/公式、内存后序、批量写；修正空 section_ids 语义。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795283050247
+      },
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795283205329
+      }
+    ],
+    "C4 Ledger 导入分阶段 profiler；COPY/staging/set-based 合并把真实大项目目标压到 5 分钟内。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795283218016
+      },
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795283350457
+      }
+    ],
+    "C5 知识词法/向量路径真实 EXPLAIN 与量级基准；按证据实施索引/pgvector。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795283375187
+      },
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795283623144
+      }
+    ],
+    "D1 TB 1000/5000 行虚拟化 canary，保持编辑、选区、右键、注释、公式和可访问性。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795283636807
+      },
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795283802691
+      }
+    ],
+    "D3 附注与合并表按 canary 结果接虚拟化；活动格才挂编辑器。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795283808634
+      },
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795283821510
+      }
+    ],
+    "D6 大 GET/保存热路径减少 clone/stringify；用 1/10/50MB 夹具记录长任务和 heap。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795283831787
+      },
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795284593466
+      }
+    ],
+    "E1 PgBouncer transaction 模式契约与 2%→25%→100% 灰度脚本；连接预算按副本计算。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795284611758
+      },
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795284884282
+      }
+    ],
+    "E2 EventBus、任务、配额、进度和失效状态外置；2/4/8 worker 零丢失/零重复验证。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795284900358
+      },
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795285055973
+      }
+    ],
+    "E4 构建可销毁大数据容量环境与分布式负载机。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795285072129
+      },
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795285174680
+      }
+    ],
+    "E5 100→1000→3000→6000 VU，6000 稳态 30 分钟；提交原始 CSV/JSON/摘要。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795285216579
+      },
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795285323941
+      }
+    ],
+    "E6 达成核心读 p95≤300ms、p99≤1s、核心错误率<0.1%，零泄露/超时/事件丢失/数据损坏。": [
+      {
+        "executionId": "d9c0a512-8c48-48e7-8cdd-63259a12c460",
+        "chatSessionId": "sess_2012a2df-f32b-47a3-bb1e-21b980812da3",
+        "timestamp": 1795285342164
+      }
+    ]
+  }
+}

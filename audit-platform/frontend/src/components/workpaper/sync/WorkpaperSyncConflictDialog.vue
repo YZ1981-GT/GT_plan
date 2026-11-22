@@ -92,6 +92,25 @@
           <span>契约：{{ preview.contractId }} @ {{ preview.contractSemanticVersion }}</span>
         </div>
 
+        <!--
+          「这是历史契约」标注（spec frozen-contract-read-path R2.3）。
+
+          🔴 它**只作标注**：不得用它门控任何按钮可用性（`contractSource` 不进
+          `disabled` / `v-if` / `v-show` 之外的能力判断）。历史 operation 恰恰是最需要
+          继续操作的那一类 —— 把它当成「不能操作」会让本能力的目的落空。
+          守卫：`test_frozen_contract_read_path.py::TestContractSourceIsNotUsedAsACapabilityGate`。
+        -->
+        <el-alert
+          v-if="preview.contractSource === 'frozen'"
+          class="wp-sync-conflict__contract-notice"
+          data-testid="wp-sync-conflict-frozen-contract-notice"
+          :title="WP_SYNC_FROZEN_CONTRACT_NOTICE"
+          :description="`冻结摘要：${shortDigest(preview.frozenDigest)}`"
+          type="info"
+          :closable="false"
+          show-icon
+        />
+
         <!-- fence 阻断原因逐项列出（AC 8.5） -->
         <ul
           v-if="!fenceReady"
@@ -355,6 +374,7 @@ import {
   WP_SYNC_BULK_SCOPES,
   WP_SYNC_BULK_SCOPE_LABEL,
   WP_SYNC_FENCE_MISSING_TEXT,
+  WP_SYNC_FROZEN_CONTRACT_NOTICE,
   bulkScopeTargets,
   buildResolveFence,
   roomDurableFenceFromOperation,
@@ -723,6 +743,11 @@ defineExpose({
   color: #909399;
   background: #fafafa;
   border-left: 3px solid #e6a23c;
+}
+
+/* 「这是历史契约」标注：纯展示，不影响任何按钮可用性 */
+.wp-sync-conflict__contract-notice {
+  margin: 0 0 8px;
 }
 
 .wp-sync-conflict__blocking {

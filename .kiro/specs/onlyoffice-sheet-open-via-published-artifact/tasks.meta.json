@@ -1,0 +1,199 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "0.4 完成五角色范围复核：合伙人确认打开对象与业务含义，项目经理确认 rollout，质控确认不伪造双向，审计助理确认界面文案，EQCR 确认历史 operation / artifact 审计边界。": [
+      {
+        "executionId": "873c0fbc-fa7b-47d2-8c98-a092436b67c5",
+        "chatSessionId": "sess_8ea2721c-ae1f-49b7-83c6-db2aedc96f1c",
+        "timestamp": 1794822567107
+      },
+      {
+        "executionId": "14392191-9554-469a-81a8-bc8e8b88892a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794905750005
+      },
+      {
+        "executionId": "14392191-9554-469a-81a8-bc8e8b88892a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794905779033
+      },
+      {
+        "executionId": "33d6068d-efe6-42a8-87d2-85e9a575782f",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794908857591
+      },
+      {
+        "executionId": "68833aaf-49e4-40e2-b528-872fb3d41299",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794908941646
+      }
+    ],
+    "3.3 迁移一个普通 single-sheet canary，从 `GtOnlyOfficeSheet` 切到 room host；记录 old URL、descriptor、target sheet 与 HTML 回读证据。": [
+      {
+        "executionId": "873c0fbc-fa7b-47d2-8c98-a092436b67c5",
+        "chatSessionId": "sess_8ea2721c-ae1f-49b7-83c6-db2aedc96f1c",
+        "timestamp": 1794822567154
+      },
+      {
+        "executionId": "14392191-9554-469a-81a8-bc8e8b88892a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794905750077
+      },
+      {
+        "executionId": "a57cbd8e-2632-429b-bc47-acb0a575393b",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794906078738
+      },
+      {
+        "executionId": "33d6068d-efe6-42a8-87d2-85e9a575782f",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794908867671
+      },
+      {
+        "executionId": "71837e23-aaad-43c1-8094-4bd96051756a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1795253017466
+      },
+      {
+        "executionId": "71837e23-aaad-43c1-8094-4bd96051756a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1795253041548
+      }
+    ],
+    "3.4 迁移一个 whole-workbook canary；验证所有 sheet 可见、target sheet 正确、切回 HTML 不丢写。": [
+      {
+        "executionId": "873c0fbc-fa7b-47d2-8c98-a092436b67c5",
+        "chatSessionId": "sess_8ea2721c-ae1f-49b7-83c6-db2aedc96f1c",
+        "timestamp": 1794822567197
+      },
+      {
+        "executionId": "14392191-9554-469a-81a8-bc8e8b88892a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794905750112
+      },
+      {
+        "executionId": "a999fa5a-4b7e-44d0-a771-625a4294fdfa",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794908117838
+      },
+      {
+        "executionId": "33d6068d-efe6-42a8-87d2-85e9a575782f",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794908874702
+      }
+    ],
+    "3.5 迁移一个聚合 source sheet；验证映射到子 entry，不回退父级模板。": [
+      {
+        "executionId": "873c0fbc-fa7b-47d2-8c98-a092436b67c5",
+        "chatSessionId": "sess_8ea2721c-ae1f-49b7-83c6-db2aedc96f1c",
+        "timestamp": 1794822567240
+      },
+      {
+        "executionId": "14392191-9554-469a-81a8-bc8e8b88892a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794905750152
+      }
+    ],
+    "4.1 将全局 legacy 开关收敛为 binding 级状态机：pending → ready → migrated → draining → retired。": [
+      {
+        "executionId": "873c0fbc-fa7b-47d2-8c98-a092436b67c5",
+        "chatSessionId": "sess_8ea2721c-ae1f-49b7-83c6-db2aedc96f1c",
+        "timestamp": 1794822567288
+      },
+      {
+        "executionId": "14392191-9554-469a-81a8-bc8e8b88892a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794905750206
+      }
+    ],
+    "4.2 新增旧 doc key / callback drain ledger：记录签发时间、TTL、binding、entry、generation、终结状态。": [
+      {
+        "executionId": "873c0fbc-fa7b-47d2-8c98-a092436b67c5",
+        "chatSessionId": "sess_8ea2721c-ae1f-49b7-83c6-db2aedc96f1c",
+        "timestamp": 1794822567334
+      },
+      {
+        "executionId": "873c0fbc-fa7b-47d2-8c98-a092436b67c5",
+        "chatSessionId": "sess_8ea2721c-ae1f-49b7-83c6-db2aedc96f1c",
+        "timestamp": 1794822732654
+      },
+      {
+        "executionId": "14392191-9554-469a-81a8-bc8e8b88892a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794905750251
+      }
+    ],
+    "4.3 migrated binding 的新请求不得签旧 URL；draining 只接受已签发且 scope / token / generation 全匹配的 callback。": [
+      {
+        "executionId": "873c0fbc-fa7b-47d2-8c98-a092436b67c5",
+        "chatSessionId": "sess_8ea2721c-ae1f-49b7-83c6-db2aedc96f1c",
+        "timestamp": 1794822567373
+      },
+      {
+        "executionId": "14392191-9554-469a-81a8-bc8e8b88892a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794905750300
+      }
+    ],
+    "4.4 旧 direct-write 分支按 binding 逐个删除；删除前守卫要求旧签发数、callback in-flight、drain timeout 连续为 0。": [
+      {
+        "executionId": "873c0fbc-fa7b-47d2-8c98-a092436b67c5",
+        "chatSessionId": "sess_8ea2721c-ae1f-49b7-83c6-db2aedc96f1c",
+        "timestamp": 1794822567415
+      },
+      {
+        "executionId": "14392191-9554-469a-81a8-bc8e8b88892a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794905750348
+      }
+    ],
+    "4.5 删除无调用方的 `GtOnlyOfficeSheet` 兼容代码前，完成 grep 0 调用、测试全绿、独立提交与回滚标签；single/custom/Word 豁免必须有真实条件断言。": [
+      {
+        "executionId": "873c0fbc-fa7b-47d2-8c98-a092436b67c5",
+        "chatSessionId": "sess_8ea2721c-ae1f-49b7-83c6-db2aedc96f1c",
+        "timestamp": 1794822567460
+      },
+      {
+        "executionId": "14392191-9554-469a-81a8-bc8e8b88892a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794905750398
+      }
+    ],
+    "5.2 后端 PG：真实 `WorkpaperContentRepresentation`、bundle、artifact 读取与项目隔离；只读验证先独立事务，写入验收只用【测试】项目并可恢复。": [
+      {
+        "executionId": "873c0fbc-fa7b-47d2-8c98-a092436b67c5",
+        "chatSessionId": "sess_8ea2721c-ae1f-49b7-83c6-db2aedc96f1c",
+        "timestamp": 1794822567507
+      },
+      {
+        "executionId": "14392191-9554-469a-81a8-bc8e8b88892a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794905750445
+      }
+    ],
+    "5.5 Playwright：普通 sheet / whole workbook / 聚合 source sheet / pending fallback / drain 五条 required scenarios；记录网络、console、页面错误、数据快照与 artifact identity。": [
+      {
+        "executionId": "873c0fbc-fa7b-47d2-8c98-a092436b67c5",
+        "chatSessionId": "sess_8ea2721c-ae1f-49b7-83c6-db2aedc96f1c",
+        "timestamp": 1794822567556
+      },
+      {
+        "executionId": "14392191-9554-469a-81a8-bc8e8b88892a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794905750488
+      }
+    ],
+    "5.7 更新 umbrella 2.8 的余项状态、INDEX、memory 与归档证据；只有完成门满足后归档本 spec。": [
+      {
+        "executionId": "873c0fbc-fa7b-47d2-8c98-a092436b67c5",
+        "chatSessionId": "sess_8ea2721c-ae1f-49b7-83c6-db2aedc96f1c",
+        "timestamp": 1794822567610
+      },
+      {
+        "executionId": "14392191-9554-469a-81a8-bc8e8b88892a",
+        "chatSessionId": "sess_3d046b2f-0dfb-4567-9b1c-075c3e83c100",
+        "timestamp": 1794905750537
+      }
+    ]
+  }
+}

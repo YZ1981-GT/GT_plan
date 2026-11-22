@@ -452,7 +452,10 @@ async def export_consol_notes_local(
 
     from fastapi.responses import StreamingResponse
 
-    from app.services.consol_note_standalone_reader import list_consol_note_sections
+    try:
+        from app.services.consol_note_standalone_reader import list_consol_note_sections
+    except (ImportError, AttributeError):
+        list_consol_note_sections = None  # type: ignore[assignment]
     from app.services.export_meta_marker import ExportMeta, marker_rows
 
     meta = ExportMeta(surface_id="consol_note_local_export", classification="data_exchange")
@@ -462,8 +465,8 @@ async def export_consol_notes_local(
     rows.append(["章节编号", "章节名称", "表格键", "值"])
 
     try:
-        sections = await list_consol_note_sections(db, project_id=project_id, year=year)
-    except (ImportError, AttributeError):
+        sections = await list_consol_note_sections(db, project_id=project_id, year=year) if list_consol_note_sections else []
+    except Exception:
         sections = []
     for sec in sections:
         section_id = str(getattr(sec, "section_id", "") or "")

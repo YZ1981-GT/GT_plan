@@ -449,6 +449,22 @@ export interface WorkpaperSyncConflictPreview {
   readonly authorityModelDefinitionSha256: string
   readonly contractId: string
   readonly contractSemanticVersion: string
+  /**
+   * 本次预览用的契约从哪来。
+   *
+   * `frozen` = 该 operation 冻结的历史契约（**与当前模板可能不同**）；
+   * `explicit` = 调用方显式传入。
+   *
+   * 🔴 它**只作标注**：不得用它门控任何按钮可用性（spec frozen-contract-read-path
+   * R2.3）。历史 operation 恰恰是最需要继续操作的那一类。
+   */
+  readonly contractSource: 'frozen' | 'explicit'
+  /** bundle 上冻结的 contract slot digest（两种 source 都有） */
+  readonly frozenDigest: string
+  /** 显式传入时调用方给的那份的 digest；`frozen` 时为 null */
+  readonly providedDigest: string | null
+  /** 冻结契约的 definition 行 id；`explicit` 时为 null */
+  readonly contractDefinitionId: string | null
   readonly conflictCount: number
   readonly groups: readonly WorkpaperSyncConflictGroup[]
 }
@@ -606,6 +622,23 @@ export function parseConflictPreview(payload: unknown): WorkpaperSyncConflictPre
     ),
     contractId: str(wire, 'contract_id', 'conflict-preview'),
     contractSemanticVersion: str(wire, 'contract_semantic_version', 'conflict-preview'),
+    // 🔴 必需字段：缺失即拒。宽松解析（默认成 'frozen' 或 'explicit'）会让面板
+    // 静默显示成「当前契约」，而用户据此做的裁决落在错误的模板上。
+    contractSource: (() => {
+      const raw = wire.contract_source
+      if (raw !== 'frozen' && raw !== 'explicit') {
+        refuse(
+          'conflict_preview_contract_source_missing',
+          `conflict-preview.contract_source 必须是 'frozen' | 'explicit'（实得 ${JSON.stringify(raw)}）` +
+            ' —— 缺它时面板不得默认成「当前契约」',
+        )
+      }
+      return raw
+    })(),
+    frozenDigest: str(wire, 'frozen_digest', 'conflict-preview'),
+    providedDigest: typeof wire.provided_digest === 'string' ? wire.provided_digest : null,
+    contractDefinitionId:
+      typeof wire.contract_definition_id === 'string' ? wire.contract_definition_id : null,
     // 累加器刻意不叫 `sum`：平台 lint 规则 `no-amount-arithmetic` 会把它当金额运算，
     // 而这里数的是冲突条数。
     conflictCount: groups.reduce((acc, group) => acc + group.items.length, 0),
@@ -616,6 +649,21 @@ export function parseConflictPreview(payload: unknown): WorkpaperSyncConflictPre
 // ═══════════════════════════════════════════════════════════════════════════
 // 6. 值渲染（金额必须经 displayPrefs）
 // ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * 「这是历史契约」的横幅文案（`contract_source === 'frozen'` 时显示）。
+ *
+ * 措辞要求（spec frozen-contract-read-path R2.3 / 勘误 E.7）：
+ * * 说清**这是什么**（该 operation 冻结的契约版本）；
+ * * 说清**可能不同**（与当前模板可能不一致）；
+ * * **不得**暗示「不能操作」—— 它是标注，不是门控。
+ */
+export const WP_SYNC_FROZEN_CONTRACT_NOTICE =
+  '本次预览使用该操作冻结时的契约版本（与当前模板可能不同），业务标签与单元格地址均按该版本渲染。'
+
+/** `contract_source === 'explicit'` 时的说明（调用方显式传入了契约）。 */
+export const WP_SYNC_EXPLICIT_CONTRACT_NOTICE =
+  '本次预览使用调用方显式传入的契约（已校验与冻结版本一致）。'
 
 /** 缺失 / 空值的显式文案。两者必须不同，否则裁决界面说不清用户在选什么。 */
 export const WP_SYNC_VALUE_ABSENT_TEXT = '（无此字段）'

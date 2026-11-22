@@ -119,6 +119,14 @@
         </el-button>
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">账簿查询</el-tag>
+        <!-- R8 / AC-14：数据集单位三态（存储单位 / 历史声明 / 未确认）。
+             只有 normalized_v1 显示「存储单位：元」+ 因子，其余按 design 文案显示。 -->
+        <el-tag
+          size="small"
+          :type="_ledgerDatasetClassification === 'normalized_v1' ? 'success' : 'info'"
+          :title="datasetUnitTitle"
+          data-testid="ledger-dataset-unit"
+        >{{ datasetUnitLabel }}</el-tag>
         <el-select v-model="displayUnit" size="small" style="width: 100px" title="金额显示单位">
           <el-option label="元" value="yuan" />
           <el-option label="万元" value="wan" />
@@ -1522,6 +1530,22 @@ const { label: datasetUnitLabel } = useDatasetUnitPresentation(
   _ledgerDatasetClassification,
   datasetSourceSummary,
 )
+
+/** 数据集单位的悬停说明：normalized 时给出换算因子（来源单位 → 存储元）。 */
+const datasetUnitTitle = computed<string>(() => {
+  if (_ledgerDatasetClassification.value !== 'normalized_v1') {
+    return '该数据集没有可验证的单位归一合同，按原始数值显示'
+  }
+  const norm = (datasetSourceSummary.value?.unit_normalization ?? null) as
+    | { contract?: { source_unit?: string; factor?: string | number } }
+    | null
+  const contract = norm?.contract
+  const factor = contract?.factor
+  const sourceUnit = contract?.source_unit
+  if (!factor || !sourceUnit) return '存储单位：元'
+  const label = sourceUnit === 'wan' ? '万元' : sourceUnit === 'qian' ? '千元' : '元'
+  return `来源单位：${label}，已按 ×${factor} 换算为元存储`
+})
 // 显示单位切换 — 直接操作 displayPrefs store（全局持久化）
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useTableDensityMetrics } from '@/composables/useTableDensityMetrics'

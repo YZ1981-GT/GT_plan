@@ -247,6 +247,38 @@ class LedgerImportUploadService:
             return None
 
     @classmethod
+    def cache_unit_detection(
+        cls,
+        project_id: UUID,
+        upload_token: str,
+        unit_detection: dict[str, Any] | None,
+    ) -> None:
+        """detect 阶段把 `unit_detection` 摘要缓存到 manifest（worker 复用）。
+
+        🔴 为什么必须缓存：worker 侧重新 detect 时用的是 bundle 里的
+        **stored_name**（带 `00_` 前缀），而 preview 用的是用户原始文件名 ⇒
+        逐 file/sheet 的 label 集合不一致 ⇒ `evidence_digest` 必不同 ⇒
+        用户确认过的合同在 submit/claim 时被判 `UNIT_DETECTION_CHANGED`。
+        缓存的是 detect 端点算出的那一份摘要本身，逐字段与预览相同。
+
+        失败不抛异常（缓存是优化非必需，worker 侧有「按同一 builder 现算」兜底）。
+        """
+        if not unit_detection:
+            return
+        try:
+            manifest_path = cls._manifest_path(project_id, upload_token)
+            if not manifest_path.exists():
+                return
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["unit_detection"] = unit_detection
+            manifest_path.write_text(
+                json.dumps(manifest, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+
+    @classmethod
     def get_bundle_files(cls, project_id: UUID, upload_token: str) -> list[tuple[str, Path]]:
         manifest = cls.load_manifest(project_id, upload_token)
         bundle_dir = cls._bundle_dir(project_id, upload_token)

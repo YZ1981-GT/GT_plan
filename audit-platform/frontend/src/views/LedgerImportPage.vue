@@ -138,6 +138,7 @@ const isSuccess = ref(false)
 const submitFailed = ref(false)
 const submitFailMsg = ref('')
 const lastMappings = ref<ConfirmedMapping[] | null>(null)
+const unitConfirmation = ref<Record<string, unknown> | null>(null)
 
 // 提交占位提示：根据 detect 估算的耗时给出预期
 const submitHint = computed(() => {
@@ -164,9 +165,14 @@ function onDetectComplete(result: LedgerDetectionResult) {
   currentStep.value = 1
 }
 
-function onDetectionConfirm(sheets: SheetDetection[], forceSubmit?: boolean) {
+function onDetectionConfirm(
+  sheets: SheetDetection[],
+  forceSubmit?: boolean,
+  confirmedUnit?: Record<string, unknown>,
+) {
   confirmedSheets.value = sheets
   forceSubmitFlag.value = forceSubmit || false
+  unitConfirmation.value = confirmedUnit ?? null
   currentStep.value = 2
 }
 
@@ -198,6 +204,7 @@ async function submitImportJob(mappings: ConfirmedMapping[]) {
         upload_token: detectionResult.value.upload_token,
         year: detectionResult.value.detected_year,
         confirmed_mappings: mappings,
+        unit_confirmation: unitConfirmation.value,
         force_activate: false,
         force_submit: forceSubmitFlag.value,
         incremental: !!appendStrategy.value,

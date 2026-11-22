@@ -456,7 +456,7 @@ backend/scripts/gen/generate_workpaper_writer_inventory.py  1547
 backend/tests/test_wopi_working_paper_qc_review.py  975
 backend/tests/test_workpaper_staged_artifact_boundary_contract.py  801
 backend/tests/test_workpaper_word_sdt_carrier_contract.py  881
-backend/tests/test_workpaper_writer_inventory.py  1326
+backend/tests/test_workpaper_writer_inventory.py  1412
 backend/tests/test_wp_html_save.py  808
 backend/tests/test_wp_onlyoffice_router.py  2198
 backend/tests/workpaper_sync/test_downstream_base_reliability_gate.py  1112
@@ -1310,7 +1310,7 @@ backend/app/routers/template_library_mgmt.py  1069
 backend/app/routers/wp_bulk_router.py  888
 backend/app/routers/wp_html_save.py  875
 # wp_sync_router 历史大文件（3257 行），本次仅删 display_name 死分支一行
-backend/app/routers/wp_sync_router.py  3467
+backend/app/routers/wp_sync_router.py  3642
 backend/app/security/coverage_guard.py  1000
 backend/scripts/gen/generate_workpaper_sync_manifest.py  1352
 backend/tests/test_adjustments.py  1024

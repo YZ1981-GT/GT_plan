@@ -1082,19 +1082,12 @@ export interface ExportTaskData {
   completed_at: string | null
 }
 
-export async function createExportTask(
-  projectId: string,
-  taskType: string,
-  documentTypes: string[],
-  exportYear: number | null,
-  passwordProtected: boolean = false,
-  password?: string,
-) {
+export async function createExportTask(projectId: string, taskType: string, documentTypes: string[], passwordProtected: boolean = false, password?: string) {
   const { data } = await http.post(P_exp.create, {
     project_id: projectId,
     task_type: taskType,
     document_types: documentTypes,
-    export_year: exportYear,
+    password_protected: passwordProtected,
     password,
   })
   return data
@@ -1111,13 +1104,7 @@ export function getExportDownloadUrl(taskId: string): string {
 
 export async function getExportHistory(projectId: string): Promise<ExportTaskData[]> {
   const { data } = await http.get(P_exp.history(projectId))
-  // 后端返回 ExportHistoryResponse 信封 {tasks: [...]}；http 拦截器已解一层，
-  // 这里的 data = {tasks: [...]}。解错成数组会让 el-table 拿到对象而崩
-  // （实测：独占环境有历史数据时 ErrorBoundary 吞整页）。
-  if (Array.isArray(data)) return data
-  return Array.isArray((data as { tasks?: ExportTaskData[] })?.tasks)
-    ? (data as { tasks: ExportTaskData[] }).tasks
-    : []
+  return data
 }
 
 

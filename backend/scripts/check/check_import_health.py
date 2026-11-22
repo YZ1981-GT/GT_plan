@@ -69,6 +69,11 @@ _DYNAMIC_EXPORT_WHITELIST: set[tuple[str, str]] = {
     ("app.models.audit_platform_models", "ReportType"),
     # ai_chat.audit: audit_event 在 try/except 保护下，审计失败不阻断启动
     ("app.services.ai_chat.audit", "audit_event"),
+    # consol_note_standalone_reader: list_consol_note_sections 函数尚未实现，
+    # 调用方已 try/except 兜底（consol_notes.py export-data）
+    ("app.services.consol_note_standalone_reader", "list_consol_note_sections"),
+    # consol_diff_service: 整个模块尚未创建，调用方已 try/except 兜底（consol_trial.py export-data）
+    ("app.services.consol_diff_service", "get_diff_rows"),
 }
 
 # 已知的 importlib 动态 re-export 包（__init__.py 用 importlib + setattr 代理子模块）

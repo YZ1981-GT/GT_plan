@@ -257,9 +257,33 @@ export function conflictPreviewWire(
     authority_model_definition_sha256: DIGEST(2),
     contract_id: 'd4-tab-customer-price',
     contract_semantic_version: '1.2.0',
+    // spec frozen-contract-read-path：`contract_source` 是**必需**字段（缺失即拒），
+    // 夹具默认给 `explicit`（= 调用方显式传入，不触发「历史契约」横幅）。
+    contract_source: 'explicit',
+    frozen_digest: DIGEST(3),
+    provided_digest: DIGEST(3),
     conflict_count: groups.reduce((acc, group) => acc + group.items.length, 0),
     groups,
     ...over,
+  }
+}
+
+/** `contract_source='frozen'` 的预览（触发「这是历史契约」横幅）。 */
+export function frozenContractPreview(): Record<string, unknown> {
+  const wire = conflictPreviewWire([
+    {
+      sheet_key: '明细表',
+      table_key: 'tbl_detail',
+      row_key: 'row-1',
+      items: [conflictItemWire()],
+    },
+  ])
+  return {
+    ...wire,
+    contract_source: 'frozen',
+    frozen_digest: DIGEST(7),
+    provided_digest: null,
+    contract_definition_id: UUID(77),
   }
 }
 

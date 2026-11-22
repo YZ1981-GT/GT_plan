@@ -46,6 +46,40 @@ describe('端点拼接（全仓唯一一处）', () => {
     expect(url).toBe('/api/projects/proj-1/workpapers/wp-1/sync/entry-identity')
     expect(url).not.toContain('/entries/')
   })
+
+  it('wholeWorkbook=true 透传 whole_workbook 查询参数', async () => {
+    get.mockImplementation((url: string, options?: { params?: Record<string, unknown> }) => {
+      if (url.includes('/sync/entry-identity')) {
+        expect(options?.params).toEqual({ sheet_name: 'B22A', whole_workbook: true })
+        return Promise.resolve(
+          envelope({
+            entry_id: 'xlsx/gt-b22-a-control-matrix',
+            status: 'pending',
+            room_ready: false,
+            reason: 'whole_workbook_target_requires_reviewed_binding',
+          }),
+        )
+      }
+      if (url.includes('onlyoffice-config')) {
+        return Promise.resolve(envelope({ config: { document: { key: 'legacy-key' } } }))
+      }
+      return Promise.reject(new Error(`意外 URL：${url}`))
+    })
+
+    const probe = await probeOnlyOfficeEntryConfig({
+      projectId: 'proj-1',
+      wpId: 'wp-1',
+      sheetName: 'B22A',
+      wholeWorkbook: true,
+    })
+
+    expect(probe.protocol).toBe('legacy')
+    expect(probe.available).toBe(true)
+    expect(probe.bindingStatus).toBeNull()
+    expect(probe.syncMode).toBe('independent')
+    expect(probe.reason).toBeNull()
+    expect(get).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('臂 1：room 供给就绪 ⇒ 判可切且不碰旧端点', () => {

@@ -60,10 +60,6 @@ async def world(monkeypatch, tmp_path):
             conn = sync_session.connection()
             WordExportTask.__table__.create(conn)
             WordExportTaskVersion.__table__.create(conn)
-            # PDF 交付件（export_tasks）也进归档清单；world 没建这张表会让
-            # _pdf_deliverable_entries 全场景 OperationalError。
-            from app.models.report_models import ExportTask as _ExportTask
-            _ExportTask.__table__.create(conn)
             CHECKLIST.create(conn)
         await w.db.run_sync(_create)
         yield w
@@ -392,10 +388,6 @@ async def version_world(monkeypatch, tmp_path):
             conn = sync_session.connection()
             WordExportTask.__table__.create(conn)
             WordExportTaskVersion.__table__.create(conn)
-            # PDF 交付件（export_tasks）也进归档清单；world 没建这张表会让
-            # _pdf_deliverable_entries 全场景 OperationalError。
-            from app.models.report_models import ExportTask as _ExportTask
-            _ExportTask.__table__.create(conn)
             CHECKLIST.create(conn)
             # 版本链四表：外键只保留指向已建表的，避免 SQLite 解析缺表
             created = {t.name for t in (

@@ -209,31 +209,14 @@ def test_route_table_covers_every_real_user_route(generated_text: str) -> None:
 
     少一条 ⇒ 该端点前端永远打不到；多一条 ⇒ 前端会打出一个统一 404，
     而调用点分辨不出「没这个端点」与「无权限」。
-
-    ═══ 为什么按**前缀种类**分别取 suffix ═══
-
-    `USER_SYNC_PREFIX` 自带 `{entry_id:path}`，凡是**要先算出 entry_id** 的端点都挂不进
-    去（挂进去前端仍得先知道 entry_id）。这类端点挂在并列的
-    `ENTRY_IDENTITY_PREFIX` 上，它同样是显式 scope 段。用单一前缀切 suffix 会把
-    `entry-identity` 算成 `entries/{entry_id:path}/…` 之外的怪值，于是「少一条 + 多一条」
-    同时成立 —— 那是判据口径错，不是生成物错。
     """
     routes = _ts_array(generated_text, "WP_SYNC_ROUTES")
-    generated = {(r["method"], r["prefixKind"], r["suffix"]) for r in routes}
+    generated = {(r["method"], r["suffix"]) for r in routes}
     real = set()
     for route in SR.router.routes:
         methods = sorted(m for m in route.methods if m not in ("HEAD", "OPTIONS"))
         assert len(methods) == 1, f"{route.path} 声明了 {methods}"
-        if route.path.startswith(SR.USER_SYNC_PREFIX):
-            real.add((methods[0], "primary", route.path[len(SR.USER_SYNC_PREFIX) :]))
-        elif route.path.startswith(SR.ENTRY_IDENTITY_PREFIX):
-            real.add(
-                (methods[0], "sibling", route.path[len(SR.ENTRY_IDENTITY_PREFIX) :])
-            )
-        else:
-            raise AssertionError(
-                f"{route.path} 不在任何显式 scope 前缀下 —— 生成器与守卫口径必须同源"
-            )
+        real.add((methods[0], route.path[len(SR.USER_SYNC_PREFIX) :]))
     assert generated == real, (
         f"生成物少了 {sorted(real - generated)}，多了 {sorted(generated - real)}"
     )
@@ -273,9 +256,6 @@ def test_a_real_slashed_entry_id_still_routes_through_the_generated_template() -
     import uuid
 
     template = _ts_string(_TARGET.read_text(encoding="utf-8"), "WP_SYNC_USER_PREFIX_TEMPLATE")
-    sibling_template = _ts_string(
-        _TARGET.read_text(encoding="utf-8"), "WP_SYNC_SIBLING_PREFIX_TEMPLATE"
-    )
     project, wp = uuid.uuid4(), uuid.uuid4()
     room, op, case, version, participant = (uuid.uuid4() for _ in range(5))
     entries = _shape_entry_ids()
@@ -288,14 +268,7 @@ def test_a_real_slashed_entry_id_still_routes_through_the_generated_template() -
             .replace("{wp_id}", str(wp))
             .replace("{entry_id}", entry)
         )
-        # 兄弟前缀（不含 entry 段）拼出的 URL 也走同一次真实路由匹配 —— 否则
-        # `entry-identity` 这类端点只有「生成物里写了」的静态证据，没有行为证据。
-        sibling_base = (
-            sibling_template.replace("{project_id}", str(project))
-            .replace("{wp_id}", str(wp))
-        )
         for spec in _ts_array(_TARGET.read_text(encoding="utf-8"), "WP_SYNC_ROUTES"):
-            spec_base = base if spec["prefixKind"] == "primary" else sibling_base
             suffix = (
                 spec["suffix"]
                 .replace("{room_id}", str(room))
@@ -311,7 +284,7 @@ def test_a_real_slashed_entry_id_still_routes_through_the_generated_template() -
             scope = {
                 "type": "http",
                 "method": spec["method"],
-                "path": spec_base + suffix,
+                "path": base + suffix,
                 "headers": [],
             }
             hits = []
@@ -322,12 +295,9 @@ def test_a_real_slashed_entry_id_still_routes_through_the_generated_template() -
             assert len(hits) == 1, (
                 f"{spec['endpoint']} 用 entry={entry!r} 命中 {[h[0] for h in hits]} —— 应恰好 1 条"
             )
-            if spec["prefixKind"] == "primary":
-                # 兄弟前缀（`entry-identity`）本身没有 entry 段，它的全部意义就是
-                # 「先算出 entry_id」—— 对它断言解出的 entry_id 是口径错。
-                assert hits[0][1].get("entry_id") == entry, (
-                    f"{spec['endpoint']} 解出的 entry_id={hits[0][1].get('entry_id')!r} ≠ {entry!r}"
-                )
+            assert hits[0][1].get("entry_id") == entry, (
+                f"{spec['endpoint']} 解出的 entry_id={hits[0][1].get('entry_id')!r} ≠ {entry!r}"
+            )
 
 
 def test_idempotency_key_projection_equals_the_dependant_truth(
@@ -494,17 +464,7 @@ def test_no_domain_is_projected_without_a_frontend_consumer(generated_text: str)
     tracker = (_FRONTEND_SYNC_DIR / "workpaperSyncOperationTracker.ts").read_text(
         encoding="utf-8"
     )
-    # `WP_SYNC_SIBLING_PREFIX_TEMPLATE` 的消费方在 composables 层：`entry-identity` 是
-    # 「先算出 entry_id」的端点，宿主/预检在挂载前就要用它，属于 sync 目录之外。
-    entry_config = (
-        _FRONTEND_SYNC_DIR.parent / "composables" / "onlyOfficeEntryConfig.ts"
-    )
-    assert entry_config.is_file(), (
-        f"消费方文件不存在：{entry_config} —— 投影的 sibling 前缀没有真实调用方"
-    )
-    consumers = _strip_ts_comments(
-        dto + api + tracker + entry_config.read_text(encoding="utf-8")
-    )
+    consumers = _strip_ts_comments(dto + api + tracker)
 
     exported = set(re.findall(r"^export const (WP_SYNC_[A-Z0-9_]+)", generated_text, re.M))
     # 只有 digest 是纯新鲜度标记（无运行时消费方，与既有 manifest 生成物同例）。
