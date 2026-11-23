@@ -1681,7 +1681,8 @@ jobs:
   render-smoke:
     # P0-3: Playwright render 冒烟测试（BLOCKING 模式）
     # 验证底稿渲染无 console error + 关键选择器存在
-    runs-on: ubuntu-latest
+    # 2026-11-22 锁 24.04：ubuntu-latest 已滚动到 26.04，Playwright 1.60 不支持 chromium on ubuntu26.04-x64（实测报错）；升级 playwright 前先固定 runner。
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -2728,8 +2729,7 @@ jobs:
           npx vitest run \
             src/components/workpaper/__tests__/e1SheetDispatch.spec.ts \
             src/components/workpaper/composables/__tests__/e1IpoLegacyMigration.spec.ts \
-            src/components/workpaper/__tests__/cycleTabComponentWiring.spec.ts \
-            -q
+            src/components/workpaper/__tests__/cycleTabComponentWiring.spec.ts
 
   f-cycle-four-table:
     # F3/F4/F5 四表取数守卫 + 分类桶守卫 + 公式预设守卫
@@ -6381,7 +6381,7 @@ jobs:
       - name: Run IPO checklist frontend guards (sync/formula/preset/two-level-header)
         run: |
           cd audit-platform/frontend
-          npx vitest run src/components/workpaper/d4/ipo/__tests__/ -q
+          npx vitest run src/components/workpaper/d4/ipo/__tests__/ --reporter=basic
 
   materialize-reuse-digest-caliber:
     # OO 物化「业务身份复用」可观测门（spec oo-single-pass-materialize-and-room-leave

@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { clearAuthedObjectUrlCache } from '@/composables/useAuthedObjectUrl'
 import AttachmentPreview from '@/components/extension/AttachmentPreview.vue'
 import AttachmentPreviewDrawer from '@/components/common/AttachmentPreviewDrawer.vue'
 
@@ -151,6 +152,10 @@ describe('Task13 OCR DTO projection', () => {
 
 describe('Task1/14 Preview_Host legacy matrix', () => {
   beforeEach(() => {
+    // 🔴 useAuthedObjectUrl 有模块级 blobCache（TTL 60s）：矩阵全部 case 共用
+    //    att-baseline 同一路径，首个 case 取回的字节会被后续 case 直接命中缓存
+    //    ⇒ api.get 调用数为 0、断言假红（2026-11-22 CI 实测 14 例）。每例先清缓存。
+    clearAuthedObjectUrlCache()
     vi.mocked(api.get).mockReset()
     vi.mocked(api.get).mockImplementation(async (url: string) => {
       if (String(url).includes('/office-preview/health')) return { available: true }
@@ -220,6 +225,8 @@ describe('Task1/14 Drawer_Host matrix', () => {
   it.each(drawerMatrix.cases)(
     'name=$name type_hint=$type_hint → $branch',
     async ({ name, type_hint, branch, previewSrcKind }) => {
+      // 同上：office 五例共用 att-drawer-1 的 preview-pdf 键，缓存命中会让取数归零
+      clearAuthedObjectUrlCache()
       vi.mocked(api.get).mockClear() // 只看本例的取数请求（保留实现）
       const wrapper = mount(AttachmentPreviewDrawer, {
         global: { stubs: drawerStubs },

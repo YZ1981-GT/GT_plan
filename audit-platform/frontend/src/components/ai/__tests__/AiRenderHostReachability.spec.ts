@@ -136,6 +136,17 @@ export function parseComponentImports(rawSource: string): ImportRecord[] {
     records.push({ localName: m[1], specifier: m[2] })
   }
 
+
+  // 第 5 形态（2026-11-22）：裸动态 import —— `import('@/components/ai/DshPanel.vue')`
+  // 直接作为表达式调用，加载结果经 `.then(({ default: component }) => ...)` 存入
+  // shallowRef，再由 `<component :is>` 渲染（ThreeColumnLayout 的 AI 助手懒加载即此
+  // 形态）。没有 localName，记为 ''；.vue 宿主出现该动态 import 即视为引用，
+  // used 判定见 findReferrers（须有 `<component :is=` 消费点，防 import 而不消费）。
+  const bareDynamic = /(?<!\bimport\s+\w+\s+from\s+)\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g
+  for (const m of source.matchAll(bareDynamic)) {
+    records.push({ localName: '', specifier: m[1] })
+  }
+
   return records
 }
 
@@ -251,10 +262,21 @@ function findReferrers(componentPath: string, allFiles: string[]): Referrer[] {
     for (const rec of parseComponentImports(source)) {
       const resolved = resolveSpecifier(file, rec.specifier)
       if (resolved !== componentPath) continue
-      const used = file.endsWith('.vue')
-        ? templateUsesComponent(extractTemplateBlock(source), rec.localName)
-        : scriptUsesIdentifierOutsideImport(source, rec.localName)
-      referrers.push({ file, localName: rec.localName, used })
+      // 裸动态 import（localName 为空）：宿主加载它就是为了渲染（shallowRef +
+      // `<component :is>`），.vue 宿主须有 `<component :is=` 消费点才算 used，
+      // 防「import 了从不 .then」的假挂载。
+      let used: boolean
+      if (rec.localName === '') {
+        used =
+          file.endsWith('.vue')
+            ? /<component[^>]*:is=/.test(extractTemplateBlock(source))
+            : /\.(?:then|value\s*=)/.test(source)
+      } else {
+        used = file.endsWith('.vue')
+          ? templateUsesComponent(extractTemplateBlock(source), rec.localName)
+          : scriptUsesIdentifierOutsideImport(source, rec.localName)
+      }
+      referrers.push({ file, localName: rec.localName || '(dynamic)', used })
     }
   }
   return referrers
