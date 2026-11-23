@@ -1325,7 +1325,7 @@ backend/app/services/knowledge_index_service.py  1307
 #   wp_disclosure_sync_service.py —— **改动前即 1545 行已超 800 上限**。本次净增 +43 行：
 #     附注同步覆盖率面板接线（覆盖率计算 + duty_rows 去重）。
 #     拆分方向：把「sync 执行」与「覆盖率统计」两个关注点分文件。
-backend/app/services/wp_disclosure_sync_service.py  1589
+backend/app/services/wp_disclosure_sync_service.py  1674
 #   test_report_engine.py —— **改动前即 847 行已超 800 上限**。本次净增 +23 行：
 #     report_engine 联动测试修正（cycle_linkage 事件触发断言更新）。
 backend/tests/test_report_engine.py  986

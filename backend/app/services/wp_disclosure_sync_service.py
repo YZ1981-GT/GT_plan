@@ -704,13 +704,24 @@ async def _resolve_project_sync_facts(
             return None, None, None, None
         audit_year, v2, template_type, report_scope = row
         year = audit_year if isinstance(audit_year, int) and audit_year > 0 else None
-        standard: dict | None = None
-        if isinstance(v2, dict) and v2:
-            standard = StandardUnificationService._normalize_standard(v2)
-        elif template_type or report_scope:
-            standard = StandardUnificationService._normalize_standard(
+        # 🔴 2026-11-23 取源修正（列优先，v2 兜底）：本函数的标准值唯一消费方是
+        # `_guard_standard_matches_project` 的跨主体拒绝，而**同一事务里**章节筛选
+        # （`_section_blocked_for_project`）按列值（template_type/report_scope）决策
+        # —— 两源不一致时若守卫读 v2、筛选读列，就会出现「列放行 listed 章节、
+        # 守卫按 v2 拒绝」的自相矛盾（真库 0ec33ac9 重药安徽：列 listed / v2 soe，
+        # 测试 test_variant_comes_from_columns_not_v2_standard 的裁决：按 v2 会拿
+        # 国企编号裁上市项目）。列是 variant 决策的既定真源，守卫与之同源。
+        col_standard: dict | None = None
+        if template_type or report_scope:
+            col_standard = StandardUnificationService._normalize_standard(
                 {"entity_type": template_type, "scope": report_scope}
             )
+        if col_standard:
+            standard = col_standard
+        elif isinstance(v2, dict) and v2:
+            standard = StandardUnificationService._normalize_standard(v2)
+        else:
+            standard = None
         return (
             year,
             standard,

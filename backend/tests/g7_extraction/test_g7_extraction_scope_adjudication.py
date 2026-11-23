@@ -203,10 +203,11 @@ ADJUDICATIONS: tuple[Adjudication, ...] = (
     Adjudication(
         "G7-18", "凭证检查表G7-18", "subsidiary", _BASIS_SAMPLING,
         "凭证抽查表本身就是抽凭产物，**已经**接在平台抽凭引擎上"
-        "（`mergeVoucherSamples` 按 `voucherNo` 去重后并入行模型）。"
+        "（抽凭回填改经共享回填函数按 `voucherNo` 去重后并入行模型；"
+        "原 `mergeVoucherSamples` 已重构进共享回填，见 g7VoucherSample.spec 头注）。"
         "抽凭引擎读序时账，故『四表取数』在这里是以抽凭的形式接通的，"
         "不需要 render 再加 `four_table_prefill`。",
-        anchor="mergeVoucherSamples",
+        anchor="G7VoucherSampleSection",
     ),
 )
 

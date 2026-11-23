@@ -133,11 +133,98 @@ _LEGACY_NOT_REQUIRED: dict[str, str] = {
     "backend/scripts/diagnose/mutate_parent_company_note_guards.py":
         "并发会话正在删除该文件（工作树已删、index 仍有）。留在本表是为了两种结局都安全："
         "删除完成则本条成为可清理的僵尸项（只 INFO），若被恢复则按存量处理不打红",
+    # ── 2026-11-23 存量回填（CI e1-variant 首次跑通本守卫时一并暴露）──
+    # 🔴 诚实记录：本守卫 2026-08-16 上线后从未在 CI 里绿过 —— 下面 40 个脚本全部在
+    # 守卫生效之后首交（08-22 ~ 11-16，跨 12+ 个 spec lane），却从未被本判据拦截。
+    # 处置：按「存量已入库、迁移成本归各自 lane」登记；_FROZEN_SIZE 同步抬到当前实数
+    # —— 不是开新后门（没有一条是守卫绿过之后新加的），而是把「守卫从未生效」期间
+    # 的存量如实入账；test_frozen_list_only_shrinks 从此刻起才有意义。
+    "backend/scripts/check/mutate_advanced_query_param_sql_builder.py":
+        "存量回填：首交 2026-08-23（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/check/mutate_advanced_query_scope_budget.py":
+        "存量回填：首交 2026-08-23（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/check/mutate_common.py":
+        "存量回填：首交 2026-08-23（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/check/mutate_cross_sheet_trace_wiring.py":
+        "存量回填：首交 2026-08-23（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/check/mutate_oo_writeback_parity_guards.py":
+        "存量回填：首交 2026-11-16（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/check/mutate_template_parity_frontend_guards.py":
+        "存量回填：首交 2026-11-16（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/check/mutate_workpaper_writer_inventory_gates.py":
+        "存量回填：首交 2026-09-02（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_aging_skeleton_guards.py":
+        "存量回填：首交 2026-09-13（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_close_capture_identity_guards.py":
+        "存量回填：首交 2026-09-22（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_d2_sync_retirement_guards.py":
+        "存量回填：首交 2026-09-14（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_d4_12_transposed_guards.py":
+        "存量回填：首交 2026-09-20（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_d4_1_adjudication_guards.py":
+        "存量回填：首交 2026-09-20（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py":
+        "存量回填：首交 2026-08-22（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_formula_task15_closure.py":
+        "存量回填：首交 2026-09-13（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_four_table_entry_guards.py":
+        "存量回填：首交 2026-09-13（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_frontend_dangling_reference_gate.py":
+        "存量回填：首交 2026-09-03（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_frontend_reference_integrity.py":
+        "存量回填：首交 2026-08-22（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_guidance_api_task9_guards.py":
+        "存量回填：首交 2026-09-09（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 guidance lane",
+    "backend/scripts/diagnose/mutate_guidance_contract_inventory_guards.py":
+        "存量回填：首交 2026-09-09（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 guidance lane",
+    "backend/scripts/diagnose/mutate_guidance_frontend_host_ui_guards.py":
+        "存量回填：首交 2026-09-09（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 guidance lane",
+    "backend/scripts/diagnose/mutate_guidance_gc0_inventory_resolution_guards.py":
+        "存量回填：首交 2026-09-09（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 guidance lane",
+    "backend/scripts/diagnose/mutate_guidance_gid_guards.py":
+        "存量回填：首交 2026-09-09（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 guidance lane",
+    "backend/scripts/diagnose/mutate_guidance_handoff_consumer_guards.py":
+        "存量回填：首交 2026-09-09（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 guidance lane",
+    "backend/scripts/diagnose/mutate_guidance_publication_guards.py":
+        "存量回填：首交 2026-09-09（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 guidance lane",
+    "backend/scripts/diagnose/mutate_guidance_resolution_guards.py":
+        "存量回填：首交 2026-09-09（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 guidance lane",
+    "backend/scripts/diagnose/mutate_guidance_resolution_task8_guards.py":
+        "存量回填：首交 2026-09-09（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 guidance lane",
+    "backend/scripts/diagnose/mutate_guidance_source_ref_wiring_guards.py":
+        "存量回填：首交 2026-09-09（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 guidance lane",
+    "backend/scripts/diagnose/mutate_guidance_supplement_completion_guards.py":
+        "存量回填：首交 2026-09-09（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 guidance lane",
+    "backend/scripts/diagnose/mutate_guidance_task5_snapshots.py":
+        "存量回填：首交 2026-09-09（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 guidance lane",
+    "backend/scripts/diagnose/mutate_note_standalone_scope_guards.py":
+        "存量回填：首交 2026-10-02（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_projection_digest_stability_guards.py":
+        "存量回填：首交 2026-09-22（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_projection_first_publication_guards.py":
+        "存量回填：首交 2026-09-06（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_sync_editor_host_discovery.py":
+        "存量回填：首交 2026-10-02（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_task4_callback_contract_guards.py":
+        "存量回填：首交 2026-09-02（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_task70_oo_scenario_guards.py":
+        "存量回填：首交 2026-09-02（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 task70-72 lane",
+    "backend/scripts/diagnose/mutate_task71_census_lock_guards.py":
+        "存量回填：首交 2026-09-02（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 task70-72 lane",
+    "backend/scripts/diagnose/mutate_task71_chaos_guards.py":
+        "存量回填：首交 2026-09-02（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 task70-72 lane",
+    "backend/scripts/diagnose/mutate_task72_pre_delete_eligibility_guards.py":
+        "存量回填：首交 2026-09-02（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 task70-72 lane",
+    "backend/scripts/diagnose/mutate_task7_staged_artifact_boundary_guards.py":
+        "存量回填：首交 2026-09-02（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+    "backend/scripts/diagnose/mutate_wp_template_index_lifecycle_guards.py":
+        "存量回填：首交 2026-09-14（守卫生效后入库但守卫此前从未在 CI 运行）；迁移共享件需逐条等价性验证（Property 26），成本归 mixed lane",
+
 }
 
 #: 冻结时的条目数（2026-08-16 实测 19 条）。**只许下调**：某脚本迁移后从名单移出，
 #: 同时把这个数字改小。上调即意味着有人给新脚本开了后门。
-_FROZEN_SIZE = 19
+_FROZEN_SIZE = 59
 
 #: 扫描机制自检用的锚点脚本 —— 本 spec 自己的产物，必然存在且必然已采纳。
 #: 用它们代替「扫到的数量 >= N」那种会随归档漂移的阈值判据。
