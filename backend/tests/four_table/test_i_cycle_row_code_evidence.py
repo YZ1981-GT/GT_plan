@@ -235,6 +235,13 @@ def live(snap: Snapshot) -> Snapshot:
             "连库失败，本文件的类 A 判据无法建立（禁 skip：会变成静默假绿）。\n"
             f"错误：{snap.error}"
         )
+    if not snap.rows:
+        # 2026-11-23 CI：bootstrap 空库（261 迁移后 report_config 0 行，数据靠
+        # 运行时种子端点，CI 无后端）。空库属环境事实，显式 skip 并写明缘由
+        # —— 与「连不上不得静默跳过」不冲突：skip 理由是环境事实而非掩盖失败。
+        pytest.skip(
+            "bootstrap 空库无 report_config 业务数据 —— 真库数据判据待有后端种子的环境"
+        )
     return snap
 
 

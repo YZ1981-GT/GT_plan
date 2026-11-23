@@ -156,20 +156,28 @@ class TestScanSurface:
         )
 
     def test_no_shadowed_strict_shape_a_routes(self, app_instance) -> None:
-        """同一 (前缀, 后缀) 不得注册两次 —— 否则「用户打到哪个端点」由注册顺序决定。"""
-        seen: dict[tuple[str, str], str] = {}
+        """同一路由**同方法**不得注册两次 —— 否则「用户打到哪个端点」由注册顺序决定。
+
+        2026-11-23 口径修正：判据原先按 (前缀, 后缀) 二元组，把「同一 handler
+        GET+POST 各一条」误判为重复 —— 那是 `_j1_import_export` 2026-11-14 现算
+        复核后的**有意设计**（GET 主用 + POST 兼容分支，各自独立 operationId，
+        见该文件 602~611 行注释）；FastAPI 语义下两条路由方法集不相交，谁也不
+        遮蔽谁。真正要拦的是**同方法重复**（同 path + 同 method ⇒ 后者永不可达），
+        故 key 补上方法集维度。
+        """
+        seen: dict[tuple[str, str, frozenset[str]], str] = {}
         shadowed: list[str] = []
         for route in app_instance.routes:
             segs = getattr(route, "path", "").strip("/").split("/")
             if not _is_strict_shape_a(segs):
                 continue
-            key = (segs[-2], segs[-1])
+            key = (segs[-2], segs[-1], frozenset(getattr(route, "methods", None) or ()))
             mod = getattr(getattr(route, "endpoint", None), "__module__", "?")
             if key in seen:
-                shadowed.append(f"{key} 先 {seen[key]} 后 {mod}")
+                shadowed.append(f"{key[:2]} methods={sorted(key[2])} 先 {seen[key]} 后 {mod}")
             else:
                 seen[key] = mod
-        assert not shadowed, f"形态 A 路由被重复注册（后者永不可达）: {shadowed}"
+        assert not shadowed, f"形态 A 路由同方法重复注册（后者永不可达）: {shadowed}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

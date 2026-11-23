@@ -66,3 +66,8 @@ backend/data/authz/*.json text eol=lf
 backend/data/onlyoffice_excel_identity_carrier_contract.json text eol=lf
 backend/data/onlyoffice_excel_instrumentation_gate.json text eol=lf
 backend/app/services/excel_structure_fingerprint.py text eol=lf
+# guidance 契约目录强制 LF（2026-11-23，wgcc-guidance CI 实测：envelope digest 按
+# 字节记录，core.autocrlf=true 下 Windows 检出 CRLF / CI 检出 LF ⇒ digest 全部失配；
+# 照 workpaper_sync_contracts/*.json 先例，index 里以 LF 存储，checkout 保持 LF）。
+backend/data/guidance/contracts/*.json text eol=lf
+backend/data/guidance/contracts/**/*.json text eol=lf

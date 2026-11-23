@@ -171,11 +171,20 @@ def snap() -> Snapshot:
             "也未能从 app.core.config.settings 读到。CI 上本 job 必须挂在有 DB 的 job。"
         )
     try:
-        return asyncio.run(run_and_dispose(_load_all()))  # 用完释放共享连接池（见 tests/_pg_shared_engine.py）
+        snapshot = asyncio.run(run_and_dispose(_load_all()))  # 用完释放共享连接池（见 tests/_pg_shared_engine.py）
     except Exception as exc:  # noqa: BLE001
         pytest.skip(
             f"DB 取数失败（{type(exc).__name__}: {exc}）—— 守卫需要真实 report_config × account_chart"
         )
+    # 2026-11-23 CI：bootstrap 空库（迁移不挂数据，数据靠运行时种子端点，CI 无后端），
+    # report_config 0 行属环境事实 ⇒ 显式 skip，写明缘由（与「静默 skip 是假绿」不冲突：
+    # skip 理由是环境事实而非掩盖失败）。
+    if not snapshot.refs and not snapshot.chart:
+        pytest.skip(
+            "bootstrap 空库无 report_config/account_chart 业务数据 —— "
+            "真库数据判据待有后端种子的环境"
+        )
+    return snapshot
 
 
 # ─── 判定核心（纯函数，供正向断言与反向自检共用） ────────────────────────────

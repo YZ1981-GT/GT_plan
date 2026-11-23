@@ -5847,9 +5847,8 @@ jobs:
       - name: SSE typed contract (Property 9)
         run: npx vitest run src/__tests__/sseEventTypes.spec.ts --reporter=verbose
         working-directory: audit-platform/frontend
-      - name: useAiChat composable (Property 9, 39)
-        run: npx vitest run src/__tests__/useAiChat.spec.ts --reporter=verbose
-        working-directory: audit-platform/frontend
+      # useAiChat.spec.ts 已随 d5d924cb6「清理零挂载旧 Chat 壳」删除；等价覆盖在
+      # PlatformAiChat* 系列（draft overlay / run payload / phase A）与 chatRunState。
       # 引用完整性（AC 1.5 / 1.9）—— 抓「引用了不存在的目标」这一整类：
       #   ① 路由孤儿：window.open('/ai-chat') 而路由未注册 ⇒ 落 404。
       #      原 e2e 只断言 URL，而 Vue Router 的 catch-all 不改 URL ⇒ 判据恒绿。
@@ -6012,6 +6011,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install Python dependencies
+        run: python -m pip install -r backend/requirements.txt
       - name: "[projection-lane] 范围边界与 capability 纪律（--offline，只读）"
         run: python backend/scripts/check/check_projection_lane_adjudication.py --offline
       - name: "[projection-lane] 变异锚点静态自检（九条，--check-anchors 只读）"
