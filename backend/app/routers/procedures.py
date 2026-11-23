@@ -268,7 +268,7 @@ async def download_blank_template(
     project_id: UUID,
     cycle: str,
     procedure_name: str = Query("自定义底稿"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user=Depends(require_project_access("readonly")),
 ):
     """生成并下载空白底稿模板 Excel."""

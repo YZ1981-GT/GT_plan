@@ -217,7 +217,7 @@ async def deserialize_tree(
 @router.get("/export-template")
 async def export_template(
     wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _user: User = Depends(get_current_user),
 ):
     """导出空模板 xlsx（坏账树结构 + 列标题，金额列留空供离线填写）。
@@ -242,7 +242,7 @@ async def export_template(
 @router.get("/export-data")
 async def export_data(
     wp_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _user: User = Depends(get_current_user),
 ):
     """导出含数据的完整坏账准备表 xlsx（父行汇总 + 子行明细 + 合计行）。

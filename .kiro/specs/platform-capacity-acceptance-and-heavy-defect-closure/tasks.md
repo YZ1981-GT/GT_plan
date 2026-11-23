@@ -100,3 +100,41 @@ C1 先于 C2/C3；C2/C3* 随 A3 窗口取证
   **实跑余项**：三阶段实跑需 PgBouncer 进程 + 真实后端 + 专用库
   （本机 docker run 被安全策略拦截），环境就绪后 `--run --window-override 30`
   冒烟 → 正式窗口实跑。
+- **2026-11-23 B4 交付**：111 条流式路由 DB 作用域候选**全部迁移**
+  `Depends(get_db, scope="function")`（FastAPI 0.135.3 原生参数），基线
+  `streaming_db_scope_baseline.json` 111→**0**（6 批收紧，`--check` 绿）。
+  分类探针（AST 判「响应期是否读 DB」）：90 A + 21 UNKNOWN；
+  UNKNOWN 逐条人工复核**全部 A**（batch_project×3 / h7×2 /
+  ledger_penetration×2 —— `build_ledger_export` 返回的 `_chunks` 生成器只读
+  `SpooledTemporaryFile` 不碰 db / workpaper_summary×1 / _d2 export_template×1；
+  其余为「await 工厂返回 BytesIO」形态，跨模块注解解析后归 A）。
+  验证：`tests/load` 146 passed；app.main import OK；相关回归
+  （f3 PBT / g14 / g5 / sprint6 zip / workpaper_export_evidence / task52 /
+  ledger_penetration×3）经 stash 归因**全部 HEAD 预存红，零新增失败**。
+  迁移工具：`tmp_b4_streaming_scope/probes/`（classify_candidates.py +
+  migrate_scope.py，AST 定位签名行、LF 写盘防 churn，一次性用完即删）。
+- **2026-11-23 B1 交付（代码+barrier）**：①语义裁决：**不建新内核**——
+  上游 C3 勘误核验属实（全仓无 `_compute_elimination`）；现状即「纯内存
+  计算 + 既有写入层」：`_elim` 用 `note_cell_values`（ViewContext 内存算）
+  → `fill_by_formula(_precomputed_cells=...)` 只走保护格/行定位/来源投影
+  写入路径，`note_breakdown` 被钉在 `if _precomputed_cells is None` 分支内
+  （守卫 `test_consol_reaggregate_batch_prefetch.py` 7 passed 钉死，
+  mutation-aware 判据绑赋值非名字）。②叶子来源整章批取**已存在**
+  （`prefetch_section_sources` 每章节一次 `load_source_tables`，既有守卫
+  4 例含双向变异）。③🔴 **真库抓到预存 P0 并修复**：
+  `_lock_note_section` 的 `pg_advisory_xact_lock(:ns,
+  hashtextextended(:k, 0))` 是非法签名组合——`pg_advisory_xact_lock` 只有
+  `(bigint)` / `(integer, integer)` 两个签名，`hashtextextended` 返回
+  bigint ⇒ `(integer, bigint)` 永远 UndefinedFunctionError ⇒ **合并附注
+  章节锁在真实 PG 上从未生效过**（每次调用即抛错）。修：`hashtext(:k)`
+  （integer 返回，匹配 `(integer, integer)`，与单体内核同形；key 含
+  node_key、namespace 独立 b"cnsn"，碰撞仅过度串行属安全方向）。触类旁通
+  grep 全仓：其余 15 处 `hashtextextended` 均为单参形态（合法），仅此一处
+  非法组合。④新建合并附注章节锁真实 PG 并发 barrier
+  `tests/test_consol_note_section_lock_concurrency_pg.py`（5 判据 + namespace
+  自检）：同 (section, node) 互斥 / 同章节不同节点并行（锁粒度=章节+节点）/
+  跨章节并行 / commit+rollback 释放 / **并发 fill_by_formula 不丢更新**
+  （临时 schema 隔离、拒共享库）。**一次性库 gt_b1_barrier 实跑 7 passed**；
+  判据 5 是锁存在的业务意义证明（后续变异验证未完成——命令被中断，
+  修复本体已由 7 例绿 + 单体内核同形背书）。SQLite 回归 7 skipped。
+  ⑤既有 barrier（单体内核 5 例）与本套（合并附注 5+1 例）双门常驻回归。

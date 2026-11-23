@@ -140,7 +140,7 @@ class TBWritebackResponse(BaseModel):
 async def m9_export_template(
     wp_id: str,
     sheet: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出空白xlsx模板（M9-2明细表，含「编制说明」页）
@@ -170,7 +170,7 @@ async def m9_export_template(
 async def m9_export_data(
     wp_id: str,
     sheet: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx（M9-2明细：输入列 + 公式列 + 合计行）

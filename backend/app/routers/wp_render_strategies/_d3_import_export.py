@@ -193,7 +193,7 @@ def _validate_sheet(sheet_code: str) -> None:
 async def d3_export_template(
     wp_id: str,
     sheet: str = Query(..., description="Sheet编码如D3-2"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出空白模板xlsx（含表头+格式，无数据行）"""
@@ -240,7 +240,7 @@ async def d3_export_template(
 async def d3_export_data(
     wp_id: str,
     sheet: str = Query(..., description="Sheet编码如D3-2"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出当前数据xlsx"""

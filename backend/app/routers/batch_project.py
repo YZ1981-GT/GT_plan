@@ -207,7 +207,7 @@ async def get_batch_import_status(
 @router.get("/batch-imports/{validation_id}/errors.xlsx")
 async def download_batch_import_errors(
     validation_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     output = await build_plan_error_workbook(
@@ -238,7 +238,7 @@ async def batch_import_projects(
 @router.get("/{project_id}/group-import-template")
 async def export_group_import_template(
     project_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     # 合并项目本身的读权限走门禁（与 readable_project_ids 同口径：admin 放行，其余看本人成员行）；
     # 企业树里每个项目还须可读，见下方子集校验（2026-10-30 同步：远端「仅登录不校项目」棘轮已收紧到 165）
     current_user: User = Depends(require_project_access("readonly")),
@@ -262,7 +262,7 @@ class BatchExportRequest(BaseModel):
 @router.post("/batch-export")
 async def batch_export_projects(
     body: BatchExportRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     requested = set(body.project_ids)

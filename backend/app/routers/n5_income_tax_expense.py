@@ -338,7 +338,7 @@ async def n5_export_template(
 async def n5_export_data(
     wp_id: str,
     sheet: str = Query("N5-5", description="Sheet编码: N5-2 / N5-5"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx（纳税调整分sheet导出）

@@ -368,7 +368,7 @@ async def batch_submit_review(
 async def batch_export_zip(
     project_id: UUID,
     data: BatchSubmitRequest,  # 复用 wp_ids 字段
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """批量导出底稿为 ZIP"""

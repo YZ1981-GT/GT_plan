@@ -45,7 +45,7 @@ class ExportWordRequest(BaseModel):
 async def export_word(
     project_id: UUID,
     body: ExportWordRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """导出附注为 Word 文档（致同标准格式）

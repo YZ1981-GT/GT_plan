@@ -675,7 +675,7 @@ async def stats_heatmap(
 @router.get("/workhours/stats/export")
 async def stats_export(
     month: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user=Depends(get_current_user),
 ):
     """月报 xlsx 导出"""

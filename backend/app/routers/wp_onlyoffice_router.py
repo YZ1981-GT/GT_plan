@@ -1051,7 +1051,7 @@ async def get_sheet_wopi_contents(
     sheet_name: str,
     request: Request,
     whole: str = "0",
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """WOPI GetFile — JWT 鉴权后返回 xlsx 内容。
 

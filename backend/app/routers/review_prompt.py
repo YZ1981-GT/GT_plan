@@ -558,7 +558,7 @@ async def export_review_report(
     pid: UUID,
     wp_code_prefix: str = Query(..., description="底稿编码前缀，如 D2"),
     session_id: Optional[str] = Query(None, description="复核会话 ID（可选）"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """导出复核结果为 Excel — 从已持久化的数据库结果读取，不重跑 LLM（项目只读级；原先无任何鉴权）

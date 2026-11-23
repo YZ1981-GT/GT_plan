@@ -813,7 +813,7 @@ async def preview_document(
 @router.get("/documents/{doc_id}/download")
 async def download_document(
     doc_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """下载文档文件。不可读 → 404 同构。"""

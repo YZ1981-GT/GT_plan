@@ -358,7 +358,7 @@ async def pivot_export(
     transpose: bool = Query(False),
     node_company_code: str | None = Query(None),
     aggregation_mode: str = Query("self"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """Excel 导出透视表"""

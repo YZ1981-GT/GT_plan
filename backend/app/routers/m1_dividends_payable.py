@@ -211,7 +211,7 @@ async def _get_wp_context(wp_id: str, db: AsyncSession) -> dict[str, Any]:
 async def m1_export_template(
     wp_id: str,
     sheet: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出空白xlsx模板（3个sheet：M1-2明细表 / M1-4外币汇率 / M1-5股利测算）
@@ -242,7 +242,7 @@ async def m1_export_template(
 async def m1_export_data(
     wp_id: str,
     sheet: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx（3个sheet：M1-2明细表 / M1-4外币汇率 / M1-5股利测算）

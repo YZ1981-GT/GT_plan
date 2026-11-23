@@ -57,7 +57,7 @@ async def generate_summary(
 async def export_summary_excel(
     project_id: UUID,
     body: SummaryRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """导出跨企业汇总 Excel"""

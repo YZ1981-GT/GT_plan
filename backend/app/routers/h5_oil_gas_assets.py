@@ -220,7 +220,7 @@ async def h5_export_template(
 @router.post("/export-data")
 async def h5_export_data(
     body: H5ExportRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出H5当前数据xlsx"""

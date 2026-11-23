@@ -106,7 +106,7 @@ class ValidateFormulasResponse(BaseModel):
 async def m4_export_template(
     wp_id: str,
     sheet: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出空白xlsx模板（2个sheet：M4-2明细表/M4-4检查表）
@@ -136,7 +136,7 @@ async def m4_export_template(
 async def m4_export_data(
     wp_id: str,
     sheet: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx（2个sheet：M4-2明细表/M4-4检查表）

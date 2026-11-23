@@ -309,7 +309,7 @@ async def l2_export_template(
 async def l2_export_data(
     wp_id: str,
     sheet: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx

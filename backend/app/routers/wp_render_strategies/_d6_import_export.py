@@ -181,7 +181,7 @@ async def d6_export_template(
 async def d6_export_data(
     wp_id: str,
     sheet: str = Query(..., description="Sheet编码如D6-2"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出当前数据xlsx"""

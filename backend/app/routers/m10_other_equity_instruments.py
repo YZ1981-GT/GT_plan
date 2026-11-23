@@ -132,7 +132,7 @@ class ClassificationSummaryResponse(BaseModel):
 async def m10_export_template(
     wp_id: str,
     sheet: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出空白xlsx模板（M10-2明细表 永续债/优先股）
@@ -162,7 +162,7 @@ async def m10_export_template(
 async def m10_export_data(
     wp_id: str,
     sheet: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx（M10-2明细表 当前永续债/优先股数据）

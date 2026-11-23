@@ -103,7 +103,7 @@ async def batch_prefill(
 async def batch_export_pdf(
     project_id: uuid.UUID,
     body: BatchExportRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """批量导出 PDF — 逐个转换+ZIP 打包+页眉页脚（Stub）

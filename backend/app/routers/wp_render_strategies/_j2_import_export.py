@@ -29,7 +29,7 @@ router = APIRouter(prefix="/api/workpapers/{wp_id}/j2", tags=["j2-import-export"
 
 
 @router.get("/export-template")
-async def export_template(wp_id: str, db: AsyncSession = Depends(get_db)):
+async def export_template(wp_id: str, db: AsyncSession = Depends(get_db, scope="function")):
     """导出J2设定受益计划空白模板."""
     try:
         import openpyxl
@@ -85,7 +85,7 @@ async def export_template(wp_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/export-data")
-async def export_data(wp_id: str, db: AsyncSession = Depends(get_db)):
+async def export_data(wp_id: str, db: AsyncSession = Depends(get_db, scope="function")):
     """导出J2当前数据."""
     try:
         import openpyxl

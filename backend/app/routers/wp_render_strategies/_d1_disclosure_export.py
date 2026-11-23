@@ -613,7 +613,7 @@ async def export_disclosure_template(
 async def export_disclosure_data(
     wp_id: str,
     variant: str = Query(..., description="上市/国企: listed or soe"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """导出含当前数据的xlsx（基础版：含表头的模板作为基础）"""
     _validate_variant(variant)

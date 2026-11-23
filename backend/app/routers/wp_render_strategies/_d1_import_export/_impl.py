@@ -2407,7 +2407,7 @@ async def d1_export_template(
     wp_id: str,
     sheet: str = Query(..., description="Sheet编码: D1-2, D1-3, D1-4, D1-6, D1-7, D1-8, D1-8T, D1-9, D1-15"),
     include_guidance: bool = Query(True, description="是否包含编制说明"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出空白xlsx模板（含表头+格式+编制说明，无业务数据行）"""
@@ -2433,7 +2433,7 @@ async def d1_export_template(
 async def d1_export_data(
     wp_id: str,
     sheet: str = Query(..., description="Sheet编码: D1-2, D1-3, D1-4, D1-6, D1-7, D1-8, D1-8T, D1-9, D1-15"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx"""

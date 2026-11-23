@@ -99,7 +99,7 @@ async def export_archive(
     project_id: UUID,
     year: int,
     template_code: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """导出 A21~A25 归档 Excel"""
     svc = ReviewWorkflowService(db)
@@ -177,7 +177,7 @@ async def export_blank_template(
     project_id: UUID,
     year: int,
     template_code: str = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """导出空白复核模板 Excel（供线下填写）"""
     import openpyxl

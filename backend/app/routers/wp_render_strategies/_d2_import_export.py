@@ -1499,7 +1499,7 @@ async def _import_d2_5_data(
 async def export_template(
     wp_id: str,
     sheet: str = Query(..., description="Sheet名称"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """导出空白xlsx模板（含表头+格式）"""
     _validate_sheet(sheet)
@@ -1556,7 +1556,7 @@ async def export_template(
 async def export_data(
     wp_id: str,
     sheet: str = Query(..., description="Sheet名称"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """导出含当前数据的xlsx"""

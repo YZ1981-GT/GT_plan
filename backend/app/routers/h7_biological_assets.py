@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/workpapers/{wp_id}/h7", tags=["h7-biological-ass
 async def export_template(
     wp_id: str,
     sheet: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """导出H7底稿模板（空表结构）."""
     content, filename = await export_h7_template(wp_id, sheet, db)
@@ -51,7 +51,7 @@ async def export_template(
 async def export_data(
     wp_id: str,
     sheet: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """导出H7底稿数据（含已填数据）."""
     content, filename = await export_h7_data(wp_id, sheet, db)

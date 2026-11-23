@@ -113,7 +113,7 @@ def _amount(value, row_no: int) -> float:
 async def export_reclassification_template(
     project_id: UUID,
     year: int | None = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """导出重分类 Excel 模板（预填科目列表）。

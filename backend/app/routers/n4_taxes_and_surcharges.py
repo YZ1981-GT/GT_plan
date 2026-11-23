@@ -341,7 +341,7 @@ async def n4_export_template(
 @router.post("/export-data")
 async def n4_export_data(
     body: N4ExportRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx

@@ -11,18 +11,18 @@
   },
   "inventoryDigest": null,
   "sourceDigests": {
-    "schema.json": "fc413f6151519b80b5f8b9b2d2fefbd993066d115c54761967db77aa93199d99",
-    "compatibility_matrix.json": "46eea1e94469f018b9efdbbc44623fa514a487a5b3510e91649171597c429598",
-    "fixtures/ack_accepted.json": "e75ce5ddef931dfb8030deeb775bafca377d1ddfe949fad3a4d688278c34ee15",
-    "fixtures/ack_rejected.json": "2250887df166f21e46b2d2c45e3c7eb3ce5921508375e1abc08619b21758cf6d",
-    "fixtures/evidence_catalog_entry.json": "067480f46ff14d22f0a5ff39bb1c5351843e57bdf304f1ebea9adca61a4b4947",
-    "fixtures/evidence_contract.json": "244b6d74fa215df23f05a1aaf182782ac3502ae784816bfc44e40d543fdafa42",
-    "fixtures/handoff_candidate.json": "0966f8d0077410f1eff7cf1e7605a80a12f7b5b41a988a6d05ec3b8d5a843df5",
-    "fixtures/handoff_finalized.json": "ea388f98867af497c8bef38e2be48a56c580802bd943cbdc95ad643ae440e4df",
-    "fixtures/location_cell.json": "5b39d6287c545a98d37688d93ac7baddf2ee632350f9947c198501b98ee4b3ac",
-    "fixtures/location_page.json": "5ce3bb74e449bd7ac18a7b52fb6baccbc3ef68e904717da7b73c631ed3498dc3",
-    "fixtures/location_sheet.json": "c61941abb881e56fc3ab1f9fc00a6d2e6299fe2033c7fcf360bddba0aab34bd3",
-    "fixtures/location_whole_workbook.json": "109c0cc2fcb4a5338c72af0750be0662c4d7cfe807b5fa953860db61ed3032bf"
+    "schema.json": "6d447d3242365619481b2d1c12305859eafdc7023094f0f033d216795eb51d72",
+    "compatibility_matrix.json": "ff719040a9eff963c55abb7d36eacb2aeb8484640468a425b1cdfae094b6fa44",
+    "fixtures/ack_accepted.json": "499ce1e3c02be04f6ef019cd8385c9eeeb3cf8fb58e40ea50f1b50062522cc2c",
+    "fixtures/ack_rejected.json": "6a2153897c5f85a638d49feb0fce1ce88e7eae30e99b76a6a5423851e7115146",
+    "fixtures/evidence_catalog_entry.json": "2023369f33a6874274b04e30e0073962aadf44c0369454a4c27affc6199594f5",
+    "fixtures/evidence_contract.json": "abd964b4be02f596299975ed698aa61abb8d6d953145eca528dc09571b91b58d",
+    "fixtures/handoff_candidate.json": "5649461b4f627017f9856fee6d07c268a82b3c3b62366bff74af00a65e7e55a6",
+    "fixtures/handoff_finalized.json": "2e78774bcd41469102c4c00780712b2995dba62ade5c7e3c40f36ce76227e45e",
+    "fixtures/location_cell.json": "d664f99fc039a3010801fef079d68a9a33b57107d323643581dff59bf69171c3",
+    "fixtures/location_page.json": "183dceeffdf754652a5f1dcf423195a41a5e2622001ebb11a0e0b05100faef39",
+    "fixtures/location_sheet.json": "60b952a5e565cf03bde08a89b8a9b7d774373867ac6b2d201d8816b2ac9e6851",
+    "fixtures/location_whole_workbook.json": "50d341281d3232a4147b7a829c01d5f86fd8d40c88c7e44fae6441401e4e5b9d"
   },
   "operationIds": {
     "write": "op-write-gc0-2026-09-07"

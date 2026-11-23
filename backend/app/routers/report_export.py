@@ -47,7 +47,7 @@ class ExportExcelRequest(BaseModel):
 async def export_excel(
     project_id: UUID,
     body: ExportExcelRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """导出报表 Excel 文件

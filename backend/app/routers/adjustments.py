@@ -925,7 +925,7 @@ async def export_adjustment_summary(
     project_id: UUID,
     year: int = Query(...),
     format: str = Query("excel", description="导出格式: excel 或 json"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_project_permission("adjustment:export")),
 ):
     """导出审计调整汇总表（AJE + RJE）"""
@@ -975,7 +975,7 @@ async def export_adjustment_template(
         None,
         description="模板类型: soe=国企版 / listed=上市版,不传则从项目派生",
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_project_permission("adjustment:export")),
 ):
     """导出调整分录空白模板 Excel (按项目实际数据生成,支持国企/上市两版).

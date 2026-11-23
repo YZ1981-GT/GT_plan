@@ -408,7 +408,7 @@ async def workpaper_ai_generate_text(
 async def workpaper_ai_chat(
     wp_id: str,
     request: WpAiChatRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """底稿级 AI 对话 — SSE streaming 响应

@@ -491,7 +491,7 @@ async def retry_failed_items(
 async def download_export_file(
     project_id: UUID,
     task_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """下载已生成的导出文件"""

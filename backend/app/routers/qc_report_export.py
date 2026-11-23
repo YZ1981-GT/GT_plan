@@ -177,7 +177,7 @@ def _build_qc_report(project_name: str, risk_data: list, opinion_data: list, rec
 @router.get("/export")
 async def export_qc_report(
     project_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出 QC 报告 Word 文件（三线表格式）"""

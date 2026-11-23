@@ -1176,7 +1176,7 @@ async def confirm_finding(
 async def export_word(
     project_id: UUID,
     year: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """导出附注为 Word 文档。

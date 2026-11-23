@@ -243,7 +243,7 @@ async def get_artifact(
 async def download_artifact(
     artifact_id: uuid.UUID,
     response: Response,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """下载证据文件（先重验摘要）。"""

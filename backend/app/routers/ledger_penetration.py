@@ -170,7 +170,7 @@ async def export_ledger_window(
     date_to: date | None = Query(None),
     keyword: str | None = Query(None, max_length=200),
     amount_dir: Literal["all", "debit", "credit"] = Query("all"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """流式读取完整普通序时账并生成 write-only XLSX；不依赖浏览器当前窗口。"""
@@ -199,7 +199,7 @@ async def export_aux_ledger_window(
     date_to: date | None = Query(None),
     keyword: str | None = Query(None, max_length=200),
     amount_dir: Literal["all", "debit", "credit"] = Query("all"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """流式读取完整辅助明细并生成 write-only XLSX。"""
@@ -807,7 +807,7 @@ async def export_ledger_excel(
     year: int = Query(...),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """导出序时账为 Excel（含期初余额行+月小计+累计余额）"""
@@ -971,7 +971,7 @@ async def export_ledger_excel(
 async def export_balance_excel(
     project_id: UUID,
     year: int = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """导出科目余额表为 Excel"""
@@ -1052,7 +1052,7 @@ async def export_aux_balance_excel(
     dim_type: Optional[str] = Query(None, description="维度类型筛选"),
     search: Optional[str] = Query(None, description="搜索关键词"),
     filter: Optional[str] = Query(None, description="筛选条件: closing/opening/changed"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """导出辅助余额表为 Excel（支持当前视图条件）"""

@@ -327,7 +327,7 @@ async def download_version(
     project_id: UUID,
     task_id: UUID,
     version_no: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     svc = DeliverableService(db)
@@ -363,7 +363,7 @@ async def download_guidance_version(
     project_id: UUID,
     task_id: UUID,
     version_no: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """下载「编制参考版」（含内部 ##NOTE## 提示的 with_notes 副本，§13.2）。
@@ -1303,7 +1303,7 @@ async def retry_trio_job(
 async def download_trio_item(
     project_id: UUID,
     item_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """下载三件套单项文件 — 下载前校验物理文件和 hash。
@@ -1678,7 +1678,7 @@ async def create_package(
 async def download_package(
     project_id: UUID,
     job_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     await _guard_action(db, current_user, project_id, DeliverableAction.download)
@@ -1920,7 +1920,7 @@ async def signed_download_version(
     version_no: int,
     expires: int = Query(...),
     sig: str = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """OnlyOffice 专用免认证下载（通过 HMAC 签名验证，10 分钟有效）"""
     if not _verify_download_sig(project_id, task_id, version_no, expires, sig):

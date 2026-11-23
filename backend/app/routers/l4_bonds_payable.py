@@ -100,7 +100,7 @@ class InitialMeasureRequest(BaseModel):
 @router.post("/export-template")
 async def l4_export_template(
     wp_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出空白xlsx模板（多sheet，L4-2区段89列分sheet）
@@ -119,7 +119,7 @@ async def l4_export_template(
 @router.post("/export-data")
 async def l4_export_data(
     wp_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx（多sheet）

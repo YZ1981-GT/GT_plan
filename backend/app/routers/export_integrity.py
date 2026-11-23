@@ -122,7 +122,7 @@ async def create_download_token(
 async def download_export(
     export_id: str,
     token: str = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """下载导出包（校验一次性令牌）"""

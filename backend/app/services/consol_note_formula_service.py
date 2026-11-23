@@ -539,7 +539,7 @@ async def _lock_note_section(
         return False
     key = f"consol_note:{project_id}:{year}:{section_id}:{node_key or ''}"
     await db.execute(
-        sa.text("SELECT pg_advisory_xact_lock(:ns, hashtextextended(:k, 0))"),
+        sa.text("SELECT pg_advisory_xact_lock(:ns, hashtext(:k))"),
         {"ns": _CONSOL_NOTE_LOCK_NAMESPACE, "k": key},
     )
     return True

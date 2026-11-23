@@ -147,7 +147,7 @@ def build_plan_docx(fields: dict[str, Any], entity_name: str = "", index_no: str
 async def h1_stocktake_plan_export(
     wp_id: str,
     body: H1StocktakePlanExportRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     _ = db, current_user, wp_id

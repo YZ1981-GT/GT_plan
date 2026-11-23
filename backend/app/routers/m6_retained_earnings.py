@@ -158,7 +158,7 @@ async def _get_wp_context(wp_id: str, db: AsyncSession) -> dict[str, Any]:
 async def m6_export_template(
     wp_id: str,
     sheet: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出空白xlsx模板（多sheet：M6-2明细表 + M6-1审定表）
@@ -188,7 +188,7 @@ async def m6_export_template(
 async def m6_export_data(
     wp_id: str,
     sheet: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx（多sheet：M6-2明细表 + M6-1审定表）

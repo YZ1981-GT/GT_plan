@@ -670,7 +670,7 @@ async def export_data(
     wp_id: str,
     sheet_type: str | None = Query(None),
     sheet: str | None = Query(None),
-    db=Depends(get_db),
+    db=Depends(get_db, scope="function"),
     _user=Depends(get_current_user),
 ):
     """导出数据（含现有数据）."""

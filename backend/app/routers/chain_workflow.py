@@ -283,7 +283,7 @@ async def get_executions(
 async def export_package(
     project_id: UUID,
     body: "ExportPackageRequest",
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """组合导出包（ZIP）

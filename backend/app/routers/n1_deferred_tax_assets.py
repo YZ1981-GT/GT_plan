@@ -384,7 +384,7 @@ async def n1_export_template(
 async def n1_export_data(
     wp_id: str,
     sheet: str = Query("N1-2", description="Sheet编码: N1-2 / N1-4 / N1-5"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx（N1-2明细表动态行数据）

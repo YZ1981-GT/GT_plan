@@ -105,7 +105,7 @@ async def get_task_status(
 @router.get("/{task_id}/download")
 async def download_export(
     task_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """下载导出文件"""

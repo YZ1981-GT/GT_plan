@@ -1638,7 +1638,7 @@ async def _attach_launch_urls(
 async def get_room_contents(
     room_id: uuid.UUID,
     token: str = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> Any:
     """OO `document.url` 消费方：短 TTL token → representation artifact 字节。
 

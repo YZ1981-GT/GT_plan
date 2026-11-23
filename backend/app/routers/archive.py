@@ -117,7 +117,7 @@ async def retry_archive_job(
 async def download_archive_package(
     project_id: UUID,
     job_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _user: User = Depends(require_project_access("readonly")),
 ):
     """下载归档包：作业须已成功；文件不在或 sha256 与完整性记录不符 ⇒ 409。"""

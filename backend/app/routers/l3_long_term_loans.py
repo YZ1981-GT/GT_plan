@@ -364,7 +364,7 @@ async def l3_export_template(
 async def l3_export_data(
     wp_id: str,
     sheet: str = Query(..., description="Sheet编码: L3-2/L3-4/L3-5/L3-6/L3-7/L3-8"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx

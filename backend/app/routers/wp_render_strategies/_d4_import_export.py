@@ -447,7 +447,7 @@ async def d4_export_template(
     wp_id: str,
     sheet: str = Query(..., description="Sheet编码如D4-2"),
     include_guidance: bool = Query(True, description="是否包含编制说明"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出空白模板xlsx（含表头+格式+编制说明，无数据行）
@@ -556,7 +556,7 @@ async def d4_export_template(
 async def d4_export_data(
     wp_id: str,
     sheet: str = Query(..., description="Sheet编码如D4-2"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出当前数据xlsx

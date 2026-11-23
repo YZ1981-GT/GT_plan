@@ -121,7 +121,7 @@ async def create_cf_adjustment(
 async def export_a5_excel(
     project_id: UUID,
     year: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """导出 A5-1 格式 Excel（现金流量表核查底稿）"""
     import io

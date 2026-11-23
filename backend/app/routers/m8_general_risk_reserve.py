@@ -112,7 +112,7 @@ class FormulaValidationResponse(BaseModel):
 async def m8_export_template(
     wp_id: str,
     sheet: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出空白xlsx模板（M8-2明细表 / M8-4风险测试表）
@@ -142,7 +142,7 @@ async def m8_export_template(
 async def m8_export_data(
     wp_id: str,
     sheet: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx（M8-2明细/M8-4风险测试）

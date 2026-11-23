@@ -750,7 +750,7 @@ def _passed_label(passed) -> str:
 @router.post("/api/projects/{project_id}/audit-checks/export")
 async def export_audit_checks(
     project_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user=Depends(require_project_access("readonly")),
 ):
     """导出审计检查结果为 xlsx（Req7，留痕）。

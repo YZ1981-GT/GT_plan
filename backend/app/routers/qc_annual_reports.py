@@ -70,7 +70,7 @@ async def list_annual_reports(
 @router.get("/{report_id}/download")
 async def download_annual_report(
     report_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_role(["qc", "admin"])),
 ):
     """下载年度质量报告文件。"""

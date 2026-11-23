@@ -108,7 +108,7 @@ class AccrualTestResponse(BaseModel):
 async def m5_export_template(
     wp_id: str,
     sheet: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出空白xlsx模板（M5-2明细表/M5-4计提检查表）
@@ -138,7 +138,7 @@ async def m5_export_template(
 async def m5_export_data(
     wp_id: str,
     sheet: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx（M5-2明细表/M5-4计提检查表）

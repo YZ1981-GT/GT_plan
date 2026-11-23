@@ -438,7 +438,7 @@ async def download_consol_artifact(
     project_id: UUID,
     year: int,
     artifact_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user=Depends(require_project_access("readonly")),
 ):
     """下载既有 ready artifact；重验 size/hash，绝不现场重算。"""
@@ -497,7 +497,7 @@ async def create_consol_workpaper(
 async def download_consol_workpaper(
     project_id: UUID,
     year: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user=Depends(require_project_access("readonly")),
 ):
     """兼容入口：下载最近正式 run 的既有工作底稿；没有 artifact 时明确失败，不重算。"""

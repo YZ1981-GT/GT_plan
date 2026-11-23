@@ -456,7 +456,7 @@ async def export_module_excel(
     note_section: str | None = Query(None),
     report_type: str | None = Query(None),
     entry_type: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """统一接口：任意模块导出 Excel"""
@@ -503,7 +503,7 @@ async def export_module_word(
     note_section: str | None = Query(None),
     report_type: str | None = Query(None),
     entry_type: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     """统一接口：任意模块导出 Word（致同三线表排版）"""

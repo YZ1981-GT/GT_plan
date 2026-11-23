@@ -210,7 +210,7 @@ async def c24_export_template(
 @router.get("/api/workpapers/{wp_id}/c24-journal/export-data")
 async def c24_export_data(
     wp_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出当前已导入的分录数据xlsx。"""

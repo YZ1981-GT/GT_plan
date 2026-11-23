@@ -370,7 +370,7 @@ async def s_estimate_auto_data(
 async def s_estimate_export_template(
     wp_id: str,
     sheet: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出空白xlsx模板（S21-2/S20-unrelated/S20-noSubstance）
@@ -403,7 +403,7 @@ async def s_estimate_export_template(
 async def s_estimate_export_data(
     wp_id: str,
     sheet: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出含当前数据的xlsx（S21-2/S20-unrelated/S20-noSubstance）
