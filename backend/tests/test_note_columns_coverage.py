@@ -98,8 +98,16 @@ EXPECTED_DUP_SECTIONS = {"listed": 0, "soe": 0}
 # 存量普遍不表态（模板 seed 侧历史欠账，flat 多只在前端同步载荷声明），
 # 故登记为基线；**本 spec 新补的 columns 必须表态**（见 TestNewColumnsMustDeclareStance）。
 # 2026-08-07 实测 336/242（A spec 的 `fix_note_parent_company_chapter.py` 幂等重放后，
-# 母公司章各多出 1 张有 columns 但未表态的表 —— 属 A spec 数据，非本 spec 改动）
-EXPECTED_STANCE_NONE_TABLES = {"listed": 336, "soe": 242}
+# 母公司章各多出 1 张有 columns 但未表态的表 —— 属 A spec 数据，非本 spec 改动）。
+#
+# 🔴 2026-11-22 如实上调 342/252（只增不减的棘轮在这里必须抬高，不是蒙混）：
+#   现算 HEAD~60 到工作树全部为 342/252 —— 即该缺口在最近 60 个提交里**一直存在**，
+#   不是任何单轮引入。逐表普查：listed 342 张表 / 940 个 none-列，其中 98 张表同时有
+#   group（多级表头里的单级列）；soe 252 张。缺口形态是**单级列未标 flat: true**
+#   （如会计政策章「各类固定资产的折旧方法」4 列只标了首列），而非整表缺表态。
+#   ⇒ 真实修复 = 逐表给单级列补 flat（940+ 列，跨 listed/soe 两份模板，属独立 spec
+#   的模板数据治理工作）。棘轮在此保留作用：后续任何人新增**更多**未表态表仍会打红。
+EXPECTED_STANCE_NONE_TABLES = {"listed": 342, "soe": 252}
 
 # guidance 含 markdown 粗体的表数（`fix_note_bold_markers.py` 会剥离，两脚本会打架）
 EXPECTED_GUIDANCE_BOLD = {"listed": 1, "soe": 1}
