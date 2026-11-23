@@ -746,7 +746,14 @@ class TestProperty24ScopeDecisionRegistered:
         """
         app_dir = _MODULE_PATH.parent.parent  # services/ → app/
         assert app_dir.name == "app", app_dir
-        allowlist = {"routers/wp_render_config.py"}
+        # 2026-11-22 登记第二处：`wp_render_pipeline.resolve_scope_redirect` 与
+        # `wp_render_config` 同职责 —— 底稿层的 scope redirect（consolidated /
+        # parent_only ⇒ 重定向合并中心），**不是附注层取数**。守卫红线是「附注层
+        # 取数路径不得表达该取值」，底稿层 redirect 属登记在册的正当使用。
+        allowlist = {
+            "routers/wp_render_config.py",
+            "routers/wp_render_pipeline.py",
+        }
 
         scanned = 0
         hits: set[str] = set()
