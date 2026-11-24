@@ -328,7 +328,15 @@ class TestReportConfigDualFamilyCoverage:
         _MIGRATED, reason="V145 已应用，改由 test_after_migration 断言"
     )
     def test_before_migration_only_primary(self):
-        """**Wave 1 期望红**：当前公式只含 primary 族 ⇒ 取数只有 0.04%。"""
+        """**Wave 1 期望红**：当前公式只含 primary 族 ⇒ 取数只有 0.04%。
+
+        2026-11-23 CI：空库 report_formulas 为空 ⇒ missing 恒空（假"空转"红），
+        显式 skip（与 test_all_four_variants_exist 同口径）。
+        """
+        if not _SNAP.report_formulas:
+            pytest.skip(
+                "bootstrap 空库无 report_config 业务数据 —— 真库数据判据待 UAT 环境"
+            )
         missing = []
         for (row, std), formula in sorted(_SNAP.report_formulas.items()):
             f = formula or ""
