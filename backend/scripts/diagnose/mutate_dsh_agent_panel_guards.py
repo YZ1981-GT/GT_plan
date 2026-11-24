@@ -341,8 +341,8 @@ MUTATIONS: tuple[Mutation, ...] = (
     Mutation(
         name="切 cloud model（_check_model_health 不做 local-only 校验）",
         target=_CAPABILITY,
-        anchor='    """检查模型 endpoint 是否为本地（Req 12.1 / 12.2）。"""',
-        replacement='    """检查模型 endpoint 是否为本地（Req 12.1 / 12.2）。"""\n    return ServiceHealth(available=True, endpoint="(mutated)", message="MUTATED: skip check")',
+        anchor='    """检查模型配置；只有 local-only 引擎才拒绝服务器端点。"""',
+        replacement='    """检查模型配置；只有 local-only 引擎才拒绝服务器端点。"""\n    return ServiceHealth(available=True, endpoint="(mutated)", message="MUTATED: skip check")',
         expect_test="test_cloud_model_endpoint_reported_local_only_violation",
         suite="be",
         selector="backend/tests/dsh_agent_panel/test_task30_capabilities.py",
@@ -478,7 +478,7 @@ MUTATIONS: tuple[Mutation, ...] = (
     Mutation(
         name="[假绿修复] 每次 saveAsNote 都换新 key（FE-P21-A）",
         target=_FE_NOTE_CAPTURE,
-        anchor="    if (!currentIdempotencyKey) {",
+        anchor="    if (!currentIdempotencyKey || fingerprint !== currentFingerprint) {",
         replacement="    if (true) { // MUTATED: 每次都新生成 key",
         expect_test="复用同一 idempotency_key",
         suite="fe",
@@ -609,7 +609,10 @@ MUTATIONS: tuple[Mutation, ...] = (
     Mutation(
         name="[MCP取数] semantic_search_strict 恢复词法伪降级（M35）",
         target=_KB_INDEX,
-        anchor="            raise EmbeddingUnavailableError(",
+        anchor=(
+            "            raise EmbeddingUnavailableError(\n"
+            "                f\"语义检索不可用：{type(exc).__name__}\""
+        ),
         replacement=(
             "            return await self._ilike_fallback("
             "project_id, query, top_k, scope)  # MUTATED: 伪降级\n"

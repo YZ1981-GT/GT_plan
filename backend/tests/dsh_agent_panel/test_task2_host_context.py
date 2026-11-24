@@ -58,6 +58,14 @@ from ._fixtures import (
     run_with_fixture,
 )
 
+# 2026-11-23：项目级资源授权链读 wp_index（同源裁决），属自有查询而非越权。
+from app.models.workpaper_models import WpIndex
+
+_HOST_MODEL_EXPECTATION = {
+    h: HOST_BUSINESS_MODEL[h] + (() if h.value in ("global_knowledge", "workpaper") else (WpIndex.__tablename__,))
+    for h in HostType
+}
+
 pytestmark = pytest.mark.skipif(not IS_PG, reason="need PostgreSQL (AI 宿主反查)")
 
 
@@ -143,7 +151,7 @@ class TestProperty5UniqueHostLoader:
                 assert outcome.resource_type is host_type
 
                 touched = _tables_touched(sql_log)
-                own = set(HOST_BUSINESS_MODEL[host_type])
+                own = set(_HOST_MODEL_EXPECTATION[host_type])
                 foreign = touched - own
                 assert not foreign, (
                     f"{host_type.value} 宿主反查竟触碰了别的业务表: {foreign}"

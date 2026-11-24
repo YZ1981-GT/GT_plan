@@ -64,8 +64,10 @@ MUTATIONS: tuple[Mutation, ...] = (
     Mutation(
         mutation_id="C03_CANDIDATE_FIXTURE_FORGES_FINALIZATION",
         relative_path=f"{GC0_DIR}/fixtures/handoff_candidate.json",
-        original=b'  "phase": "candidate",\r\n  "authority": {',
-        replacement=b'  "phase": "finalized",\r\n  "authority": {',
+        # 2026-11-23：guidance 契约目录已按 .gitattributes 钉 LF（digest 全环境一致），
+        # 锚点随之从 CRLF 改 LF。
+        original=b'  "phase": "candidate",\n  "authority": {',
+        replacement=b'  "phase": "finalized",\n  "authority": {',
         test_node=(
             "backend/tests/test_guidance_gc0_conformance.py"
             "::TestReq14_HandoffPhaseFieldDiscipline::test_candidate_fixture_lacks_finalization_fields"

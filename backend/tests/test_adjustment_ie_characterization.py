@@ -452,16 +452,24 @@ def test_c_export_summary_headers_include_type_column():
     # 2026-07-27（f3354f539，调整分录集中登记）起末尾另加「所属循环」「协作状态」两列只读信息；
     # 中央导入按列头取值（import_templates 按名取），尾部多出的列不影响导回 —— 前 8 列契约不变
     # 2026-10-31（spec adjustment-hall-entry-review-closure 需求 2.7）末尾再加「复核状态」「编制人」两列只读信息
+    # 2026-11-23：尾部又追加「提出阶段」「客户处理」两列只读信息（列头取值导入
+    # 不受影响，前 12 列契约不变），字面量同步现值。
     assert (
         'headers = ["编号", "类型", "摘要", "科目编码", "科目名称", '
-        '"借方金额", "贷方金额", "来源", "所属循环", "协作状态", "复核状态", "编制人"]'
+        '"借方金额", "贷方金额", "来源", "所属循环", "协作状态", "复核状态", "编制人", '
+        '"提出阶段", "客户处理"]'
     ) in src
     assert 'headers = ["编号", "摘要"' not in src, "旧 7 列列头不得回退"
 
-    # sheet 名仍保留（缺「类型」列的旧文件靠它兜底推断，见 Property 7）
+    # 2026-11-23：Excel 构建已下沉 `adjustment_export_service.export_excel`
+    # （单一 sheet「汇总」，列头含类型列；缺「类型」列的旧文件靠 sheet 名兜底
+    # 推断的路径随旧实现一并退役）。这里锁死服务侧的 sheet 名与路由侧的委托。
     export_src = inspect.getsource(adj_router.export_adjustment_summary)
-    assert 'ws_aje.title = "AJE审计调整"' in export_src
-    assert 'wb.create_sheet("RJE重分类")' in export_src
+    assert "from app.services.adjustment_export_service import build_full_projection, export_excel" in export_src
+    assert "buf = export_excel(projection, year)" in export_src
+    from app.services import adjustment_export_service as svc
+    svc_src = inspect.getsource(svc)
+    assert 'ws_summary.title = "汇总"' in svc_src
 
 
 # ═══════════════════════════════════════════════════════════════════════════

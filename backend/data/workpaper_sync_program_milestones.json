@@ -447,159 +447,35 @@
     "internal_edge_count": 186,
     "node_count": 236
   },
-  "database_probe_digest": "50118fe8f893cae3ad5a9f7e31764869921e0114fd70fa7a74eda92cfefd9bb5",
+  "database_probe_digest": "fac2c53b411d784ea21690d2a2077a7d9610fef9127682b9cec9b12d4391f405",
   "database_probe_facts": {
     "column_denominator": 60,
     "constraint_denominator": 23,
     "failure": null,
-    "observed_column_count": 0,
-    "observed_constraint_count": 0,
-    "observed_relation_count": 0,
-    "probe_digest": "50118fe8f893cae3ad5a9f7e31764869921e0114fd70fa7a74eda92cfefd9bb5",
+    "observed_column_count": 60,
+    "observed_constraint_count": 23,
+    "observed_relation_count": 7,
+    "probe_digest": "fac2c53b411d784ea21690d2a2077a7d9610fef9127682b9cec9b12d4391f405",
     "probes": {
       "durable-application-schema": {
         "column_denominator": 33,
         "constraint_denominator": 13,
-        "missing_columns": {
-          "working_paper_callback_delivery": [
-            "application_id",
-            "durable_at",
-            "forcesave_request_id",
-            "id",
-            "incoming_artifact_id",
-            "operation_id",
-            "response_error",
-            "room_id",
-            "state"
-          ],
-          "working_paper_content_application": [
-            "application_key",
-            "definition_bundle_id",
-            "entry_id",
-            "generation",
-            "id",
-            "incoming_artifact_id",
-            "origin_request_id",
-            "result_revision",
-            "room_id",
-            "state",
-            "wp_id"
-          ],
-          "working_paper_content_version": [
-            "id",
-            "operation_id",
-            "revision",
-            "source",
-            "wp_id"
-          ],
-          "working_paper_sync_operation": [
-            "application_id",
-            "definition_bundle_id",
-            "direction",
-            "entry_id",
-            "forcesave_request_id",
-            "id",
-            "state",
-            "wp_id"
-          ]
-        },
-        "missing_constraints": {
-          "working_paper_callback_delivery": [
-            "ck_wpcd_durable_exactly_one_owner",
-            "ck_wpcd_durable_requires_incoming",
-            "ck_wpcd_durable_state_requires_fact"
-          ],
-          "working_paper_content_application": [
-            "ck_wpca_applied_requires_result",
-            "ck_wpca_state",
-            "working_paper_content_application_application_key_key"
-          ],
-          "working_paper_content_version": [
-            "ck_wpcv_source",
-            "fk_wpcv_operation",
-            "uq_wpcv_wp_revision"
-          ],
-          "working_paper_sync_operation": [
-            "ck_wpso_bound_requires_application",
-            "ck_wpso_not_both_owners",
-            "uq_wpso_application",
-            "uq_wpso_request"
-          ]
-        },
-        "missing_relations": [
-          "working_paper_callback_delivery",
-          "working_paper_content_application",
-          "working_paper_content_version",
-          "working_paper_sync_operation"
-        ],
-        "reason_code": "database_schema_requirements_missing",
+        "missing_columns": {},
+        "missing_constraints": {},
+        "missing_relations": [],
+        "reason_code": null,
         "relation_denominator": 4,
-        "result": "fail"
+        "result": "pass"
       },
       "unified-room-schema": {
         "column_denominator": 27,
         "constraint_denominator": 10,
-        "missing_columns": {
-          "working_paper_forcesave_request": [
-            "frozen_request_fingerprint",
-            "generation",
-            "id",
-            "idempotency_key",
-            "initiated_by_participant_id",
-            "request_sequence",
-            "room_id",
-            "state"
-          ],
-          "working_paper_oo_close_intent": [
-            "barrier_epoch",
-            "generation",
-            "id",
-            "intent_sequence",
-            "ordinary_forcesave_request_id",
-            "participant_id",
-            "promoted_request_id",
-            "room_id",
-            "state"
-          ],
-          "working_paper_oo_room": [
-            "doc_key",
-            "entry_id",
-            "generation",
-            "id",
-            "latest_durable_application_id",
-            "latest_durable_sequence",
-            "latest_request_sequence",
-            "state",
-            "wp_id",
-            "write_fence_epoch"
-          ]
-        },
-        "missing_constraints": {
-          "working_paper_forcesave_request": [
-            "ck_wpfr_state",
-            "uq_wpfr_idempotency",
-            "uq_wpfr_sequence"
-          ],
-          "working_paper_oo_close_intent": [
-            "ck_wpoci_promoted_pair",
-            "ck_wpoci_state",
-            "uq_wpoci_sequence"
-          ],
-          "working_paper_oo_room": [
-            "ck_wpoor_durable_fence_pair",
-            "fk_wpoor_latest_durable_application",
-            "uq_wpoor_doc_key",
-            "uq_wpoor_generation"
-          ]
-        },
-        "missing_relations": [
-          "working_paper_forcesave_request",
-          "working_paper_oo_close_intent",
-          "working_paper_oo_room"
-        ],
-        "reason_code": "database_schema_requirements_missing",
+        "missing_columns": {},
+        "missing_constraints": {},
+        "missing_relations": [],
+        "reason_code": null,
         "relation_denominator": 3,
-        "result": "fail"
+        "result": "pass"
       }
     },
     "query_set_digest": "7a839a90460c5a2dd3873914e22d8af6e896f4f54ae31f6ebf52d62c223051ae",
@@ -690,7 +566,7 @@
     "backend/app/services/workpaper_sync/retention.py": "8e38e39089cb57afffeff05b06bf3285d5b7a9dd3d59a209a58e50af64543368",
     "backend/app/services/workpaper_sync/rooms.py": "0ff9525aec3e77b622d5aec989557c9829c2dd532cbf55e5f08ff7c1c475fb9c",
     "backend/data/guidance/contracts/gc0/compatibility_matrix.json": "ff719040a9eff963c55abb7d36eacb2aeb8484640468a425b1cdfae094b6fa44",
-    "backend/data/guidance/contracts/gc0/evidence/gc0_evidence.json": "15e5eadff04b5a9479184ad46981b22edee8768825d91d366bf91545baab322b",
+    "backend/data/guidance/contracts/gc0/evidence/gc0_evidence.json": "81fd35a249108b99cad9638237cc245595ce177dc28aa36944b1ce091e7e2794",
     "backend/data/guidance/contracts/gc0/fixtures/ack_accepted.json": "499ce1e3c02be04f6ef019cd8385c9eeeb3cf8fb58e40ea50f1b50062522cc2c",
     "backend/data/guidance/contracts/gc0/fixtures/ack_rejected.json": "6a2153897c5f85a638d49feb0fce1ce88e7eae30e99b76a6a5423851e7115146",
     "backend/data/guidance/contracts/gc0/fixtures/evidence_catalog_entry.json": "2023369f33a6874274b04e30e0073962aadf44c0369454a4c27affc6199594f5",
@@ -946,7 +822,7 @@
             },
             {
               "path": "backend/data/guidance/contracts/gc0/evidence/gc0_evidence.json",
-              "sha256": "15e5eadff04b5a9479184ad46981b22edee8768825d91d366bf91545baab322b"
+              "sha256": "81fd35a249108b99cad9638237cc245595ce177dc28aa36944b1ce091e7e2794"
             },
             {
               "path": "backend/data/guidance/contracts/gc0/fixtures/ack_accepted.json",
@@ -9542,11 +9418,6 @@
           "result": "blocked"
         },
         {
-          "predicate_id": "durable-application.database-schema",
-          "reason_code": "database_schema_requirements_missing",
-          "result": "fail"
-        },
-        {
           "predicate_id": "durable-application.real-callback-evidence",
           "reason_code": "durable_callback_application_evidence_missing",
           "result": "unverifiable"
@@ -9611,89 +9482,20 @@
           "details": {
             "column_denominator": 33,
             "constraint_denominator": 13,
-            "missing_columns": {
-              "working_paper_callback_delivery": [
-                "application_id",
-                "durable_at",
-                "forcesave_request_id",
-                "id",
-                "incoming_artifact_id",
-                "operation_id",
-                "response_error",
-                "room_id",
-                "state"
-              ],
-              "working_paper_content_application": [
-                "application_key",
-                "definition_bundle_id",
-                "entry_id",
-                "generation",
-                "id",
-                "incoming_artifact_id",
-                "origin_request_id",
-                "result_revision",
-                "room_id",
-                "state",
-                "wp_id"
-              ],
-              "working_paper_content_version": [
-                "id",
-                "operation_id",
-                "revision",
-                "source",
-                "wp_id"
-              ],
-              "working_paper_sync_operation": [
-                "application_id",
-                "definition_bundle_id",
-                "direction",
-                "entry_id",
-                "forcesave_request_id",
-                "id",
-                "state",
-                "wp_id"
-              ]
-            },
-            "missing_constraints": {
-              "working_paper_callback_delivery": [
-                "ck_wpcd_durable_exactly_one_owner",
-                "ck_wpcd_durable_requires_incoming",
-                "ck_wpcd_durable_state_requires_fact"
-              ],
-              "working_paper_content_application": [
-                "ck_wpca_applied_requires_result",
-                "ck_wpca_state",
-                "working_paper_content_application_application_key_key"
-              ],
-              "working_paper_content_version": [
-                "ck_wpcv_source",
-                "fk_wpcv_operation",
-                "uq_wpcv_wp_revision"
-              ],
-              "working_paper_sync_operation": [
-                "ck_wpso_bound_requires_application",
-                "ck_wpso_not_both_owners",
-                "uq_wpso_application",
-                "uq_wpso_request"
-              ]
-            },
-            "missing_relations": [
-              "working_paper_callback_delivery",
-              "working_paper_content_application",
-              "working_paper_content_version",
-              "working_paper_sync_operation"
-            ],
-            "probe_digest": "50118fe8f893cae3ad5a9f7e31764869921e0114fd70fa7a74eda92cfefd9bb5",
+            "missing_columns": {},
+            "missing_constraints": {},
+            "missing_relations": [],
+            "probe_digest": "fac2c53b411d784ea21690d2a2077a7d9610fef9127682b9cec9b12d4391f405",
             "probe_id": "durable-application-schema",
             "query_set_digest": "7a839a90460c5a2dd3873914e22d8af6e896f4f54ae31f6ebf52d62c223051ae",
             "read_only_verified": true,
-            "reason_code": "database_schema_requirements_missing",
+            "reason_code": null,
             "relation_denominator": 4,
-            "result": "fail"
+            "result": "pass"
           },
           "id": "durable-application.database-schema",
-          "reason_code": "database_schema_requirements_missing",
-          "result": "fail",
+          "reason_code": null,
+          "result": "pass",
           "source_refs": []
         },
         {
@@ -9970,11 +9772,6 @@
           "result": "blocked"
         },
         {
-          "predicate_id": "unified-room.database-schema",
-          "reason_code": "database_schema_requirements_missing",
-          "result": "fail"
-        },
-        {
           "predicate_id": "unified-room.real-room-evidence",
           "reason_code": "real_room_forcesave_close_evidence_missing",
           "result": "unverifiable"
@@ -10039,75 +9836,20 @@
           "details": {
             "column_denominator": 27,
             "constraint_denominator": 10,
-            "missing_columns": {
-              "working_paper_forcesave_request": [
-                "frozen_request_fingerprint",
-                "generation",
-                "id",
-                "idempotency_key",
-                "initiated_by_participant_id",
-                "request_sequence",
-                "room_id",
-                "state"
-              ],
-              "working_paper_oo_close_intent": [
-                "barrier_epoch",
-                "generation",
-                "id",
-                "intent_sequence",
-                "ordinary_forcesave_request_id",
-                "participant_id",
-                "promoted_request_id",
-                "room_id",
-                "state"
-              ],
-              "working_paper_oo_room": [
-                "doc_key",
-                "entry_id",
-                "generation",
-                "id",
-                "latest_durable_application_id",
-                "latest_durable_sequence",
-                "latest_request_sequence",
-                "state",
-                "wp_id",
-                "write_fence_epoch"
-              ]
-            },
-            "missing_constraints": {
-              "working_paper_forcesave_request": [
-                "ck_wpfr_state",
-                "uq_wpfr_idempotency",
-                "uq_wpfr_sequence"
-              ],
-              "working_paper_oo_close_intent": [
-                "ck_wpoci_promoted_pair",
-                "ck_wpoci_state",
-                "uq_wpoci_sequence"
-              ],
-              "working_paper_oo_room": [
-                "ck_wpoor_durable_fence_pair",
-                "fk_wpoor_latest_durable_application",
-                "uq_wpoor_doc_key",
-                "uq_wpoor_generation"
-              ]
-            },
-            "missing_relations": [
-              "working_paper_forcesave_request",
-              "working_paper_oo_close_intent",
-              "working_paper_oo_room"
-            ],
-            "probe_digest": "50118fe8f893cae3ad5a9f7e31764869921e0114fd70fa7a74eda92cfefd9bb5",
+            "missing_columns": {},
+            "missing_constraints": {},
+            "missing_relations": [],
+            "probe_digest": "fac2c53b411d784ea21690d2a2077a7d9610fef9127682b9cec9b12d4391f405",
             "probe_id": "unified-room-schema",
             "query_set_digest": "7a839a90460c5a2dd3873914e22d8af6e896f4f54ae31f6ebf52d62c223051ae",
             "read_only_verified": true,
-            "reason_code": "database_schema_requirements_missing",
+            "reason_code": null,
             "relation_denominator": 3,
-            "result": "fail"
+            "result": "pass"
           },
           "id": "unified-room.database-schema",
-          "reason_code": "database_schema_requirements_missing",
-          "result": "fail",
+          "reason_code": null,
+          "result": "pass",
           "source_refs": []
         },
         {
@@ -10426,12 +10168,12 @@
       "state": "BLOCKED"
     }
   ],
-  "program_digest": "2adee995d0dc572730987c02f9ed1ec61778d6c9c4d5d17f52033ff489e3b4d6",
+  "program_digest": "0617511a7fb6d39cf93614ee297b120fafd587196eaa236f4a8ac05fa99a5b4e",
   "program_id": "workpaper-html-onlyoffice-bidirectional-writeback",
   "program_state": "STALE",
   "schema_version": "workpaper-sync-program-milestones/v1",
   "source_commit": null,
-  "source_digest": "820808b2591b1b40a64914ae21d0dafd588cccc0242e45d17a12cd24f70c4e2d",
+  "source_digest": "1cf8fe0679f219c2470910ef8eac9966441154d78cc9e72d42dc1987e7d931aa",
   "source_state": "digest_bound_without_common_commit",
   "specs": {
     "custom-workpaper-template-ingestion-and-sync-closure": {

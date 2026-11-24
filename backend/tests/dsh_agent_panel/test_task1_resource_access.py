@@ -1027,15 +1027,24 @@ class TestKnowledgeRoutesConsumePublicPolicy:
         run_with_fixture(scenario)
 
     def test_list_documents_denies_before_reading_names_or_bodies(self):
+        """无权读文件夹：**不可枚举 404**（不把无权伪装成合法空目录），且零敏感读取。
+
+        2026-11-23 口径更新：`knowledge_folders._authorize_folder_read` 明确
+        「文件夹不存在或不可读统一 404；列表不得把无权伪装成合法空目录」——
+        旧断言 EXPECT `docs == []`（把无权当空目录返回）已被该设计取代。
+        拒绝语义从「空列表」收紧为「404 不可枚举」，本测试随之断言 404，
+        并保留「拒绝发生在读取 name/正文之前」这一核心判据。
+        """
         async def scenario(fx: AccessFixture, sql_log: list[str]):
             from app.routers import knowledge_folders as kb_routes
+            from app.services.wp_visibility.denial import ExternalNotFound
 
-            # 无权文件夹：返回空列表，且不读取任何文档 name / content_text
+            # 无权文件夹：不可枚举 404，且不读取任何文档 name / content_text
             sql_log.clear()
-            docs = await kb_routes.list_documents(
-                fx.folder_private_auditor.id, fx.session, fx.actor("manager").user
-            )
-            assert docs == []
+            with pytest.raises(ExternalNotFound):
+                await kb_routes.list_documents(
+                    fx.folder_private_auditor.id, fx.session, fx.actor("manager").user
+                )
             hits = [h for h in _sensitive_hits(sql_log) if "knowledge" in h or "content" in h]
             assert not hits, f"无权 list_documents 竟读取了 label/正文: {hits}"
 
