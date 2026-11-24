@@ -62,6 +62,13 @@ def parse_args() -> argparse.Namespace:
         help="分布式运行：master 侧汇总目录，内含各 worker 的 stage_stats_worker*.json（E4）",
     )
     parser.add_argument("--resource-sample-interval", type=float, default=15.0)
+    parser.add_argument(
+        "--skip-safety-probes",
+        action="store_true",
+        help="跳过 A1 探针自动采集（默认在压测前后各跑一次 run_all_probes 喂安全证据）",
+    )
+    parser.add_argument("--probe-project", default=None, help="探针项目 id（安全计数生产者需要；缺省时写探针类探针 fail-closed）")
+    parser.add_argument("--probe-pg-dsn", default=None, help="探针用 PG DSN（连接池对账；缺省从 DATABASE_URL 推导）")
     return parser.parse_args()
 
 def run_locust_full_shape(
@@ -260,6 +267,126 @@ def _prepare_external_evidence(args: argparse.Namespace) -> tuple[dict[str, Any]
     return safety, baseline
 
 
+def _probe_pg_dsn(args: argparse.Namespace) -> str | None:
+    """探针连接池对账用 DSN；--probe-pg-dsn 优先，否则从 DATABASE_URL 推导。"""
+    if args.probe_pg_dsn:
+        return args.probe_pg_dsn
+    url = os.environ.get("DATABASE_URL", "")
+    if "postgresql" not in url:
+        return None
+    # asyncpg:// → psycopg 需要的 postgres://（其余部分兼容）
+    dsn = url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    if dsn.startswith("postgresql+"):
+        dsn = dsn.split("+", 1)[0].replace("postgresql", "postgresql", 1) and dsn.split("://", 1)[0].split("+")[0] + "://" + dsn.split("://", 1)[1]
+    return dsn
+
+
+def _probe_env_flags(args: argparse.Namespace) -> tuple[bool, str | None, str | None]:
+    """从环境推导探针三要素：disposable、低权账号密码、探针项目 id。"""
+    disposable = (os.environ.get("GT_LOAD_DISPOSABLE_ENV") or "").strip() == "YES"
+    low_user = (os.environ.get("GT_LOAD_PROBE_LOW_USER") or "").strip() or None
+    low_password = (os.environ.get("GT_LOAD_PROBE_LOW_PASSWORD") or "").strip() or None
+    return disposable, low_user, low_password
+
+
+def _admin_token_for_probe(host: str) -> str | None:
+    """压测发起方需要管理员 token 供探针读端点使用；从账号池第一个账号登录获取。"""
+    from tests.load.load_config import load_config
+
+    try:
+        config = load_config()
+    except ValueError as exc:
+        print(f"[PROBE] 账号池不可用，探针将 fail-closed：{exc}")
+        return None
+    if not config.accounts:
+        return None
+    account = config.accounts[0]
+    import httpx
+
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            response = client.post(
+                f"{host.rstrip('/')}/api/auth/login",
+                json={"username": account.username, "password": account.password},
+            )
+    except httpx.HTTPError as exc:
+        print(f"[PROBE] 探针登录失败（fail-closed）：{exc}")
+        return None
+    if response.status_code != 200:
+        print(f"[PROBE] 探针登录 HTTP {response.status_code}（fail-closed）")
+        return None
+    body = response.json()
+    data = body.get("data") if isinstance(body, dict) else None
+    token = (data or {}).get("access_token") if isinstance(data, dict) else None
+    return str(token) if token else None
+
+
+def _low_privilege_token_for_probe(host: str, username: str | None, password: str | None) -> str | None:
+    """低权账号登录（越权回放探针用）；未配置返回 None（探针自己 fail-closed）。"""
+    if not username or not password:
+        return None
+    import httpx
+
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            response = client.post(
+                f"{host.rstrip('/')}/api/auth/login",
+                json={"username": username, "password": password},
+            )
+    except httpx.HTTPError:
+        return None
+    if response.status_code != 200:
+        return None
+    body = response.json()
+    data = body.get("data") if isinstance(body, dict) else None
+    token = (data or {}).get("access_token") if isinstance(data, dict) else None
+    return str(token) if token else None
+
+
+def run_probe_evidence(
+    *,
+    phase: str,
+    host: str,
+    evidence_dir: Path,
+    args: argparse.Namespace,
+    connection_timeouts: int | None = None,
+    skip_write_probes: bool = False,
+) -> dict[str, Any]:
+    """A1 接线：调 ``safety_probes.run_all_probes`` 生成六类安全计数证据。
+
+    - before/after 两个时点各调一次（探针的连接池对账需要压测前后采样对）；
+      before 在 Locust 启动前、after 在压测结束后；
+    - 结果写 ``evidence_dir/probe_evidence.json``，并把两个时点的
+      ``safety`` 合并进 stats（after 时点为准，before 采样明细进 probe_meta）；
+    - 探针 runner 的 ``errors``（环境前提缺失/探针执行失败）原样落
+      ``probe_meta.errors``，由 evaluate/校验层 fail-closed——本函数不吞、
+      也不伪造 0。
+    """
+    from tests.load.safety_probes import run_all_probes
+
+    disposable, low_user, low_password = _probe_env_flags(args)
+    admin_token = _admin_token_for_probe(host)
+    low_token = _low_privilege_token_for_probe(host, low_user, low_password) if low_user else None
+    payload = run_all_probes(
+        phase=phase,
+        base_url=host,
+        admin_token=admin_token or "",
+        low_privilege_token=low_token,
+        probe_project_id=args.probe_project,
+        disposable_env=disposable,
+        pg_dsn=_probe_pg_dsn(args),
+        connection_timeouts=connection_timeouts,
+        skip_write_probes=skip_write_probes,
+    )
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    path = evidence_dir / f"probe_evidence_{phase}.json"
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False),
+        encoding="utf-8",
+    )
+    return payload
+
+
 def main() -> int:
     args = parse_args()
     print("=" * 70)
@@ -286,13 +413,53 @@ def main() -> int:
         if args.evidence_dir
         else DEFAULT_EVIDENCE_ROOT / f"run_{stamp}"
     )
+
+    # A1：压测前时点探针（连接池 before 采样 + 环境自检；读探针不在此时点跑）。
+    if not args.skip_safety_probes:
+        try:
+            before_payload = run_probe_evidence(
+                phase="before", host=args.host, evidence_dir=evidence_dir, args=args,
+            )
+            print(f"[PROBE] before 时点证据已写 {evidence_dir / 'probe_evidence_before.json'}")
+        except Exception as exc:  # noqa: BLE001 - 探针失败不挡压测，after 时点会 fail-closed
+            before_payload = None
+            print(f"[PROBE] before 时点执行失败（不挡压测）：{exc}")
+
     stats = run_locust_full_shape(
         args.host,
         evidence_dir,
         sample_interval=args.resource_sample_interval,
         worker_stats_dir=Path(args.worker_stats_dir) if args.worker_stats_dir else None,
     )
-    stats["safety"] = safety
+    # A1：压测后时点探针（全量六类）；connection_timeouts 由 Locust 统计喂入，
+    # 拿不到就传 None（探针自己 fail-closed，不伪造 0）。
+    if not args.skip_safety_probes:
+        try:
+            after_payload = run_probe_evidence(
+                phase="after", host=args.host, evidence_dir=evidence_dir, args=args,
+                connection_timeouts=None,
+                skip_write_probes=bool(args.worker_stats_dir),
+            )
+            stats["safety"] = after_payload.get("safety") or {}
+            stats["probe_meta"] = {
+                "before": (before_payload or {}).get("probe_meta"),
+                "after": after_payload.get("probe_meta"),
+            }
+            probe_errors = list(after_payload.get("probe_meta", {}).get("errors") or [])
+            if probe_errors:
+                stats["probe_errors"] = probe_errors
+                print(f"[PROBE] {len(probe_errors)} 条探针错误（fail-closed 进判定）")
+                for message in probe_errors:
+                    print(f"  - {message}")
+            else:
+                print(f"[PROBE] after 时点证据已写 {evidence_dir / 'probe_evidence_after.json'}")
+        except Exception as exc:  # noqa: BLE001 - 同上：探针异常落 errors 不伪造证据
+            stats["probe_errors"] = [f"after 探针执行失败：{exc}"]
+            print(f"[PROBE] after 时点执行失败（fail-closed）：{exc}")
+    else:
+        stats["probe_meta"] = {"skipped": True}
+
+    stats["safety"] = safety if safety else stats.get("safety", {})
     comparison = compare_to_baseline(stats, baseline)
     stats["comparison"] = comparison
     evaluation = evaluate_results(stats)

@@ -260,7 +260,12 @@ class AuditPlatformUser(HttpUser):
 
 
 class StepLoadShape(LoadTestShape):
-    """E5 正式梯度：100 → 1000 → 3000 → 6000；6000 稳态 30 分钟。"""
+    """E5 正式梯度：100 → 1000 → 3000 → 6000；6000 稳态 30 分钟。
+
+    A2 编排冒烟通过 ``GT_LOAD_SMOKE_STAGES_JSON`` 注入短阶段（同 schema：users /
+    spawn_rate / duration），此时 timeline 由同一 ``stage_timeline`` 按冒烟阶段计算，
+    时间线/稳态窗口语义与正式梯度完全一致（单一来源不变）。
+    """
 
     timeline = stage_timeline()
 

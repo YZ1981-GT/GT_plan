@@ -22,10 +22,29 @@ from tests.load.load_contract import LOAD_STAGES, STEADY_SETTLE_SECONDS
 SCHEMA_VERSION = 1
 STAGE_STATS_ENV = "GT_LOAD_STAGE_STATS_FILE"
 STAGE_STATS_FILE_NAME = "stage_stats.json"
+#: A2 编排冒烟的短梯度注入（JSON 数组，schema 与 LOAD_STAGES 同）。
+#: 只在 run_smoke 显式设置时生效；未设置时 stage_timeline 一律用正式 LOAD_STAGES。
+SMOKE_STAGES_ENV = "GT_LOAD_SMOKE_STAGES_JSON"
+
+
+def _stages_source() -> list[dict[str, Any]]:
+    """冒烟注入优先，否则正式梯度（load_contract 单一来源）。"""
+    import os
+
+    raw = (os.environ.get(SMOKE_STAGES_ENV) or "").strip()
+    if not raw:
+        return [dict(stage) for stage in LOAD_STAGES]
+    value = json.loads(raw)
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{SMOKE_STAGES_ENV} 必须是非空 JSON 数组")
+    for index, stage in enumerate(value):
+        if not isinstance(stage, dict) or not {"users", "spawn_rate", "duration"} <= set(stage):
+            raise ValueError(f"{SMOKE_STAGES_ENV} 第 {index + 1} 项缺 users/spawn_rate/duration")
+    return value
 
 
 def stage_timeline(
-    stages: Iterable[Mapping[str, Any]] = LOAD_STAGES,
+    stages: Iterable[Mapping[str, Any]] | None = None,
     *,
     settle_seconds: float = STEADY_SETTLE_SECONDS,
 ) -> list[dict[str, Any]]:
@@ -33,7 +52,12 @@ def stage_timeline(
 
     第 i 阶段占 ``[begin_s, end_s)``：先按 ``users / spawn_rate`` 的标称时长加压，再稳态
     ``duration`` 秒；稳态窗口从标称加压结束后再过 ``settle_seconds`` 开始计入。
+
+    ``stages=None``（默认）时读 ``_stages_source()``：设置 ``GT_LOAD_SMOKE_STAGES_JSON``
+    用冒烟短梯度，否则正式 LOAD_STAGES。
     """
+    if stages is None:
+        stages = _stages_source()
     timeline: list[dict[str, Any]] = []
     elapsed = 0.0
     for stage in stages:

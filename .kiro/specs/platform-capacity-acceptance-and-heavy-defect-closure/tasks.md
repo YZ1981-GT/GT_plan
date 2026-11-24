@@ -4,7 +4,7 @@
 > （2026-11-22 用户拍板）。上游 36 项编号任务已交付 35 项 + E6 进行中 `[-]`；
 > 本清单只承接**必须专用容量环境或独立 spec 工作量**的余项，编号与上游余项对应。
 > 所有 `*` 项 = 需专用容量环境（6000 VU 负载机 + 可销毁容量 PG + PgBouncer 进程），
-> 本机无法伪造，未具备环境前保持 `[ ]*`。
+> 本机无法伪造，未具备环境前保持 `[ ]`。
 
 ## A. 容量验收（R1~R3）
 
@@ -13,28 +13,34 @@
     六个探针，输出进 `stage_stats.json` 同形载荷；`run_final --safety-evidence`
     从「只校验」升级为「有生产者喂数」。
   - 每个探针配 SQLite/合成夹具单测 + 磁盘变异（删探针 ⇒ run_final 缺键即 FAIL）。
-- [ ]* A2 分布式负载机编排（E4 余量）：Locust master + N worker 启动脚本、
+  - ✅ 2026-11-24 接线收口：`run_final.run_probe_evidence` before/after 两时点
+    自动喂 `run_all_probes`；变异 2/2 RED。见交付登记。
+- [ ] A2 分布式负载机编排（E4 余量）：Locust master + N worker 启动脚本、
   `--worker-stats-dir` 共享目录、逐 worker stage_stats 合并判定全链跑通。
   - 环境前提：≥4 核压测机 + 独立可销毁容量 PG。先在本机单 worker 冒烟
     （短梯度 + 假后端，复用上游 E5 冒烟模式）验证编排正确性。
-- [ ]* A3 6000 VU 梯度实跑与判定（E5/E6）：100→1000→3000→6000、6000 稳态
+- [ ] A3 6000 VU 梯度实跑与判定（E5/E6）：100→1000→3000→6000、6000 稳态
   ≥30 分钟；核心读 p95≤300ms / p99≤1s / 错误率<0.1%；六类安全计数全 0。
   - 环境前提：A1+A2 就绪；产出归档原始 CSV / summary.json / resource_samples.json。
 - [~] A4 PgBouncer 灰度脚本 + 2%→25%→100% 实跑（E1 余量）。
   - 代码与守卫本机可做：`scripts/ops/pgbouncer_gradual_rollout.py` 三阶段状态机 +
     越门回退 + `rollout_incident.json`；前置断言接契约 9 例与连接预算 14 例。
   - 实跑需部署环境（PgBouncer 进程 + 真实后端 + 专用库）。
-- [ ]* A5 多 worker 2/4/8 验证（E2 余量）：进度 / 失效状态外置补齐 + Redis adapter
+- [ ] A5 多 worker 2/4/8 验证（E2 余量）：进度 / 失效状态外置补齐 + Redis adapter
   注入 + 零丢失 / 零重复实跑。
   - 进度读侧聚合与失效对账探针本机可做；多 worker 实跑需容量环境。
+  - ✅ 2026-11-24 本机部分交付：`worker_reconcile.py`（读侧聚合 + attempt
+    冲突检测 + 失效广播对账，12 单测 + 变异 3/3 RED）；2/4/8 实跑仍需容量环境。
 
 ## B. SQL / 索引 / 流式路由（R4/R6）
 
-- [ ] B1 合并附注差额节点语义裁决 + 叶子来源整章批取（C2/C3 余项）。
+- [x] B1 合并附注差额节点语义裁决 + 叶子来源整章批取（C2/C3 余项）。
   - 先裁决：`fill_by_formula` 语义是否需要纯内存内核（对照上游 C3 勘误，
     不得写成不存在的 `_compute_elimination`）；裁决结论写 ADR。
   - 章节锁并发 barrier（5 例）作回归门；真 PG 一次性库复跑。
-- [ ]* B2 真实大项目 SQL 基线（C1/C4 余项）：10000 公式单元 run 基线与耗时、
+  - ✅ 2026-11-24 变异验证收口：4 条锁语义变异（去锁/粗粒度/非法签名/ns 串号）
+    全 RED 且红在指定判据；一次性库 gt_b1_mutation 复跑。见交付登记。
+- [ ] B2 真实大项目 SQL 基线（C1/C4 余项）：10000 公式单元 run 基线与耗时、
   大账套导入 rows/s / WAL / COPY / staging / index / activation 实测。
   - 环境前提：专用可销毁 PG + 真实大项目数据；棘轮只降不升。
 - [ ] B3 知识检索索引落地生产（C5 余量）：按 EXPLAIN 证据裁决 pg_trgm vs tsvector，
@@ -49,7 +55,7 @@
 - [ ] C1 虚拟化表交互契约（D1 前置，约 1000 行前端）：离屏逻辑选区 / 编辑器回收 /
   稳定行与列 key / 公式格 / 批注锚点 / 无障碍协议定义 + GtVirtualTable 接入层。
   - 单测对拍先行（GridKernel 事件）；任何既有能力回退即阻断。
-- [ ]* C2 TB 1000/5000 行 canary（D1 本体）与 C3 附注 / 合并表接入（D3）：
+- [ ] C2 TB 1000/5000 行 canary（D1 本体）与 C3 附注 / 合并表接入（D3）：
   契约齐全后真实数据 Playwright 取证。
   - 环境前提：容量环境一并取证（与 A3 同窗口）。
 
@@ -138,3 +144,61 @@ C1 先于 C2/C3；C2/C3* 随 A3 窗口取证
   判据 5 是锁存在的业务意义证明（后续变异验证未完成——命令被中断，
   修复本体已由 7 例绿 + 单体内核同形背书）。SQLite 回归 7 skipped。
   ⑤既有 barrier（单体内核 5 例）与本套（合并附注 5+1 例）双门常驻回归。
+- **2026-11-24 B1 变异验证补齐（B1 全项收口 `[x]`）**：4 条变异逐个磁盘注入
+  `consol_note_formula_service.py` 的锁 SQL（subprocess 隔离跑 barrier，
+  LF 写盘、finally 逐字节还原）全部 RED 且红在指定判据：
+  M1 去锁 → 判据 1（同 (section,node) 互斥超时红）· M2 粗粒度（锁 key 去
+  node 段，**行锚定注入**）→ 判据 2（同章节不同节点红）· M3 非法签名回归
+  （`hashtextextended` 两参，B1 真库 P0 原形）→ 判据 1/2/3 全
+  UndefinedFunctionError · M4 namespace 串号（改成与单体内核同 0x6E6F7465）
+  → 第 7 例「跨域误伤」自检红。一次性库 `gt_b1_mutation` 基线 7 passed 后
+  跑变异，用完 DROP；目标文件与 HEAD byte-equal、`git ls-files` 27153 条数不变。
+  🔴 教训：①变异锚点命中 docstring + 代码两处同名引用时 `replace(1)` 会改到
+  docstring ⇒ 行为不变、变异存活（首轮 M2 即此形态），锚定必须带行首缩进
+  或整行上下文；②红形态判据用「红在哪个测试函数」比 assert 文案硬
+  （`--tb=line` 不打断言消息，靠文案匹配会误判「红但形态不符」）。
+  探针：`tmp_b1_mutation/probe/run_mutations.py`（一次性）。
+- **2026-11-24 A1 接线交付（A1 全项收口 `[x]`）**：`run_final.py` 新增
+  `run_probe_evidence()` + `--skip-safety-probes` / `--probe-project` /
+  `--probe-pg-dsn`：**before**（Locust 启动前，连接池采样 + 环境自检）与
+  **after**（压测后，全量六类探针）各调一次 `safety_probes.run_all_probes`，
+  证据写 `evidence_dir/probe_evidence_{phase}.json`；after 的 `safety` 进
+  `stats["safety"]`（外部 `--safety-evidence` 仍可覆盖，向后兼容），
+  `probe_meta.errors` 原样落 `stats["probe_errors"]` **fail-closed 不吞错、
+  不伪造 0**；多 worker 分支（`--worker-stats-dir`）写探针跳过（探针只在
+  master 侧跑，分布式下逐 worker 写探针会重复计数）。配套单测
+  `test_run_final_probe_wiring.py` 3 例**真调 main()**（monkeypatch sys.argv
+  避开 argparse 吃 pytest 参数；`write_evidence_json` 替身参数化 `write_hook`
+  捕获 stats）：正常链路 before+after 各一次、skip 分支不调探针且不伪造
+  safety、errors 必进 `probe_errors`。变异 2/2 全 RED：M1 skip 分支伪造全 0
+  证据 → skip 用例红；M2 探针错误被吞 → errors 用例红。
+  🔴 教训：①**上一会话登记的「A1 接线完成 8 passed」与磁盘不符**
+  （`test_run_final_probe_evidence.py` 不存在、`run_final.py` 无接线改动）
+  —— 任务标记前必须核磁盘，本会话按磁盘现状重做；②守卫假绿新形态：
+  把 main() 的分支逻辑 copy 进测试自己拼 stats，变异改 run_final.py 时
+  测试路径不经过被改代码恒绿（v1 两条变异全存活）⇒ 判据必须真调 main()；
+  ③测试替身 lambda 无意覆盖调用方自建的 capture hook ⇒ 替身与捕获钩子
+  参数化分离。`safety_probes.py` + `test_safety_probes.py` 全文 mojibake
+  顺带修复（HEAD 已入库版本 0 CJK / 1280 个 `?`，按 ASCII docstring 重写，
+  API 与行为不变；重写后 14 passed）。
+- **2026-11-24 A5 本机部分交付（实跑余项保持 `[ ]*`）**：新建
+  `tests/load/worker_reconcile.py`（A5 读侧聚合与失效对账探针，runner
+  编排职责不经 HTTP）：①`aggregate_job_progress(rows)` —— 各 worker 的
+  job 行按 operation 聚合（状态计数 / progress 求和 / **attempt 冲突检测**：
+  同一 operation 出现多个 attempt_count ⇒ `attempt_conflicts` +1，多 worker
+  各自改同一 DB 行时暴露）；②`run_stale_reconcile_probe(broadcast_seq,
+  received_seqs)` —— 失效广播对账：以 master 广播序列为基准逐 worker 对账，
+  缺号 ⇒ `stale_event_loss` 逐号计数、重号 ⇒ `stale_event_duplicate`，
+  worker 收到基准外的号（其他项目事件）不算异常；键
+  `STALE_RECONCILE_KEYS` 与六类安全计数同形随 stage_stats 输出。
+  `test_worker_reconcile.py` 12 passed（空集全零 / 负数钳 0 / 缺字段落
+  unknown / 多余 id 不算丢 / 双故障独立可红）；变异 3/3 全 RED
+  （M1 attempt 盲化 len>1→>99 / M2 丢失盲化集合差→空 / M3 重复盲化
+  count>1→>99，各红在对应用例）。**执行侧不重复实现**：跨 worker 认领
+  （SKIP LOCKED + attempt 围栏）已由 `test_platform_job_fault_injection.py`
+  5 例钉住，本模块只做读侧。多 worker 2/4/8 实跑需容量环境，保持 `[ ]*`。
+- **2026-11-24 回归**：`tests/load/` 全套 **171 passed**（含 A1 接线 3 +
+  A5 12 + mojibake 修复后 safety 14）；B1 修复本体与变异互不干扰
+  （formula_service 变异后与 HEAD byte-equal）；并发会话同日交付的
+  A2（fakeserver/run_smoke/编排单测）与 C1（virtualInteractionContract
+  626 行 + spec 389 行）文件在工作区完好，本会话未触碰。

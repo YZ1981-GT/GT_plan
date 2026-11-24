@@ -1,11 +1,14 @@
-"""A1 ??????????????????????? / ?? PG??"""
+"""A1 safety-probe unit tests (synthetic fixtures, no real PG / no network).
+
+spec: platform-capacity-acceptance-and-heavy-defect-closure A1.
+Every probe is exercised through an injected ``httpx.MockTransport`` so the
+suite stays offline; assertion semantics mirror the module docstring.
+"""
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import httpx
-import pytest
 
 from tests.load.safety_probes import (
     CONNECTION_LEAK_TOLERANCE,
@@ -17,7 +20,7 @@ from tests.load.safety_probes import (
 
 
 # ---------------------------------------------------------------------------
-# ?????? load_evaluation.load_safety_evidence ??????
+# Payload shape must match load_evaluation.load_safety_evidence
 # ---------------------------------------------------------------------------
 
 
@@ -25,17 +28,13 @@ class TestReportShape:
     def test_keys_match_safety_zero_keys(self) -> None:
         report = ProbeReport()
         assert set(report.counts) == set(SAFETY_ZERO_KEYS)
-        # ????? None???? ? 0??fail-closed ??????????
+        # All-None start: "not measured" is not "0", fail-closed on missing data.
         assert all(value is None for value in report.counts.values())
 
     def test_payload_directly_consumable_by_load_evaluation(self) -> None:
         report = ProbeReport()
         report.counts = {k: 0 for k in SAFETY_ZERO_KEYS}
         payload = report.to_payload()
-        from tests.load.load_evaluation import load_safety_evidence
-
-        loaded = load_safety_evidence.__wrapped__ if False else None  # guard against accidental misuse
-        # ??? safety ???????????????? + ?????
         safety = payload["safety"]
         unknown = sorted(set(safety) - set(SAFETY_ZERO_KEYS))
         assert not unknown
@@ -44,12 +43,12 @@ class TestReportShape:
 
 
 # ---------------------------------------------------------------------------
-# ?? 1?????
+# Probe 1: unauthorized successes
 # ---------------------------------------------------------------------------
 
 
 class TestUnauthorizedProbe:
-    """?? runner._make_client ???? httpx.MockTransport?"""
+    """Injects a httpx.MockTransport via runner._make_client."""
 
     @staticmethod
     def _runner(**kwargs) -> SafetyProbeRunner:
@@ -114,8 +113,7 @@ class TestConnectionLeaks:
         runner = SafetyProbeRunner(
             base_url="http://probe", admin_token="t", probe_project_id="p1",
         )
-        runner.report.details["connection_pool"] = {"before": 10, "after": 10 + CONNECTION_LEAK_TOLERANCE}
-        # ????????? pg_dsn ????delta == tolerance ? ???
+        # Tolerance edge: delta == tolerance counts 0 (warm pool drift is not a leak).
         leaked = CONNECTION_LEAK_TOLERANCE
         assert (1 if leaked > CONNECTION_LEAK_TOLERANCE else 0) == 0
 
@@ -132,7 +130,7 @@ class TestConnectionLeaks:
 
 
 # ---------------------------------------------------------------------------
-# ?? 3???????
+# Probe 3: connection timeouts
 # ---------------------------------------------------------------------------
 
 
@@ -150,13 +148,14 @@ class TestConnectionTimeouts:
 
 
 # ---------------------------------------------------------------------------
-# run_all_probes ????
+# run_all_probes phase orchestration
 # ---------------------------------------------------------------------------
 
 
 class TestRunAllProbes:
     def test_before_phase_does_not_run_write_probes(self) -> None:
-        # before ???????disposable=False??????????
+        # before: no probe errors expected even with disposable_env=False
+        # (no write probe runs in the before phase).
         payload = run_all_probes(
             phase="before",
             base_url="http://probe",
@@ -165,10 +164,7 @@ class TestRunAllProbes:
             disposable_env=False,
         )
         assert set(payload["safety"]) == set(SAFETY_ZERO_KEYS)
-        # before ?????????????????????? None?????
-        assert payload["probe_meta"]["errors"] == [] or all(
-            "?????" not in e for e in payload["probe_meta"]["errors"]
-        )
+        assert payload["probe_meta"]["errors"] == []
 
     def test_after_phase_without_disposable_fails_write_probes(self) -> None:
         payload = run_all_probes(
@@ -180,8 +176,9 @@ class TestRunAllProbes:
             skip_write_probes=False,
         )
         errors = payload["probe_meta"]["errors"]
-        assert any("?????" in e for e in errors)
-        # ????????? None??? 0?
+        assert any("duplicate_side_effects" in e for e in errors)
+        assert any("data_corruption" in e for e in errors)
+        # Write probes that could not run must stay None, never 0.
         assert payload["safety"]["duplicate_side_effects"] is None
         assert payload["safety"]["data_corruption"] is None
 
@@ -196,5 +193,5 @@ class TestRunAllProbes:
         )
         assert payload["safety"]["duplicate_side_effects"] is None
         assert payload["safety"]["data_corruption"] is None
-        # ??????? token ? unauthorized ?? None?fail-closed?
+        # Missing probe project also leaves unauthorized None (fail-closed).
         assert payload["safety"]["unauthorized_successes"] is None
