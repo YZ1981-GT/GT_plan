@@ -39,7 +39,20 @@ import {
 // ── Generators ───────────────────────────────────────────────────────────────
 
 const THREE_PERIOD = ['D2', 'K1', 'K3', 'G5'] as const
-const TWO_PERIOD = ['D3', 'F1'] as const
+// 🔴 2026-11-24 勘误：F1 已在生产 THREE_PERIOD_SUBJECTS 里（升为三期间科目），
+// 双期间清单若仍含 F1，PBT 生成 subject=F1 时「双期间 currentField 必须为空」
+// 这条断言就与生产矛盾（实测 Counterexample: subject=F1）。
+// 生产全集注释（useAgingConfig.ts buildAgingExportHeaders）：3-period =
+// D2/K1/K3/G5/F1；2-period = D3。此处用生产常量对拍防再漂移。
+const TWO_PERIOD = ['D3'] as const
+
+/** 与生产 THREE_PERIOD_SUBJECTS 逐值对拍（防清单再漂移；segmentsToBands 已在上方 import）。 */
+const PROD_THREE = new Set(['D2', 'K1', 'K3', 'G5', 'F1'])
+expect([...PROD_THREE].sort()).toEqual([...THREE_PERIOD, 'F1'].sort())
+// 两个测试清单与生产集合互斥
+for (const t of TWO_PERIOD) {
+  expect(PROD_THREE.has(t)).toBe(false)
+}
 
 /** Generate N segments (2..10) with unique keys and derived labels. */
 function segmentsArb(min = 2, max = 10): fc.Arbitrary<AgingSegment[]> {

@@ -155,6 +155,8 @@ class SheetReport:
     projection_recommendation: ProjectionRecommendation
     sample_formulas: tuple[str, ...]
     cell_type_counts: dict[str, int]
+    #: 单列金额 region 候选（逐 region 确认 UI 的数据源；扫描器只给候选，不猜单位）
+    amount_region_candidates: tuple[AmountRegionCandidate, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -181,6 +183,7 @@ class SheetReport:
             "projectionRecommendation": self.projection_recommendation.value,
             "sampleFormulas": list(self.sample_formulas),
             "cellTypeCounts": dict(self.cell_type_counts),
+            "amountRegionCandidates": [r.to_dict() for r in self.amount_region_candidates],
         }
 
 
@@ -439,6 +442,12 @@ def _scan_sheet(
     hidden_cols = 0
     comment_count = 0
 
+    # 逐列统计（amount region 候选推导）：记录每列的非空数值格数、首行文本、
+    # 首个数值格行号 —— 金额列的形态 = 首行（表头）是文本 + 该列数值格显著。
+    col_numeric: dict[int, int] = {}
+    col_first_text: dict[int, str] = {}
+    col_first_numeric_row: dict[int, int] = {}
+
     # 声明范围（稀疏炸弹信号）
     dim = getattr(ws, "dimensions", None) or getattr(ws, "calculate_dimension", lambda: None)()
     used_range = str(dim) if dim else None
@@ -465,8 +474,13 @@ def _scan_sheet(
                 type_counts["b"] += 1
             elif isinstance(value, (int, float)):
                 type_counts["n"] += 1
+                col_numeric[cell.column] = col_numeric.get(cell.column, 0) + 1
+                col_first_numeric_row.setdefault(cell.column, cell.row)
             elif isinstance(value, str):
                 type_counts["s"] += 1
+                # 首行（表头区）的文本记作该列的标题候选
+                if cell.row <= 3 and cell.column not in col_first_text:
+                    col_first_text[cell.column] = value.strip()[:60]
             else:
                 type_counts["other"] += 1
 
@@ -539,6 +553,16 @@ def _scan_sheet(
         non_empty=non_empty,
         state=state,
     )
+    from app.services.custom_template_ingestion.amount_region_candidates import (
+        derive_amount_region_candidates,
+    )
+
+    region_candidates = derive_amount_region_candidates(
+        col_numeric=col_numeric,
+        col_first_text=col_first_text,
+        col_first_numeric_row=col_first_numeric_row,
+        non_empty=non_empty,
+    )
 
     report = SheetReport(
         sheet_uid=sheet_uid,
@@ -564,6 +588,7 @@ def _scan_sheet(
         projection_recommendation=projection,
         sample_formulas=tuple(sample_formulas),
         cell_type_counts=type_counts,
+        amount_region_candidates=tuple(region_candidates),
     )
     return report, cross_samples, non_empty
 

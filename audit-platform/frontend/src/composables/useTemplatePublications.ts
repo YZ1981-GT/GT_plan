@@ -68,6 +68,35 @@ export interface SheetMappingInput {
   manifestVersion?: string | null
 }
 
+export interface WithdrawResult {
+  publicationKey: string
+  state: string
+  reason: string
+  runtimeDiscoverable: boolean
+}
+
+export interface SecurityRevokeResult {
+  publicationKey: string
+  state: string
+  reason: string
+  affectedProjects: string[]
+  pinsCleared: boolean
+  runtimeDiscoverable: boolean
+}
+
+export interface UpgradeOffer {
+  fromPublicationKey: string
+  toPublicationKey: string
+  diffDigest: string
+  requiresApproval: boolean
+}
+
+export interface ApplyUpgradeResult {
+  projectId: string
+  pinnedTo: string
+  stagingOk: boolean
+}
+
 /** preflight 报告里的单个 sheet（来自 `GET /artifacts/{id}` 的 manifest.preflight）。 */
 export interface PreflightSheet {
   sheetUid: string
@@ -168,7 +197,7 @@ export function useTemplatePublications() {
             reasonCodes: a.reasonCodes ?? [],
           })),
         },
-        { _silent: true },
+        { _silent: true } as any,
       )
       await load()
       return response
@@ -192,7 +221,7 @@ export function useTemplatePublications() {
     try {
       const response = await api.get<{ artifact: Record<string, unknown> }>(
         `${BASE}/artifacts/${artifactId}`,
-        { _silent: true },
+        { _silent: true } as any,
       )
       const artifact = response?.artifact ?? {}
       const preflight = artifact.preflight as Record<string, unknown> | undefined
@@ -236,7 +265,7 @@ export function useTemplatePublications() {
       const response = await api.post<InstantiateResult>(
         `${BASE}/publications/instantiate`,
         { publicationKey, workingPaperId, sheets },
-        { _silent: true },
+        { _silent: true } as any,
       )
       // 🔴 服务端说没真实例化就不是成功 —— 不能把 pinned 当完成。
       if (!response?.instantiated || !response?.workbookInstanceId) {
@@ -253,6 +282,108 @@ export function useTemplatePublications() {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // 撤回 / 安全撤销 / 升级（2026-11-24 接线：后端四端点此前无前端入口）
+  // -------------------------------------------------------------------------
+
+  /** 撤回 publication（ACTIVE → WITHDRAWN）。已 pin 的项目继续使用。 */
+  async function withdraw(
+    publicationKey: string,
+    reason: string,
+  ): Promise<WithdrawResult | null> {
+    lastError.value = null
+    if (!reason.trim()) {
+      // 撤回必须写原因（与后端 Field(min_length=2) 同口径，前端先挡一次）。
+      lastError.value = '撤回必须填写原因'
+      return null
+    }
+    try {
+      const response = await api.post<WithdrawResult>(
+        `${BASE}/publications/${encodeURIComponent(publicationKey)}/withdraw`,
+        { reason },
+        { _silent: true } as any,
+      )
+      await load()
+      return response
+    } catch (error) {
+      lastError.value = apiErrorMessage(error, '撤回失败')
+      return null
+    }
+  }
+
+  /** 安全撤销（ACTIVE → SECURITY_REVOKED）。默认清 pin，阻断后续实例化。 */
+  async function securityRevoke(
+    publicationKey: string,
+    reason: string,
+    clearPins = true,
+  ): Promise<SecurityRevokeResult | null> {
+    lastError.value = null
+    if (!reason.trim()) {
+      lastError.value = '安全撤销必须填写原因'
+      return null
+    }
+    try {
+      const response = await api.post<SecurityRevokeResult>(
+        `${BASE}/publications/${encodeURIComponent(publicationKey)}/security-revoke`,
+        { reason, clearPins },
+        { _silent: true } as any,
+      )
+      await load()
+      return response
+    } catch (error) {
+      lastError.value = apiErrorMessage(error, '安全撤销失败')
+      return null
+    }
+  }
+
+  /** 产出升级提议（不改状态）。项目必须已 pin，目标必须 ACTIVE。 */
+  async function offerUpgrade(
+    projectId: string,
+    toPublicationKey: string,
+  ): Promise<UpgradeOffer | null> {
+    lastError.value = null
+    try {
+      return await api.post<UpgradeOffer>(
+        `${BASE}/publications/upgrade-offer`,
+        { projectId, toPublicationKey },
+        { _silent: true } as any,
+      )
+    } catch (error) {
+      lastError.value = apiErrorMessage(error, '生成升级提议失败')
+      return null
+    }
+  }
+
+  /** 执行升级（需要 ApprovalIntent）。stagingOk=false 时 pin 不变。 */
+  async function applyUpgrade(
+    projectId: string,
+    toPublicationKey: string,
+    approvalIntentId: string,
+    stagingOk = true,
+  ): Promise<ApplyUpgradeResult | null> {
+    lastError.value = null
+    if (!approvalIntentId.trim()) {
+      lastError.value = '升级需要审批单号（ApprovalIntent）'
+      return null
+    }
+    try {
+      const response = await api.post<ApplyUpgradeResult>(
+        `${BASE}/publications/apply-upgrade`,
+        { projectId, toPublicationKey, approvalIntentId, stagingOk },
+        { _silent: true } as any,
+      )
+      // 🔴 stagingOk=false 时服务端保持原 pin —— 不能当升级成功展示。
+      if (!stagingOk) {
+        lastError.value = 'staging 未就绪，项目仍使用原 publication'
+      }
+      await load()
+      return response
+    } catch (error) {
+      lastError.value = apiErrorMessage(error, '执行升级失败')
+      return null
+    }
+  }
+
   return {
     publications,
     pending,
@@ -264,5 +395,9 @@ export function useTemplatePublications() {
     acceptAllConsumers,
     loadPreflightSheets,
     instantiate,
+    withdraw,
+    securityRevoke,
+    offerUpgrade,
+    applyUpgrade,
   }
 }

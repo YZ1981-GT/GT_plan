@@ -50,7 +50,14 @@ _INFRA_TABLES = {
     # PG 系统目录/进度视图（gin_index_monitor 等查询用）
     "pg_index", "pg_stat_progress_create_index", "pg_stat_activity",
     "pg_locks", "pg_database", "pg_roles",
-    # 真实存在于 PG 但 ORM 未映射的历史表（drift detector 标 db_extra，合法）
+    # PG 系统目录：project_purge_service 外键级联清点用（pg_constraint）
+    "pg_constraint",
+    # SQLite 系统表（方言分支里查 sqlite_master 判表存在，PG 上不执行）
+    "sqlite_master",
+    # 2026-11-24 V275 起，下列 3 张表由 V275 持有（原先只靠历史 create_all 兜底）：
+    # review_conversation_participants / review_conversation_exports / tb_aux_balance_summary
+    # —— 它们现在同时出现在迁移 CREATE 里，_collect_migration_tables 已能覆盖；
+    # 此处保留只为兼容从旧快照读到的缓存，避免双向漂移。
     "review_conversation_participants", "tb_aux_balance_summary",
     "review_conversation_exports", "wp_sheet_locks", "wp_migration_snapshots",
 }

@@ -248,7 +248,7 @@ export function useCustomIngestionWizard() {
       const response = await api.post<IngestResponse>(`${BASE}/ingest`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
         _silent: true,
-      })
+      } as any)
       state.value = {
         ...state.value,
         entry: 'ingest_excel',
@@ -283,7 +283,7 @@ export function useCustomIngestionWizard() {
     try {
       const response = await api.post<PreflightResponse>(`${BASE}/artifacts/${id}/preflight`, undefined, {
         _silent: true,
-      })
+      } as any)
       state.value = {
         ...state.value,
         artifactId: id,
@@ -309,6 +309,56 @@ export function useCustomIngestionWizard() {
     }
   }
 
+  /**
+   * 拉取该 artifact 的逐 region 候选清单（来自 preflight 报告的
+   * amountRegionCandidates；按 sheet 分组扁平返回）。空数组 = 报告里没有
+   * 数值列候选 —— unit-authority 仍可提交（比如全是文本模板），但界面会提示。
+   */
+  async function loadRegionCandidates(artifactId?: string): Promise<PreflightRegionCandidate[]> {
+    const id = artifactId ?? state.value.artifactId
+    if (!fshell.ok || !id) return []
+    try {
+      const response = await api.get<{ artifact: Record<string, unknown> }>(
+        `${BASE}/artifacts/${id}`,
+        { _silent: true } as any,
+      )
+      const artifact = response?.artifact ?? {}
+      const preflight = artifact.preflight as Record<string, unknown> | undefined
+      const workbook = preflight?.workbook as Record<string, unknown> | undefined
+      const raw = workbook?.sheets
+      if (!Array.isArray(raw)) return []
+      const out: PreflightRegionCandidate[] = []
+      for (const s of raw) {
+        if (!s || typeof s !== 'object') continue
+        const sheetUid = String((s as Record<string, unknown>).sheetUid ?? '')
+        const sheetName = String((s as Record<string, unknown>).sheetName ?? '')
+        const cands = (s as Record<string, unknown>).amountRegionCandidates
+        if (!Array.isArray(cands)) continue
+        for (const c of cands) {
+          if (!c || typeof c !== 'object') continue
+          const r = c as Record<string, unknown>
+          out.push({
+            stableId: String(r.stableId ?? ''),
+            columnLetter: String(r.columnLetter ?? ''),
+            header: String(r.header ?? ''),
+            numericCells: Number(r.numericCells ?? 0),
+            firstNumericRow: Number(r.firstNumericRow ?? 0),
+            sheetUid,
+            sheetName,
+          })
+        }
+      }
+      return out.filter((c) => c.stableId)
+    } catch (error) {
+      setBlockers([{
+        code: 'region_candidates_failed',
+        messageZh: apiErrorMessage(error, '加载金额列候选失败'),
+        recoverable: true,
+      }])
+      return []
+    }
+  }
+
   /** 提交 unit authority；只在 preflightDigest 已冻结时可用。 */
   async function putUnitAuthority(
     input: UnitAuthorityInput,
@@ -330,7 +380,7 @@ export function useCustomIngestionWizard() {
       const response = await api.put<AuthorityResponse>(
         `${BASE}/artifacts/${id}/unit-authority`,
         input,
-        { _silent: true },
+        { _silent: true } as any,
       )
       state.value = {
         ...state.value,
@@ -372,7 +422,7 @@ export function useCustomIngestionWizard() {
       const response = await api.post<FinalizeResponse>(
         `${BASE}/artifacts/${id}/finalize`,
         input,
-        { _silent: true },
+        { _silent: true } as any,
       )
       state.value = {
         ...state.value,
@@ -404,7 +454,106 @@ export function useCustomIngestionWizard() {
     entrySuccessMessage,
     ingestFile,
     runPreflight,
+    loadRegionCandidates,
     putUnitAuthority,
     finalizeAuthority,
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// 逐 amount region 确认（2026-11-24 平台技术债清偿）
+//
+// 背景：unit-authority 的 manifest.regions 此前只能由调用方手写 JSON，没有
+// 「确认界面」。preflight 报告现在按列统计产出 amountRegionCandidates（后端
+// semantic_preflight._amount_region_candidates），本段把它变成用户可裁决的清单：
+//   loadRegionCandidates(artifactId) → PreflightRegionCandidate[]
+//   buildRegionsFromDecisions(...)  → manifest.regions（形状与后端校验逐字段一致）
+// scanner 只给候选（列位置 + 表头 + 数值格数），单位 / kind 语义由用户裁决 ——
+// 不猜单位（与后端 _validate_authority_manifest 的允许集合同口径）。
+// ---------------------------------------------------------------------------
+
+/** preflight 报告里的单列金额 region 候选（camelCase，后端 to_dict 同形）。 */
+export interface PreflightRegionCandidate {
+  stableId: string
+  columnLetter: string
+  header: string
+  numericCells: number
+  firstNumericRow: number
+  /** 候选所在 sheet（前端分组展示用；不进 manifest.regions）。 */
+  sheetUid: string
+  sheetName: string
+}
+
+/** 用户对一个 region 的裁决（决定 manifest.regions 成员形状）。 */
+export interface RegionDecision {
+  stableId: string
+  measureKind: 'amount' | 'quantity' | 'count' | 'ratio' | 'exchange_rate' | 'unit_price' | 'text'
+  /** amount 必填：yuan / qian / wan */
+  unit?: 'yuan' | 'qian' | 'wan'
+  /** amount 必填：与 unit 对应的除数（1 / 1000 / 10000） */
+  divisor?: 1 | 1000 | 10000
+  /** ratio 必填：fraction / percent_points；非 ratio 禁传 */
+  ratioScale?: 'fraction' | 'percent_points'
+}
+
+/** 后端 ALLOWED 集合（与 custom_template_ingestion._validate_authority_manifest 同口径）。 */
+export const REGION_ALLOWED_KINDS = [
+  'amount', 'quantity', 'count', 'ratio', 'exchange_rate', 'unit_price', 'text',
+] as const
+export const REGION_ALLOWED_UNITS: Record<string, 1 | 1000 | 10000> = {
+  yuan: 1,
+  qian: 1000,
+  wan: 10000,
+}
+export const REGION_ALLOWED_SCALES = ['fraction', 'percent_points'] as const
+
+/** 后端 kind 命名是 snake_case（measure_kind），前端裁决用下划线形态直传。 */
+export function toSnakeKind(kind: RegionDecision['measureKind']): string {
+  return kind.replace(/_/g, '_')
+}
+
+/** 从裁决组装 manifest.regions；非法组合抛中文错误（不静默丢字段）。 */
+export function buildRegionsFromDecisions(
+  decisions: RegionDecision[],
+): { regions: Record<string, unknown>[]; errors: string[] } {
+  const errors: string[] = []
+  const regions: Record<string, unknown>[] = []
+  const seen = new Set<string>()
+  for (const d of decisions) {
+    if (seen.has(d.stableId)) {
+      errors.push(`region ${d.stableId} 重复`)
+      continue
+    }
+    seen.add(d.stableId)
+    if (!(REGION_ALLOWED_KINDS as readonly string[]).includes(d.measureKind)) {
+      errors.push(`region ${d.stableId} 的 measure_kind 无效：${d.measureKind}`)
+      continue
+    }
+    const region: Record<string, unknown> = {
+      stable_id: d.stableId,
+      measure_kind: d.measureKind,
+    }
+    if (d.measureKind === 'ratio') {
+      if (d.ratioScale && (REGION_ALLOWED_SCALES as readonly string[]).includes(d.ratioScale)) {
+        region.ratio_scale = d.ratioScale
+      } else {
+        errors.push(`ratio region ${d.stableId} 必须声明 ratio_scale（fraction 或 percent_points）`)
+        continue
+      }
+    } else if (d.ratioScale) {
+      errors.push(`非 ratio region ${d.stableId} 不得声明 ratio_scale`)
+      continue
+    }
+    if (d.measureKind === 'amount') {
+      if (!d.unit || !(d.unit in REGION_ALLOWED_UNITS)) {
+        errors.push(`amount region ${d.stableId} 必须选择单位（元/千元/万元）`)
+        continue
+      }
+      region.unit = d.unit
+      region.divisor = REGION_ALLOWED_UNITS[d.unit]
+    }
+    regions.push(region)
+  }
+  return { regions, errors }
 }

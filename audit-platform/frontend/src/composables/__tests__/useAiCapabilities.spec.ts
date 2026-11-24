@@ -10,8 +10,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref, nextTick } from 'vue'
 
 // Mock http module — factory must not reference outer scope variables
+// 🔴 生产代码 import { isRequestCancelled }（GET 去重取消判定）；mock 缺这个导出
+// 时 fail-closed 用例直接在 import 解析层报错（vitest: No "isRequestCancelled"
+// export is defined on the mock），而不是测到行为 —— 与生产 import 面保持同步。
 vi.mock('@/utils/http', () => ({
   default: { get: vi.fn() },
+  isRequestCancelled: vi.fn((e: unknown) =>
+    !!(e && typeof e === 'object' && (e as { name?: string }).name === 'CanceledError'),
+  ),
 }))
 
 import { useAiCapabilities, type CapabilityResponse } from '../useAiCapabilities'

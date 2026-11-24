@@ -71,6 +71,78 @@ async function onCommit(pub: TemplatePublication) {
   }
 }
 
+/** 撤回（ACTIVE → WITHDRAWN）：下架但已 pin 项目继续用。必须填原因。 */
+async function onWithdraw(pub: TemplatePublication) {
+  let reason: string | null = null
+  try {
+    const box = await ElMessageBox.prompt(
+      '撤回后该 publication 不再出现在可实例化列表（已 pin 的项目不受影响）。请填写撤回原因：',
+      '撤回 publication',
+      {
+        type: 'warning',
+        confirmButtonText: '确认撤回',
+        cancelButtonText: '取消',
+        inputPlaceholder: '例如：模板公式有误，需修正后重新发布',
+        inputValidator: (v: string) =>
+          (v ?? '').trim().length >= 2 ? true : '原因至少 2 个字',
+      },
+    )
+    reason = (box?.value ?? '').trim() || null
+  } catch {
+    return
+  }
+  if (!reason) return
+  busyKey.value = pub.publicationKey
+  try {
+    const result = await pubs.withdraw(pub.publicationKey, reason)
+    if (!result) {
+      ElMessage.error(pubs.lastError.value ?? '撤回失败')
+      return
+    }
+    ElMessage.success('已撤回（已 pin 的项目继续使用）')
+  } finally {
+    busyKey.value = null
+  }
+}
+
+/** 安全撤销（ACTIVE → SECURITY_REVOKED）：清 pin 阻断后续实例化。 */
+async function onSecurityRevoke(pub: TemplatePublication) {
+  let reason: string | null = null
+  try {
+    const box = await ElMessageBox.prompt(
+      '安全撤销将同时清除已 pin 的项目（阻断它们用该模板新建实例化）。此动作影响面更大，请确认。请填写原因：',
+      '安全撤销 publication',
+      {
+        type: 'error',
+        confirmButtonText: '确认撤销',
+        cancelButtonText: '取消',
+        inputPlaceholder: '例如：发现模板内含敏感数据',
+        inputValidator: (v: string) =>
+          (v ?? '').trim().length >= 2 ? true : '原因至少 2 个字',
+      },
+    )
+    reason = (box?.value ?? '').trim() || null
+  } catch {
+    return
+  }
+  if (!reason) return
+  busyKey.value = pub.publicationKey
+  try {
+    const result = await pubs.securityRevoke(pub.publicationKey, reason, true)
+    if (!result) {
+      ElMessage.error(pubs.lastError.value ?? '安全撤销失败')
+      return
+    }
+    ElMessage.success(
+      result.pinsCleared && result.affectedProjects.length
+        ? `已撤销并清除 ${result.affectedProjects.length} 个项目的 pin`
+        : '已撤销',
+    )
+  } finally {
+    busyKey.value = null
+  }
+}
+
 async function openInstantiate(pub: TemplatePublication) {
   instantiateTarget.value = pub
   instantiateResult.value = null
@@ -240,7 +312,7 @@ async function submitInstantiate() {
           <span :title="row.artifactDigest">{{ shortKey(row.artifactDigest) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
           <el-button
             v-if="row.state === 'PENDING_VISIBILITY'"
@@ -260,6 +332,24 @@ async function submitInstantiate() {
             @click="openInstantiate(row)"
           >
             实例化
+          </el-button>
+          <el-button
+            v-if="row.state === 'ACTIVE'"
+            link
+            type="warning"
+            :data-testid="`withdraw-${row.publicationKey}`"
+            @click="onWithdraw(row)"
+          >
+            撤回
+          </el-button>
+          <el-button
+            v-if="row.state === 'ACTIVE'"
+            link
+            type="danger"
+            :data-testid="`revoke-${row.publicationKey}`"
+            @click="onSecurityRevoke(row)"
+          >
+            安全撤销
           </el-button>
           <span v-if="!row.runtimeDiscoverable && row.state !== 'PENDING_VISIBILITY'" class="gt-pubs__muted">
             不可操作

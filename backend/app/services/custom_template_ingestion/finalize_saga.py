@@ -253,7 +253,9 @@ def collect_consumer_acks(
             verdict = str(raw)
             reasons = ()
         if verdict not in (ACK_ACCEPTED, ACK_REJECTED):
-            raise FinalizeSagaError(f"非法 verdict: {verdict}")
+            raise FinalizeSagaError(
+                f"非法 verdict（{consumer}）: {verdict!r}，只接受 ACCEPTED / REJECTED"
+            )
         out.append(
             ledger.upsert(
                 handoff_id=handoff_id,

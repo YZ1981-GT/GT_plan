@@ -52,6 +52,10 @@ __all__ = [
     "pin_project",
     "get_project_pin",
     "assert_instantiate_allowed_persisted",
+    "withdraw_publication_persisted",
+    "security_revoke_publication_persisted",
+    "offer_upgrade_persisted",
+    "apply_upgrade_persisted",
 ]
 
 
@@ -292,3 +296,174 @@ def assert_instantiate_allowed_persisted(pub: StoredPublication) -> None:
         raise PublicationStoreError(
             f"instantiate 仅允许 ACTIVE publication，当前={pub.state.value}"
         )
+
+
+# ---------------------------------------------------------------------------
+# 撤回 / 安全撤销 / 升级（2026-11-24 补齐持久层接线）
+#
+# 为什么补这一层：`publication_ops.py` 早有 `withdraw_publication` /
+# `security_revoke` / `offer_upgrade` / `apply_upgrade_via_staging` 四个纯内存实现，
+# 但**只有测试调用**（零生产调用方）：进程重启后撤销状态与 pin 全丢，路由层也没有
+# 对应端点 ⇒ 「撤回已发布的模板」这个业务能力在生产上根本不存在。
+#
+# 本段把它们逐一映射到 `custom_template_publications` /
+# `custom_template_publication_pins`，语义与内存版逐条对齐：
+# * withdraw：publication → WITHDRAWN，**pin 不自动清除**（已实例化的项目继续用）
+# * security_revoke：publication → SECURITY_REVOKED，**清除相关 pin**（阻断新实例化）
+# * offer_upgrade：只产 UpgradeOffer（含 from/to artifact digest 的 diff 指纹），
+#   不改任何状态 —— 真正生效要 apply_upgrade
+# * apply_upgrade：改写 pin 行（一个项目一个 pin，DB 唯一约束兜底）
+# ---------------------------------------------------------------------------
+
+
+def withdraw_publication_persisted(
+    session: Any,
+    *,
+    organization_id: str,
+    publication_key: str,
+    reason: str = "withdrawn",
+    clock: datetime | None = None,
+) -> StoredPublication:
+    """撤回 publication（→ WITHDRAWN）。pin 不清 —— 已实例化项目继续使用。
+
+    与内存版 `publication_ops.withdraw_publication` 同语义：撤回是「下架，不再
+    供新项目 pin」，不是「让在用的项目失效」。需要后者请用 security_revoke。
+    """
+    return transition_publication(
+        session,
+        organization_id=organization_id,
+        publication_key=publication_key,
+        to_state=PublicationState.WITHDRAWN,
+        reason=reason,
+        clock=clock,
+    )
+
+
+def security_revoke_publication_persisted(
+    session: Any,
+    *,
+    organization_id: str,
+    publication_key: str,
+    reason: str = "security_revoked",
+    clear_pins: bool = True,
+    clock: datetime | None = None,
+) -> list[uuid.UUID]:
+    """安全撤销（→ SECURITY_REVOKED），默认清除相关 pin 以阻断后续实例化。
+
+    返回受影响的 project_id 列表（与内存版返回值同型）。
+    """
+    pub = session.execute(
+        sa.select(CustomTemplatePublication).where(
+            CustomTemplatePublication.organization_id == organization_id,
+            CustomTemplatePublication.publication_key == publication_key,
+        )
+    ).scalar_one_or_none()
+    if pub is None:
+        raise PublicationStoreError(f"publication 不存在：{publication_key}")
+
+    # 先收集受影响项目，再推进状态（顺序与内存版一致：先 transition 再清 pin。
+    # 这里先读是为了在同一事务里拿到准确列表，语义等价）。
+    affected = list(
+        session.execute(
+            sa.select(CustomTemplatePublicationPin.project_id).where(
+                CustomTemplatePublicationPin.publication_id == pub.id
+            )
+        ).scalars().all()
+    )
+
+    transition_publication(
+        session,
+        organization_id=organization_id,
+        publication_key=publication_key,
+        to_state=PublicationState.SECURITY_REVOKED,
+        reason=reason,
+        clock=clock,
+    )
+
+    if clear_pins and affected:
+        session.execute(
+            sa.delete(CustomTemplatePublicationPin).where(
+                CustomTemplatePublicationPin.publication_id == pub.id
+            )
+        )
+        session.flush()
+    return affected
+
+
+def offer_upgrade_persisted(
+    session: Any,
+    *,
+    project_id: uuid.UUID,
+    to_publication_key: str,
+    organization_id: str,
+) -> dict[str, Any]:
+    """产出一份升级提议（不改状态）。
+
+    与内存版 `offer_upgrade` 同判据：项目必须已 pin、目标必须存在且 ACTIVE。
+    diff 指纹 = sha256(from|to|from_digest|to_digest)，与内存版逐字相同。
+    """
+    import hashlib as _hashlib
+
+    from_pub = get_project_pin(session, project_id=project_id)
+    if from_pub is None:
+        raise PublicationStoreError("项目未 pin，无 upgrade")
+    to_pub = get_publication(
+        session, organization_id=organization_id, publication_key=to_publication_key
+    )
+    if to_pub is None:
+        raise PublicationStoreError(f"目标 publication 不存在：{to_publication_key}")
+    if to_pub.state != PublicationState.ACTIVE:
+        raise PublicationStoreError(
+            f"只能升级到 ACTIVE publication，目标当前 {to_pub.state.value}"
+        )
+    raw = (
+        f"{from_pub.publication_key}|{to_pub.publication_key}|"
+        f"{from_pub.artifact_digest}|{to_pub.artifact_digest}"
+    )
+    return {
+        "fromPublicationKey": from_pub.publication_key,
+        "toPublicationKey": to_pub.publication_key,
+        "diffDigest": _hashlib.sha256(raw.encode()).hexdigest(),
+        "requiresApproval": True,
+    }
+
+
+def apply_upgrade_persisted(
+    session: Any,
+    *,
+    organization_id: str,
+    project_id: uuid.UUID,
+    to_publication_key: str,
+    approval_intent_id: str | None,
+    staging_ok: bool,
+) -> str:
+    """执行升级：改写项目 pin 到目标 publication。
+
+    与内存版 `apply_upgrade_via_staging` 同判据：
+    * 必须有 ApprovalIntent（升级是审批动作，不信任前端）；
+    * `staging_ok=False` 时 **pin 不变**（失败不留半截状态）。
+    """
+    if not approval_intent_id:
+        raise PublicationStoreError("升级需要有效 ApprovalIntent")
+    to_pub = get_publication(
+        session, organization_id=organization_id, publication_key=to_publication_key
+    )
+    if to_pub is None:
+        raise PublicationStoreError(f"目标 publication 不存在：{to_publication_key}")
+    if to_pub.state != PublicationState.ACTIVE:
+        raise PublicationStoreError("只能升级到 ACTIVE publication")
+
+    current = get_project_pin(session, project_id=project_id)
+    if not staging_ok:
+        # pin 不变 —— 与内存版一致
+        if current is None:
+            raise PublicationStoreError("项目未 pin，且 staging 未就绪")
+        return current.publication_key
+
+    pin_project(
+        session,
+        organization_id=organization_id,
+        project_id=project_id,
+        publication_key=to_publication_key,
+    )
+    return to_publication_key

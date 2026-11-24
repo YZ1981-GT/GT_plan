@@ -473,9 +473,21 @@ describe('useCControlTestData', () => {
       const ctrlItems = items.filter(i => i.item_id.match(/^C5-ctrl-/))
       expect(ctrlItems.length).toBeGreaterThan(0)
 
-      // Check deviation items: 2 × (5 steps + 1 conclusion) = 12
+      // Check deviation items: 每行 8 条（step1~6 + exceptionDesc + conclusion）× 2 行 = 16。
+      // 🔴 2026-11-24 勘误：旧断言 12 停留在 CC-65 修复前口径 —— 生产 serializeAll
+      // 为修复「显式选『否』与『未填』不可区分」补了 step5（布尔推导显式落库）
+      // 与 exceptionDesc（文本字段）两行，每行 6 → 8 条。生产行为是修复后的正确形态。
       const devItems = items.filter(i => i.item_id.match(/^C5-dev-/))
-      expect(devItems).toHaveLength(12)
+      expect(devItems).toHaveLength(16)
+      // 每行的 8 个键都要在（分母内部结构断言，防止将来再丢字段时静默）
+      for (const m of [1, 2]) {
+        for (const suffix of ['step1', 'step2', 'step3', 'step4', 'step5', 'step6', 'exceptionDesc', 'conclusion']) {
+          expect(items.some(i => i.item_id === `C5-dev-${m}-${suffix}`)).toBe(true)
+        }
+      }
+      // CC-65 语义：step5 落库为推导布尔字符串
+      const step5 = items.find(i => i.item_id === 'C5-dev-1-step5')
+      expect(step5?.conclusion === 'true' || step5?.conclusion === 'false').toBe(true)
 
       // Check cycle conclusion
       const cycleItem = items.find(i => i.item_id === 'C5-cycle-conclusion')

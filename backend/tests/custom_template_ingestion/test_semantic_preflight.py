@@ -199,3 +199,79 @@ def test_to_dict_roundtrip_keys() -> None:
     assert d["valid"] is True
     assert d["workbook"]["sheetCount"] == 1
     assert isinstance(d["findings"], list)
+
+
+# ---------------------------------------------------------------------------
+# 逐 region 确认：amount region 候选推导（2026-11-24，平台技术债清偿）
+#
+# 背景：unit-authority 的 manifest.regions 此前由客户端自造（没有任何候选来源），
+# 「逐 amount region 确认 UI」无从谈起。现在 preflight 报告按列统计产出候选，
+# 前端按候选清单让用户逐 region 裁决（kind / unit / divisor），scanner 不猜单位。
+#
+# 判据：
+# 1. 金额列形态（首 3 行有文本表头 + 数值格数达阈值）必须出现在候选里；
+# 2. 表头文字带进候选（用户能看到列名再裁决单位）；
+# 3. 纯文本列 / 数值格不足阈值的列不产候选（不把什么都当金额列）；
+# 4. stable_id 同结构重跑稳定（幂等）；
+# 5. 反向：无任何数值的 workbook 候选为空（分母非空对照）。
+# ---------------------------------------------------------------------------
+
+
+def _money_sheet_bytes() -> bytes:
+    """一张典型金额表：A 列科目名（文本），B 列金额（数值），首行表头。"""
+    cells: list[tuple[str, object]] = [
+        ("A1", "科目名称"), ("B1", "期末余额"),
+        ("A2", "货币资金"), ("B2", 1234.5),
+        ("A3", "应收账款"), ("B3", 2234.5),
+        ("A4", "存货"), ("B4", 3234.5),
+        ("A5", "固定资产"), ("B5", 4234.5),
+        ("A6", "合计"), ("B6", "=SUM(B2:B5)"),
+    ]
+    return _xlsx_bytes(sheets={"余额表": cells})
+
+
+def test_amount_region_candidates_found_for_money_column() -> None:
+    result = run_semantic_preflight(_money_sheet_bytes(), filename_hint="money.xlsx")
+    assert result.workbook is not None
+    sheet = result.workbook.sheets[0]
+    cand = sheet.amount_region_candidates
+    assert cand, "金额表必须有 region 候选（分母非空）"
+    letters = {c.column_letter for c in cand}
+    assert "B" in letters, f"B 列（期末余额）应在候选里，实际 {sorted(letters)}"
+    # A 列是纯文本科目名，不是金额列
+    assert "A" not in letters
+
+
+def test_amount_region_candidate_carries_header() -> None:
+    result = run_semantic_preflight(_money_sheet_bytes(), filename_hint="money.xlsx")
+    sheet = result.workbook.sheets[0]
+    cand = {c.column_letter: c for c in sheet.amount_region_candidates}
+    assert cand["B"].header == "期末余额"
+
+
+def test_amount_region_stable_id_is_deterministic() -> None:
+    """同结构重跑 preflight，stable_id 必须稳定（幂等）。"""
+    r1 = run_semantic_preflight(_money_sheet_bytes(), filename_hint="m.xlsx")
+    r2 = run_semantic_preflight(_money_sheet_bytes(), filename_hint="m.xlsx")
+    s1 = [c.stable_id for c in r1.workbook.sheets[0].amount_region_candidates]
+    s2 = [c.stable_id for c in r2.workbook.sheets[0].amount_region_candidates]
+    assert s1 == s2
+    assert s1, "候选非空（反向对照：两次都空也可能是推导恒失败）"
+
+
+def test_amount_region_empty_for_text_only_sheet() -> None:
+    """纯文本 sheet（无数值列）候选为空 —— 不把文本列当金额列。"""
+    cells = [("A1", "名称"), ("A2", "备注一"), ("A3", "备注二")]
+    result = run_semantic_preflight(_xlsx_bytes(sheets={"说明": cells}), filename_hint="t.xlsx")
+    assert result.workbook is not None
+    assert list(result.workbook.sheets[0].amount_region_candidates) == []
+
+
+def test_amount_region_to_dict_shape() -> None:
+    """to_dict 给 camelCase（前端直接消费），字段齐。"""
+    result = run_semantic_preflight(_money_sheet_bytes(), filename_hint="m.xlsx")
+    raw = result.workbook.sheets[0].to_dict()
+    cands = raw["amountRegionCandidates"]
+    assert cands, "to_dict 必须带候选（前端读的就是这个键）"
+    for c in cands:
+        assert {"stableId", "columnLetter", "header", "numericCells", "firstNumericRow"} <= set(c)

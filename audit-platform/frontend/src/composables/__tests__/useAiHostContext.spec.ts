@@ -280,10 +280,16 @@ describe('useAiHostContext — 全局面板 / 独立窗口的 ambient 宿主（R
     expect(req.projectToolsEnabled).toBe(true)
   })
 
-  it('有项目但无具体文档 → 仍用显式全局模式（不伪造项目级文档宿主）', () => {
+  it('有项目但无具体文档 → fail-visible 不可用（不静默退回全局模式）', () => {
+    // 🔴 2026-11-24 勘误：生产行为已改 —— 「项目内却没有具体资源」静默退回
+    // 无项目全局模式会让用户以为 AI 看到了当前项目（useAiHostContext
+    // buildAmbientHost 的注释明写这一点）。现在返回 host=null + 中文原因的
+    // unavailable 形态。旧断言 `req.host!.type` 对 null 解引用直接 TypeError。
     const req = buildAmbientHost({ projectId: PROJECT_ID })
-    expect(req.host!.type).toBe('global_knowledge')
-    expect(req.host!.projectId).toBeNull()
+    expect(req.host).toBeNull()
+    expect(req.available).toBe(false)
+    expect(req.unavailableReason).toContain('尚未选定')
+    expect(req.projectToolsEnabled).toBe(false)
   })
 })
 

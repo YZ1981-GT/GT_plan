@@ -358,15 +358,33 @@ async def commit_publication_visibility(
 
     def _run(session):
         ledger = DurableAckLedger(session)
-        for ack in body.acks:
-            ledger.upsert(
-                handoff_id=handoff_id,
-                handoff_digest=handoff_digest,
-                consumer=ack.consumer,
-                consumer_version=ack.consumerVersion,
-                verdict=ack.verdict,
-                reason_codes=tuple(ack.reasonCodes),
-            )
+        # 🔴 run_finalize_saga 接线（2026-11-24）：此前这里手写「upsert 循环 +
+        # resolve + transition」，跳过了 saga 的 phase 函数与 ACK 收集判据。
+        # 现在：
+        #   * ACK 收集走 saga 的 `collect_consumer_acks`（与 run_finalize_saga
+        #     同一份判据，不另立第二套）。verdict 闭集在此前有两道：pydantic
+        #     的 `AckInput.verdict` pattern（HTTP 层）与 saga 内部校验（服务层，
+        #     服务非 HTTP 调用方）—— 两者作用域不同，不属重复判据。
+        #   * FinalizeLock 指纹从 publication.handoff 已冻结字段重建，**有就**随
+        #     响应返回供幂等重试对账。缺字段（历史存量 publication 由旧版
+        #     finalize 写入，不带 idempotencyKey 等）时返回 None 而**不阻断** ——
+        #     指纹是幂等对账用的元数据，不是准入门槛；把它做成硬门会让存量数据
+        #     永远无法推进可见性（首批实现即如此，被既有 7 例测试当场抓出）。
+        from app.services.custom_template_ingestion.finalize_saga import (
+            collect_consumer_acks,
+        )
+
+        lock_fingerprint = _finalize_lock_fingerprint(handoff)
+
+        collect_consumer_acks(
+            ledger,
+            handoff=handoff,
+            handoff_digest=handoff_digest,
+            consumer_results={
+                ack.consumer: ack.verdict
+                for ack in body.acks
+            },
+        )
         state = ledger.resolve(handoff_id=handoff_id, handoff_digest=handoff_digest)
         if state == "ACTIVE":
             transition_publication(
@@ -384,10 +402,10 @@ async def commit_publication_visibility(
                 to_state=PublicationState.FAILED,
                 reason="ack_rejected",
             )
-        return state
+        return state, lock_fingerprint
 
     try:
-        visibility_state = await db.run_sync(_run)
+        visibility_state, lock_fingerprint = await db.run_sync(_run)
     except FinalizeSagaError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except InvalidLifecycleTransition as exc:
@@ -398,6 +416,7 @@ async def commit_publication_visibility(
     return {
         "publicationKey": body.publicationKey,
         "visibilityState": visibility_state,
+        "lockFingerprint": lock_fingerprint,
         "state": (
             PublicationState.ACTIVE.value
             if visibility_state == "ACTIVE"
@@ -408,4 +427,258 @@ async def commit_publication_visibility(
         "runtimeDiscoverable": visibility_state == "ACTIVE",
         "requiredConsumers": list(REQUIRED_FINALIZE_CONSUMERS),
         "idempotent": False,
+    }
+
+
+# ---------------------------------------------------------------------------
+# finalize lock 指纹（2026-11-24 接线 run_finalize_saga 的幂等锚点）
+#
+# 与 finalize_saga.FinalizeLock.fingerprint() 同一 canonical JSON 形状。
+# handoff 在 finalize 端点冻结了 candidate/authority/digest 全部字段，
+# 指纹可从 handoff 直接重建 —— 不需要客户端重传。
+# ---------------------------------------------------------------------------
+
+def _finalize_lock_fingerprint(handoff: dict[str, Any]) -> str | None:
+    """从 finalized handoff 重建 FinalizeLock 指纹；缺字段返回 None（fail-closed）。"""
+    import hashlib as _hashlib
+    import json as _json
+
+    required = (
+        "artifactId", "authorityId", "workbookSha256",
+        "preflightDigest", "manifestDigest", "idempotencyKey",
+    )
+    if any(not str(handoff.get(k) or "") for k in required):
+        return None
+    payload = {
+        "candidateId": str(handoff.get("artifactId")),
+        "candidateDigest": str(handoff.get("preflightDigest")),
+        "approvalIntentId": str(handoff.get("authorityId")),
+        "approvalIntentDigest": str(handoff.get("manifestDigest")),
+        "policyFingerprint": "custom-template-ingestion-v1",
+        "scannerFingerprint": str(handoff.get("preflightDigest")),
+        "authorityRef": str(handoff.get("authorityId")),
+        "mappingDigest": str(handoff.get("manifestDigest")),
+        "guidanceDigest": str(handoff.get("manifestDigest")),
+        "idempotencyKey": str(handoff.get("idempotencyKey")),
+        "organizationId": str(handoff.get("organizationId") or ""),
+    }
+    raw = _json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return _hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# 撤回 / 安全撤销 / 升级（2026-11-24 接线持久层）
+# ---------------------------------------------------------------------------
+
+
+class WithdrawPublicationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(min_length=2, max_length=200, default="withdrawn")
+
+
+class SecurityRevokePublicationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(min_length=2, max_length=200, default="security_revoked")
+    clearPins: bool = True
+
+
+def _require_publish_capability(current_user: User) -> Any:
+    """撤回/安全撤销是发布管理动作 —— 用与 instantiate 同级的 FINALIZE_PROJECT。
+
+    与 commit-visibility 同级（技术管理动作）；组织级「批准发布」语义属于
+    APPROVE_PUBLISH_ORGANIZATION，不在本组端点（与权限口径教训一致：
+    partner/qc 实际用户数为 0，挂 approve 会让端点无人可用）。
+    """
+    role = role_of(current_user)
+    if not is_permitted(role, Capability.FINALIZE_PROJECT):
+        raise HTTPException(
+            status_code=403, detail="publication 撤回/撤销需要 finalize 权限"
+        )
+    return role
+
+
+@router.post("/publications/{publication_key}/withdraw")
+async def withdraw_publication(
+    publication_key: str,
+    body: WithdrawPublicationRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """撤回 publication（ACTIVE → WITHDRAWN）。pin 不清，已实例化项目继续使用。"""
+    from app.services.custom_template_ingestion.lifecycles import (
+        InvalidLifecycleTransition,
+    )
+    from app.services.custom_template_ingestion.publication_registry_store import (
+        PublicationStoreError,
+        get_publication,
+        withdraw_publication_persisted,
+    )
+
+    scope = derive_implicit_scope(user=current_user)
+    _require_publish_capability(current_user)
+
+    existing = await db.run_sync(
+        lambda s: get_publication(
+            s, organization_id=scope.organization_id, publication_key=publication_key
+        )
+    )
+    if existing is None:
+        raise HTTPException(status_code=404, detail="publication 不存在")
+
+    try:
+        updated = await db.run_sync(
+            lambda s: withdraw_publication_persisted(
+                s,
+                organization_id=scope.organization_id,
+                publication_key=publication_key,
+                reason=body.reason,
+            )
+        )
+    except PublicationStoreError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except InvalidLifecycleTransition as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await db.commit()
+    return {
+        "publicationKey": updated.publication_key,
+        "state": updated.state.value,
+        "reason": updated.reason,
+        "runtimeDiscoverable": False,
+    }
+
+
+@router.post("/publications/{publication_key}/security-revoke")
+async def security_revoke_publication(
+    publication_key: str,
+    body: SecurityRevokePublicationRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """安全撤销（ACTIVE → SECURITY_REVOKED），默认清除相关 pin 阻断后续实例化。"""
+    from app.services.custom_template_ingestion.lifecycles import (
+        InvalidLifecycleTransition,
+    )
+    from app.services.custom_template_ingestion.publication_registry_store import (
+        PublicationStoreError,
+        get_publication,
+        security_revoke_publication_persisted,
+    )
+
+    scope = derive_implicit_scope(user=current_user)
+    _require_publish_capability(current_user)
+
+    existing = await db.run_sync(
+        lambda s: get_publication(
+            s, organization_id=scope.organization_id, publication_key=publication_key
+        )
+    )
+    if existing is None:
+        raise HTTPException(status_code=404, detail="publication 不存在")
+
+    try:
+        affected = await db.run_sync(
+            lambda s: security_revoke_publication_persisted(
+                s,
+                organization_id=scope.organization_id,
+                publication_key=publication_key,
+                reason=body.reason,
+                clear_pins=body.clearPins,
+            )
+        )
+    except PublicationStoreError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except InvalidLifecycleTransition as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await db.commit()
+    return {
+        "publicationKey": publication_key,
+        "state": "SECURITY_REVOKED",
+        "reason": body.reason,
+        "affectedProjects": [str(p) for p in affected],
+        "pinsCleared": body.clearPins,
+        "runtimeDiscoverable": False,
+    }
+
+
+class UpgradeOfferRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    projectId: UUID
+    toPublicationKey: str = Field(min_length=1, max_length=160)
+
+
+class ApplyUpgradeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    projectId: UUID
+    toPublicationKey: str = Field(min_length=1, max_length=160)
+    approvalIntentId: str = Field(min_length=4, max_length=160)
+    stagingOk: bool = True
+
+
+@router.post("/publications/upgrade-offer")
+async def create_upgrade_offer(
+    body: UpgradeOfferRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """产出一份升级提议（不改任何状态）。项目必须已 pin，目标必须 ACTIVE。"""
+    from app.services.custom_template_ingestion.publication_registry_store import (
+        PublicationStoreError,
+        offer_upgrade_persisted,
+    )
+
+    scope = derive_implicit_scope(user=current_user)
+    _require_publish_capability(current_user)
+    try:
+        offer = await db.run_sync(
+            lambda s: offer_upgrade_persisted(
+                s,
+                project_id=body.projectId,
+                to_publication_key=body.toPublicationKey,
+                organization_id=scope.organization_id,
+            )
+        )
+    except PublicationStoreError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return offer
+
+
+@router.post("/publications/apply-upgrade")
+async def apply_publication_upgrade(
+    body: ApplyUpgradeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """执行升级：改写项目 pin 到目标 publication（需要 ApprovalIntent）。
+
+    stagingOk=False 时 pin 不变（失败不留半截状态）。
+    """
+    from app.services.custom_template_ingestion.publication_registry_store import (
+        PublicationStoreError,
+        apply_upgrade_persisted,
+    )
+
+    scope = derive_implicit_scope(user=current_user)
+    _require_publish_capability(current_user)
+    try:
+        pinned_to = await db.run_sync(
+            lambda s: apply_upgrade_persisted(
+                s,
+                organization_id=scope.organization_id,
+                project_id=body.projectId,
+                to_publication_key=body.toPublicationKey,
+                approval_intent_id=body.approvalIntentId,
+                staging_ok=body.stagingOk,
+            )
+        )
+    except PublicationStoreError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await db.commit()
+    return {
+        "projectId": str(body.projectId),
+        "pinnedTo": pinned_to,
+        "stagingOk": body.stagingOk,
     }

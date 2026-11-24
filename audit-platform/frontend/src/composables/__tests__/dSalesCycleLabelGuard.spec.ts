@@ -63,28 +63,55 @@ describe('WorkpaperWorkbenchView D 循环 coreWps 标签', () => {
 
 // ─── 公式编辑器 D1 标签测试 ─────────────────────────────────────────────────
 
-describe('FormulaEditDialog D1 标签', () => {
-  const filePath = resolve(
-    __dirname,
-    '../../components/formula/FormulaEditDialog.vue'
-  )
-  const content = readFileSync(filePath, 'utf-8')
+describe('公式引用标签 D1/D2 语义（跨文件扫描）', () => {
+  // 🔴 2026-11-24 勘误：守卫原来只扫 FormulaEditDialog.vue 里 `'wp', 'D1'`
+  // 字面行 —— 该引用清单已搬到 WorkpaperWorkbenchView.vue 的 coreWps
+  //（code/name 字段），FormulaEditDialog 里不再有这种写法 ⇒ 守卫恒红
+  //（expected undefined to be defined，两例）。
+  // 修法 = 扫「底稿工作台 + 公式组件」两个文件的 D1/D2 标签行，语义断言不变：
+  // 任何出现 D1 标签的地方都必须是「应收票据」、D2 必须是「应收账款」。
+  const FILES = [
+    resolve(__dirname, '../../views/workpaper-list/WorkpaperWorkbenchView.vue'),
+    resolve(__dirname, '../../components/formula/FormulaEditDialog.vue'),
+  ]
 
-  it('D1 引用标签为"应收票据"而非"营业收入"', () => {
-    // Find the D1 reference row
-    const d1Line = content
-      .split('\n')
-      .find((l) => l.includes("'wp', 'D1'") || l.includes('"wp", "D1"'))
-    expect(d1Line).toBeDefined()
-    expect(d1Line!).toContain('应收票据')
-    expect(d1Line!).not.toContain('营业收入')
+  function linesWithD1(): { file: string; line: string }[] {
+    return FILES.flatMap((f) =>
+      readFileSync(f, 'utf-8')
+        .split('\n')
+        // 🔴 只认 coreWps 形态（`role:` 字段是底稿条目的标志）：
+        // 同文件还有 wpLinks 的 `{ code: 'D1', name: '收入循环总控台' }` ——
+        // 那是循环总览链接不是底稿标签，name 语义本就不同，混进分母会把
+        // 守卫变成文本侦探（实测：首轮把它当 D1 行报「应收票据缺失」）。
+        .filter((l) => /code:\s*['"]D1['"]/.test(l) && /role\s*:/.test(l))
+        .map((line) => ({ file: f, line })),
+    )
+  }
+
+  function linesWithD2(): { file: string; line: string }[] {
+    return FILES.flatMap((f) =>
+      readFileSync(f, 'utf-8')
+        .split('\n')
+        .filter((l) => /code:\s*['"]D2['"]/.test(l) && /role\s*:/.test(l))
+        .map((line) => ({ file: f, line })),
+    )
+  }
+
+  it('D1 引用标签为"应收票据"而非"营业收入"（分母非空）', () => {
+    const hits = linesWithD1()
+    // 🔴 分母非空断言：两文件都没有 D1 标签行 = 守卫空转（文件再次搬家/改名要在这里报）
+    expect(hits.length).toBeGreaterThan(0)
+    for (const { file, line } of hits) {
+      expect(`${file}: ${line}`).toContain('应收票据')
+      expect(`${file}: ${line}`).not.toContain('营业收入')
+    }
   })
 
-  it('D2 引用标签为"应收账款"', () => {
-    const d2Line = content
-      .split('\n')
-      .find((l) => l.includes("'wp', 'D2'") || l.includes('"wp", "D2"'))
-    expect(d2Line).toBeDefined()
-    expect(d2Line!).toContain('应收账款')
+  it('D2 引用标签为"应收账款"（分母非空）', () => {
+    const hits = linesWithD2()
+    expect(hits.length).toBeGreaterThan(0)
+    for (const { file, line } of hits) {
+      expect(`${file}: ${line}`).toContain('应收账款')
+    }
   })
 })
