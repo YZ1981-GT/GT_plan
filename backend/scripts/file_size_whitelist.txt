@@ -2016,3 +2016,6 @@ backend/tests/procedure_trim/test_completeness_scope_override.py  1139
 # 2026-11-23 B4（platform-capacity）：HEAD 历史大文件 835 行，本 spec 只改 1 行（scope=function），拆分另立
 backend/app/routers/knowledge_folders.py 835
 backend/app/routers/wp_render_strategies/_d1_disclosure_export.py 935
+# 2026-11-24 登记：Task 5 run coordinator 全套（SSE drain/重连/恢复/并发）本体即数据，
+# 拆分会让「drain 帧 ↔ stop() 语义 ↔ heartbeat 判据」三件相互约束的判据跨文件。
+backend/tests/dsh_agent_panel/test_task5_run_coordinator.py  2577

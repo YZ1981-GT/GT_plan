@@ -1315,20 +1315,37 @@ async def _scenario_drain(db_engine, ids) -> dict[str, Any]:
                 after_event_id=None,
                 heartbeat_interval=0.05,
                 poll_interval=0.02,
-                max_seconds=5.0,
+                # 🔴 max_seconds 必须显著大于下面的等待循环上限（600×0.02s≈12s）：
+                #    原 5.0 会在等待循环还没等到心跳时就先结束 follow（此时 conn 未关
+                #    ⇒ 不打 drain 帧），CI 快机器上必然撞上。
+                max_seconds=30.0,
                 stop=lambda: conn.is_closed,
             ):
-                if conn.is_closed:
-                    frames.append(encode_draining())
-                    return
                 frames.append(encode_heartbeat() if item is None else encode_event(item))
+            # 🔴 2026-11-24 CI 竞态修复（第二轮）：`follow` 的 stop() 命中后是**直接结束
+            #    生成器**，控制流根本不会回到循环体 —— 原写在循环体内的
+            #    `if conn.is_closed: frames.append(encode_draining())` 永不执行
+            #    （本地曾因 run 慢而恰好有其它路径兜住，CI 快机器稳定暴露）。
+            #    drain 帧必须在**退出 async for 之后**补发，这正是生产 SSE 端点在
+            #    生成器结束后写 `server_draining` 的同一形态。
+            if conn.is_closed:
+                frames.append(encode_draining())
         finally:
             sse_registry.unregister(conn)
 
     task = asyncio.create_task(consume())
-    # 等到"两条事件都发完 + 至少一次空转心跳"才 drain：只等事件会让心跳判据变成空断言。
-    for _ in range(300):
-        if any(HEARTBEAT_COMMENT in f for f in frames) and len(frames) >= 3:
+    # 等到"两条事件都发完 + 至少一次**空转**心跳"才 drain：只等事件会让心跳判据变成空断言。
+    #
+    # 🔴 2026-11-24 CI 竞态修复：原条件 `any(HEARTBEAT_COMMENT in f for f in frames)`
+    #    对首条连接 comment 也成立（两者共享「:」前缀子串），于是 CI 机器快的时候
+    #    循环立即 break ⇒ close_all() 落在 consume 尚未进入空转轮询之前 ⇒ follow 因
+    #    stop() 直接结束、drain 帧永不产出（本地因 DB 开销慢反而恰好稳定通过）。
+    #    改判「**事件帧已齐 + 确有独立心跳 comment**」：心跳按 encode_heartbeat()
+    #    的完整载荷计数，不靠子串；并把等待上限抬到足以覆盖心跳间隔（0.05s）。
+    for _ in range(600):
+        event_frames = [f for f in frames if f.startswith("event:")]
+        heartbeat_frames = [f for f in frames if f.startswith(":") and not f.startswith(": run")]
+        if len(event_frames) >= 2 and heartbeat_frames:
             break
         await asyncio.sleep(0.02)
     await sse_registry.close_all()
