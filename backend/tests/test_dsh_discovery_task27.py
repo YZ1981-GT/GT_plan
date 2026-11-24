@@ -77,11 +77,26 @@ def vendor_root() -> Path:
     return DSH_VENDOR_ROOT
 
 
+# 2026-11-24：DSH vendor SDK 是**外部依赖**（需人工 pin 安装到 DSH_VENDOR_ROOT，
+# 见 docs/reference/llm-provider-configuration.md §9）。本机与 CI 均未安装时，
+# 依赖它的 15 条判据无法建立 —— 显式 skip 并在理由里写明安装步骤，
+# 与「静默 skip 是假绿」不冲突：这是环境缺失的诚实不可判（非掩盖失败）。
+_VENDOR_READY = DSH_VENDOR_ROOT.is_dir()
+_requires_vendor = pytest.mark.skipif(
+    not _VENDOR_READY,
+    reason=(
+        f"DSH vendor SDK 未安装（{DSH_VENDOR_ROOT} 不存在）—— "
+        "按 docs/reference/llm-provider-configuration.md §9 完成 pin 安装后本组自动启用"
+    ),
+)
+
+
 # ---------------------------------------------------------------------------
 # Property 26: Effective Cordis 与工具目录受控
 # ---------------------------------------------------------------------------
 
 
+@_requires_vendor
 class TestDshDiscovery:
     """SDK discovery 结果验证。
 
@@ -528,6 +543,7 @@ class TestDshFailureNoDegradation:
 # ---------------------------------------------------------------------------
 
 
+@_requires_vendor
 class TestSdkSmoke:
     """SDK smoke test。
 
@@ -604,6 +620,7 @@ class TestDiscoveryNonExistent:
 # ---------------------------------------------------------------------------
 
 
+@_requires_vendor
 class TestFullDiscoveryPipeline:
     """完整 discovery + 版本 pin + Cordis 安全校验管线。
 

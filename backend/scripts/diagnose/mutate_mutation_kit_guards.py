@@ -374,8 +374,8 @@ MUTATIONS += [
     ),
     Mutation(
         id="M20", side="be", path=ADOPTION, kind="replace",
-        anchor="_FROZEN_SIZE = 19",
-        new="_FROZEN_SIZE = 18",
+        anchor="_FROZEN_SIZE = 59",
+        new="_FROZEN_SIZE = 58",
         want="test_frozen_list_only_shrinks",
         why="下调冻结上限模拟「名单增长了一条」⇒ only-shrinks 判据必红。这条守的是"
             "R8.2 的第二条不变量：新脚本不得把自己加进名单来逃避约束，否则名单退化成"

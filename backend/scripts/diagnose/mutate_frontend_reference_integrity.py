@@ -52,9 +52,10 @@ MUTATIONS: list[Mutation] = [
     Mutation(
         id="MR1",
         desc="删掉 /ai-chat 路由声明（复刻 AC 1.5 的原始缺陷形态）",
-        file="src/router/index.ts",
-        anchor="      path: '/ai-chat',",
-        replacement="      path: '/__ai_chat_removed__',",
+        # 2026-11-24：路由声明已迁至 router/domains/standalone.ts（index.ts 只做装配）。
+        file="src/router/domains/standalone.ts",
+anchor="    path: '/ai-chat',",
+replacement="    path: '/__ai_chat_removed__',",
         expect_test="AC 1.5：新窗口聊天路由 /ai-chat 已注册",
     ),
     Mutation(
