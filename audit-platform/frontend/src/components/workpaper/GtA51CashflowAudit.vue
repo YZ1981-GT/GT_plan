@@ -321,16 +321,12 @@ const {
   flushHtml: async () => {
     // 🔴 A5-1 不是 store-backed entry（后端 provider 无 STORE_ITEM_ID），
     // 不能走 readStoreProjection（会 422 entry_not_store_backed）。
-    // 从后端 _debug 端点获取 content_revision（临时方案，正式应由 store-projection 统一）。
+    // 🔴 已登记缺口：原先从无鉴权的 `/api/_debug/a51-content-revision` 取 content_revision，
+    //    该调试端点已在 bb29a49f6（release-blocker-closure）随其余 _debug 端点删除 ⇒ 请求恒 404、
+    //    恒走 0 兜底。此处删掉死调用（行为与删除端点后完全一致），正式的 content_revision 来源
+    //    需后端为非 store-backed entry 提供鉴权读取端点（待定，勿再接调试端点）。
     flushPendingAndProject()
-    let expectedRevision = 0
-    try {
-      const resp = await fetch(`/api/_debug/a51-content-revision?wp_id=${props.wpId}`)
-      if (resp.ok) {
-        const d = await resp.json()
-        expectedRevision = (d.data?.content_revision ?? d.content_revision) || 0
-      }
-    } catch { /* fallback to 0 */ }
+    const expectedRevision = 0
     return { expectedRevision, projection: { values: {} }, sheetKey: A51_SHEET_KEY }
   },
   reloadHtml: async () => { await reloadA51() },
