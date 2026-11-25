@@ -25,7 +25,7 @@ import re
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
@@ -201,34 +201,15 @@ _PROBE_PROJECT_SQL = """
 """
 
 
-async def _probe(db, snap: _Snapshot) -> None:
-    from app.services.formula_engine import execute
-    from app.services.formula_preloader import _load_wp, preload
-    from app.services.prefill_anchor_map import ANCHOR_MAP, read_anchor_value
-    from app.services.prev_wp_field import PriorWpFieldResolver
-    from app.services.sampling_registry_service import resolve_project_year
+async def _probe_schema_and_anchors(db, snap: _Snapshot, pid: UUID) -> None:
+    """取值层 SQL 对真实 schema 的可执行性探针。
 
-    row = (await db.execute(sa.text(_COUNT_SQL))).first()
-    snap.total_parsed, snap.cells_count, snap.html_count, snap.wp_code_count = (int(v or 0) for v in row)
-    prow = (await db.execute(sa.text(_PROBE_PROJECT_SQL))).first()
-    if prow is None:
-        return
-    snap.probe_project_id, snap.d_wp_count = prow[0], int(prow[1] or 0)
-    pid = UUID(snap.probe_project_id)
-    snap.probe_year = int(await resolve_project_year(db, pid) or 0)  # 取不到年度不猜今年（原写 COALESCE(…, 2025)）
-    for args in _WP_PROBES:  # 三参按「表!锚点」存（L1 _handle_wp 同一写法取）
-        loaded = await _load_wp(db, pid, snap.probe_year, {args})
-        snap.wp_results[args] = loaded.get(args[0], {}).get(f"{args[1]}!{args[2]}")
-        formula = "WP('{}','{}','{}')".format(*args)
-        result = execute(formula, await preload(db, pid, snap.probe_year, [formula]))
-        snap.wp_l1_results[args] = (result.ok, result.value, list(result.errors))
-    snap.short_wp_result = (await _load_wp(db, pid, snap.probe_year, {("D1", "审定表D1-1")})).get("D1")
-    resolver = PriorWpFieldResolver(db, pid, snap.probe_year)
-    source = await resolver.source()
-    snap.prev_source = (source.project_id, source.reason)
-    for args in _PREV_PROBES:
-        hit = await resolver.resolve(*args)
-        snap.prev_results[args] = (hit.value, hit.reason)
+    🔴 只依赖 schema、不依赖业务数据：任意 UUID 即可（查不到行只会得 NO_ITEM 之类的业务态，
+    列名 / 类型写错才会抛异常）。原先挂在「库里有 D 循环底稿」之后，CI 的 bootstrap 空库
+    提前 return ⇒ 三条 schema 契约判据全红，而它们恰恰是空库也能验的。
+    """
+    from app.services.prefill_anchor_map import ANCHOR_MAP, read_anchor_value
+
     # 取值层每条映射真跑一次（抓 SQL 列名 / 类型错）：异常记 EXC 让断言打红，不吞成「无数据」
     for key, spec in ANCHOR_MAP.items():
         label = "|".join(key)
@@ -253,6 +234,38 @@ async def _probe(db, snap: _Snapshot) -> None:
         snap.schema_probe_ok = True
     except Exception as exc:  # noqa: BLE001
         snap.schema_probe_error = f"{type(exc).__name__}: {exc}"
+
+
+async def _probe(db, snap: _Snapshot) -> None:
+    from app.services.formula_engine import execute
+    from app.services.formula_preloader import _load_wp, preload
+    from app.services.prev_wp_field import PriorWpFieldResolver
+    from app.services.sampling_registry_service import resolve_project_year
+
+    row = (await db.execute(sa.text(_COUNT_SQL))).first()
+    snap.total_parsed, snap.cells_count, snap.html_count, snap.wp_code_count = (int(v or 0) for v in row)
+    prow = (await db.execute(sa.text(_PROBE_PROJECT_SQL))).first()
+    if prow is None:
+        # 空库：无业务数据可探，但 schema 契约（列名 / 类型）照样要验
+        await _probe_schema_and_anchors(db, snap, uuid4())
+        return
+    snap.probe_project_id, snap.d_wp_count = prow[0], int(prow[1] or 0)
+    pid = UUID(snap.probe_project_id)
+    snap.probe_year = int(await resolve_project_year(db, pid) or 0)  # 取不到年度不猜今年（原写 COALESCE(…, 2025)）
+    for args in _WP_PROBES:  # 三参按「表!锚点」存（L1 _handle_wp 同一写法取）
+        loaded = await _load_wp(db, pid, snap.probe_year, {args})
+        snap.wp_results[args] = loaded.get(args[0], {}).get(f"{args[1]}!{args[2]}")
+        formula = "WP('{}','{}','{}')".format(*args)
+        result = execute(formula, await preload(db, pid, snap.probe_year, [formula]))
+        snap.wp_l1_results[args] = (result.ok, result.value, list(result.errors))
+    snap.short_wp_result = (await _load_wp(db, pid, snap.probe_year, {("D1", "审定表D1-1")})).get("D1")
+    resolver = PriorWpFieldResolver(db, pid, snap.probe_year)
+    source = await resolver.source()
+    snap.prev_source = (source.project_id, source.reason)
+    for args in _PREV_PROBES:
+        hit = await resolver.resolve(*args)
+        snap.prev_results[args] = (hit.value, hit.reason)
+    await _probe_schema_and_anchors(db, snap, pid)
 
 
 async def _load_snapshot() -> _Snapshot:
@@ -516,6 +529,9 @@ class TestAnchorSqlSchemaContract:
             f"  {k} -> {v}" for k, v in sorted(crashed.items()))
 
     def test_at_least_one_anchor_hits_in_real_db(self, snap: _Snapshot) -> None:
+        # 命中需要真实业务数据；空库的 schema 可执行性由上两条判据负责
+        if snap.probe_project_id is None:
+            pytest.skip("bootstrap 空库无 working_paper/D 循环底稿 —— 命中判据待有后端种子的环境")
         hits = {k: v for k, v in snap.anchor_exec_results.items() if v.startswith("hit")}
         assert hits, "真实库里没有任何已对齐锚点取到数，六态分布：\n" + "\n".join(
             f"  {k} -> {v}" for k, v in sorted(snap.anchor_exec_results.items()))
