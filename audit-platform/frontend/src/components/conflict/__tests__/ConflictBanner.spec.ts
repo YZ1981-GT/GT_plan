@@ -61,7 +61,7 @@ describe('ConflictBanner', () => {
     mockGet.mockResolvedValue({ count: 0, items: [] })
     const wrapper = makeBanner({ projectId: 'p1' })
     await flushPromises()
-    expect(mockGet).toHaveBeenCalledWith('/api/projects/p1/conflicts/pending')
+    expect(mockGet).toHaveBeenCalledWith('/api/projects/p1/conflicts/pending', expect.objectContaining({ _silent: true }))
     expect(wrapper.find('.gt-conflict-banner-stub').exists()).toBe(false)
   })
 
@@ -118,12 +118,12 @@ describe('ConflictBanner', () => {
     mockGet.mockResolvedValueOnce({ count: 0 })
     const wrapper = makeBanner({ projectId: 'p1' })
     await flushPromises()
-    expect(mockGet).toHaveBeenLastCalledWith('/api/projects/p1/conflicts/pending')
+    expect(mockGet).toHaveBeenLastCalledWith('/api/projects/p1/conflicts/pending', expect.objectContaining({ _silent: true }))
 
     mockGet.mockResolvedValueOnce({ count: 4 })
     await wrapper.setProps({ projectId: 'p2' })
     await flushPromises()
-    expect(mockGet).toHaveBeenLastCalledWith('/api/projects/p2/conflicts/pending')
+    expect(mockGet).toHaveBeenLastCalledWith('/api/projects/p2/conflicts/pending', expect.objectContaining({ _silent: true }))
     expect(wrapper.text()).toContain('4')
   })
 })

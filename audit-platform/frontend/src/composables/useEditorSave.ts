@@ -104,17 +104,26 @@ export function useEditorSave(opts: UseEditorSaveOptions) {
       nextExpectedVersion = null
     }
     const expectedVersion = nextExpectedVersion ?? detail.file_version
-    const data = await httpApi.post(
-      P_wp.univerSave(opts.projectId.value, opts.wpId.value),
-      {
-        snapshot,
-        expected_version: expectedVersion,
-        parsed_data_patch: { user_overrides: opts.userOverrides.serializeOverrides() },
-      },
-      { validateStatus: (status: number) => (status >= 200 && status < 300) || status === 409 },
-    )
+    // 🔴 不再用 validateStatus 放行 409：apiProxy 只回 body、拿不到状态码，放行后非版本冲突的 409
+    //    （如编辑锁冲突）会被当成保存成功（版本号 +1）。改为 409 照常抛出，只认「状态码 409 且
+    //    error_code=VERSION_CONFLICT」为版本冲突；其余错误交给调用方 handleApiError（_silent 防全局重复提示）。
+    let data: any
+    let conflict: any = null
+    try {
+      data = await httpApi.post(
+        P_wp.univerSave(opts.projectId.value, opts.wpId.value),
+        {
+          snapshot,
+          expected_version: expectedVersion,
+          parsed_data_patch: { user_overrides: opts.userOverrides.serializeOverrides() },
+        },
+        { _silent: true } as any,
+      )
+    } catch (err: any) {
+      conflict = err?.response?.status === 409 ? versionConflictOf(err.response.data) : null
+      if (!conflict) throw err
+    }
 
-    const conflict = versionConflictOf(data)
     if (conflict) {
       try {
         await confirmVersionConflict(conflict.server_version, conflict.expected_version)

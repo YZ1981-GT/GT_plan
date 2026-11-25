@@ -336,8 +336,9 @@ describe('useEditorSave — 保存代际与单飞', () => {
   })
 
   it('409 选择留下时不绕过 expected_version 强制覆盖，并保留 dirty', async () => {
-    vi.mocked(httpApi.post).mockResolvedValue({
-      detail: { error_code: 'VERSION_CONFLICT', server_version: 4, expected_version: 1 },
+    // 409 照常 reject（不再用 validateStatus 放行），版本冲突按状态码 + error_code 识别
+    vi.mocked(httpApi.post).mockRejectedValue({
+      response: { status: 409, data: { detail: { error_code: 'VERSION_CONFLICT', server_version: 4, expected_version: 1 } } },
     })
     vi.mocked(confirmVersionConflict).mockRejectedValueOnce('cancel')
     const initUniver = vi.fn().mockResolvedValue(undefined)
@@ -354,6 +355,19 @@ describe('useEditorSave — 保存代际与单飞', () => {
     expect(eventBus.emit).not.toHaveBeenCalled()
   })
 
+  it('非版本冲突的 409（如编辑锁冲突）不得当成保存成功', async () => {
+    vi.mocked(httpApi.post).mockRejectedValue({
+      response: { status: 409, data: { detail: { error_code: 'EDIT_LOCK_CONFLICT' } } },
+    })
+    const opts = makeOptions({ dirty: ref(true) })
+    const save = useEditorSave(opts)
+    save.markEdited()
+    await expect(save.onSave()).resolves.toBe(false)
+    expect(confirmVersionConflict).not.toHaveBeenCalled()
+    expect(opts.dirty.value).toBe(true)
+    expect(opts.autoSave.clearDirty).not.toHaveBeenCalled()
+    expect(eventBus.emit).not.toHaveBeenCalled()
+  })
   it('网络异常返回 false 且不清除 dirty', async () => {
     vi.mocked(httpApi.post).mockRejectedValue({ response: { status: 500 } })
     const opts = makeOptions({ dirty: ref(true) })
