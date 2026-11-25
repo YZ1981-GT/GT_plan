@@ -128,10 +128,12 @@ def test_report_release_classification_matches_reconcile_and_cache():
 
 
 def test_no_basis_list_is_design_thirteen_records():
+    """无依据清单只能是设计 §1.3 那 13 条的子集：库表补上依据后条目会被移出（2026-11-25 共享库已对齐，
+    清单为空），但不得出现设计之外的新条目。是否「真的有依据」由下方 PG 判据按记录级现算核对。"""
     items = _load_reconcile()["cache_only_without_db_basis"]["items"]
     got = {(i["wp_code"], i["sheet_name"]) for i in items}
-    assert got == _DESIGN_NO_BASIS, (
-        f"无依据清单与设计 §1.3 的 13 条记录不一致：多 {sorted(got - _DESIGN_NO_BASIS)} 缺 {sorted(_DESIGN_NO_BASIS - got)}"
+    assert got <= _DESIGN_NO_BASIS, (
+        f"无依据清单出现设计 §1.3 之外的记录：{sorted(got - _DESIGN_NO_BASIS)}"
     )
     cache_keys = {(r["wp_code"], r["sheet_name"]) for r in _load_cache()}
     assert got <= cache_keys, "清单里有缓存中不存在的记录"

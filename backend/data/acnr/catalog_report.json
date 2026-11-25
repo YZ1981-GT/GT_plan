@@ -2995,7 +2995,7 @@
       }
     ]
   },
-  "generated_at": "2026-10-30T15:54:51.579205+00:00",
+  "generated_at": "2026-11-25T14:00:48.324056+00:00",
   "info": {
     "count": 116,
     "items": [
@@ -3815,9 +3815,9 @@
       "附注国企"
     ]
   },
-  "registry_version": "20261030155451",
+  "registry_version": "20261125140047",
   "release": {
-    "catalog_sha256": "44018727f4bcc009aaf73907650d04a75c9018b6ce3d86a1b210fa87c8bc416a",
+    "catalog_sha256": "c46887e856651d5d773b9096fbe7ff79e135739eb67d2ecde3d487f2d376b9ce",
     "classification": {
       "path": "backend/data/acnr/sources/classification_cache.json",
       "record_count": 4640,
@@ -3896,8 +3896,8 @@
         "sha256": "165f455a9e6fad3b588519a84e20fc29a259271bdc0d31c6be7b7b1e4a91d742"
       },
       {
-        "path": "backend/data/acnr/catalog_snapshots/20261030063137.json",
-        "sha256": "935e62482f2f6fc8e23e65373f658b81b860a0d2c735e425943498e75d6c958f"
+        "path": "backend/data/acnr/catalog_snapshots/20261030155451.json",
+        "sha256": "44018727f4bcc009aaf73907650d04a75c9018b6ce3d86a1b210fa87c8bc416a"
       },
       {
         "path": "backend/data/acnr/global_catalog.overrides.json",
@@ -3957,7 +3957,7 @@
       },
       {
         "path": "backend/data/acnr/sources/sheet_verdicts.json",
-        "sha256": "15bbde348ed3f10cc7841d9618154fc8891e121c98716d82353f59d3a9da20f8"
+        "sha256": "9b99227c94d86d3216e8287e2b1ef43ba539669c2b68a4ba0e4c39c481c66e85"
       },
       {
         "path": "backend/data/c22_address_registry_seed.json",
@@ -4028,10 +4028,10 @@
         "sha256": "74c881dccc7799f8b27e4bf8e7591e01704e3ff9810c72a0c65585307261e620"
       }
     ],
-    "inputs_fingerprint": "e23183dcd5751c7d74c9ef0c2bb9997c0be6f4f0fbe964b81d9c603a1df6dbb0",
-    "previous_catalog_sha256": "935e62482f2f6fc8e23e65373f658b81b860a0d2c735e425943498e75d6c958f",
-    "previous_version": "20261030063137",
-    "registry_version": "20261030155451",
+    "inputs_fingerprint": "ea0ebde26ad94bcec0526b26e1de1fd259f10ba557d11be3904566f6fa9e93a9",
+    "previous_catalog_sha256": "44018727f4bcc009aaf73907650d04a75c9018b6ce3d86a1b210fa87c8bc416a",
+    "previous_version": "20261030155451",
+    "registry_version": "20261125140047",
     "schema_sha256": "6f3ee9a5c1be46e1c2d290997320317ac3d1080ab25d7afbf3244a196580c896"
   },
   "summary": {

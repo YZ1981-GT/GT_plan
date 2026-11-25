@@ -23,10 +23,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "extra": "渲染组件 i6-research-development-expense.yaml 不含 I6-7 tab / 不含 研发加计扣除测算",
         "template_tabs": {
@@ -51,8 +51,8 @@
           "研发加计扣除测算"
         ],
         "wp_index": {
-          "projects": 1,
-          "as_of": "2026-10-27"
+          "projects": 3,
+          "as_of": "2026-11-25"
         }
       }
     },
@@ -73,10 +73,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "extra": "种子名出现在 J2-1/J2-3 渲染 schema 的 cross_refs.target_wp（数据流声明，不带本 sheet 的有效 cell）",
         "template_tabs": {
@@ -104,8 +104,8 @@
           "精算重新计算"
         ],
         "wp_index": {
-          "projects": 1,
-          "as_of": "2026-10-27"
+          "projects": 3,
+          "as_of": "2026-11-25"
         }
       }
     },
@@ -126,10 +126,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "extra": "种子名出现在 J3-1 渲染 schema 的 cross_refs.target_wp（数据流声明）",
         "template_tabs": {
@@ -157,8 +157,8 @@
           "期权公允价值测算"
         ],
         "wp_index": {
-          "projects": 1,
-          "as_of": "2026-10-27"
+          "projects": 3,
+          "as_of": "2026-11-25"
         }
       }
     },
@@ -179,10 +179,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "extra": "种子名出现在 J3-1 渲染 schema 的 cross_refs.target_wp（数据流声明）",
         "template_tabs": {
@@ -208,8 +208,8 @@
           "等待期费用分摊"
         ],
         "wp_index": {
-          "projects": 1,
-          "as_of": "2026-10-27"
+          "projects": 3,
+          "as_of": "2026-11-25"
         }
       }
     },
@@ -230,10 +230,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "extra": "渲染组件 M6-1.yaml 的 cross_refs.target_wp 含 损益联动验证（数据流声明，不带本 sheet 的有效 cell）",
         "template_tabs": {
@@ -260,8 +260,8 @@
           "损益联动验证"
         ],
         "wp_index": {
-          "projects": 1,
-          "as_of": "2026-10-27"
+          "projects": 3,
+          "as_of": "2026-11-25"
         }
       }
     },
@@ -298,14 +298,15 @@
         "ie_manifest": false,
         "wp_account_mapping": [],
         "wp_index": {
-          "projects": 4,
-          "as_of": "2026-10-27"
+          "projects": 2,
+          "as_of": "2026-11-25"
         },
         "project_files": {
-          "sheet_level_workpapers": 4,
-          "with_file": 4,
-          "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "sheet_level_workpapers": 2,
+          "with_file": 2,
+          "parsed_data_null": false,
+          "as_of": "2026-11-25",
+          "parsed_data_note": "2026-11-25 复核：parsed_data 非空只来自 audit_checks 簿记（{\"audit_checks\": [], \"audit_checks_at\": …}，2026-08-04 一次检查运行写入），无任何单元格数据；停用判定前提不受影响。"
         }
       }
     },
@@ -342,14 +343,15 @@
         "ie_manifest": false,
         "wp_account_mapping": [],
         "wp_index": {
-          "projects": 4,
-          "as_of": "2026-10-27"
+          "projects": 2,
+          "as_of": "2026-11-25"
         },
         "project_files": {
-          "sheet_level_workpapers": 4,
-          "with_file": 4,
-          "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "sheet_level_workpapers": 2,
+          "with_file": 2,
+          "parsed_data_null": false,
+          "as_of": "2026-11-25",
+          "parsed_data_note": "2026-11-25 复核：parsed_data 非空只来自 audit_checks 簿记（{\"audit_checks\": [], \"audit_checks_at\": …}，2026-08-04 一次检查运行写入），无任何单元格数据；停用判定前提不受影响。"
         }
       }
     },
@@ -386,14 +388,15 @@
         "ie_manifest": false,
         "wp_account_mapping": [],
         "wp_index": {
-          "projects": 4,
-          "as_of": "2026-10-27"
+          "projects": 2,
+          "as_of": "2026-11-25"
         },
         "project_files": {
-          "sheet_level_workpapers": 4,
-          "with_file": 4,
-          "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "sheet_level_workpapers": 2,
+          "with_file": 2,
+          "parsed_data_null": false,
+          "as_of": "2026-11-25",
+          "parsed_data_note": "2026-11-25 复核：parsed_data 非空只来自 audit_checks 簿记（{\"audit_checks\": [], \"audit_checks_at\": …}，2026-08-04 一次检查运行写入），无任何单元格数据；停用判定前提不受影响。"
         }
       }
     },
@@ -430,14 +433,15 @@
         "ie_manifest": false,
         "wp_account_mapping": [],
         "wp_index": {
-          "projects": 3,
-          "as_of": "2026-10-27"
+          "projects": 2,
+          "as_of": "2026-11-25"
         },
         "project_files": {
-          "sheet_level_workpapers": 3,
-          "with_file": 3,
-          "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "sheet_level_workpapers": 2,
+          "with_file": 2,
+          "parsed_data_null": false,
+          "as_of": "2026-11-25",
+          "parsed_data_note": "2026-11-25 复核：parsed_data 非空只来自 audit_checks 簿记（{\"audit_checks\": [], \"audit_checks_at\": …}，2026-08-04 一次检查运行写入），无任何单元格数据；停用判定前提不受影响。"
         }
       }
     },
@@ -474,14 +478,15 @@
         "ie_manifest": false,
         "wp_account_mapping": [],
         "wp_index": {
-          "projects": 4,
-          "as_of": "2026-10-27"
+          "projects": 2,
+          "as_of": "2026-11-25"
         },
         "project_files": {
-          "sheet_level_workpapers": 4,
-          "with_file": 4,
-          "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "sheet_level_workpapers": 2,
+          "with_file": 2,
+          "parsed_data_null": false,
+          "as_of": "2026-11-25",
+          "parsed_data_note": "2026-11-25 复核：parsed_data 非空只来自 audit_checks 簿记（{\"audit_checks\": [], \"audit_checks_at\": …}，2026-08-04 一次检查运行写入），无任何单元格数据；停用判定前提不受影响。"
         }
       }
     }
@@ -499,10 +504,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -521,10 +526,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -543,10 +548,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -565,10 +570,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -587,10 +592,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -609,10 +614,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -631,10 +636,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -653,10 +658,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -675,10 +680,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -697,10 +702,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -719,10 +724,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -741,10 +746,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -763,10 +768,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -785,10 +790,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -807,10 +812,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -829,10 +834,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -851,10 +856,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -873,10 +878,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -895,10 +900,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -917,10 +922,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -939,10 +944,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -961,10 +966,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -983,10 +988,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -1005,10 +1010,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
@@ -1027,10 +1032,10 @@
           "has_tab": false
         },
         "project_files": {
-          "sheet_level_workpapers": 1,
-          "with_file": 1,
+          "sheet_level_workpapers": 3,
+          "with_file": 3,
           "parsed_data_null": true,
-          "as_of": "2026-10-27"
+          "as_of": "2026-11-25"
         },
         "static_refs": 0,
         "pg_formula_refs": 0,
