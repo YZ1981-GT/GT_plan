@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -95,13 +96,17 @@ def run_eslint_no_undef(out_json: Path) -> list[dict[str, Any]]:
     """跑专用最小配置的 no-undef，返回逐条 finding。"""
     if not GATE_ESLINTRC.is_file():
         raise GateError(f"缺门禁专用 eslint 配置 {GATE_ESLINTRC}")
+    # 🔴 跨平台：Windows 的 npx 实为 npx.cmd（须经 cmd /c）；POSIX 上
+    #    `shell=True` + 列表参数只会执行 `npx` 本身、丢掉其余参数 ⇒ eslint 从未运行 ⇒
+    #    「eslint 没产出报告」（2026-11-25 CI 连续红，本地 Windows 绿的原因）。
+    npx = ["cmd", "/c", "npx"] if os.name == "nt" else ["npx"]
     cmd = [
-        "npx", "eslint", "--no-eslintrc", "-c", GATE_ESLINTRC.name,
+        *npx, "eslint", "--no-eslintrc", "-c", GATE_ESLINTRC.name,
         "--ext", ".ts,.vue", "src", "-f", "json", "-o", str(out_json),
     ]
     proc = subprocess.run(
         cmd, cwd=str(FRONTEND), capture_output=True, text=True,
-        encoding="utf-8", errors="replace", shell=True,
+        encoding="utf-8", errors="replace",
     )
     if not out_json.is_file():
         raise GateError(
@@ -130,10 +135,11 @@ def run_vite_optimize(log: Path) -> dict[str, Any]:
     vite_bin = FRONTEND / "node_modules" / "vite" / "bin" / "vite.js"
     if not vite_bin.is_file():
         raise GateError(f"缺 {vite_bin} —— 先在 frontend 跑 npm install")
+    # node 是真可执行文件，直接列表调用即可（shell=True + 列表在 POSIX 上会丢参数）。
     proc = subprocess.run(
         ["node", str(vite_bin), "optimize", "--force"],
         cwd=str(FRONTEND), capture_output=True, text=True,
-        encoding="utf-8", errors="replace", shell=True,
+        encoding="utf-8", errors="replace",
     )
     text = (proc.stdout or "") + (proc.stderr or "")
     log.write_text(text, encoding="utf-8")

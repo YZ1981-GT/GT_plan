@@ -274,11 +274,20 @@ MUTATIONS: tuple[Mutation, ...] = (
     ),
     # ⑭ 同步失败提示回退成 fail-open：真同步失败分支改回吞异常的裸 catch
     #    —— 这正是「已同步 128 行」与「同步附注失败」同时弹出的成因形态。
+    #    🔴 2026-11-25 锚点随 5bb3142f6（同步 cancelled 修复，catch 块开头插入
+    #    ERR_CANCELED 三行）后的真实形态同步；变异语义不变：捕获去掉 err 绑定
+    #    ⇒ 取消分支的 e 判断与 console.error 全部失去对象 ⇒ 退回吞异常。
     Mutation(
         name="国企 Tab 同步失败分支回退成裸 catch（吞异常）",
         target=_TAB_SOE,
-        anchor="    } catch (err: unknown) {\n      // 🔴 绝不吞异常",
-        replacement="    } catch {\n      // MUTATED 绝不吞异常",
+        anchor=(
+            "    } catch (err: unknown) {\n"
+            "      // 请求被取消（防重复提交 / 组件卸载 / 竞争去重）→ 静默跳过，不误报「同步失败」"
+        ),
+        replacement=(
+            "    } catch {  // MUTATED 裸 catch\n"
+            "      // 请求被取消（防重复提交 / 组件卸载 / 竞争去重）→ 静默跳过，不误报「同步失败」"
+        ),
         expect_test="不再用裸 catch",
         suite="fe",
         selector=_FE_SOE_MODEL,

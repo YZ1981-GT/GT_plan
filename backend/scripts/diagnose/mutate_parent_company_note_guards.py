@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -343,9 +344,15 @@ def _run_backend(tests: tuple[str, ...]) -> set[str]:
 
 
 def _run_frontend(pattern: str) -> set[str]:
+    # 🔴 跨平台：Windows 的 npx 实为 npx.cmd（须经 cmd /c）；POSIX 上
+    #    `shell=True` + 列表参数只会执行 `npx` 本身、丢掉其余参数 ⇒ vitest 从未运行 ⇒
+    #    既没有 JSON 也没有失败项 ⇒ 前端变异恒判 GREEN（2026-11-25 CI 实证：
+    #    drop_frontend_banner 在 Linux 上「未被任何断言抓到」，本地 Windows 上 RED）。
+    #    与 mutate_task14/20/21 同款写法。
+    npx = ["cmd", "/c", "npx"] if os.name == "nt" else ["npx"]
     proc = subprocess.run(
-        ["npx", "vitest", "run", pattern, "--reporter=json"],
-        cwd=REPO / "audit-platform" / "frontend", capture_output=True, shell=True,
+        [*npx, "vitest", "run", pattern, "--reporter=json"],
+        cwd=REPO / "audit-platform" / "frontend", capture_output=True,
     )
     txt = proc.stdout.decode("utf-8", "replace")
     i, j = txt.find("{"), txt.rfind("}")
