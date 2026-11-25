@@ -1158,8 +1158,7 @@ function statusLabel(s: string) {
   return m[s] || s
 }
 
-// 在独立窗口打开查账（multi-window-ledger-workbench Phase 1 Task 4）。
-// 不带年度：项目审计年度不一定有账套数据，由查账窗口自己取「审计年度有数据就用它，否则最近有数据的年度」。
+// 在独立窗口打开查账（multi-window-ledger-workbench Phase 1 Task 4）；不带年度：项目审计年度不一定有账套数据，由查账窗口自己取「审计年度有数据就用它，否则最近有数据的年度」。
 function onOpenLedgerWindow() {
   openLedgerWindow(projectId.value)
 }

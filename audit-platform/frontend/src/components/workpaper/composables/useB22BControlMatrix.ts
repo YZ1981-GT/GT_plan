@@ -10,8 +10,8 @@
  *
  * 持久化：
  * - GET/PUT /api/workpapers/{wpId}/checklist-responses
- * - item_id：`B22B-row-{n}-{field}`（每字段一条，值存 remark，conclusion 恒 null）
- *   + `B22B-row-count`（行数）
+ * - item_id：`B22B-rows`（行数组 JSON，行身份 rowId 在行对象内）+ `B22B-row-count`（校验值）；
+ *   旧 `B22B-row-{n}-{field}` 逐字段键只在迁移时回读（BC-53）
  * - PUT 请求体绝不传 project_id（wpId 不是 project_id，传错触发 422 project_mismatch）
  *
  * 从 B22A 带入控制点：

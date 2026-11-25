@@ -110,7 +110,7 @@ export function useL4CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
    *
    * 数据来源：
    * - L4-1 审定表合计存于 item_id: "L4-L4-1-adjudication-total"（remark=合计审定数）
-   * - L4-2 明细表行数据存于 item_id: "L4-L4-2-rows"（remark=JSON数组，各行auditedAmount）
+   * - L4-2 明细表行数据存于 item_id: "L4-2-rows"（remark=JSON数组，useL4Detail 写入；按期末摊余成本合计）
    */
   const adjudicationVsDetail: ComputedRef<AdjudicationVsDetailResult> = computed(() => {
     // 审定表期末审定合计（useL4Adjudication 写入 L4-L4-1-adjudication-total）

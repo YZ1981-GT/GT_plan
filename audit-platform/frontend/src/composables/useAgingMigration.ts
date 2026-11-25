@@ -165,9 +165,10 @@ export function migrateD3F1Keys(raw: any, segments: AgingSegment[]): D3F1DetailR
   const oldPrior: AgingData = (raw.agingPrior && typeof raw.agingPrior === 'object')
     ? raw.agingPrior
     : {}
-  const oldCurrent: AgingData = (raw.agingCurrent && typeof raw.agingCurrent === 'object')
-    ? raw.agingCurrent
-    : {}
+  // 只有输入本来带期末未审账龄（F1-2 三期）才输出 agingCurrent；D3/D7 是两期科目，
+  // 不得凭空补一个全 0 的第三期（与 remapRowAgingData「有 agingCurrent 才重映射」同口径）
+  const hasCurrent = !!raw.agingCurrent && typeof raw.agingCurrent === 'object'
+  const oldCurrent: AgingData = hasCurrent ? raw.agingCurrent : {}
   const oldAudited: AgingData = (raw.agingAudited && typeof raw.agingAudited === 'object')
     ? raw.agingAudited
     : {}
@@ -184,7 +185,7 @@ export function migrateD3F1Keys(raw: any, segments: AgingSegment[]): D3F1DetailR
   }
 
   result.agingPrior = newPrior
-  result.agingCurrent = newCurrent
+  if (hasCurrent) result.agingCurrent = newCurrent
   result.agingAudited = newAudited
 
   return result as D3F1DetailRowV2
