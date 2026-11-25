@@ -6331,6 +6331,17 @@ jobs:
           psql -h localhost -U postgres -d audit_platform -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           psql -h localhost -U postgres -d audit_platform -c "DROP TABLE IF EXISTS ai_chat_action_receipts, ai_chat_tool_calls, ai_chat_attachments, ai_chat_runs CASCADE;"
           python -c "import asyncio,sys; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', [f.version for f in r.failed]); sys.exit(1 if r.failed else 0)"
+      # 🔴 2026-11-25：生成器经 generate_workpaper_sync_manifest.discover_source() 起
+      #    `node discover-workpaper-sync-mounts.mjs`（依赖 @typescript-eslint/parser、
+      #    vue-eslint-parser）。原先本 job 没装前端依赖 ⇒ 源派生失败 ⇒ 产物里的
+      #    source_reason 变成 manifest_source_derivation_failed ⇒ 与提交件字节不符、恒 stale
+      #    （无 node_modules 的干净 worktree 复现出与 CI 相同的 digest 97d6739a…）。
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install frontend deps (mount discoverer runs on node)
+        working-directory: audit-platform/frontend
+        run: npm ci
       - name: Recompute and byte-check program milestone registry
         run: python backend/scripts/gen/generate_workpaper_sync_program_milestones.py --check
       - name: Program milestone guards (DAG, digests, evidence, live read-only DB)
