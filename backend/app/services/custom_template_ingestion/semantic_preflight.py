@@ -26,6 +26,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Iterable
 
+from app.services.custom_template_ingestion.amount_region_candidates import (
+    AmountRegionCandidate,
+)
 from app.services.custom_template_ingestion.package_scanner import (
     FINDING_CORRUPT,
     FINDING_ENCRYPTED,
