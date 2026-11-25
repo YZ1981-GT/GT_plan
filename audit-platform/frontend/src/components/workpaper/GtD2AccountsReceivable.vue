@@ -49,6 +49,18 @@
 
       <!-- HTML 结构化视图 -->
       <template v-else>
+      <!-- D2-2 未填「信用风险组合方式」的行不进 D2-1 的 SUMIF 汇总：点名行数与金额，免得 D2-1 合计静默为 0
+           （spec writeback-followup-issue-closure R11.2；crossSheet 是普通对象，模板里嵌套 computed 须写 .value） -->
+      <el-alert
+        v-if="crossSheet.unclassifiedDetail.value.count > 0"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="d2-unclassified-alert"
+      >
+        D2-2 明细表有 {{ crossSheet.unclassifiedDetail.value.count }} 行未填「信用风险组合方式」，
+        合计审定数 {{ fmtAmt(crossSheet.unclassifiedDetail.value.totalAudited) }} 未汇总进 D2-1 审定表。
+      </el-alert>
       <!-- D2 主入口 / 目录 -->
       <D2TabIndex
         v-if="currentSheet === 'D2' || currentSheet === '目录'"
@@ -239,6 +251,7 @@ import { useEntrySyncReadiness } from './sync/useEntrySyncReadiness'
 import { useAgingConfig } from '@/composables/useAgingConfig'
 import { useD2FormData, type ChecklistResponse } from './composables/useD2FormData'
 import { useD2CrossSheet } from './composables/useD2CrossSheet'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useD2TabImportExport } from './composables/useD2TabImportExport'
 // 2026-09-10: DEC-10 解除后迁统一路径。`useD2SyncBridge` + `/d2-sync/*` 仍保留
 // 至 ONLYOFFICE_VERIFIED（DEC-08），但本宿主不再调用它们。
@@ -552,6 +565,9 @@ provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
 
 provide('d2CrossSheet', crossSheet)
+
+const displayPrefs = useDisplayPrefsStore()
+const fmtAmt = (v: number) => displayPrefs.fmt(v)
 
 const _d2TbSourceCodes = computed(() => pickDTbSourceCodes(props.htmlData))
 provide('tbSourceCodes', _d2TbSourceCodes)

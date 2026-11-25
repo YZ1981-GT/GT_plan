@@ -46,7 +46,7 @@ import type { EngineFilledPayload } from '../composables/shared/voucherCheckFill
 /**
  * 抽凭科目码取自单一真源 `dCycleAccountScope`（D2 应收账款）。
  * 原为模板内字面量；接真源后科目口径与该循环的取数/回写共用同一定义，
- * 避免各处独立硬编码而漂移。本组件无 `tbSourceCodes` prop ⇒ 走兜底码。
+ * 避免各处独立硬编码而漂移。挂凭匹配前缀经 inject('tbSourceCodes') 取宿主映射码，缺省走兜底码。
  * spec: voucher-sampling-account-scope-and-attach-closure R1.1/R1.2
  */
 import { dCycleScope } from '../composables/dCycleAccountScope'
