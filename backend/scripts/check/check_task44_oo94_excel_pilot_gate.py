@@ -1257,6 +1257,32 @@ def _probe_request_path_registration() -> tuple[tuple[str, ...] | None, str]:
     return probe_request_path_registration()
 
 
+def _derive_required_for_pilot(ev: Any, entry: Any, authority_model: Any) -> Any:
+    """推导 pilot 的 required set；pending entry（`capability=null`）按其目标能力推导。
+
+    🔴 `derive_for_manifest_entry` 内部用 `capability_of`，对 pending entry 一律抛
+    `EntryProfileError`，整个门在 `collect_pilot_facts` 就崩（--json 报告不产出，
+    projection-lane 门复用不到读数）。pending 的正确语义是「还没启用任何能力」——
+    此时准入信号 `capability_enabled` 必为 False，门会如实报「未准入」；required set
+    只作参考读数，故以 `capability_target`（entry 声明的目标能力）推导，而不是崩溃。
+    非 pending 的 `capability=null` 仍照旧抛（不替坏清册放宽）。
+    """
+    from app.services.workpaper_sync.entry_profile import (
+        Capability,
+        extract_entry_profile,
+        is_pending_entry,
+    )
+
+    if not is_pending_entry(entry):
+        return ev.derive_for_manifest_entry(entry, authority_model=authority_model)
+    target = Capability(entry.get("capability_target"))
+    return ev.derive_required_scenarios(
+        profile=extract_entry_profile(entry),
+        capability=target,
+        authority_model=authority_model,
+    )
+
+
 def collect_pilot_facts(ref: PilotRef) -> PilotFacts:
     """一个 pilot 的全部实测事实：required set、四个 digest、bundle、准入信号。"""
     _ensure_backend_on_path()
@@ -1275,7 +1301,7 @@ def collect_pilot_facts(ref: PilotRef) -> PilotFacts:
             f"pilot {ref.pilot_class}: entry {entry_id} 不在 source-backed manifest 里"
         )
     entry = entries[entry_id]
-    required = ev.derive_for_manifest_entry(entry, authority_model=module.AUTHORITY_MODEL)
+    required = _derive_required_for_pilot(ev, entry, module.AUTHORITY_MODEL)
 
     authority = canonical_digest(module.authority_model_payload())
     template = canonical_digest(module.template_definition_payload())
