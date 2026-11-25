@@ -397,6 +397,14 @@ def main() -> int:
         if key not in baselines:
             baselines[key] = _run(mut)
             lines.append(f"[baseline] {'/'.join(key)} 失败 {len(baselines[key])} 项")
+            # 🔴 基线 vitest 根本没跑起来（无 JSON / 非零退出且无断言）时，变异前后结果必然相同
+            #    ⇒ 会被误判 GREEN「守卫缺陷」。环境不可用必须直接失败（2026-11-25 CI 实证：
+            #    本 job 未装 Node 依赖，drop_frontend_banner 恒 GREEN）。
+            dead = baselines[key] & {"<vitest-nonzero-exit>", "<vitest-json-parse-failed>"}
+            if dead:
+                print("\n".join(lines))
+                print(f"[ERR] baseline 前端测试没有真正跑起来（环境不可用，非守卫缺陷）: {sorted(dead)}")
+                return 2
         base = baselines[key]
 
         orig = mut.target.read_bytes()

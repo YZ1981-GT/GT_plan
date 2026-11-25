@@ -270,8 +270,11 @@ MUTATIONS: tuple[Mutation, ...] = (
     Mutation(
         mid="M16",
         what="H9 TB 字段名退回内嵌错码（`unadjusted2205`，`\\b` 判据抓不到）",
-        rel="audit-platform/frontend/src/components/workpaper/composables/useH9FormData.ts",
-        anchor="  unadjustedLeaseLiability: number",
+        # 2026-11-25：原锚点文件 useH9FormData.ts 已作为零消费载体删除，守卫随之从
+        # 「单文件」加宽到整个 H8/H9 扫描面（hCycleAccountScope.spec.ts「全扫描面」用例）。
+        # 变异改落到扫描面内仍存在的 H9 composable，验证的仍是「内嵌错码标识符必被抓」。
+        rel="audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts",
+        anchor="  endBalance: number",
         new_line="  unadjusted2205: number",
         groups=(FE_SCOPE,),
     ),
@@ -428,12 +431,20 @@ def main() -> int:
     log("")
     log("[1/2] 采集 baseline 失败集合")
     baseline: dict[str, set[str]] = {}
+    baseline_passed: dict[str, int] = {}
     for g in needed:
         fails, passed = run_group(g)
         baseline[g] = fails
+        baseline_passed[g] = passed
         log(f"  {g:<12} passed={passed:<5} baseline_failures={len(fails)}")
         for f in sorted(fails):
             log(f"      (baseline red) {f}")
+    # 🔴 2026-11-25：基线跑不起来（没装前端依赖 ⇒ 无 JSON；或一条都没通过）时，变异前后
+    #    失败集合必然相同 ⇒ 全部判 GREEN，错误地指向「守卫缺陷」。环境不可用必须直接失败。
+    dead = [g for g in needed if "__NO_JSON_OUTPUT__" in baseline[g] or baseline_passed[g] == 0]
+    if dead:
+        log(f"[ERR] baseline 没有真正跑起来（环境不可用，非守卫缺陷）: {dead}")
+        return 2
     log("")
     log("[2/2] 逐个注入")
 
