@@ -2019,3 +2019,12 @@ backend/app/routers/wp_render_strategies/_d1_disclosure_export.py 935
 # 2026-11-24 登记：Task 5 run coordinator 全套（SSE drain/重连/恢复/并发）本体即数据，
 # 拆分会让「drain 帧 ↔ stop() 语义 ↔ heartbeat 判据」三件相互约束的判据跨文件。
 backend/tests/dsh_agent_panel/test_task5_run_coordinator.py  2577
+# 2026-11-24 登记（本批改动把三个 HEAD 已超 800 的历史大文件推过 +5% 膨胀线，非本批引入的规模）：
+#   event_bus.py —— HEAD 813 行，本批仅 +1 行（UUID import）；拆分方向：SSE 派发/重放扫描抽伴生模块。
+backend/app/services/event_bus.py 815
+#   _status_doc_checks.py —— HEAD 776 行；本批 +31 行是 ACNR 状态文档守卫的判据库
+#   （登记制 claim + 计划表空态两态），判据与登记表同文件是设计约束（同 spec 三件套口径）。
+backend/tests/acnr/_status_doc_checks.py 807
+#   test_acnr_status_doc_statements.py —— HEAD 790 行；本批 +12 行为状态文档新增「更新行」
+#   登记判据（每句文档陈述一条可证伪判据），登记键须逐字与文档一致，拆分会让对照跨文件。
+backend/tests/acnr/test_acnr_status_doc_statements.py 803
