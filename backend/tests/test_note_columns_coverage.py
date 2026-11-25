@@ -764,38 +764,9 @@ class TestColumnsRuleProvenance:
             f"白名单条目理由过短（<12 字）：{short} —— 每条跨章放行必须写明实证依据"
         )
 
-    @pytest.mark.parametrize("variant", VARIANTS)
-    def test_every_rule_passes_chapter_gate(self, columns_rules, variant) -> None:
-        """🔴 章归属闸门：每条规则的 docx 匹配必须同章或已登记为等价/已知错落章。
-
-        缺陷背景（2026-08-07 实证）：生成器原按「末级 heading 归一后相等/互含」
-        匹配 docx 章节，**不校验章归属** ⇒ 跨章同名表会被静默配错。最毒的一例：
-
-            JSON  `三、长期股权投资`（第三章 = 重要会计政策及会计估计）
-                  headers = ['项  目', '期末余额', '上年年末余额']
-            docx  `合并财务报表项目附注 / 长期股权投资`（= JSON 第五章）
-                  13 列两级变动表
-
-        它恰好被「列数相等」这道**弱**安全阀挡住了；但跨章同名且列数相等时
-        没有任何东西能拦住静默错配。本断言要求每条已生成的规则都过闸门。
-        """
-        gen = _load_rules_generator()
-        chapters = _chapter_titles(variant)
-
-        bad: list[str] = []
-        for num, r in _iter_rule_tables(columns_rules, variant):
-            docx_key = str(r.get("docx_key") or "")
-            chapter = chapters.get(gen._chapter_no(num), "")
-            ok, kind = gen.chapter_verdict(variant, chapter, gen._docx_root(docx_key))
-            if not ok:
-                bad.append(
-                    f"{variant} {num} #{r.get('index')} JSON 章={chapter!r} "
-                    f"docx root={gen._docx_root(docx_key)!r} verdict={kind}"
-                )
-        assert not bad, (
-            "规则表存在未过章归属闸门的条目（跨章匹配且未登记）：\n"
-            + "\n".join(bad[:15])
-        )
+    # 2026-11-25：此处原有一份同名 test_every_rule_passes_chapter_gate（ruff F811）。
+    # 它读 r['docx_key']，而规则表 85 条全都只有 source_ref ⇒ 每条都拿空 root 判闸门（空转），
+    # 且同名定义把上面那份读 source_ref 的正确版本整个遮蔽、从未执行。已删除重复定义。
 
     def test_chapter_gate_actually_rejects_cross_chapter(self) -> None:
         """反向自检：闸门必须真的拒绝未登记的跨章组合（防它退化成恒 True）。"""
