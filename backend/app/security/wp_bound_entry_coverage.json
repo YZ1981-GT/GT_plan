@@ -2,7 +2,7 @@
   "spec": "procedure-delegation-visibility-isolation",
   "artifact": "wp_bound_entry_coverage.json",
   "generated_by": "app.security.coverage_guard.reconcile_ledger",
-  "generated_at": "2026-08-14T12:40:30.874954+00:00",
+  "generated_at": "2026-11-25T09:09:03.923277+00:00",
   "app_import": "app.main:app",
   "migration_head": "V112",
   "baseline_note": "Inventory-only baseline. No unified Wp_Bound_Gate/Action_Matrix exists yet, so every wp-bound entry is 'unmigrated'. Do not treat 'unmigrated' as implemented. Regenerate via `python -m app.security.entry_coverage_scanner`.",
@@ -43,30 +43,30 @@
     "detail": []
   },
   "summary": {
-    "entry_total": 2684,
-    "http_total": 2662,
-    "http_wp_bound": 901,
-    "http_non_wp_bound": 1761,
+    "entry_total": 2688,
+    "http_total": 2666,
+    "http_wp_bound": 903,
+    "http_non_wp_bound": 1763,
     "worker_total": 22,
     "by_family": {
       "ai": 107,
-      "attachment": 22,
-      "background": 15,
+      "attachment": 13,
+      "background": 22,
       "bulk": 12,
       "callback": 3,
       "checklist": 2,
       "comment": 4,
       "cross_ref": 2,
-      "detail": 87,
-      "download": 6,
+      "detail": 163,
+      "download": 5,
       "export": 248,
       "history": 3,
       "html": 1,
       "import": 129,
-      "infra": 10,
-      "non_wp_bound": 1474,
+      "infra": 5,
+      "non_wp_bound": 1758,
       "onlyoffice_wopi": 15,
-      "preview": 5,
+      "preview": 3,
       "procedure_task": 16,
       "render_config": 1,
       "review": 17,
@@ -76,39 +76,34 @@
       "version": 7
     },
     "by_gate": {
-      "not_applicable": 1790,
-      "gated": 739,
-      "unmigrated": 76,
-      "native_authz": 63,
-      "migrated": 6,
-      "deferred_editor": 5,
-      "editor_security.verify_callback_preconditions + resolve_wp_binding_and_access(editor.file_write)": 1,
-      "resolve_wp_binding_and_access(editor.config)": 1,
+      "deferred_editor": 6,
       "editor_security.validate_editor_token(editor_read)": 1,
-      "resolve_wp_binding_and_access(editor.file_write) -> UserCanWrite": 1,
-      "resolve_wp_binding_and_access(editor.file_write)": 1
-    },
-    "by_action": {
-      "ai": 107,
-      "bulk": 12,
-      "callback": 3,
-      "comment": 4,
-      "create": 694,
-      "dead_letter": 1,
-      "delete": 76,
-      "download": 6,
-      "editor": 15,
-      "export": 248,
-      "import": 129,
-      "preview": 5,
-      "read": 893,
-      "retry": 1,
-      "review": 17,
-      "update": 115,
-      "worker_loop": 13
+      "editor_security.verify_callback_preconditions + resolve_wp_binding_and_access(editor.file_write)": 1,
+      "gated": 781,
+      "migrated": 6,
+      "native_authz": 97,
+      "not_applicable": 1793,
+      "resolve_wp_binding_and_access(editor.config)": 1,
+      "resolve_wp_binding_and_access(editor.file_write)": 1,
+      "resolve_wp_binding_and_access(editor.file_write) -> UserCanWrite": 1
     }
   },
   "entries": [
+    {
+      "kind": "dead_letter",
+      "entrypoint": "app.services.import_event_outbox_service:ImportEventOutboxService.replay_pending",
+      "callable": "replay_pending",
+      "route": null,
+      "method": null,
+      "family": "background",
+      "action": "dead_letter",
+      "wp_bound": false,
+      "binding": "n/a",
+      "gate": "not_applicable",
+      "matrix": "not_applicable",
+      "test_ids": [],
+      "notes": "ledger import outbox DLQ mover (event_outbox_dlq); not wp content"
+    },
     {
       "kind": "http",
       "entrypoint": "app.routers.a17_summary:a176_agenda_prefill",
@@ -713,16 +708,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.acnr:acnr_locate_workpaper",
+      "callable": "acnr_locate_workpaper",
       "route": "/api/acnr/workpapers/{wp_id}/locate",
       "method": "GET",
-      "entrypoint": "app.routers.acnr:acnr_locate_workpaper",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
@@ -1129,7 +1128,12 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": [],
-      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。",
+      "duplicate_registration": true,
+      "duplicate_entrypoints": [
+        "app.routers.aging_config:get_aging_presets",
+        "app.routers.aging_analysis:list_presets"
+      ]
     },
     {
       "kind": "http",
@@ -1160,16 +1164,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.doc_ai_chat:delete_attachment",
+      "callable": "delete_attachment",
       "route": "/api/ai-chat/attachments/{attachment_id}",
       "method": "DELETE",
-      "entrypoint": "app.routers.doc_ai_chat:delete_attachment",
       "family": "detail",
       "action": "delete",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
@@ -1782,185 +1790,241 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.attachments:delete_attachment",
+      "callable": "delete_attachment",
       "route": "/api/attachments/{attachment_id:uuid}",
       "method": "DELETE",
-      "entrypoint": "app.routers.attachments:delete_attachment",
       "family": "detail",
       "action": "delete",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_delete",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: handler_call:enforce_attachment_wp_visibility"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.attachments:get_attachment",
+      "callable": "get_attachment",
       "route": "/api/attachments/{attachment_id:uuid}",
       "method": "GET",
-      "entrypoint": "app.routers.attachments:get_attachment",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: handler_call:enforce_attachment_wp_visibility"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.attachments:associate_with_wp",
+      "callable": "associate_with_wp",
       "route": "/api/attachments/{attachment_id:uuid}/associate",
       "method": "POST",
-      "entrypoint": "app.routers.attachments:associate_with_wp",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: handler_call:gate_attachment_associate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.attachments:classify_document",
+      "callable": "classify_document",
       "route": "/api/attachments/{attachment_id:uuid}/classify",
       "method": "POST",
-      "entrypoint": "app.routers.attachments:classify_document",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: handler_call:enforce_attachment_wp_visibility"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.attachments:download_attachment",
+      "callable": "download_attachment",
       "route": "/api/attachments/{attachment_id:uuid}/download",
       "method": "GET",
-      "entrypoint": "app.routers.attachments:download_attachment",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: handler_call:enforce_attachment_wp_visibility"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.attachments:extract_confirmation_reply",
+      "callable": "extract_confirmation_reply",
       "route": "/api/attachments/{attachment_id:uuid}/extract-confirmation",
       "method": "POST",
-      "entrypoint": "app.routers.attachments:extract_confirmation_reply",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: handler_call:enforce_attachment_wp_visibility"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.attachments:confirm_ocr",
+      "callable": "confirm_ocr",
       "route": "/api/attachments/{attachment_id:uuid}/ocr-confirm",
       "method": "POST",
-      "entrypoint": "app.routers.attachments:confirm_ocr",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: handler_call:enforce_attachment_wp_visibility"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.attachments:update_ocr_status",
+      "callable": "update_ocr_status",
       "route": "/api/attachments/{attachment_id:uuid}/ocr-status",
       "method": "PUT",
-      "entrypoint": "app.routers.attachments:update_ocr_status",
       "family": "detail",
       "action": "update",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: handler_call:enforce_attachment_wp_visibility"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.attachments:get_ocr_text",
+      "callable": "get_ocr_text",
       "route": "/api/attachments/{attachment_id:uuid}/ocr-text",
       "method": "GET",
-      "entrypoint": "app.routers.attachments:get_ocr_text",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: handler_call:enforce_attachment_wp_visibility"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.attachments:preview_attachment",
+      "callable": "preview_attachment",
       "route": "/api/attachments/{attachment_id:uuid}/preview",
       "method": "GET",
-      "entrypoint": "app.routers.attachments:preview_attachment",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: handler_call:enforce_attachment_wp_visibility"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.office_preview:preview_office_as_pdf",
+      "callable": "preview_office_as_pdf",
       "route": "/api/attachments/{attachment_id:uuid}/preview-pdf",
       "method": "GET",
-      "entrypoint": "app.routers.office_preview:preview_office_as_pdf",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: handler_call:enforce_attachment_wp_visibility"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.attachments:retry_ocr",
+      "callable": "retry_ocr",
       "route": "/api/attachments/{attachment_id:uuid}/retry-ocr",
       "method": "POST",
-      "entrypoint": "app.routers.attachments:retry_ocr",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: handler_call:enforce_attachment_wp_visibility"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.attachments:list_attachment_versions",
+      "callable": "list_attachment_versions",
       "route": "/api/attachments/{attachment_id:uuid}/versions",
       "method": "GET",
-      "entrypoint": "app.routers.attachments:list_attachment_versions",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: handler_call:enforce_attachment_wp_visibility"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.attachments:rollback_attachment_version",
+      "callable": "rollback_attachment_version",
       "route": "/api/attachments/{attachment_id:uuid}/versions/{version_id}/rollback",
       "method": "POST",
-      "entrypoint": "app.routers.attachments:rollback_attachment_version",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "attachment_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: handler_call:enforce_attachment_wp_visibility"
     },
     {
       "kind": "http",
@@ -2058,7 +2122,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.audit_logs:verify_chain",
+      "entrypoint": "app.routers.audit_logs:verify_chain_endpoint",
       "callable": "verify_chain",
       "route": "/api/audit-logs/verify-chain",
       "method": "GET",
@@ -4865,7 +4929,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.custom_query:cell_writeback",
+      "entrypoint": "app.routers.custom_query:cell_writeback_gone",
       "callable": "cell_writeback",
       "route": "/api/custom-query/cell-writeback",
       "method": "POST",
@@ -5293,6 +5357,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.custom_template_publications:apply_publication_upgrade",
+      "callable": "apply_publication_upgrade",
+      "route": "/api/custom-template-ingestion/publications/apply-upgrade",
+      "method": "POST",
+      "family": "non_wp_bound",
+      "action": "create",
+      "wp_bound": false,
+      "binding": "n/a",
+      "gate": "not_applicable",
+      "matrix": "not_applicable",
+      "test_ids": []
+    },
+    {
+      "kind": "http",
       "route": "/api/custom-template-ingestion/publications/commit-visibility",
       "method": "POST",
       "entrypoint": "app.routers.custom_template_publications:commit_publication_visibility",
@@ -5316,6 +5394,48 @@
       "matrix": "not_applicable",
       "test_ids": [],
       "wp_bound": false
+    },
+    {
+      "kind": "http",
+      "entrypoint": "app.routers.custom_template_publications:create_upgrade_offer",
+      "callable": "create_upgrade_offer",
+      "route": "/api/custom-template-ingestion/publications/upgrade-offer",
+      "method": "POST",
+      "family": "non_wp_bound",
+      "action": "create",
+      "wp_bound": false,
+      "binding": "n/a",
+      "gate": "not_applicable",
+      "matrix": "not_applicable",
+      "test_ids": []
+    },
+    {
+      "kind": "http",
+      "entrypoint": "app.routers.custom_template_publications:security_revoke_publication",
+      "callable": "security_revoke_publication",
+      "route": "/api/custom-template-ingestion/publications/{publication_key}/security-revoke",
+      "method": "POST",
+      "family": "non_wp_bound",
+      "action": "create",
+      "wp_bound": false,
+      "binding": "n/a",
+      "gate": "not_applicable",
+      "matrix": "not_applicable",
+      "test_ids": []
+    },
+    {
+      "kind": "http",
+      "entrypoint": "app.routers.custom_template_publications:withdraw_publication",
+      "callable": "withdraw_publication",
+      "route": "/api/custom-template-ingestion/publications/{publication_key}/withdraw",
+      "method": "POST",
+      "family": "non_wp_bound",
+      "action": "create",
+      "wp_bound": false,
+      "binding": "n/a",
+      "gate": "not_applicable",
+      "matrix": "not_applicable",
+      "test_ids": []
     },
     {
       "kind": "http",
@@ -12204,42 +12324,54 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.procedure_trim:trim_program_row",
+      "callable": "trim_program_row",
       "route": "/api/projects/{pid}/procedure-trim/workpapers/{wp_id}/program-rows/not-applicable",
       "method": "POST",
-      "entrypoint": "app.routers.procedure_trim:trim_program_row",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.procedure_trim:restore_program_row",
+      "callable": "restore_program_row",
       "route": "/api/projects/{pid}/procedure-trim/workpapers/{wp_id}/program-rows/restore",
       "method": "POST",
-      "entrypoint": "app.routers.procedure_trim:restore_program_row",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.procedure_trim:ensure_program_row_task",
+      "callable": "ensure_program_row_task",
       "route": "/api/projects/{pid}/procedure-trim/workpapers/{wp_id}/program-rows/task",
       "method": "POST",
-      "entrypoint": "app.routers.procedure_trim:ensure_program_row_task",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
@@ -13486,7 +13618,12 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": [],
-      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。",
+      "duplicate_registration": true,
+      "duplicate_entrypoints": [
+        "app.routers.aging_config:get_aging_config",
+        "app.routers.aging_analysis:get_config"
+      ]
     },
     {
       "kind": "http",
@@ -13501,7 +13638,12 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": [],
-      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。",
+      "duplicate_registration": true,
+      "duplicate_entrypoints": [
+        "app.routers.aging_config:put_aging_config",
+        "app.routers.aging_analysis:save_config"
+      ]
     },
     {
       "kind": "http",
@@ -14316,16 +14458,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_bulk_router:cancel_bulk_import",
+      "callable": "cancel_bulk_import",
       "route": "/api/projects/{project_id}/bulk-tab/import/{task_id}/cancel",
       "method": "POST",
-      "entrypoint": "app.routers.wp_bulk_router:cancel_bulk_import",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "bulk_manifest",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
@@ -14373,18 +14519,14 @@
       "method": "GET",
       "family": "bulk",
       "action": "bulk",
-      "wp_bound": false,
+      "wp_bound": true,
       "binding": "bulk_manifest",
-      "gate": "not_applicable",
-      "matrix": "not_applicable",
+      "gate": "native_authz",
+      "matrix": "native_authz",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
-        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user",
-      "audit_classification": "justified_allowlist",
-      "audit_reason": "bulk 任务进度 SSE 为任务级进度元数据，不返回底稿正文。",
-      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
+      "classification_reason": "native project authz: dependant:get_current_user_stream"
     },
     {
       "kind": "http",
@@ -17606,7 +17748,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.issue_hints:get_project_issue_hints",
+      "entrypoint": "app.routers.completion_phase:get_issue_hints",
       "callable": "get_project_issue_hints",
       "route": "/api/projects/{project_id}/issue-hints",
       "method": "GET",
@@ -17617,7 +17759,12 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": [],
-      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。",
+      "duplicate_registration": true,
+      "duplicate_entrypoints": [
+        "app.routers.completion_phase:get_issue_hints",
+        "app.routers.issue_hints:get_project_issue_hints"
+      ]
     },
     {
       "kind": "http",
@@ -17996,7 +18143,12 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": [],
-      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。",
+      "duplicate_registration": true,
+      "duplicate_entrypoints": [
+        "app.routers.ledger_datasets:retry_import_job",
+        "app.routers.ledger_import_v2:retry_job"
+      ]
     },
     {
       "kind": "http",
@@ -18361,7 +18513,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.ledger_penetration:sample_voucher",
+      "entrypoint": "app.routers.voucher_links:sample_voucher",
       "callable": "sample_voucher",
       "route": "/api/projects/{project_id}/ledger/sample-voucher",
       "method": "POST",
@@ -18388,7 +18540,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.ledger_penetration:list_sampled_vouchers",
+      "entrypoint": "app.routers.voucher_links:list_sampled_vouchers",
       "callable": "list_sampled_vouchers",
       "route": "/api/projects/{project_id}/ledger/sampled-vouchers",
       "method": "GET",
@@ -18402,7 +18554,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.ledger_penetration:delete_sampled_voucher",
+      "entrypoint": "app.routers.voucher_links:delete_sampled_voucher",
       "callable": "delete_sampled_voucher",
       "route": "/api/projects/{project_id}/ledger/sampled-vouchers/{sampled_id}",
       "method": "DELETE",
@@ -18579,16 +18731,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.voucher_links:attached_voucher_status",
+      "callable": "attached_voucher_status",
       "route": "/api/projects/{project_id}/ledger/workpapers/{wp_id}/attached-voucher-status",
       "method": "GET",
-      "entrypoint": "app.routers.voucher_links:attached_voucher_status",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: indirect:_wp_readable->handler_call:try_gate_wp"
     },
     {
       "kind": "http",
@@ -22371,16 +22527,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_template:get_workpaper_generation_operation",
+      "callable": "get_workpaper_generation_operation",
       "route": "/api/projects/{project_id}/working-papers/generation-operations/{operation_id}",
       "method": "GET",
-      "entrypoint": "app.routers.wp_template:get_workpaper_generation_operation",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "server_resolved",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
@@ -22901,7 +23061,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.workpaper_summaries:get_project_workpaper_summary",
+      "entrypoint": "app.routers.completion_phase:get_workpaper_summary",
       "callable": "get_project_workpaper_summary",
       "route": "/api/projects/{project_id}/workpaper-summaries/{key}",
       "method": "GET",
@@ -22912,7 +23072,12 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": [],
-      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。"
+      "notes": "2026-10-31 去重（spec platform-performance-residual-findings-closure）：同路径死实现已删除，本条只剩生效的一份。",
+      "duplicate_registration": true,
+      "duplicate_entrypoints": [
+        "app.routers.completion_phase:get_workpaper_summary",
+        "app.routers.workpaper_summaries:get_project_workpaper_summary"
+      ]
     },
     {
       "kind": "http",
@@ -23392,16 +23557,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.completion_phase:get_archive_checklist_suggestions",
+      "callable": "get_archive_checklist_suggestions",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/archive-checklist/suggestions",
       "method": "GET",
-      "entrypoint": "app.routers.completion_phase:get_archive_checklist_suggestions",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
@@ -23524,42 +23693,54 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_evidence:bind_contract_evidence_endpoint",
+      "callable": "bind_contract_evidence_endpoint",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/evidence/contract-link",
       "method": "PUT",
-      "entrypoint": "app.routers.wp_evidence:bind_contract_evidence_endpoint",
       "family": "detail",
       "action": "update",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_evidence:query_contract_evidence_endpoint",
+      "callable": "query_contract_evidence_endpoint",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/evidence/contract-query",
       "method": "POST",
-      "entrypoint": "app.routers.wp_evidence:query_contract_evidence_endpoint",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_evidence:reuse_contract_evidence_endpoint",
+      "callable": "reuse_contract_evidence_endpoint",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/evidence/contract-reuse",
       "method": "POST",
-      "entrypoint": "app.routers.wp_evidence:reuse_contract_evidence_endpoint",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
@@ -23614,16 +23795,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_evidence:reuse_voucher_evidence_endpoint",
+      "callable": "reuse_voucher_evidence_endpoint",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/evidence/voucher-reuse",
       "method": "POST",
-      "entrypoint": "app.routers.wp_evidence:reuse_voucher_evidence_endpoint",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
@@ -24421,315 +24606,411 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:adopt_substrate",
+      "callable": "adopt_substrate",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/adopt-substrate",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:adopt_substrate",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:ensure_first_publication",
+      "callable": "ensure_first_publication",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/first-publication",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:ensure_first_publication",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:materialize",
+      "callable": "materialize",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/materialize",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:materialize",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:materialize_from_store",
+      "callable": "materialize_from_store",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/materialize-from-store",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:materialize_from_store",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:get_operation",
+      "callable": "get_operation",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/operations/{operation_id}",
       "method": "GET",
-      "entrypoint": "app.routers.wp_sync_router:get_operation",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:abandon_conflicts",
+      "callable": "abandon_conflicts",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/operations/{operation_id}/abandon",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:abandon_conflicts",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:get_operation_conflicts",
+      "callable": "get_operation_conflicts",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/operations/{operation_id}/conflicts",
       "method": "GET",
-      "entrypoint": "app.routers.wp_sync_router:get_operation_conflicts",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:resolve_conflicts",
+      "callable": "resolve_conflicts",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/operations/{operation_id}/resolve",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:resolve_conflicts",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:retry_operation",
+      "callable": "retry_operation",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/operations/{operation_id}/retry",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:retry_operation",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:get_operation_timeline",
+      "callable": "get_operation_timeline",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/operations/{operation_id}/timeline",
       "method": "GET",
-      "entrypoint": "app.routers.wp_sync_router:get_operation_timeline",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:create_pending_mutation",
+      "callable": "create_pending_mutation",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/pending-mutations",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:create_pending_mutation",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:read_entry_readiness",
+      "callable": "read_entry_readiness",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/readiness",
       "method": "GET",
-      "entrypoint": "app.routers.wp_sync_router:read_entry_readiness",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:list_recovery_cases",
+      "callable": "list_recovery_cases",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/recovery-cases",
       "method": "GET",
-      "entrypoint": "app.routers.wp_sync_router:list_recovery_cases",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:claim_recovery_case",
+      "callable": "claim_recovery_case",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/recovery-cases/{case_id}/claim",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:claim_recovery_case",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:download_recovery_artifact",
+      "callable": "download_recovery_artifact",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/recovery-cases/{case_id}/download",
       "method": "GET",
-      "entrypoint": "app.routers.wp_sync_router:download_recovery_artifact",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:terminate_recovery_download_only",
+      "callable": "terminate_recovery_download_only",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/recovery-cases/{case_id}/download-only",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:terminate_recovery_download_only",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:get_recovery_case_timeline",
+      "callable": "get_recovery_case_timeline",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/recovery-cases/{case_id}/timeline",
       "method": "GET",
-      "entrypoint": "app.routers.wp_sync_router:get_recovery_case_timeline",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:create_close_intent",
+      "callable": "create_close_intent",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/rooms/{room_id}/close-intents",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:create_close_intent",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:confirm_descriptor",
+      "callable": "confirm_descriptor",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/rooms/{room_id}/confirm-descriptor",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:confirm_descriptor",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:request_forcesave",
+      "callable": "request_forcesave",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/rooms/{room_id}/forcesave",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:request_forcesave",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:leave_room",
+      "callable": "leave_room",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/rooms/{room_id}/participants/{participant_id}/leave",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:leave_room",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:read_store_projection",
+      "callable": "read_store_projection",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/store-projection",
       "method": "GET",
-      "entrypoint": "app.routers.wp_sync_router:read_store_projection",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:rollback_version",
+      "callable": "rollback_version",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}/versions/{version_id}/rollback",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:rollback_version",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:resolve_entry_identity",
+      "callable": "resolve_entry_identity",
       "route": "/api/projects/{project_id}/workpapers/{wp_id}/sync/entry-identity",
       "method": "GET",
-      "entrypoint": "app.routers.wp_sync_router:resolve_entry_identity",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
@@ -24998,7 +25279,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.wp_mapping:assign_workpaper",
+      "entrypoint": "app.routers.wp_mapping:assign_workpaper_gone",
       "callable": "assign_workpaper",
       "route": "/api/projects/{project_id}/wp-mapping/assign/{wp_code}",
       "method": "POST",
@@ -26616,7 +26897,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.report_config:report_drill_down",
+      "entrypoint": "app.routers.report_drill_down:report_drill_down",
       "callable": "report_drill_down",
       "route": "/api/report-config/drill-down",
       "method": "POST",
@@ -26686,7 +26967,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.report_config:get_row_note_mapping",
+      "entrypoint": "app.routers.report_row_note_mapping:get_row_note_mapping",
       "callable": "get_row_note_mapping",
       "route": "/api/report-config/row-note-mapping",
       "method": "GET",
@@ -26742,7 +27023,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.report_config:get_tb_detail_formulas",
+      "entrypoint": "app.routers.tb_detail_formulas:get_tb_detail_formulas",
       "callable": "get_tb_detail_formulas",
       "route": "/api/report-config/tb-detail-formulas/{project_id}",
       "method": "GET",
@@ -26756,7 +27037,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "app.routers.report_config:save_tb_detail_formulas",
+      "entrypoint": "app.routers.tb_detail_formulas:save_tb_detail_formulas",
       "callable": "save_tb_detail_formulas",
       "route": "/api/report-config/tb-detail-formulas/{project_id}",
       "method": "PUT",
@@ -29413,16 +29694,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_sync_router:post_room_onlyoffice_callback",
+      "callable": "post_room_onlyoffice_callback",
       "route": "/api/workpaper-sync/rooms/{room_id}/onlyoffice-callback",
       "method": "POST",
-      "entrypoint": "app.routers.wp_sync_router:post_room_onlyoffice_callback",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "server_resolved",
+      "gate": "deferred_editor",
+      "matrix": "deferred_editor",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_deferred_editor_allowlist_mechanism_exists"
+      ],
+      "classification_reason": "unified-sync room DS callback; platform-signed route_token verified by callback_route.verify_callback_route before any delivery write (no user session)"
     },
     {
       "kind": "http",
@@ -29447,16 +29732,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.row_name_alignment_router:batch_refresh",
+      "callable": "batch_refresh",
       "route": "/api/workpapers/batch-refresh",
       "method": "POST",
-      "entrypoint": "app.routers.row_name_alignment_router:batch_refresh",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "server_resolved",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
@@ -29586,16 +29875,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_field_overrides:set_field_overrides_batch",
+      "callable": "set_field_overrides_batch",
       "route": "/api/workpapers/field-overrides/batch",
       "method": "POST",
-      "entrypoint": "app.routers.wp_field_overrides:set_field_overrides_batch",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "server_resolved",
+      "gate": "native_authz",
+      "matrix": "native_authz",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+      ],
+      "classification_reason": "native project authz: dependant:get_current_user"
     },
     {
       "kind": "http",
@@ -29723,18 +30016,14 @@
       "method": "GET",
       "family": "onlyoffice_wopi",
       "action": "editor",
-      "wp_bound": false,
+      "wp_bound": true,
       "binding": "server_resolved",
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
-        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_not_applicable_allowlist_is_non_wp_or_project_level"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user",
-      "audit_classification": "justified_allowlist",
-      "audit_reason": "OnlyOffice 健康探针，不返回任何底稿正文。",
-      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
+      "classification_reason": "public OnlyOffice health probe; returns only healthy/session counters, no wp/project resource"
     },
     {
       "kind": "http",
@@ -30620,16 +30909,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_html_save:publish_determination_to_tb",
+      "callable": "publish_determination_to_tb",
       "route": "/api/workpapers/{wp_id}/audit-determination/publish-to-tb",
       "method": "POST",
-      "entrypoint": "app.routers.wp_html_save:publish_determination_to_tb",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
@@ -31011,29 +31304,37 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_capability_snapshot:assert_capability_action",
+      "callable": "assert_capability_action",
       "route": "/api/workpapers/{wp_id}/capability-assert",
       "method": "POST",
-      "entrypoint": "app.routers.wp_capability_snapshot:assert_capability_action",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_capability_snapshot:get_capability_snapshot",
+      "callable": "get_capability_snapshot",
       "route": "/api/workpapers/{wp_id}/capability-snapshot",
       "method": "GET",
-      "entrypoint": "app.routers.wp_capability_snapshot:get_capability_snapshot",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
@@ -31074,29 +31375,37 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_client_booked_adjustments:get_workpaper_client_booked_adjustments",
+      "callable": "get_workpaper_client_booked_adjustments",
       "route": "/api/workpapers/{wp_id}/client-booked-adjustments",
       "method": "GET",
-      "entrypoint": "app.routers.wp_client_booked_adjustments:get_workpaper_client_booked_adjustments",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_render_strategies._confirmation_alt_doc_ocr:confirmation_alternative_doc_ocr",
+      "callable": "confirmation_alternative_doc_ocr",
       "route": "/api/workpapers/{wp_id}/confirmation-alternative/doc-ocr",
       "method": "POST",
-      "entrypoint": "app.routers.wp_render_strategies._confirmation_alt_doc_ocr:confirmation_alternative_doc_ocr",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
@@ -31337,55 +31646,71 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.d2_sync_router:d2_forcesave",
+      "callable": "d2_forcesave",
       "route": "/api/workpapers/{wp_id}/d2-sync/forcesave",
       "method": "POST",
-      "entrypoint": "app.routers.d2_sync_router:d2_forcesave",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.d2_sync_router:d2_pull_from_excel",
+      "callable": "d2_pull_from_excel",
       "route": "/api/workpapers/{wp_id}/d2-sync/pull-from-excel",
       "method": "POST",
-      "entrypoint": "app.routers.d2_sync_router:d2_pull_from_excel",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.d2_sync_router:d2_push_to_excel",
+      "callable": "d2_push_to_excel",
       "route": "/api/workpapers/{wp_id}/d2-sync/push-to-excel",
       "method": "POST",
-      "entrypoint": "app.routers.d2_sync_router:d2_push_to_excel",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.d2_sync_router:d2_sync_status",
+      "callable": "d2_sync_status",
       "route": "/api/workpapers/{wp_id}/d2-sync/status",
       "method": "GET",
-      "entrypoint": "app.routers.d2_sync_router:d2_sync_status",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
@@ -31525,42 +31850,54 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_render_strategies._d2_vc_import_export:export_voucher_check_data",
+      "callable": "export_voucher_check_data",
       "route": "/api/workpapers/{wp_id}/d2/vc-export-data",
       "method": "POST",
-      "entrypoint": "app.routers.wp_render_strategies._d2_vc_import_export:export_voucher_check_data",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_render_strategies._d2_vc_import_export:export_voucher_check_template",
+      "callable": "export_voucher_check_template",
       "route": "/api/workpapers/{wp_id}/d2/vc-export-template",
       "method": "POST",
-      "entrypoint": "app.routers.wp_render_strategies._d2_vc_import_export:export_voucher_check_template",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_render_strategies._d2_vc_import_export:import_voucher_check_data",
+      "callable": "import_voucher_check_data",
       "route": "/api/workpapers/{wp_id}/d2/vc-import-data",
       "method": "POST",
-      "entrypoint": "app.routers.wp_render_strategies._d2_vc_import_export:import_voucher_check_data",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
@@ -32033,42 +32370,54 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_render_strategies._e1_account_list_ocr:e1_account_list_ocr",
+      "callable": "e1_account_list_ocr",
       "route": "/api/workpapers/{wp_id}/e1/account-list-ocr",
       "method": "POST",
-      "entrypoint": "app.routers.wp_render_strategies._e1_account_list_ocr:e1_account_list_ocr",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_render_strategies._e1_commit_ocr:e1_commit_ocr",
+      "callable": "e1_commit_ocr",
       "route": "/api/workpapers/{wp_id}/e1/commit-ocr",
       "method": "POST",
-      "entrypoint": "app.routers.wp_render_strategies._e1_commit_ocr:e1_commit_ocr",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_render_strategies._e1_credit_ocr:e1_credit_ocr",
+      "callable": "e1_credit_ocr",
       "route": "/api/workpapers/{wp_id}/e1/credit-ocr",
       "method": "POST",
-      "entrypoint": "app.routers.wp_render_strategies._e1_credit_ocr:e1_credit_ocr",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
@@ -33156,16 +33505,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_formula:save_formulas_batch",
+      "callable": "save_formulas_batch",
       "route": "/api/workpapers/{wp_id}/formulas/batch",
       "method": "PUT",
-      "entrypoint": "app.routers.wp_formula:save_formulas_batch",
       "family": "detail",
       "action": "update",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
@@ -39284,16 +39637,20 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_program_row_access:get_program_row_access",
+      "callable": "get_program_row_access",
       "route": "/api/workpapers/{wp_id}/program-row-access",
       "method": "GET",
-      "entrypoint": "app.routers.wp_program_row_access:get_program_row_access",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
@@ -39402,29 +39759,37 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.row_name_alignment_router:row_name_alignment",
+      "callable": "row_name_alignment",
       "route": "/api/workpapers/{wp_id}/row-name-alignment",
       "method": "POST",
-      "entrypoint": "app.routers.row_name_alignment_router:row_name_alignment",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.row_name_alignment_router:confirm_row_name_mapping",
+      "callable": "confirm_row_name_mapping",
       "route": "/api/workpapers/{wp_id}/row-name-mapping/confirm",
       "method": "POST",
-      "entrypoint": "app.routers.row_name_alignment_router:confirm_row_name_mapping",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
@@ -39685,42 +40050,54 @@
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_user_formulas_v2:list_user_formulas_v2",
+      "callable": "list_user_formulas_v2",
       "route": "/api/workpapers/{wp_id}/user-formulas/v2",
       "method": "GET",
-      "entrypoint": "app.routers.wp_user_formulas_v2:list_user_formulas_v2",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_user_formulas_v2:user_formula_v2_history",
+      "callable": "user_formula_v2_history",
       "route": "/api/workpapers/{wp_id}/user-formulas/v2/{formula_id}/history",
       "method": "GET",
-      "entrypoint": "app.routers.wp_user_formulas_v2:user_formula_v2_history",
       "family": "detail",
       "action": "read",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
+      "entrypoint": "app.routers.wp_user_formulas_v2:batch_mutate_user_formulas_v2",
+      "callable": "batch_mutate_user_formulas_v2",
       "route": "/api/workpapers/{wp_id}/user-formulas/v2:batchMutate",
       "method": "POST",
-      "entrypoint": "app.routers.wp_user_formulas_v2:batch_mutate_user_formulas_v2",
       "family": "detail",
       "action": "create",
-      "binding": null,
-      "gate": "unmigrated",
-      "matrix": "unmigrated",
-      "test_ids": [],
-      "wp_bound": true
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+      ],
+      "classification_reason": "wp gate wired: route_dep:dedicated_wp_gate"
     },
     {
       "kind": "http",
@@ -40491,7 +40868,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "fastapi.applications:FastAPI.setup.<locals>.swagger_ui_html",
+      "entrypoint": "app.core.openapi_runtime:install_deferred_docs.<locals>.swagger_docs",
       "callable": "FastAPI.setup.<locals>.swagger_ui_html",
       "route": "/docs",
       "method": "GET",
@@ -40533,7 +40910,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "fastapi.applications:FastAPI.setup.<locals>.openapi",
+      "entrypoint": "app.core.openapi_runtime:install_deferred_docs.<locals>.openapi_json",
       "callable": "FastAPI.setup.<locals>.openapi",
       "route": "/openapi.json",
       "method": "GET",
@@ -40687,7 +41064,7 @@
     },
     {
       "kind": "http",
-      "entrypoint": "fastapi.applications:FastAPI.setup.<locals>.redoc_html",
+      "entrypoint": "app.core.openapi_runtime:install_deferred_docs.<locals>.redoc_docs",
       "callable": "FastAPI.setup.<locals>.redoc_html",
       "route": "/redoc",
       "method": "GET",
@@ -40949,21 +41326,6 @@
       ]
     },
     {
-      "kind": "dead_letter",
-      "entrypoint": "app.services.import_event_outbox_service:ImportEventOutboxService.replay_pending",
-      "callable": "replay_pending",
-      "route": null,
-      "method": null,
-      "family": "background",
-      "action": "dead_letter",
-      "wp_bound": false,
-      "binding": "n/a",
-      "gate": "not_applicable",
-      "matrix": "not_applicable",
-      "test_ids": [],
-      "notes": "ledger import outbox DLQ mover (event_outbox_dlq); not wp content"
-    },
-    {
       "kind": "retry",
       "entrypoint": "app.workers.audit_log_writer_worker:_consume_retry_queue",
       "callable": "_consume_retry_queue",
@@ -40977,6 +41339,17 @@
       "matrix": "not_applicable",
       "test_ids": [],
       "notes": "audit-log write retry queue consumer (not wp content)"
+    },
+    {
+      "kind": "worker",
+      "entrypoint": "app.workers.ai_task_worker:run",
+      "family": "background",
+      "action": "worker_loop",
+      "binding": "n/a",
+      "gate": "not_applicable",
+      "matrix": "not_applicable",
+      "test_ids": [],
+      "wp_bound": false
     },
     {
       "kind": "worker",
@@ -41008,6 +41381,28 @@
     },
     {
       "kind": "worker",
+      "entrypoint": "app.workers.capacity_queue_worker:run",
+      "family": "background",
+      "action": "worker_loop",
+      "binding": "n/a",
+      "gate": "not_applicable",
+      "matrix": "not_applicable",
+      "test_ids": [],
+      "wp_bound": false
+    },
+    {
+      "kind": "worker",
+      "entrypoint": "app.workers.consol_operation_worker:run",
+      "family": "background",
+      "action": "worker_loop",
+      "binding": "n/a",
+      "gate": "not_applicable",
+      "matrix": "not_applicable",
+      "test_ids": [],
+      "wp_bound": false
+    },
+    {
+      "kind": "worker",
       "entrypoint": "app.workers.dataset_purge_worker:run",
       "callable": "run",
       "route": null,
@@ -41019,6 +41414,17 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": []
+    },
+    {
+      "kind": "worker",
+      "entrypoint": "app.workers.event_loop_lag_worker:run",
+      "family": "background",
+      "action": "worker_loop",
+      "binding": "n/a",
+      "gate": "not_applicable",
+      "matrix": "not_applicable",
+      "test_ids": [],
+      "wp_bound": false
     },
     {
       "kind": "worker",
@@ -41064,6 +41470,28 @@
     },
     {
       "kind": "worker",
+      "entrypoint": "app.workers.knowledge_ocr_worker:run",
+      "family": "background",
+      "action": "worker_loop",
+      "binding": "n/a",
+      "gate": "not_applicable",
+      "matrix": "not_applicable",
+      "test_ids": [],
+      "wp_bound": false
+    },
+    {
+      "kind": "worker",
+      "entrypoint": "app.workers.oo_apply_redrive_worker:run",
+      "family": "background",
+      "action": "worker_loop",
+      "binding": "n/a",
+      "gate": "not_applicable",
+      "matrix": "not_applicable",
+      "test_ids": [],
+      "wp_bound": false
+    },
+    {
+      "kind": "worker",
       "entrypoint": "app.workers.outbox_replay_worker:run",
       "callable": "run",
       "route": null,
@@ -41075,6 +41503,17 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": []
+    },
+    {
+      "kind": "worker",
+      "entrypoint": "app.workers.platform_job_worker:run",
+      "family": "background",
+      "action": "worker_loop",
+      "binding": "n/a",
+      "gate": "not_applicable",
+      "matrix": "not_applicable",
+      "test_ids": [],
+      "wp_bound": false
     },
     {
       "kind": "worker",
@@ -41163,83 +41602,6 @@
       "gate": "not_applicable",
       "matrix": "not_applicable",
       "test_ids": []
-    },
-    {
-      "kind": "worker",
-      "entrypoint": "app.workers.ai_task_worker:run",
-      "family": "background",
-      "action": "worker_loop",
-      "binding": "n/a",
-      "gate": "not_applicable",
-      "matrix": "not_applicable",
-      "test_ids": [],
-      "wp_bound": false
-    },
-    {
-      "kind": "worker",
-      "entrypoint": "app.workers.capacity_queue_worker:run",
-      "family": "background",
-      "action": "worker_loop",
-      "binding": "n/a",
-      "gate": "not_applicable",
-      "matrix": "not_applicable",
-      "test_ids": [],
-      "wp_bound": false
-    },
-    {
-      "kind": "worker",
-      "entrypoint": "app.workers.consol_operation_worker:run",
-      "family": "background",
-      "action": "worker_loop",
-      "binding": "n/a",
-      "gate": "not_applicable",
-      "matrix": "not_applicable",
-      "test_ids": [],
-      "wp_bound": false
-    },
-    {
-      "kind": "worker",
-      "entrypoint": "app.workers.event_loop_lag_worker:run",
-      "family": "background",
-      "action": "worker_loop",
-      "binding": "n/a",
-      "gate": "not_applicable",
-      "matrix": "not_applicable",
-      "test_ids": [],
-      "wp_bound": false
-    },
-    {
-      "kind": "worker",
-      "entrypoint": "app.workers.knowledge_ocr_worker:run",
-      "family": "background",
-      "action": "worker_loop",
-      "binding": "n/a",
-      "gate": "not_applicable",
-      "matrix": "not_applicable",
-      "test_ids": [],
-      "wp_bound": false
-    },
-    {
-      "kind": "worker",
-      "entrypoint": "app.workers.oo_apply_redrive_worker:run",
-      "family": "background",
-      "action": "worker_loop",
-      "binding": "n/a",
-      "gate": "not_applicable",
-      "matrix": "not_applicable",
-      "test_ids": [],
-      "wp_bound": false
-    },
-    {
-      "kind": "worker",
-      "entrypoint": "app.workers.platform_job_worker:run",
-      "family": "background",
-      "action": "worker_loop",
-      "binding": "n/a",
-      "gate": "not_applicable",
-      "matrix": "not_applicable",
-      "test_ids": [],
-      "wp_bound": false
     }
   ],
   "task_progress": {

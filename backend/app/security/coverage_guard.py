@@ -90,6 +90,10 @@ NATIVE_AUTHZ_DEP_NAMES: frozenset[str] = frozenset(
         "require_operation",
         "require_project_member",
         "get_current_user",
+        # SSE / 文件流变体：与 get_current_user 同一认证语义，仅把鉴权 DB 会话在响应体
+        # 发送前释放（deps.py `get_current_user_stream`）。词表缺它会把用了 _stream 的
+        # 路由误判为「无 native 鉴权」。
+        "get_current_user_stream",
         "get_current_active_user",
     }
 )
@@ -98,6 +102,10 @@ NATIVE_AUTHZ_DEP_NAMES: frozenset[str] = frozenset(
 NATIVE_AUTHZ_CALL_NAMES: frozenset[str] = frozenset(
     {
         "require_project_access",
+        # `require_project_access_stream` 内部调用同一个 `assert_project_permission`
+        # （deps.py：与 require_project_access 同一实现、同样 fail-closed），区别只是流式
+        # 响应前释放鉴权 DB 会话；是项目级鉴权，不是换名的「仅登录」。
+        "require_project_access_stream",
         "require_project_permission",
         "require_project_delegator",
         "require_project_delegator_pid",
@@ -153,6 +161,11 @@ NOT_APPLICABLE_WP_ALLOWLIST: dict[tuple[str, str], str] = {
     ("/api/projects/{project_id}/procedure-tables/{table_code}", "GET"): "project-level procedure template catalog; no底稿正文",
     ("/api/projects/{project_id}/procedure-tables/custom-items", "POST"): "project-level custom procedure row catalog write; no底稿正文",
     ("/api/projects/{project_id}/procedure-tables/custom-items/{item_id}", "DELETE"): "project-level custom procedure row catalog delete; no底稿正文",
+    # 2026-11-25 核实：公开状态端点（handler 文档「无需用户鉴权（状态端点）」），只返回
+    # healthy / active_sessions / max_sessions 三个数值，不触达任何底稿 / 项目资源。
+    # 与下方 DEFERRED_EDITOR_ALLOWLIST 的 `/wopi/health` 同类，但本路由没有 editor 令牌机制可延期，
+    # 故归「无 wp 资源」类。
+    ("/api/workpapers/onlyoffice/health", "GET"): "public OnlyOffice health probe; returns only healthy/session counters, no wp/project resource",
 }
 
 # Editor / OnlyOffice / WOPI online-editing protocol endpoints whose full live
@@ -166,6 +179,11 @@ DEFERRED_EDITOR_ALLOWLIST: dict[tuple[str, str], str] = {
     ("/wopi/health", "GET"): "WOPI health probe; no wp resource returned; deferred with editor family",
     ("/wopi/ds-callback/{file_id}", "POST"): "OnlyOffice DS callback legacy; re-validation mechanism in Task 11, live Task 17",
     ("/api/projects/{project_id}/deliverables/onlyoffice/callback/{task_id}", "POST"): "deliverables OnlyOffice callback; editor callback re-gate mechanism Task 11, live Task 17",
+    # 2026-11-25 核实：统一同步房间回调。无用户会话（DocServer 发起），授权凭据是 callbackUrl 的
+    # `route_token` query（平台签发的 route claim，secret 验签），room/generation/doc_key 绑定由
+    # `callback_route.verify_callback_route` 逐项校验；`CallbackDeliveryService.handle_callback`
+    # 第一步即调用它，且**刻意不在校验前落 delivery 行**（未鉴权请求不得写库）。
+    ("/api/workpaper-sync/rooms/{room_id}/onlyoffice-callback", "POST"): "unified-sync room DS callback; platform-signed route_token verified by callback_route.verify_callback_route before any delivery write (no user session)",
 }
 
 # Pre-existing genuine duplicate (route, method) registrations in production
@@ -640,9 +658,18 @@ def reconcile_ledger(app: Any | None = None, ledger: dict[str, Any] | None = Non
     for key, le in live_http.items():
         prev = old_http.get(key)
         gate_prev = prev.get("gate") if prev else None
+        # 自愈：台账当时判定「非 wp-bound ⇒ not_applicable」，而代码现在（路由换了参数 /
+        # scanner 启发式变了）判定 wp-bound ⇒ 原样保留会直接变成 fake_pass，必须按代码
+        # 事实重新派生（会走豁免名单 / gate / native_authz 的同一套判定，不放宽任何一档）。
+        became_wp_bound = (
+            prev is not None
+            and gate_prev == _NOT_APPLICABLE
+            and bool(le.wp_bound)
+            and not prev.get("wp_bound")
+        )
         # Preserve an already-classified (non-unmigrated) HTTP entry verbatim,
         # only refreshing identity fields; guard re-verifies it against code.
-        if prev is not None and gate_prev != _UNMIGRATED:
+        if prev is not None and gate_prev != _UNMIGRATED and not became_wp_bound:
             entry = dict(prev)
             entry["route"], entry["method"] = key
             entry["entrypoint"] = le.entrypoint
