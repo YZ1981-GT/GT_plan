@@ -541,12 +541,13 @@
     ".kiro/specs/_archive/17-2026-10-03-verified-batch/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-4-host-consumes-unified-path/d2-2/network.json": "377c1229255bb933fed334bf3758c81d75d4b34d5caf24c9a78a5d21c45f756c",
     ".kiro/specs/_archive/17-2026-10-03-verified-batch/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-4-host-consumes-unified-path/index.json": "61db3d288a1b69eac3e61d31b6c0432500a75b97143556d9efe6f1d2226a5a7b",
     ".kiro/specs/_archive/180-workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md": "a8e6e108ca1d84d11c2fe58fb2330a93b2d5387a2800e4cc0f45dd6be826b90c",
+    "audit-platform/frontend/scripts/discover-workpaper-sync-mounts.mjs": "511567d6aa9877ee3cb79b614124c2b2243fe988579e9ee757d4aea2134a7994",
     "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue": "a7cc234203faecc33c9d67c796961e6f75eac224a5a1d3b4f0d0b70ac73a65b2",
     "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue": "30d734a233969f6f2f85569eee36ded5045a790218b30f88e0889ba0aefeece5",
     "audit-platform/frontend/src/components/workpaper/sync/useD2SyncBridge.ts": "77c1690a4352236b99f668834c047c216c8f3014891d942dc7edbab269f8b727",
     "backend/app/models/workpaper_sync_models.py": "1880af682e0663bd877b1a11afaaba02aa7704dd6ba66f6f921977ba98d372dc",
     "backend/app/routers/d2_sync_router.py": "5a53630704cdda1d5d2b9bb364f5fd99d6315edc6ca6483b0fd17838fb40e129",
-    "backend/app/routers/wp_onlyoffice_router.py": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f",
+    "backend/app/routers/wp_onlyoffice_router.py": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2",
     "backend/app/routers/wp_sync_router.py": "6133afc33198a072823ad71a1df503a4dcb1d01c08a9c631b52837e5b1e8aaf6",
     "backend/app/services/guidance_gid.py": "1a1538ce4760c6195bfaa8d358989a6bd686ecd11d232260ace5fc9037645ba1",
     "backend/app/services/guidance_handoff_consumer_service.py": "99bb29b2321796419a9bad07109f57ea018bb2d9ec1f65595c93f2ed4f955c5f",
@@ -580,8 +581,9 @@
     "backend/data/guidance/contracts/ghandoff/evidence/ghandoff_consumer_evidence.json": "5a8d6b4cfd27cf0235ca408a19fcef1295805386d93bbb45ceaa70f7c2a870d6",
     "backend/data/guidance/contracts/gid/evidence/gid_evidence.json": "58ac9e0923854e1b04d599d12e68008622e89c4402cf237bf7606a91f15c7b85",
     "backend/data/workpaper_sync_entry_manifest.json": "cc6cfa65e7824dbe5a7e2d5423f2c995c630232d0510a76c545d1e1edbc647de",
+    "backend/data/workpaper_sync_entry_overlay.json": "ceac30098f73ca85c3dac586e4f7fffce101f77e35fcaf9b671a0ffa76ebc7bd",
     "backend/data/workpaper_sync_program_milestone_definitions.json": "21988137c70a59b316902aaa37129c0c6f7644ebe9916f654c7bbaddd3a33e89",
-    "backend/data/workpaper_writer_inventory.json": "40b230393cd268b01db569b0dac77806a8b0b21518b0005a5c2e73a3e30af4fd",
+    "backend/data/workpaper_writer_inventory.json": "1ae4819996e97ef6921cbe7babde5bed0969eda4e8309515e29ead16e8db83cd",
     "backend/scripts/check/check_workpaper_writer_revision_gate.py": "ec06b9a62e75164fd9d17216917ccf2b17eae801501ae4354986e0ac5a83c734",
     "backend/scripts/gen/generate_workpaper_sync_manifest.py": "c2dec7f7a028e7f83c403daa9fd9fd57ca0c4d911f48121d2994136ba765ccd5",
     "docs/operations/workpaper-html-onlyoffice-bidirectional-writeback-master-control.md": "b67ab929ceb16cf315a87a7da39706e21c4c5c71258d84e609e7471170588154"
@@ -647,7 +649,7 @@
     },
     "self_consistent": true,
     "source_current": false,
-    "source_reason": "manifest_source_derivation_failed:ManifestGenerationError"
+    "source_reason": "manifest_projection_differs_from_source"
   },
   "milestones": [
     {
@@ -1289,7 +1291,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -1367,7 +1369,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -1445,7 +1447,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -1523,7 +1525,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -1601,7 +1603,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -1679,7 +1681,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -1757,7 +1759,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -1835,7 +1837,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -3324,7 +3326,7 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
@@ -3412,7 +3414,7 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
@@ -3500,7 +3502,7 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
@@ -3588,7 +3590,7 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
@@ -3676,7 +3678,7 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
@@ -3764,7 +3766,7 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
@@ -3852,7 +3854,7 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
@@ -3940,7 +3942,7 @@
               },
               {
                 "path": "backend/app/routers/wp_onlyoffice_router.py",
-                "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
               },
               {
                 "path": "backend/app/routers/wp_sync_router.py",
@@ -4055,7 +4057,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -4269,7 +4271,7 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+              "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
@@ -4351,7 +4353,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -4565,7 +4567,7 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+              "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
@@ -4647,7 +4649,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -4861,7 +4863,7 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+              "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
@@ -4943,7 +4945,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -5157,7 +5159,7 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+              "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
@@ -5239,7 +5241,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -5453,7 +5455,7 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+              "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
@@ -5535,7 +5537,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -5749,7 +5751,7 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+              "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
@@ -5831,7 +5833,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -6045,7 +6047,7 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+              "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
@@ -6127,7 +6129,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -6341,7 +6343,7 @@
             },
             {
               "path": "backend/app/routers/wp_onlyoffice_router.py",
-              "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+              "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
             },
             {
               "path": "backend/app/routers/wp_sync_router.py",
@@ -6473,7 +6475,7 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                        "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
@@ -6551,7 +6553,7 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                        "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
@@ -6629,7 +6631,7 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                        "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
@@ -6707,7 +6709,7 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                        "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
@@ -6785,7 +6787,7 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                        "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
@@ -6863,7 +6865,7 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                        "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
@@ -6941,7 +6943,7 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                        "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
@@ -7019,7 +7021,7 @@
                       },
                       {
                         "path": "backend/app/routers/wp_onlyoffice_router.py",
-                        "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                        "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                       },
                       {
                         "path": "backend/app/routers/wp_sync_router.py",
@@ -8508,7 +8510,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -8596,7 +8598,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -8684,7 +8686,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -8772,7 +8774,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -8860,7 +8862,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -8948,7 +8950,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -9036,7 +9038,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -9124,7 +9126,7 @@
                   },
                   {
                     "path": "backend/app/routers/wp_onlyoffice_router.py",
-                    "sha256": "85f99f9551f7f96cb4bba9b85545f64c48c65a1042fb517a205a1820fd87aa4f"
+                    "sha256": "e28442ae4e75ab1df74c258d062244fbf483155b8c713f708770df133f8a77a2"
                   },
                   {
                     "path": "backend/app/routers/wp_sync_router.py",
@@ -9169,7 +9171,7 @@
       "blockers": [
         {
           "predicate_id": "published-entry.manifest-integrity",
-          "reason_code": "manifest_source_derivation_failed:ManifestGenerationError",
+          "reason_code": "manifest_projection_differs_from_source",
           "result": "stale"
         },
         {
@@ -9271,10 +9273,10 @@
             },
             "self_consistent": true,
             "source_current": false,
-            "source_reason": "manifest_source_derivation_failed:ManifestGenerationError"
+            "source_reason": "manifest_projection_differs_from_source"
           },
           "id": "published-entry.manifest-integrity",
-          "reason_code": "manifest_source_derivation_failed:ManifestGenerationError",
+          "reason_code": "manifest_projection_differs_from_source",
           "result": "stale",
           "source_refs": [
             {
@@ -9520,7 +9522,7 @@
       "blockers": [
         {
           "predicate_id": "entry-namespace.manifest-integrity",
-          "reason_code": "manifest_source_derivation_failed:ManifestGenerationError",
+          "reason_code": "manifest_projection_differs_from_source",
           "result": "stale"
         },
         {
@@ -9618,10 +9620,10 @@
             },
             "self_consistent": true,
             "source_current": false,
-            "source_reason": "manifest_source_derivation_failed:ManifestGenerationError"
+            "source_reason": "manifest_projection_differs_from_source"
           },
           "id": "entry-namespace.manifest-integrity",
-          "reason_code": "manifest_source_derivation_failed:ManifestGenerationError",
+          "reason_code": "manifest_projection_differs_from_source",
           "result": "stale",
           "source_refs": [
             {
@@ -9716,7 +9718,7 @@
         {
           "details": {
             "count": 4,
-            "inventory_digest": "46aba23c9629c6fce4ea2a2ab316fbcf7deb5410abb95e903fafbd567aaf22a9",
+            "inventory_digest": "3254ae0b4670e4b6b7628e58133169a6fcb698777ac58dbc3c4d37fca0d04831",
             "issue": "multi_resolver",
             "sample": [
               "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config",
@@ -9731,7 +9733,7 @@
           "source_refs": [
             {
               "path": "backend/data/workpaper_writer_inventory.json",
-              "sha256": "40b230393cd268b01db569b0dac77806a8b0b21518b0005a5c2e73a3e30af4fd"
+              "sha256": "1ae4819996e97ef6921cbe7babde5bed0969eda4e8309515e29ead16e8db83cd"
             }
           ]
         },
@@ -10166,12 +10168,12 @@
       "state": "BLOCKED"
     }
   ],
-  "program_digest": "38fdb5698096a225cabf609402aaa32173170fb02595f8759fc65fea2adf93b0",
+  "program_digest": "c919e39cfb8b80956ecb6655db4812b33d74434f82c0855ea94e1a33d0e379a1",
   "program_id": "workpaper-html-onlyoffice-bidirectional-writeback",
   "program_state": "STALE",
   "schema_version": "workpaper-sync-program-milestones/v1",
   "source_commit": null,
-  "source_digest": "73536336d5ae988a2e6f3c7eda7a7107a1de0500e6232cb5753c0bd4f021620d",
+  "source_digest": "d89dce0a6e9678dd95831782764653fd2545027865beb7fa82509c690855693c",
   "source_state": "digest_bound_without_common_commit",
   "specs": {
     "custom-workpaper-template-ingestion-and-sync-closure": {
@@ -11095,7 +11097,7 @@
     ]
   },
   "writer_gate_facts": {
-    "inventory_digest": "46aba23c9629c6fce4ea2a2ab316fbcf7deb5410abb95e903fafbd567aaf22a9",
+    "inventory_digest": "3254ae0b4670e4b6b7628e58133169a6fcb698777ac58dbc3c4d37fca0d04831",
     "issue_counts": {
       "after_save_still_increments_revision": 0,
       "artifact_snapshot_writer_not_verifiable": 0,
@@ -11156,7 +11158,7 @@
       ]
     },
     "source_current": true,
-    "source_digest": "a1275c206257811eae2cdf31f4786834eff8ea08e312370dd93fd56a13c2540b",
+    "source_digest": "8b657dda6577749d789257efd0d314381599ba8131ed8e6037f1e37b45919a04",
     "source_reason": null
   }
 }

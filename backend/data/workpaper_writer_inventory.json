@@ -7347,7 +7347,7 @@
         "artifact_write_targets": [
           {
             "attr": "copy2",
-            "line": 289,
+            "line": 290,
             "target": "unclassified"
           }
         ],
@@ -7365,8 +7365,8 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          265,
-          284
+          266,
+          285
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -7374,7 +7374,7 @@
       },
       "is_async": false,
       "kind": "writer_resolver",
-      "line": 228,
+      "line": 229,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "_resolve_wp_file",
       "resolver_identities": [
@@ -7434,7 +7434,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 656,
+      "line": 657,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "get_sheet_onlyoffice_config",
       "resolver_identities": [
@@ -7496,7 +7496,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 1049,
+      "line": 1050,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "get_sheet_wopi_contents",
       "resolver_identities": [
@@ -7548,7 +7548,7 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          618
+          619
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -7556,7 +7556,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 562,
+      "line": 563,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "get_template_structure",
       "resolver_identities": [
@@ -7612,7 +7612,7 @@
       },
       "is_async": true,
       "kind": "resolver",
-      "line": 961,
+      "line": 962,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "get_whole_excel_grid",
       "resolver_identities": [
@@ -7654,7 +7654,7 @@
         "artifact_write_targets": [
           {
             "attr": "write_bytes",
-            "line": 1829,
+            "line": 1830,
             "target": "unclassified"
           }
         ],
@@ -7677,10 +7677,10 @@
           "checklist_responses.remark"
         ],
         "swallowed_exception_lines": [
-          1843,
-          1860,
-          1907,
-          1927
+          1844,
+          1861,
+          1908,
+          1928
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -7688,7 +7688,7 @@
       },
       "is_async": true,
       "kind": "writer_resolver",
-      "line": 1757,
+      "line": 1758,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "import_structured_docx",
       "resolver_identities": [
@@ -7733,7 +7733,7 @@
         "artifact_write_targets": [
           {
             "attr": "write_bytes",
-            "line": 1506,
+            "line": 1507,
             "target": "unclassified"
           }
         ],
@@ -7759,16 +7759,16 @@
           "checklist_responses.remark"
         ],
         "swallowed_exception_lines": [
-          1387,
-          1427,
-          1496,
-          1527,
-          1595,
-          1628,
-          1672,
-          1684,
-          1727,
-          1735
+          1388,
+          1428,
+          1497,
+          1528,
+          1596,
+          1629,
+          1673,
+          1685,
+          1728,
+          1736
         ],
         "unified_commit_calls": [],
         "version_fields_read": [
@@ -7780,7 +7780,7 @@
       },
       "is_async": true,
       "kind": "writer_resolver",
-      "line": 1277,
+      "line": 1278,
       "module": "app.routers.wp_onlyoffice_router",
       "qualname": "post_sheet_onlyoffice_callback",
       "resolver_identities": [
@@ -25989,7 +25989,7 @@
       "writer_id": "app.services.wp_xlsx_export_service::_sync_export_workpaper_xlsx"
     }
   ],
-  "inventory_digest": "46aba23c9629c6fce4ea2a2ab316fbcf7deb5410abb95e903fafbd567aaf22a9",
+  "inventory_digest": "3254ae0b4670e4b6b7628e58133169a6fcb698777ac58dbc3c4d37fca0d04831",
   "overlay_digest": "261853b1787b6951b1ea67d10b02f5e73b8462d54ce4d79e451a8fe4063482c2",
   "representation_upgrade_lane": [
     {
@@ -26308,7 +26308,7 @@
     }
   ],
   "schema_version": 1,
-  "source_digest": "a1275c206257811eae2cdf31f4786834eff8ea08e312370dd93fd56a13c2540b",
+  "source_digest": "8b657dda6577749d789257efd0d314381599ba8131ed8e6037f1e37b45919a04",
   "stats": {
     "artifact_snapshot_only_count": 1,
     "by_content_store": {
