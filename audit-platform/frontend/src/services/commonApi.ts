@@ -3,6 +3,7 @@
  * 规则：所有页面必须通过 API 服务层调用，不允许直接拼 URL
  */
 import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import { invalidateProjectListQuery, listProjectsShared } from '@/services/projectListQuery'
 import {
   projects as P_proj, staff as P_staff, procedures as P_proc,
@@ -2161,13 +2162,20 @@ export async function resolveAddress(uri: string, projectId: string, year?: numb
   return data
 }
 
-export async function validateFormulaRefs(formula: string, projectId: string, year?: number, templateType?: string): Promise<{
+export async function validateFormulaRefs(
+  formula: string,
+  projectId: string,
+  year?: number | null,
+  templateType?: string,
+  /** 调用方自管错误提示时传 `{ _silent: true }`（全局拦截器不再弹一次） */
+  config?: Record<string, unknown>,
+): Promise<{
   valid: boolean; issues: Array<{ ref: string; uri: string; status: string; message: string }>
 }> {
-  const { data } = await http.post(P_ar.validate, {
+  // 走 apiProxy（与 http.post 同样拿解包后的业务数据）：组件侧既有测试统一拦 apiProxy
+  return await api.post(P_ar.validate, {
     formula, project_id: projectId, year, template_type: templateType,
-  })
-  return data
+  }, config as any)
 }
 
 export async function getJumpRoute(params: {

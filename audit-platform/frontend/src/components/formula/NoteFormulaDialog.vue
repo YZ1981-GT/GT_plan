@@ -129,7 +129,8 @@ import { fetchTrialBalanceRows } from '@/services/trialBalanceRows'
 // spec: formula-management-runtime-closure Task 14 — 端点收敛进 apiPaths（纯搬迁）
 import { noteFormula } from '@/services/apiPaths/formula'
 import { SINGLE_WP_REF, useAddressRegistry, type ValidateResult } from '@/stores/addressRegistry'
-import { acnr, addressRegistry } from '@/services/apiPaths/system'
+import { acnr } from '@/services/apiPaths/system'
+import { validateFormulaRefs } from '@/services/commonApi'
 import { isAcnrRegistryFailure, parseAcnrRegistryFailure } from '@/services/acnr/registryLockFailure'
 import type { AcnrResolveResult } from '@/services/acnr/useAcnr'
 import { formatRefIssue } from '@/utils/formulaRefIssues'
@@ -423,9 +424,11 @@ async function validateFormula(formula: string, context: DialogContext): Promise
   }
   if (!isCurrent(context)) return null
   try {
-    return await api.post<ValidateResult>(addressRegistry.validate, {
-      formula, project_id: context.projectId, year: context.year, template_type: context.templateType,
-    }, { _silent: true } as any)
+    // 经服务层 validateFormulaRefs（ACNR 绕过棘轮：组件不直接拼 addressRegistry.validate 路径）；
+    // 项目 / 年度 / 模板仍取本次请求冻结的 context，不读 store 的可变状态
+    return (await validateFormulaRefs(
+      formula, context.projectId, context.year, context.templateType, { _silent: true },
+    )) as unknown as ValidateResult
   } catch {
     return { valid: false, issues: [{ ref: formula, message: '校验请求失败' }], formula }
   }
