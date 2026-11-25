@@ -716,12 +716,15 @@
       "action": "read",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.detail/read_detail",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "短链定位返回底稿所属项目与 wp_code，可泄漏对当前用户不可见底稿的存在性 → Leak_Risk；已在 readonly 项目权限与回收站判断之后接 enforce_wp_gate(read_detail)。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -1175,9 +1178,13 @@
       "gate": "native_authz",
       "matrix": "native_authz",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "native project authz: dependant:get_current_user",
+      "audit_classification": "justified_allowlist",
+      "audit_reason": "AI 对话附件删除：ai_chat_attachments 独立表、按 owner_id=当前用户过滤，与底稿附件无关联，非底稿正文。",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -1969,11 +1976,14 @@
       "wp_bound": true,
       "binding": "attachment_id",
       "gate": "gated",
-      "matrix": "workpaper.dedicated_subroute/dedicated_read",
+      "matrix": "attachment.read/attach_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency"
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "wp gate wired: handler_call:enforce_attachment_wp_visibility"
+      "classification_reason": "附件转 PDF 在线预览直接返回附件正文(可含scope-internal底稿证据)；原仅项目级授权，已在其上再接 wp 可见性收紧 → gated。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -12332,12 +12342,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "改写该底稿程序表某一行（裁剪/恢复/取任务）→ Leak_Risk；委派人依赖不含底稿级可见性，已接 enforce_wp_gate(dedicated_write)。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -12349,12 +12362,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "改写该底稿程序表某一行（裁剪/恢复/取任务）→ Leak_Risk；委派人依赖不含底稿级可见性，已接 enforce_wp_gate(dedicated_write)。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -12366,12 +12382,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "改写该底稿程序表某一行（裁剪/恢复/取任务）→ Leak_Risk；委派人依赖不含底稿级可见性，已接 enforce_wp_gate(dedicated_write)。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -14432,9 +14451,13 @@
       "test_ids": [
         "tests/procedure_delegation_visibility/test_task10_entry_gate.py::TestBulkGate::test_preflight_allows_visible",
         "tests/procedure_delegation_visibility/test_task10_entry_gate.py::TestBulkGate::test_preflight_atomic_deny_on_invisible",
-        "tests/procedure_delegation_visibility/test_task10_entry_gate.py::TestWorkerRegateAfterRevocation::test_worker_preflight_rejects_after_revocation"
+        "tests/procedure_delegation_visibility/test_task10_entry_gate.py::TestWorkerRegateAfterRevocation::test_worker_preflight_rejects_after_revocation",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "notes": "Task10: 异步导入，worker 执行时逐资源 re-gate（bulk_async_runner._run_import），撤权后排队任务被拒"
+      "notes": "Task10: 异步导入，worker 执行时逐资源 re-gate（bulk_async_runner._run_import），撤权后排队任务被拒",
+      "audit_classification": "justified_allowlist",
+      "audit_reason": "异步导入只落盘 ZIP 并建耐久任务（项目 edit + 可导入状态），不读写底稿正文；后台执行（bulk_async_runner / durable_job_executor）逐底稿 make_bulk_preflight(worker) 后才写入。",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -14469,9 +14492,13 @@
       "gate": "native_authz",
       "matrix": "native_authz",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "native project authz: dependant:get_current_user",
+      "audit_classification": "justified_allowlist",
+      "audit_reason": "bulk 导入取消为任务级操作（按发起人 + job_id），不读写底稿正文；导入本身由后台按资源 preflight。",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -14507,9 +14534,13 @@
       "gate": "native_authz",
       "matrix": "native_authz",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "native project authz: dependant:get_current_user",
+      "audit_classification": "justified_allowlist",
+      "audit_reason": "bulk 导入预览只解析上传 ZIP 内的 manifest.json（周期/文件数/模式），不查库、不读写任何底稿正文。",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -14524,9 +14555,13 @@
       "gate": "native_authz",
       "matrix": "native_authz",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user_stream"
+      "classification_reason": "native project authz: dependant:get_current_user_stream",
+      "audit_classification": "justified_allowlist",
+      "audit_reason": "bulk 任务进度 SSE 为任务级进度元数据，不返回底稿正文。",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -14541,9 +14576,13 @@
       "gate": "native_authz",
       "matrix": "native_authz",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "native project authz: dependant:get_current_user",
+      "audit_classification": "justified_allowlist",
+      "audit_reason": "bulk 场景清单为静态文案与项目状态元数据（项目 readonly），不返回底稿正文。",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -14905,12 +14944,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "attachment_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "attachment.read/attach_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "回函件 OCR 比对读取附件全文并写 ocr_fields_cache → Leak_Risk；已接 enforce_attachment_wp_visibility（与 attachments.py 的 OCR 写入同口径）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -14978,12 +15020,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "attachment_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "attachment.read/attach_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "把回函件指派到函证会读取并改写已挂底稿的附件 → Leak_Risk；路由级门只校验项目归属，已接 enforce_attachment_wp_visibility。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -22442,9 +22487,13 @@
       "gate": "native_authz",
       "matrix": "native_authz",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "native project authz: dependant:get_current_user",
+      "audit_classification": "justified_allowlist",
+      "audit_reason": "批量自建底稿从模板创建新底稿（项目 edit），不读取既有 scope-internal 底稿正文；与单条 create-custom 同口径。",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -22459,9 +22508,13 @@
       "gate": "native_authz",
       "matrix": "native_authz",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "native project authz: dependant:get_current_user",
+      "audit_classification": "justified_allowlist",
+      "audit_reason": "批量自建底稿预览只按请求体的新编码做查重，不读取既有 scope-internal 底稿正文。",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -22538,9 +22591,13 @@
       "gate": "native_authz",
       "matrix": "native_authz",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "native project authz: dependant:get_current_user",
+      "audit_classification": "justified_allowlist",
+      "audit_reason": "底稿生成任务状态为项目级进度元数据（状态/计数/生成回执），非底稿正文；由项目 readonly 保护。",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24614,12 +24671,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24631,12 +24691,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24648,12 +24711,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24665,12 +24731,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24682,12 +24751,15 @@
       "action": "read",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24699,12 +24771,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24716,12 +24791,15 @@
       "action": "read",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24733,12 +24811,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24750,12 +24831,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24767,12 +24851,15 @@
       "action": "read",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24784,12 +24871,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24801,12 +24891,15 @@
       "action": "read",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24818,12 +24911,15 @@
       "action": "read",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24835,12 +24931,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24852,12 +24951,15 @@
       "action": "read",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24869,12 +24971,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24886,12 +24991,15 @@
       "action": "read",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24903,12 +25011,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24920,12 +25031,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24937,12 +25051,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24954,12 +25071,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24971,12 +25091,15 @@
       "action": "read",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -24988,12 +25111,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -25005,12 +25131,15 @@
       "action": "read",
       "wp_bound": true,
       "binding": "wp_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "按 (wp_id, sheet_name) 返回该底稿的 room 身份与已发布 representation 摘要 → Leak_Risk；原只有 authorize_wp_read 项目成员级校验，已在其后接 enforce_wp_gate(dedicated_read)。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -25707,12 +25836,15 @@
       "action": "read",
       "wp_bound": true,
       "binding": "attachment_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "attachment.download/attach_download",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "证据附件字节读取返回附件正文（可为底稿证据）→ Leak_Risk；已在字节读取前接 enforce_attachment_wp_visibility(attach_download)。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -25724,12 +25856,15 @@
       "action": "read",
       "wp_bound": true,
       "binding": "attachment_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "attachment.read/attach_read",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "影响评估列出附件的下游引用与正式产出 → Leak_Risk；已在 scope 校验后接 enforce_attachment_wp_visibility(attach_read)。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -25741,12 +25876,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "attachment_id",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "attachment.upload/attach_upload",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "替换证据附件内容（新版本）改写已挂底稿的证据 → Leak_Risk；已在替换前接 enforce_attachment_wp_visibility(attach_upload)。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -29740,12 +29878,15 @@
       "action": "create",
       "wp_bound": true,
       "binding": "server_resolved",
-      "gate": "native_authz",
-      "matrix": "native_authz",
+      "gate": "gated",
+      "matrix": "workpaper.parsed_data_write/save_parsed_data",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "批量刷新改写 body.wp_ids 底稿的取数 → Leak_Risk；项目 edit 之外已逐份 gate_wp(save_parsed_data)，不可见/只读的底稿按单份失败回报、不写入。",
+      "audit_classification": "gated",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -29886,9 +30027,13 @@
       "gate": "native_authz",
       "matrix": "native_authz",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "native project authz: dependant:get_current_user",
+      "audit_classification": "justified_allowlist",
+      "audit_reason": "字段覆盖值批量写入：与单条 POST 同为 project/year/scope 级派生覆盖值（项目 edit）；程序表行的覆盖逐项过 wp_visibility.program_row_guard.assert_program_override_allowed，非底稿正文。",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -29924,9 +30069,13 @@
       "gate": "native_authz",
       "matrix": "native_authz",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "native project authz: dependant:get_current_user",
+      "audit_classification": "justified_allowlist",
+      "audit_reason": "I4 同行业行业清单为同一全局静态目录的索引，与具体底稿实例无关。",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -29941,9 +30090,13 @@
       "gate": "native_authz",
       "matrix": "native_authz",
       "test_ids": [
-        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency"
+        "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user"
+      "classification_reason": "native project authz: dependant:get_current_user",
+      "audit_classification": "justified_allowlist",
+      "audit_reason": "I4 同行业长期待摊政策为全局静态目录（data/peer_ltpa_policies.json），与具体底稿实例无关。",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",
@@ -39702,9 +39855,13 @@
       "matrix": "native_authz",
       "test_ids": [
         "tests/procedure_delegation_visibility/test_task16_coverage_guard.py::test_native_authz_ledger_entries_have_native_dependency",
-        "tests/test_pid_path_authz_endpoints.py::test_single_review_needs_review_level_on_the_workpapers_project"
+        "tests/test_pid_path_authz_endpoints.py::test_single_review_needs_review_level_on_the_workpapers_project",
+        "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py::test_every_native_authz_entry_is_gated_or_allowlisted"
       ],
-      "classification_reason": "native project authz: dependant:get_current_user (authorize_wp_read + assert_project_permission review; spec project-pid-path-authz-coverage)"
+      "classification_reason": "native project authz: dependant:get_current_user (authorize_wp_read + assert_project_permission review; spec project-pid-path-authz-coverage)",
+      "audit_classification": "justified_allowlist",
+      "audit_reason": "单底稿 AI 复核：authorize_wp_read 确认底稿存在且用户有底稿只读权，再按底稿所属项目校验 review 级（与批量复核同级）；产出独立写入 ai_content，不改动底稿正文；未接 dedicated_wp_gate 因底稿门的 ai_generate 矩阵不含 reviewer（QC 需要复核）；scope-internal 可见性差异为合伙人/admin 可越过委派可见性审查，但 AI 复核不是正常编辑流程——与合并报表聚合输出等价。",
+      "audit_reviewer": "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
     },
     {
       "kind": "http",

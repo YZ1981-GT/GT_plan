@@ -62,13 +62,20 @@ class TestFullClassification:
         assert report["baseline_native_authz_total"] == 72
 
     def test_classification_counts(self):
-        """gated=19 + justified=52 + leak_risk_deferred=0 + worker=1 = 72（Req 3.3/3.5）。"""
-        c = audit.build_report()["classification"]
-        assert c["gated"] == 19
-        assert c["justified_allowlist"] == 52
+        """gated=53 + justified=62 + leak_risk_deferred=0 + worker=1 = 116（Req 3.3/3.5）。
+
+        原基线 72（19 + 52 + 1）。2026-11-25 补审 45 条（接门 34 + justified 11），并删 2 条
+        已失效 justified；明细见 ``native_authz_audit.BASELINE_CLASSIFIED_TOTAL`` 注释。
+        """
+        report = audit.build_report()
+        c = report["classification"]
+        assert c["gated"] == 53
+        assert c["justified_allowlist"] == 62
         assert c["leak_risk_deferred"] == 0
         assert c["worker_justified"] == 1
-        assert c["gated"] + c["justified_allowlist"] + c["leak_risk_deferred"] + c["worker_justified"] == 72
+        total = c["gated"] + c["justified_allowlist"] + c["leak_risk_deferred"] + c["worker_justified"]
+        assert total == audit.BASELINE_CLASSIFIED_TOTAL == 116
+        assert report["unaudited_http"] == 0
 
     @pytest.mark.skip(reason="spec 已归档，coverage/evidence 基线停更导致永红（2026-10-07 清理 evidence 空壳时标记）")
     def test_flip_condition_met_all_wired(self):
@@ -83,8 +90,8 @@ class TestFullClassification:
         assert audit.LEAK_RISK_DEFERRED == {}
 
     def test_thirteen_previously_deferred_now_gated(self):
-        """原 13 条 leak_risk 现全部在 GATED_LEAK_RISK（gated=6 附件族 + 13 批量族 = 19）。"""
-        assert len(audit.GATED_LEAK_RISK) == 19
+        """原 13 条 leak_risk 现全部在 GATED_LEAK_RISK（原 19 = 6 附件族 + 13 批量族；2026-11-25 再接 34 条 = 53）。"""
+        assert len(audit.GATED_LEAK_RISK) == 53
         # 13 条批量/导入/同步/搜索族均带 registered matrix
         newly = {
             ("/api/projects/{project_id}/working-papers/download-pack", "POST"),

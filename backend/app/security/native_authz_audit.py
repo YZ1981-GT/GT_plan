@@ -45,6 +45,17 @@ from app.security.entry_coverage_scanner import LEDGER_PATH
 # ---------------------------------------------------------------------------
 REVIEWER = "visibility-isolation-go-live-hardening/task4-native-authz-auditor"
 
+#: 审计覆盖的 native_authz 入口总数（HTTP gated + justified + deferred + worker）。
+#:
+#: 原 Task 4 基线为 72（gated 19 + justified 52 + worker 1）。2026-11-25：台账按代码重新对账后
+#: 冒出 45 条未审计入口，逐条审计为 gated 34（接门）+ justified 11；另删 2 条已失效 justified
+#: （归档路由已下线；onlyoffice/health 已改记 not_applicable）⇒ 116。改动分类表时必须同步本值
+#: （快照判据：漏改即红，迫使变更是有意识的）。
+BASELINE_CLASSIFIED_TOTAL = 116
+
+#: 统一同步端点的 scope 前缀（与 wp_sync_router.USER_SYNC_PREFIX 一致；审计表只是静态数据，不 import router）。
+_SYNC = "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}"
+
 # Stable audit test id (collective proof for the classification).
 AUDIT_TEST = (
     "tests/visibility_go_live_hardening/test_task4_native_authz_audit.py"
@@ -85,7 +96,8 @@ GATED_LEAK_RISK: dict[tuple[str, str], dict[str, str]] = {
         "reason": "对附件触发 OCR 字段提取会返回附件内容(可含底稿证据正文)；原仅认证 → Leak_Risk，已接门。",
         "matrix": "attachment.read/attach_read",
     },
-    ("/api/attachments/{attachment_id}/preview-pdf", "GET"): {
+    # 路由已加 uuid 转换器（`{attachment_id:uuid}`），键随 live 路由更新，否则本条匹配不到台账。
+    ("/api/attachments/{attachment_id:uuid}/preview-pdf", "GET"): {
         "reason": "附件转 PDF 在线预览直接返回附件正文(可含scope-internal底稿证据)；原仅项目级授权，已在其上再接 wp 可见性收紧 → gated。",
         "matrix": "attachment.read/attach_read",
     },
@@ -146,6 +158,85 @@ GATED_LEAK_RISK: dict[tuple[str, str], dict[str, str]] = {
         "matrix": "workpaper.parsed_data_write/save_parsed_data",
     },
     # ── 搜索（Task 4 接线）：结果按可见集过滤，杜绝跨 scope 标题/内容泄露。 ──
+    **{
+        # ── 2026-11-25 接线：统一同步端点（wp_sync_router）。每个 handler 第一句 `_guard(...)` →
+        #    SyncEndpointGuard → WpGateVisibilityProbe.observe → enforce_wp_gate
+        #    (workpaper.dedicated_subroute/dedicated_read)；只读用户的写 action 由 guard 阶段 ⑤ 按探针
+        #    回报的 readonly 拒绝（403 SyncReadonlyAccessError，同日补）。coverage_guard 经
+        #    VERIFIED_GATE_WRAPPERS 从 AST 验证该链（不是凭注释）。 ──
+        (route, method): {
+            "reason": (
+                "统一同步端点读/写该底稿的 room、representation、冲突、恢复件与版本 → Leak_Risk；"
+                "handler 首句 _guard 经 WpGateVisibilityProbe 调 enforce_wp_gate（不可见即 404），"
+                "只读用户写 action 由 guard 阶段⑤按 readonly 拒绝（403）。"
+            ),
+            "matrix": "workpaper.dedicated_subroute/dedicated_read",
+        }
+        for route, method in (
+            (_SYNC + "/readiness", "GET"),
+            (_SYNC + "/store-projection", "GET"),
+            (_SYNC + "/first-publication", "POST"),
+            (_SYNC + "/adopt-substrate", "POST"),
+            (_SYNC + "/materialize", "POST"),
+            (_SYNC + "/materialize-from-store", "POST"),
+            (_SYNC + "/rooms/{room_id}/confirm-descriptor", "POST"),
+            (_SYNC + "/rooms/{room_id}/forcesave", "POST"),
+            (_SYNC + "/rooms/{room_id}/close-intents", "POST"),
+            (_SYNC + "/rooms/{room_id}/participants/{participant_id}/leave", "POST"),
+            (_SYNC + "/recovery-cases", "GET"),
+            (_SYNC + "/recovery-cases/{case_id}/claim", "POST"),
+            (_SYNC + "/recovery-cases/{case_id}/download-only", "POST"),
+            (_SYNC + "/recovery-cases/{case_id}/download", "GET"),
+            (_SYNC + "/recovery-cases/{case_id}/timeline", "GET"),
+            (_SYNC + "/operations/{operation_id}", "GET"),
+            (_SYNC + "/operations/{operation_id}/conflicts", "GET"),
+            (_SYNC + "/operations/{operation_id}/timeline", "GET"),
+            (_SYNC + "/operations/{operation_id}/resolve", "POST"),
+            (_SYNC + "/operations/{operation_id}/abandon", "POST"),
+            (_SYNC + "/operations/{operation_id}/retry", "POST"),
+            (_SYNC + "/versions/{version_id}/rollback", "POST"),
+            (_SYNC + "/pending-mutations", "POST"),
+        )
+    },
+    ("/api/projects/{project_id}/workpapers/{wp_id}/sync/entry-identity", "GET"): {
+        "reason": "按 (wp_id, sheet_name) 返回该底稿的 room 身份与已发布 representation 摘要 → Leak_Risk；原只有 authorize_wp_read 项目成员级校验，已在其后接 enforce_wp_gate(dedicated_read)。",
+        "matrix": "workpaper.dedicated_subroute/dedicated_read",
+    },
+    ("/api/acnr/workpapers/{wp_id}/locate", "GET"): {
+        "reason": "短链定位返回底稿所属项目与 wp_code，可泄漏对当前用户不可见底稿的存在性 → Leak_Risk；已在 readonly 项目权限与回收站判断之后接 enforce_wp_gate(read_detail)。",
+        "matrix": "workpaper.detail/read_detail",
+    },
+    ("/api/projects/{project_id}/confirmations/match-queue/{attachment_id}/assign", "POST"): {
+        "reason": "把回函件指派到函证会读取并改写已挂底稿的附件 → Leak_Risk；路由级门只校验项目归属，已接 enforce_attachment_wp_visibility。",
+        "matrix": "attachment.read/attach_read",
+    },
+    ("/api/projects/{project_id}/confirmations/attachments/{attachment_id}/extract-compare", "POST"): {
+        "reason": "回函件 OCR 比对读取附件全文并写 ocr_fields_cache → Leak_Risk；已接 enforce_attachment_wp_visibility（与 attachments.py 的 OCR 写入同口径）。",
+        "matrix": "attachment.read/attach_read",
+    },
+    ("/api/projects/{project_id}/years/{year}/evidence/attachments/{attachment_id}/content", "GET"): {
+        "reason": "证据附件字节读取返回附件正文（可为底稿证据）→ Leak_Risk；已在字节读取前接 enforce_attachment_wp_visibility(attach_download)。",
+        "matrix": "attachment.download/attach_download",
+    },
+    ("/api/projects/{project_id}/years/{year}/evidence/attachments/{attachment_id}/versions", "POST"): {
+        "reason": "替换证据附件内容（新版本）改写已挂底稿的证据 → Leak_Risk；已在替换前接 enforce_attachment_wp_visibility(attach_upload)。",
+        "matrix": "attachment.upload/attach_upload",
+    },
+    ("/api/projects/{project_id}/years/{year}/evidence/attachments/{attachment_id}/impact", "GET"): {
+        "reason": "影响评估列出附件的下游引用与正式产出 → Leak_Risk；已在 scope 校验后接 enforce_attachment_wp_visibility(attach_read)。",
+        "matrix": "attachment.read/attach_read",
+    },
+    **{
+        ("/api/projects/{pid}/procedure-trim/workpapers/{wp_id}/program-rows/" + suffix, "POST"): {
+            "reason": "改写该底稿程序表某一行（裁剪/恢复/取任务）→ Leak_Risk；委派人依赖不含底稿级可见性，已接 enforce_wp_gate(dedicated_write)。",
+            "matrix": "workpaper.dedicated_subroute/dedicated_write",
+        }
+        for suffix in ("not-applicable", "restore", "task")
+    },
+    ("/api/workpapers/batch-refresh", "POST"): {
+        "reason": "批量刷新改写 body.wp_ids 底稿的取数 → Leak_Risk；项目 edit 之外已逐份 gate_wp(save_parsed_data)，不可见/只读的底稿按单份失败回报、不写入。",
+        "matrix": "workpaper.parsed_data_write/save_parsed_data",
+    },
     ("/api/projects/{project_id}/workpapers/search", "GET"): {
         "reason": "底稿搜索(search_workpapers)枚举项目内底稿(名称/编码)可泄漏 scope-internal-not-delegated 底稿存在性 → Leak_Risk；已用 make_bulk_visible_filter 过滤结果到可见集(仅已实例化底稿，静默剔除不可见)。",
         "matrix": "workpaper.detail/read_detail",
@@ -216,14 +307,38 @@ JUSTIFIED_ALLOWLIST: dict[tuple[str, str], str] = {
         "一键初稿刷新为合伙人专属项目级公式刷新(已 require partner/signing_partner 角色)，作用于项目级公式集非个别 scope-internal 底稿正文委派。",
     ("/api/workpapers/draft-refresh/{run_id}/rollback", "POST"):
         "初稿刷新回滚为合伙人专属项目级操作(已角色门控)，非个别底稿正文委派。",
-    # ── 项目级归档管理 ──
-    ("/api/workpapers/projects/{project_id}/archive", "POST"):
-        "项目归档为项目级管理动作，不返回/改动个别底稿正文。",
+    # （原登记 `POST /api/workpapers/projects/{project_id}/archive` 已不在生产路由与台账中，
+    #   2026-11-25 删除该失效条目。）
     # ── 覆盖值/字段覆盖(project/year/scope 派生值，非底稿正文) ──
     ("/api/workpapers/field-overrides", "GET"):
         "字段覆盖值读取为 project/year/scope 级派生覆盖值，非底稿正文。",
     ("/api/workpapers/field-overrides", "POST"):
         "字段覆盖值写入为 project/year/scope 级派生覆盖值，非底稿正文。",
+    # ── 2026-11-25 审计补登（其余 45 条中经逐条核实不落底稿正文的部分）──
+    ("/api/workpapers/field-overrides/batch", "POST"):
+        "字段覆盖值批量写入：与单条 POST 同为 project/year/scope 级派生覆盖值（项目 edit）；"
+        "程序表行的覆盖逐项过 wp_visibility.program_row_guard.assert_program_override_allowed，非底稿正文。",
+    ("/api/ai-chat/attachments/{attachment_id}", "DELETE"):
+        "AI 对话附件删除：ai_chat_attachments 独立表、按 owner_id=当前用户过滤，与底稿附件无关联，非底稿正文。",
+    ("/api/projects/{project_id}/bulk-tab/import/{task_id}/cancel", "POST"):
+        "bulk 导入取消为任务级操作（按发起人 + job_id），不读写底稿正文；导入本身由后台按资源 preflight。",
+    ("/api/projects/{project_id}/bulk-tab/scenarios", "GET"):
+        "bulk 场景清单为静态文案与项目状态元数据（项目 readonly），不返回底稿正文。",
+    ("/api/projects/{project_id}/bulk-tab/preview-manifest", "POST"):
+        "bulk 导入预览只解析上传 ZIP 内的 manifest.json（周期/文件数/模式），不查库、不读写任何底稿正文。",
+    ("/api/projects/{project_id}/bulk-tab/import/async", "POST"):
+        "异步导入只落盘 ZIP 并建耐久任务（项目 edit + 可导入状态），不读写底稿正文；"
+        "后台执行（bulk_async_runner / durable_job_executor）逐底稿 make_bulk_preflight(worker) 后才写入。",
+    ("/api/workpapers/i4/peer-ltpa-policies", "GET"):
+        "I4 同行业长期待摊政策为全局静态目录（data/peer_ltpa_policies.json），与具体底稿实例无关。",
+    ("/api/workpapers/i4/peer-ltpa-industries", "GET"):
+        "I4 同行业行业清单为同一全局静态目录的索引，与具体底稿实例无关。",
+    ("/api/projects/{project_id}/working-papers/generation-operations/{operation_id}", "GET"):
+        "底稿生成任务状态为项目级进度元数据（状态/计数/生成回执），非底稿正文；由项目 readonly 保护。",
+    ("/api/projects/{project_id}/working-papers/create-custom-batch/preview", "POST"):
+        "批量自建底稿预览只按请求体的新编码做查重，不读取既有 scope-internal 底稿正文。",
+    ("/api/projects/{project_id}/working-papers/create-custom-batch", "POST"):
+        "批量自建底稿从模板创建新底稿（项目 edit），不读取既有 scope-internal 底稿正文；与单条 create-custom 同口径。",
     # ── 全局元数据 / 目录 / 映射规则(与具体底稿实例无关) ──
     ("/api/workpapers/cycle-prerequisites/{cycle_code}", "GET"):
         "循环前置条件为全局映射元数据(按 cycle_code)，与具体底稿实例无关。",
@@ -272,8 +387,8 @@ JUSTIFIED_ALLOWLIST: dict[tuple[str, str], str] = {
     ("/api/workpapers/{project_id}/{year}/misstatement-summary", "GET"):
         "错报汇总为 A13 项目/年度聚合，非个别底稿正文。",
     # ── 健康探针 / WOPI 锁与统计(不返回任何底稿正文) ──
-    ("/api/workpapers/onlyoffice/health", "GET"):
-        "OnlyOffice 健康探针，不返回任何底稿正文。",
+    # （`GET /api/workpapers/onlyoffice/health` 已归入 coverage_guard.NOT_APPLICABLE_WP_ALLOWLIST，
+    #   台账为 not_applicable，不再是 native_authz；2026-11-25 删除本处重复登记。）
     ("/wopi/files/{file_id}/lock", "DELETE"):
         "WOPI 强制解锁为编辑器锁管理(锁状态)，不返回/改动底稿正文；编辑器文件族令牌强制归 Task 2/父 spec editor_security。",
     ("/wopi/files/{file_id}/lock-status", "GET"):
@@ -479,7 +594,7 @@ def build_report(ledger: dict[str, Any] | None = None) -> dict[str, Any]:
         "task_id": "4. 审计 72 条 native_authz 入口（R3）",
         "component": "H3 NativeAuthzAuditor",
         "reviewer": REVIEWER,
-        "baseline_native_authz_total": 72,
+        "baseline_native_authz_total": BASELINE_CLASSIFIED_TOTAL,
         "classification": {
             "gated": gated + gated_moved,
             "justified_allowlist": justified,
@@ -530,15 +645,15 @@ def _main() -> int:
 
     report = build_report()
     c = report["classification"]
-    print("[native-authz-audit] classification of 72 native_authz baseline entries:")
+    print(f"[native-authz-audit] classification of {BASELINE_CLASSIFIED_TOTAL} native_authz baseline entries:")
     print(f"  gated (leak_risk wired) : {c['gated']}")
     print(f"  justified_allowlist     : {c['justified_allowlist']}")
     print(f"  leak_risk_deferred      : {c['leak_risk_deferred']}")
     print(f"  worker (justified)      : {c['worker_justified']}")
-    print(f"  classified_total        : {report['classified_total']} / 72")
+    print(f"  classified_total        : {report['classified_total']} / {BASELINE_CLASSIFIED_TOTAL}")
     print(f"  unaudited (fail-closed) : {report['unaudited_http']}")
     print(f"  flip_condition_met      : {report['flip_condition_met']}")
-    if report["classified_total"] != 72 or report["unaudited_http"] != 0:
+    if report["classified_total"] != BASELINE_CLASSIFIED_TOTAL or report["unaudited_http"] != 0:
         print("[native-authz-audit] INCOMPLETE COVERAGE — unaudited entries remain")
         return 1
     print("[native-authz-audit] every native_authz entry classified (no silent pass)")

@@ -232,6 +232,19 @@ DEFERRED_GATE_SCHEDULERS: dict[str, str] = {
     "schedule_import": "app.services.bulk_tab.bulk_async_runner",
 }
 
+# Verified in-module gate wrappers (registry + verifier live in app.security.gate_wrappers).
+from app.security.gate_wrappers import VERIFIED_GATE_WRAPPERS  # noqa: E402
+
+
+def verified_wrapper_gate(module_name: str, qualname: str) -> bool:
+    """True iff ``module_name.qualname`` exists and its source calls a gate (AST)."""
+    from app.security.gate_wrappers import verified_wrapper_gate as _verify
+
+    return _verify(
+        module_name, qualname, source_of=_safe_source,
+        calls_gate=lambda src: source_calls_gate(src, HANDLER_GATE_CALL_NAMES),
+    )
+
 
 # ---------------------------------------------------------------------------
 # AST gate detection (pure, unit-tested; fake-comment resistant)
@@ -299,6 +312,12 @@ def detect_handler_gate(endpoint: Any, *, _depth: int = 0) -> tuple[bool, str]:
         runner_mod = DEFERRED_GATE_SCHEDULERS[sched]
         if module_calls_gate(runner_mod):
             return (True, f"deferred:{sched}->{runner_mod}")
+
+    endpoint_module = getattr(inspect.getmodule(endpoint), "__name__", "")
+    for wrapper in called & set(VERIFIED_GATE_WRAPPERS):
+        mod_name, verifier = VERIFIED_GATE_WRAPPERS[wrapper]
+        if endpoint_module == mod_name and verified_wrapper_gate(mod_name, verifier):
+            return (True, f"wrapper:{wrapper}->{mod_name}.{verifier}")
 
     if _depth >= 1:
         return (False, "no_gate_call")
