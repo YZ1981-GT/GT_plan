@@ -8,48 +8,6 @@
   "not_a_whitelist": "每条都带 importer / target / name / owner / reason，读者能直接看到坏在哪、归谁。计数式基线（只记条数）才是抬基线，本表刻意用逐条形态。",
   "entries": [
     {
-      "importer": "src/components/workpaper/__tests__/b23ProcessControl.pbt.spec.ts",
-      "target": "src/components/workpaper/composables/useB23ProcessControl.ts",
-      "name": "suggestProcessConclusion",
-      "owner": "b23 流程控制",
-      "reason": "模块已重命名为 suggestCycleConclusion（Process 改 Cycle 且加 B23 前缀），3 个 spec 未跟上；对应关系需该 spec 的人确认，不擅自猜"
-    },
-    {
-      "importer": "src/components/workpaper/__tests__/b23ProcessControl.pbt.spec.ts",
-      "target": "src/components/workpaper/composables/useB23ProcessControl.ts",
-      "name": "STANDARD_PROCESSES",
-      "owner": "b23 流程控制",
-      "reason": "模块里无任何对应导出，疑为已删 API，spec 可能在测已下线的能力"
-    },
-    {
-      "importer": "src/components/workpaper/__tests__/b23ProcessControl.pbt.spec.ts",
-      "target": "src/components/workpaper/composables/useB23ProcessControl.ts",
-      "name": "ProcessConclusion",
-      "owner": "b23 流程控制",
-      "reason": "疑对应 CycleConclusion"
-    },
-    {
-      "importer": "src/components/workpaper/__tests__/b23ProcessControl.pbt.spec.ts",
-      "target": "src/components/workpaper/composables/useB23ProcessControl.ts",
-      "name": "WalkthroughConclusion",
-      "owner": "b23 流程控制",
-      "reason": "模块里无对应导出，只有 B23WalkthroughTest"
-    },
-    {
-      "importer": "src/components/workpaper/__tests__/b23ProcessControl.pbt.spec.ts",
-      "target": "src/components/workpaper/composables/useB23ProcessControl.ts",
-      "name": "ControlPoint",
-      "owner": "b23 流程控制",
-      "reason": "疑对应 B23ControlPoint"
-    },
-    {
-      "importer": "src/components/workpaper/__tests__/b23ProcessControl.pbt.spec.ts",
-      "target": "src/components/workpaper/composables/useB23ProcessControl.ts",
-      "name": "ProcessCard",
-      "owner": "b23 流程控制",
-      "reason": "疑对应 B23CycleCard"
-    },
-    {
       "importer": "src/components/workpaper/__tests__/samplingHostMethodologyCoverage.spec.ts",
       "target": "src/components/workpaper/composables/useF3VoucherCheck.ts",
       "name": "useX",
