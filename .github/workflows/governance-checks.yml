@@ -3864,6 +3864,14 @@ jobs:
         run: python backend/scripts/fix/fix_note_chapter_scope.py --check
       - name: Standalone must not carry consolidated-only chapters (write/read/cleanup)
         run: python -m pytest backend/tests/test_note_standalone_consolidated_only_scope.py -q
+      # 🔴 2026-11-25：变异清单里有前端变异（drop_frontend_banner 跑 vitest），本 job 原先
+      #    没装 Node 依赖 ⇒ 基线与变异两次 vitest 都同样起不来 ⇒ 失败集合相同 ⇒ 恒判 GREEN。
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install frontend deps (frontend mutations run vitest)
+        working-directory: audit-platform/frontend
+        run: npm ci
       - name: Mutation check (every guard must go red, then restore)
         run: python backend/scripts/diagnose/mutate_parent_company_note_guards.py
       - name: Mutation check (standalone scope guards; 15 mutations must all die)
@@ -3953,6 +3961,14 @@ jobs:
       # 🔴 本步曾判出 3 个 GREEN，暴露 Task 6「H8/H9 兜底码接双族」是**假绿** ——
       #    scope 里仍写单族字面量 `("1641",)`，而守卫只测双族真源自身、
       #    一条都没钉「谁在用它」。补「运行时值比对 + 源码级禁字面量」双层判据后转红。
+      # 🔴 2026-11-25：M1~M6 / M9~M16 是前端变异（run_frontend 跑 vitest），本 job 原先没装
+      #    Node 依赖 ⇒ 基线与变异的 vitest 同样起不来 ⇒ 失败集合无变化 ⇒ 13 条恒判 GREEN。
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install frontend deps (frontend mutations run vitest)
+        working-directory: audit-platform/frontend
+        run: npm ci
       - name: Mutation check (every guard must go red, then restore)
         run: python backend/scripts/diagnose/mutate_h_cycle_guards.py
 
