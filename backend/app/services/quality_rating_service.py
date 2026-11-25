@@ -264,20 +264,25 @@ class QualityRatingService:
         意见条数 >= 3 得满分，退回率 10%-30% 为合理区间。
         """
         try:
-            # 查询复核记录数和退回数
-            result = await db.execute(
-                sa_text(
-                    "SELECT COUNT(*) as total, "
-                    "SUM(CASE WHEN review_status = 'rejected' THEN 1 ELSE 0 END) as rejected "
-                    "FROM wp_review_records "
-                    "WHERE project_id = :pid"
-                ),
-                {"pid": str(project_id)},
-            )
-            row = result.fetchone()
-            if row and row[0] and row[0] > 0:
-                total = row[0]
-                rejected = row[1] or 0
+            # 查询复核记录数和退回数（2026-11-25 改 ORM：`WpReviewRecord`）
+            from sqlalchemy import func as _func
+
+            from app.models.rescued_runtime_tables import WpReviewRecord
+
+            row = (
+                await db.execute(
+                    sa.select(
+                        _func.count().label("total"),
+                        _func.sum(
+                            sa.case((WpReviewRecord.review_status == "rejected", 1), else_=0)
+                        ).label("rejected"),
+                    )
+                    .where(WpReviewRecord.project_id == project_id)
+                )
+            ).one()
+            if row and row.total and row.total > 0:
+                total = row.total
+                rejected = row.rejected or 0
                 rejection_rate = rejected / total
 
                 # 退回率评分：10%-30% 为最佳区间

@@ -660,20 +660,24 @@ async def get_seed_status(
     # 用 _expected_note_templates() 同款逻辑作为 record_count
     table_counts["note_templates"] = _expected_note_templates() or 0
 
-    # 查 seed_load_history 最近 last_loaded_at
+    # 查 seed_load_history 最近 last_loaded_at（2026-11-25 改 ORM）
     last_loaded_map: dict[str, str] = {}
     try:
+        from sqlalchemy import func as _func
+
+        from app.models.rescued_runtime_tables import SeedLoadHistory
+
         rows = (
             await db.execute(
-                text(
-                    "SELECT seed_name, MAX(loaded_at) AS last_at "
-                    "FROM seed_load_history GROUP BY seed_name"
-                )
+                sa.select(
+                    SeedLoadHistory.seed_name,
+                    _func.max(SeedLoadHistory.loaded_at).label("last_at"),
+                ).group_by(SeedLoadHistory.seed_name)
             )
-        ).mappings().all()
-        for r in rows:
-            if r["seed_name"] and r["last_at"]:
-                last_loaded_map[r["seed_name"]] = r["last_at"].isoformat() if hasattr(r["last_at"], "isoformat") else str(r["last_at"])
+        ).all()
+        for seed_name, last_at in rows:
+            if seed_name and last_at:
+                last_loaded_map[seed_name] = last_at.isoformat() if hasattr(last_at, "isoformat") else str(last_at)
     except Exception as exc:
         logger.warning("query seed_load_history failed: %s", exc)
         try:
@@ -769,27 +773,42 @@ async def _record_history(
     errors: list | None = None,
     loaded_by: Any | None = None,
 ) -> None:
-    """写入 seed_load_history 表（D15 审计轨迹）。"""
+    """写入 seed_load_history 表（D15 审计轨迹）。
+
+    2026-11-25 由裸 SQL 改 ORM（`SeedLoadHistory`）——列型由迁移 V276 修正为
+    JSONB（错误明细数组），`errors` 列 ORM 直接收 list（SQLAlchemy JSONB 自动
+    序列化，无需手工 json.dumps + CAST）。
+    """
+    from app.models.rescued_runtime_tables import SeedLoadHistory
+
     try:
-        await db.execute(
-            text(
-                "INSERT INTO seed_load_history "
-                "(seed_name, loaded_at, loaded_by, record_count, inserted, updated, errors, status) "
-                "VALUES (:seed_name, NOW(), :loaded_by, :record_count, :inserted, :updated, "
-                "CAST(:errors AS JSONB), :status)"
-            ),
-            {
-                "seed_name": seed_name,
-                "loaded_by": loaded_by,
-                "record_count": record_count,
-                "inserted": inserted,
-                "updated": updated,
-                "errors": json.dumps(errors or [], ensure_ascii=False),
-                "status": status,
-            },
-        )
+        db.add(SeedLoadHistory(
+            seed_name=seed_name,
+            loaded_by=loaded_by if loaded_by is None else _coerce_history_uuid(loaded_by),
+            record_count=record_count,
+            inserted=inserted,
+            updated=updated,
+            errors=errors or [],
+            status=status,
+        ))
     except Exception as exc:
         logger.error("record_history(%s) failed: %s", seed_name, exc)
+
+
+def _coerce_history_uuid(value: Any) -> Any:
+    """把 loaded_by 归一到 UUID（调用方可能传 str）。
+
+    非法值记 WARN 返回 None（审计轨迹不该因为一个坏 id 丢整条记录）。
+    """
+    from uuid import UUID as _UUID
+
+    if value is None or isinstance(value, _UUID):
+        return value
+    try:
+        return _UUID(str(value).strip())
+    except (ValueError, AttributeError, TypeError):
+        logger.warning("record_history: 非法 loaded_by，按 NULL 写入: %r", value)
+        return None
 
 
 async def _exec_seed(seed_name: str, db: AsyncSession, current_user: User) -> dict:
@@ -1038,26 +1057,28 @@ async def get_version_info(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """返回版本标识 + seed_load_history 最近 N 条记录（按 loaded_at DESC）。"""
+    """返回版本标识 + seed_load_history 最近 N 条记录（按 loaded_at DESC）。
+
+    2026-11-25 由裸 SQL 改 ORM（`SeedLoadHistory`）。
+    """
+    from app.models.rescued_runtime_tables import SeedLoadHistory
+
     try:
         rows = (
             await db.execute(
-                text(
-                    "SELECT seed_name, loaded_at, record_count, inserted, updated, status "
-                    "FROM seed_load_history "
-                    "ORDER BY loaded_at DESC "
-                    "LIMIT 20"
-                )
+                sa.select(SeedLoadHistory)
+                .order_by(SeedLoadHistory.loaded_at.desc())
+                .limit(20)
             )
-        ).mappings().all()
+        ).scalars().all()
         last_seed_loads = [
             {
-                "seed_name": r["seed_name"],
-                "loaded_at": r["loaded_at"].isoformat() if hasattr(r["loaded_at"], "isoformat") else str(r["loaded_at"]),
-                "record_count": int(r["record_count"] or 0),
-                "inserted": int(r["inserted"] or 0),
-                "updated": int(r["updated"] or 0),
-                "status": r["status"],
+                "seed_name": r.seed_name,
+                "loaded_at": r.loaded_at.isoformat() if hasattr(r.loaded_at, "isoformat") else str(r.loaded_at),
+                "record_count": int(r.record_count or 0),
+                "inserted": int(r.inserted or 0),
+                "updated": int(r.updated or 0),
+                "status": r.status,
             }
             for r in rows
         ]

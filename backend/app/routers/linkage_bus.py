@@ -295,41 +295,45 @@ async def get_audit_log(
     """获取联动传播审计日志（分页）。
 
     Sprint 4 Task 4.8：返回最近的 stale 传播事件记录。
+    2026-11-25 由裸 SQL 改 ORM（`LinkageAuditLog`）——三层一致；分页/过滤
+    语义不变（project_id 精确匹配 + created_at DESC + LIMIT/OFFSET）。
     """
-    from sqlalchemy import text as sa_text
+    import uuid as _uuid
+
+    from app.models.rescued_runtime_tables import LinkageAuditLog
 
     try:
-        # 构建查询
-        where_clause = ""
-        params: dict[str, Any] = {"limit": limit, "offset": offset}
+        # project_id 过滤：非法 UUID 归 None（列可空，等价于不过滤——与旧
+        # 裸 SQL 行为一致：参数绑定字符串到 uuid 列会直接炸，此处按安全方向退化）
+        pid: _uuid.UUID | None = None
         if project_id:
-            where_clause = "WHERE project_id = :project_id"
-            params["project_id"] = project_id
+            try:
+                pid = _uuid.UUID(str(project_id).strip())
+            except (ValueError, AttributeError, TypeError):
+                pid = None
 
-        # 查询总数
-        count_sql = f"SELECT COUNT(*) FROM linkage_audit_log {where_clause}"
-        count_result = await db.execute(sa_text(count_sql), params)
-        total = count_result.scalar() or 0
+        stmt = sa.select(sa.func.count()).select_from(LinkageAuditLog)
+        if pid is not None:
+            stmt = stmt.where(LinkageAuditLog.project_id == pid)
+        total = (await db.execute(stmt)).scalar() or 0
 
-        # 查询数据
-        data_sql = (
-            f"SELECT id, source_uri, affected_count, duration_ms, project_id, created_at "
-            f"FROM linkage_audit_log {where_clause} "
-            f"ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
-        )
-        result = await db.execute(sa_text(data_sql), params)
-        rows = result.fetchall()
+        rows_stmt = sa.select(LinkageAuditLog).order_by(
+            LinkageAuditLog.created_at.desc()
+        ).limit(limit).offset(offset)
+        if pid is not None:
+            rows_stmt = rows_stmt.where(LinkageAuditLog.project_id == pid)
+        rows = (await db.execute(rows_stmt)).scalars().all()
 
         items = [
             {
-                "id": str(row[0]),
-                "source_uri": row[1],
-                "affected_count": row[2],
-                "duration_ms": row[3],
-                "project_id": str(row[4]) if row[4] else None,
-                "created_at": row[5].isoformat() if row[5] else None,
+                "id": str(r.id),
+                "source_uri": r.source_uri,
+                "affected_count": r.affected_count,
+                "duration_ms": r.duration_ms,
+                "project_id": str(r.project_id) if r.project_id else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
             }
-            for row in rows
+            for r in rows
         ]
 
         return {

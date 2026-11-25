@@ -27,6 +27,26 @@ from app.core.database import async_session as async_session_factory
 
 logger = logging.getLogger(__name__)
 
+
+def _coerce_uuid(value: UUID | str | None) -> UUID | None:
+    """把 `project_id` 归一到 UUID（ORM UUID 列需要真 UUID，字符串由 asyncpg 拒绝）。
+
+    None / 空串返回 None（列可空）；非法字符串记 WARN 并返回 None，不让审计
+    日志写失败拖垮调用方（该方法本身是「失败不阻断主流程」语义）。
+    """
+    if value is None:
+        return None
+    if isinstance(value, UUID):
+        return value
+    raw = str(value).strip()
+    if not raw:
+        return None
+    try:
+        return UUID(raw)
+    except (ValueError, AttributeError, TypeError):
+        logger.warning("[StalePropagation-Audit] 非法 project_id，按 NULL 写入: %r", value)
+        return None
+
 # Data directory for unified_dependency_graph.json
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 
@@ -433,22 +453,23 @@ class StalePropagationEngine:
         project_id: UUID | str,
         duration_ms: int = 0,
     ) -> None:
-        """写入传播审计日志到 linkage_audit_log 表。"""
+        """写入传播审计日志到 linkage_audit_log 表。
+
+        2026-11-25 由裸 SQL 改 ORM（`LinkageAuditLog`）——三层一致：表由 V275
+        迁移持有、模型在 `app.models.rescued_runtime_tables`、本处走 ORM 写入。
+        `id` / `created_at` 由 DB server_default 生成（模型已声明），写入方不传。
+        """
+        from app.models.rescued_runtime_tables import LinkageAuditLog
+
         try:
             async with async_session_factory() as session:
-                await session.execute(
-                    text(
-                        "INSERT INTO linkage_audit_log "
-                        "(id, source_uri, affected_count, duration_ms, project_id, created_at) "
-                        "VALUES (gen_random_uuid(), :source_uri, :affected_count, :duration_ms, :project_id, NOW())"
-                    ),
-                    {
-                        "source_uri": source_uri,
-                        "affected_count": len(affected_uris),
-                        "duration_ms": duration_ms,
-                        "project_id": str(project_id),
-                    },
-                )
+                session.add(LinkageAuditLog(
+                    source_uri=source_uri,
+                    affected_count=len(affected_uris),
+                    duration_ms=duration_ms,
+                    # ORM 列是 UUID 类型：字符串 id 也能绑，但统一走 uuid.UUID 更安全
+                    project_id=_coerce_uuid(project_id),
+                ))
                 await session.commit()
         except Exception as e:
             # 审计日志写入失败不应阻断主流程

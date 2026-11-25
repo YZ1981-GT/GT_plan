@@ -46,7 +46,11 @@ class LinkageAuditLog(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         sa.dialects.postgresql.UUID(as_uuid=True),
         primary_key=True,
-        server_default=func.gen_random_uuid(),
+        # ?? Python ?????????server_default=gen_random_uuid() ? PG ???
+        #    SQLite create_all ?? flush ?? unknown function?2026-11-25 ??
+        #    test_seed_all_savepoint_isolation ? PendingRollbackError??
+        #    DB ? default ?? V275 ?????gen_random_uuid()??????????
+        default=uuid.uuid4,
     )
     source_uri: Mapped[str] = mapped_column(String, nullable=False)
     affected_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -71,7 +75,11 @@ class SeedLoadHistory(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         sa.dialects.postgresql.UUID(as_uuid=True),
         primary_key=True,
-        server_default=func.gen_random_uuid(),
+        # ?? Python ?????????server_default=gen_random_uuid() ? PG ???
+        #    SQLite create_all ?? flush ?? unknown function?2026-11-25 ??
+        #    test_seed_all_savepoint_isolation ? PendingRollbackError??
+        #    DB ? default ?? V275 ?????gen_random_uuid()??????????
+        default=uuid.uuid4,
     )
     seed_name: Mapped[str] = mapped_column(String, nullable=False)
     loaded_at: Mapped[datetime] = mapped_column(
@@ -84,7 +92,13 @@ class SeedLoadHistory(Base):
     inserted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     updated: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     errors: Mapped[list] = mapped_column(
-        JSONB, nullable=False, server_default=sa.text("'[]'::jsonb"),
+        # 🔴 通用 server_default：PG 上渲染成 `'[]'::jsonb`，SQLite 上渲染成 `'[]'`。
+        #    不能写死 `sa.text("'[]'::jsonb")` —— 全表 create_all 的 SQLite 单测
+        #    （overlay PBT / formula_chain / extension_services 等）会被
+        #    `unrecognized token ":"` 打红（2026-11-24 实测，155337bec 引入）。
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'[]'"),
     )
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="ok")
 
@@ -102,7 +116,11 @@ class WpReviewRecord(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         sa.dialects.postgresql.UUID(as_uuid=True),
         primary_key=True,
-        server_default=func.gen_random_uuid(),
+        # ?? Python ?????????server_default=gen_random_uuid() ? PG ???
+        #    SQLite create_all ?? flush ?? unknown function?2026-11-25 ??
+        #    test_seed_all_savepoint_isolation ? PendingRollbackError??
+        #    DB ? default ?? V275 ?????gen_random_uuid()??????????
+        default=uuid.uuid4,
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
         sa.dialects.postgresql.UUID(as_uuid=True), nullable=False,
