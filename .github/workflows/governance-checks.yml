@@ -6043,6 +6043,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install Python dependencies
+        # 2026-11-25：原先没有任何安装步骤，`python -m pytest` 直接报 No module named pytest。
+        # 干净 venv 复现：只装 pytest 也不够——backend/tests/conftest.py 顶层 import
+        # pytest_asyncio（并按需拉 app.*），故沿用同类 job（b60-external-link-census）的
+        # 整套 requirements。第二步「锚点自检」只用标准库，本来就是绿的。
+        run: python -m pip install -r backend/requirements.txt
       - name: "[workbook-row-change] 范围边界判据（Requirement 9.1–9.6，只读）"
         run: python -m pytest backend/tests/workpaper_sync/test_workbook_row_change_scope_boundary.py -q --no-header -p no:randomly
       - name: "[workbook-row-change] 变异锚点静态自检（九条，--check-anchors 只读）"
