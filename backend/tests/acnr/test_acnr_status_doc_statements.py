@@ -36,7 +36,7 @@ import pytest
 from app.services.acnr import catalog_integrity as ci
 from tests.acnr._status_doc_checks import (
     _DESIGN, _FE_GUARD_REL, _GEN_REL, _LINKAGE_REL, _RESOLVER_REL, _STALE_REL, _STATUS_GUARD_REL, _SUBSECTIONS,
-    _TABLE_HEADERS, _THIS_REL, _V2_REL, H_ERRATA, H_INTRO, H_PARALLEL, H_VERSION, NON_WP_TO_V1, PLANNED_ROWS_OPEN,
+    _TABLE_HEADERS, _THIS_REL, _V2_REL, H_ERRATA, H_INTRO, H_PARALLEL, H_VERSION, NON_WP_TO_V1, PLANNED_EMPTY_OR_OPEN, PLANNED_ROWS_OPEN,
     RESOLVER_DOC_OK,
     SCHEMA_FOLLOWS_CONTRACT, SPEC_TASKS, T31_HINT_MODULE, T31_HINT_TEST, T31_REASON_CHECKS,
     T31_REASON_SYMBOLS, V1_BYPASS, Check, Unit, _ci_job_runs, _short_link_route_ok,
@@ -222,6 +222,10 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             SPEC_TASKS, claim("design.md 有「## 15. D12」节", lambda: any(
                 ln.startswith("## 15. D12") for ln in _read(_DESIGN).split("\n"))),
             has_tests(_THIS_REL, "test_every_statement_unit_is_registered", "test_registered_criteria_hold")),
+        # 2026-11-24：新增的「更新」行（spec 归档说明），登记判据 = 归档 tasks 全勾选 + 计划表两态
+        "更新（2026-11-24）：实施 spec `acnr-foundation-defect-closure` 已全部完成并归档（33 个任务全部勾选），「计划中（未落地）」表因此为空": P(
+            claim("33 个任务全部勾选", lambda: bool(_task_states()) and all(_task_states().values())),
+            PLANNED_EMPTY_OR_OPEN),
         "守卫 `backend/tests/acnr/test_acnr_architecture_status_doc.py` 逐项复算：「已落地」事实表的每个值从真实产物（`global_catalog.json`、`catalog_report.json`、快照、生成器源码）现算，组件表用 AST 确认模块、符号与测试存在，「计划中（未落地）」的任务号必须在 tasks.md 里仍未勾选": P(
             has_tests(_STATUS_GUARD_REL, "test_fact_table_values_recomputed_from_artifacts",
                       "test_component_rows_exist_by_ast", "test_planned_rows_reference_unchecked_tasks"),
@@ -234,10 +238,10 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             outside_unchanged()),
         "修订（2026-10-27，段四审计 F4-01）：本节初版（提交 `96fba2c49`）把尚未实施的内容写成了现状（发布后目录规模、生成器结构化比对、版本锁持久化、跨模块单元格取值、显示名统一、「已完成 P0/P1/P2」等），已按上述口径重写": P(
             task_open_at("96fba2c49", "T05", "T07", "T14", "T17", "T29", "T30"),
-            claim("tasks.md 的 33 个任务并未全部勾选（「已完成 P0/P1/P2」不成立）",
-                  lambda: len(_task_states()) == 33 and not all(_task_states().values())),
+            claim("tasks.md 的 33 个任务现已全部勾选（spec 完成归档，2026-11-24 更新行）",
+                  lambda: len(_task_states()) == 33 and all(_task_states().values())),
             claim("现状节结构封闭（三张表与固定子节）", lambda: not _parsed()[1])),
-        "未落地内容全部移到「计划中（未落地）」并标任务号": P(PLANNED_ROWS_OPEN),
+        "未落地内容全部移到「计划中（未落地）」并标任务号": P(PLANNED_EMPTY_OR_OPEN),
     },
     H_FACTS: {
         "说明：现行 schema 由 `catalog_contract.build_schema()` 生成并改为跟随真实契约（purpose 改受控模式、functional_type 换成目录里实际出现的取值、`registry_version` 改为时间戳格式、`item_id` 允许数组，均有设计依据），所以上表的 schema 错误数（`catalog.schema_errors` 为 0）是 schema 修正的结果，不是目录本身被修正：审计报告记的报错数是 `b5fc200e0` 时的旧 schema 对同一份目录的校验结果": P(
@@ -552,7 +556,9 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             T31_HINT_MODULE, "AcnrCandidatesHint", T31_HINT_TEST, task_done("T31"), exists(_FE_GUARD_REL)),
     },
     H_PLANNED: {
-        "INDEX 登记与提交边界核对": L("T33"),
+        # 🔴 2026-11-24：T33 已勾选完成（归档 tasks.md `- [x] 33.`），按
+        # test_planned_rows_reference_unchecked_tasks 的口径从文档计划表移除。
+        # 本登记表同步清空 —— 有新计划项时在这里登记并补 `L("Tnn")` 判据。
     },
     H_VERSION: {
         "`registry_version` 为 **14 位 UTC 时间戳**（`%Y%m%d%H%M%S`，形态 `^\\d{14}$`，与 `catalog_contract.REGISTRY_VERSION_PATTERN` 一致；当前值见上表），由生成器在写出时赋值": P(
@@ -591,9 +597,12 @@ _STATEMENTS: dict[str, dict[str, Stmt]] = {
             claim("resolve_instance 按 WpIndex.wp_code 查项目底稿（AST）", _resolve_instance_binds_wp_code)),
     },
     H_ERRATA: {
-        "「文档体系地图」表「实施 spec」行的「❌ **尚未创建**（G8 阻塞项）」：实施 spec `acnr-foundation-defect-closure` 已创建，进度以其 tasks.md 为准": P(
-            quote_at("❌ **尚未创建**（G8 阻塞项）", "### 文档体系地图", "**实施 spec**"), SPEC_TASKS),
-        "上方「计划中（未落地）」所列任务均未完成": P(PLANNED_ROWS_OPEN),
+        # 2026-11-24：文档勘误行已同步改写（spec 全部完成归档），登记键随文档逐字更新；
+        # 旧句「上方…所列任务均未完成」随「计划中」表清空一并从文档移除（stale 条目删除）。
+        "「文档体系地图」表「实施 spec」行的「❌ **尚未创建**（G8 阻塞项）」：实施 spec `acnr-foundation-defect-closure` 已创建并**全部完成归档**（33 个任务全部勾选）": P(
+            quote_at("❌ **尚未创建**（G8 阻塞项）", "### 文档体系地图", "**实施 spec**"),
+            SPEC_TASKS,
+            claim("33 个任务全部勾选", lambda: bool(_task_states()) and all(_task_states().values()))),
         "「5.2 SheetCatalogEntry」「5.3 CellCatalogEntry」两节示例里的 `registry_version: \"2026.07.10\"`：版本号已改为 14 位 UTC 时间戳，`YYYY.N.N` 形态作废": P(
             quote_at('registry_version: "2026.07.10"', "### 5.2 SheetCatalogEntry（L1 主条目）"),
             quote_at('registry_version: "2026.07.10"', "### 5.3 CellCatalogEntry（L1 坐标子条目）"),
@@ -771,7 +780,10 @@ _SELF_CHECK = {
     "非表格子节加表格": lambda s: _insert_after(s, H_ERRATA, ["", "| 事项 | 状态 |", "|---|---|", "| 版本锁 | 已落地 |"]),
     "组件行改测试列": lambda s: _set_cell(s, _row_index(s, "后端"), 4, "`backend/tests/acnr/__init__.py`"),
     "事实行改复算键": lambda s: _set_cell(s, _first_row_after(s, H_FACTS), 2, "`catalog.cells_with_parent_x`"),
-    "计划行改任务列": lambda s: _set_cell(s, _first_row_after(s, H_PLANNED), 1, "T02"),
+    # 2026-11-24：计划表在合成节里为空（H_PLANNED 登记表清空后无数据行），
+    # 原「改任务列」无从下手 ⇒ 改为「往计划表插一行未登记的项」，仍验证登记制会报出问题。
+    "计划行插入未登记项": lambda s: _insert_after(
+        s, H_PLANNED, ["", "| 未登记的计划项 | T02 |"]),
     "表格行收尾竖线之后加文字": lambda s: s[:_row_index(s, "前端")] + [
         s[_row_index(s, "前端")] + " 统一从目录取显示名"] + s[_row_index(s, "前端") + 1:],
 }

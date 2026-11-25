@@ -39,7 +39,13 @@ _REPO = Path(__file__).resolve().parents[3]
 _BACKEND = _REPO / "backend"
 _ACNR_DATA = _BACKEND / "data" / "acnr"
 _DOC = _REPO / "docs" / "proposals" / "address-coordinate-name-registry-architecture.md"
-_TASKS = _REPO / ".kiro" / "specs" / "acnr-foundation-defect-closure" / "tasks.md"
+#: tasks.md 在活跃目录或归档目录（spec 归档后路径移到 `_archive/153-`，判据读归档版继续生效；
+#: 🔴 2026-11-24：d7d7515f5 把 spec 移进 _archive 后本文件没跟着改，干净检出 FileNotFoundError）。
+_TASKS_CANDIDATES = (
+    _REPO / ".kiro" / "specs" / "acnr-foundation-defect-closure" / "tasks.md",
+    _REPO / ".kiro" / "specs" / "_archive" / "153-acnr-foundation-defect-closure" / "tasks.md",
+)
+_TASKS = next(p for p in _TASKS_CANDIDATES if p.exists())
 _RESOLVER = _BACKEND / "app" / "services" / "acnr" / "resolver.py"
 _GENERATOR = _BACKEND / "scripts" / "acnr" / "generate_catalog.py"
 
@@ -105,7 +111,7 @@ def _cells(row: str) -> list[str]:
 def _table(lines: list[str]) -> list[list[str]]:
     """子节里第一张 markdown 表的数据行（去掉表头与分隔行）。"""
     rows = [ln for ln in lines if ln.strip().startswith("|")]
-    assert len(rows) >= 3, "子节里没有带数据行的表"
+    assert len(rows) >= 2, "子节里没有表（至少表头 + 分隔行）"
     return [_cells(r) for r in rows[2:]]
 
 
@@ -287,8 +293,11 @@ def _task_states() -> dict[str, bool]:
 
 def test_status_section_present_and_has_three_tables():
     section = _section()
-    for h in (H_FACTS, H_COMPONENTS, H_PLANNED):
+    for h in (H_FACTS, H_COMPONENTS):
         assert _table(_subsection(section, h)), f"子节「{h}」没有数据行"
+    # 「计划中」表只要求表结构存在（2026-11-24：T33 勾选后该表数据行为空是**合法状态**
+    # —— 无未落地计划项；有行时由 test_planned_rows_reference_unchecked_tasks 校验任务号）。
+    _table(_subsection(section, H_PLANNED))
 
 
 # ─── 2. 事实表逐项复算 ───────────────────────────────────────────────────────
@@ -565,6 +574,8 @@ _COMPLETION_CLAIMS: list[tuple[str, re.Pattern, object]] = [
     ("legacy 导航门面转发 ACNR", re.compile(r"已转发\s*ACNR"), _claim_legacy_forwarding),
     ("resolver 注释更正", re.compile(r"注释已[^，。；]{0,4}更正"), lambda: not _resolver_doc_problems()),
     ("实施 spec 已创建", re.compile(r"`acnr-foundation-defect-closure`\s*已创建"), lambda: _TASKS.is_file()),
+    ("实施 spec 已全部完成并归档", re.compile(r"已全部完成并归档"),
+     lambda: bool(_task_states()) and all(_task_states().values()) and _TASKS.is_file()),
     ("版本号改为 14 位 UTC 时间戳", re.compile(r"版本号已改为\s*14\s*位\s*UTC\s*时间戳"), _claim_version_format),
     ("L1 按 classification 骨架覆盖各循环", re.compile(r"现已按\s*classification\s*骨架覆盖"),
      lambda: bool(_facts()["catalog.parent_cycles"]) and _facts()["catalog.domains"] == "wp"),

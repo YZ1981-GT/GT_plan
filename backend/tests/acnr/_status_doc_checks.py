@@ -101,6 +101,11 @@ def _units_and_structure_problems(section: list[str]) -> tuple[list[Unit], list[
         s = ln.strip()
         if not s:
             continue
+        if s.startswith("<!--"):
+            # HTML 注释（计划表空态说明）不进陈述单元；单行注释整行跳过
+            if "-->" not in s[4:]:
+                problems.append(f"跨行 HTML 注释不支持，请写成单行：{s[:60]}")
+            continue
         if s.startswith("#"):
             headings.append(s)
             current = s
@@ -120,7 +125,10 @@ def _units_and_structure_problems(section: list[str]) -> tuple[list[Unit], list[
         problems.append(f"子节标题或顺序与登记不符：{headings}")
     for heading, header in _TABLE_HEADERS.items():
         table = rows.get(heading, [])
-        if len(table) < 3:
+        # 🔴 2026-11-24：「计划中」表数据行为空是合法状态（T33 勾选完成后无未落地计划项）；
+        #    只要求表头 + 分隔行，有行才逐行校验。其余子节仍要求 ≥3 行（表头+分隔+数据）。
+        min_rows = 2 if heading == H_PLANNED else 3
+        if len(table) < min_rows:
             problems.append(f"「{heading}」缺表格或没有数据行")
             continue
         if tuple(table[0]) != header:
@@ -168,7 +176,20 @@ _STATUS_GUARD_REL = "backend/tests/acnr/test_acnr_architecture_status_doc.py"
 _THIS_REL = "backend/tests/acnr/test_acnr_status_doc_statements.py"
 _FE_GUARD_REL = "audit-platform/frontend/src/services/acnr/tests/acnrArchitectureStatusDoc.spec.ts"
 _TASKS_REL = ".kiro/specs/acnr-foundation-defect-closure/tasks.md"
-_DESIGN = _REPO / ".kiro" / "specs" / "acnr-foundation-defect-closure" / "design.md"
+# 🔴 2026-11-24：spec 归档后（d7d7515f5 移进 _archive/153-）活跃路径不存在，回退归档版
+# （tasks.md / design.md 的内容不变，只挪位置）。
+_TASKS_REL = next(
+    rel for rel in (
+        ".kiro/specs/acnr-foundation-defect-closure/tasks.md",
+        ".kiro/specs/_archive/153-acnr-foundation-defect-closure/tasks.md",
+    ) if (_REPO / rel).exists()
+)
+_DESIGN = next(
+    p for p in (
+        _REPO / ".kiro" / "specs" / "acnr-foundation-defect-closure" / "design.md",
+        _REPO / ".kiro" / "specs" / "_archive" / "153-acnr-foundation-defect-closure" / "design.md",
+    ) if p.exists()
+)
 #: 插入现状节之前（96fba2c49^）提案原文的 LF 内容 sha256。现算：节外文本（见 _outside_lines）与
 #: `git show 96fba2c49^:docs/proposals/address-coordinate-name-registry-architecture.md` 逐字相同，
 #: 两者 sha256 都是这个值（tmp_acnr_foundation/probes/fix4r3/p02_outside_text.py）。
@@ -565,6 +586,15 @@ def in_planned(*ids: str) -> Check:
 
 
 PLANNED_ROWS_OPEN = claim("计划表每行都带任务号，且这些任务在 tasks.md 里仍为 [ ]", _planned_rows_open)
+
+
+def _planned_empty_or_open() -> bool:
+    """计划表两态皆合法（2026-11-24 spec 归档后允许空表）：空表（无未落地项）或有行且全未勾选。"""
+    rows = _units_of("planned")
+    return not rows or (_planned_rows_open() and bool(rows))
+
+
+PLANNED_EMPTY_OR_OPEN = claim("计划表为空（无未落地项）或每行带未勾选任务号", _planned_empty_or_open)
 RESOLVER_DOC_OK = claim("resolver 模块与函数文档定位为「canonical resolver + legacy 委托」、不称唯一入口（AST）",
                         lambda: not _resolver_doc_problems())
 V1_BYPASS = claim("backend/app 里仍有绕过 ACNR 直接导入 V1 的文件（AST）", lambda: bool(_v1_direct_importers()))

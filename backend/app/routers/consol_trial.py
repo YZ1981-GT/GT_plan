@@ -1,6 +1,9 @@
 """合并试算表路由"""
 
+from __future__ import annotations
+
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -17,6 +20,9 @@ from app.services.consol_trial_service import (
     recalculate_trial,
 )
 from app.services.consol_reconciliation_service import reconcile_worksheet_vs_trial
+
+if TYPE_CHECKING:  # pragma: no cover - 仅注解用，运行时由函数内局部 import 提供
+    from fastapi.responses import StreamingResponse
 
 router = APIRouter(prefix="/api/consolidation/trial", tags=["合并试算表"])
 

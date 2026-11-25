@@ -36,7 +36,7 @@ R3.4 原文：
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from scripts.check.sync_settlement_facts import (  # noqa: F401 - re-export
     ConflictRollup,

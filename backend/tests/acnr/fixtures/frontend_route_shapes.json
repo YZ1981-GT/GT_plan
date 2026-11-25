@@ -14,6 +14,14 @@
       "shape": "/workpapers/{…}?sheet={…}"
     },
     {
+      "file": "services/ai_chat/audit_relation_context.py",
+      "shape": "/workpapers/{…}"
+    },
+    {
+      "file": "services/ai_chat/context_plan.py",
+      "shape": "/workpapers/{…}"
+    },
+    {
       "file": "services/ai_chat/mention_service.py",
       "shape": "/workpapers/{…}"
     },

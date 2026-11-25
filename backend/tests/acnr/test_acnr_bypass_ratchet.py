@@ -36,11 +36,13 @@ def _run_cli(script: Path, *args: str) -> subprocess.CompletedProcess:
 def test_real_repo_strict_green_and_counts_recomputed():
     result = scan.run(REPO)
     assert scan.violations(result) == 0, result
-    # 现算冻结值：BP-1 8 处 / 7 个文件（design §14.1 同值），BP-2 窄定义下 1 个文件（linkage_graph_builder）
-    assert result["bp1_statements"] == 8
+    # 现算冻结值：BP-1 7 处 / 6 个文件，BP-2 窄定义下 1 个文件（linkage_graph_builder）。
+    # 🔴 2026-11-24：基线（bypass_baseline.json）此前已把 address_index_source 的 V1 fallback
+    #    移除（564228dae 删了 legacy address_registry 回退，消除一处绕过），但本守卫的
+    #    冻结值仍停在 8/7 ⇒ 干净检出必红。按基线现算值收紧（只许减少的棘轮方向）。
+    assert result["bp1_statements"] == 7
     assert result["bp1_files"] == [
         "backend/app/routers/wp_structure.py",
-        "backend/app/services/ai_chat/address_index_source.py",
         "backend/app/services/ai_chat/address_mention.py",
         "backend/app/services/ai_chat/mcp_tools.py",
         "backend/app/services/ai_chat/mention_service.py",
@@ -60,7 +62,7 @@ def test_real_repo_strict_green_and_counts_recomputed():
 def test_cli_strict_exit_zero_with_summary_without_site_packages(script):
     proc = _run_cli(CHECK_DIR / script, "--strict")
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert "BP-1 8 处 / 7 个文件" in proc.stdout
+    assert "BP-1 7 处 / 6 个文件" in proc.stdout
     assert "新增 0 条、失效 0 条、排除项问题 0 条、台账问题 0 条" in proc.stdout
 
 

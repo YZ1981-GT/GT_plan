@@ -249,6 +249,13 @@ async def _pg(fn):
         async with async_sessionmaker(eng, expire_on_commit=False)() as s:
             await s.execute(text("SET TRANSACTION READ ONLY"))
             try:
+                n = (await s.execute(text(
+                    "SELECT count(*) FROM working_paper w "
+                    "WHERE COALESCE(w.is_deleted, false) = false"))).scalar()
+                if not n:
+                    # 🔴 2026-11-24：CI 一次性空库无任何底稿 —— 环境事实，显式 skip
+                    # （与 tests/four_table 连库守卫的空库 skip 同口径）。
+                    pytest.skip("bootstrap 空库：working_paper 无业务数据 —— 真库判据待有数据的环境")
                 return await fn(s)
             finally:
                 await s.rollback()

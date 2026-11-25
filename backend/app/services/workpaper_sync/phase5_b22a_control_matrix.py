@@ -311,7 +311,7 @@ def _src(cell: str) -> str:
 def _rows_table_payload() -> dict[str, Any]:
     return {
         'table_key': ROWS_TABLE_KEY,
-        'anchor': f'A{HEADER_FIRST_ROW}' if False else 'A5',
+        'anchor': 'A5',  # header_rows=2 ⇒ 表头占 5~6 行，数据从 FIRST_DATA_ROW=7 起
         'header_rows': 2,
         'row_identity': {'kind': 'field', 'json_pointer': '/rows/*/rowId'},
         'delete_policy': 'tombstone',

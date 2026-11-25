@@ -205,6 +205,8 @@ async def _load(snap: Snapshot) -> None:
                 )
                 snap.chart_by_name.setdefault(_norm_name(nm), set()).add(str(code))
         snap.ok = True
+    except Exception as exc:  # noqa: BLE001 — 连不上要带原因判红（禁静默 skip）
+        snap.error = f"{type(exc).__name__}: {exc}"
     finally:
         await engine.dispose()
 
@@ -213,7 +215,17 @@ _SNAP: Snapshot | None = None
 
 
 def snap() -> Snapshot:
-    """取 DB 快照（模块级缓存，一次 asyncio.run）。"""
+    """取 DB 快照（模块级缓存，一次 asyncio.run）。
+
+    🔴 两种失败形态分开（memory 铁律「0 分不清 NULL 与空串」同源）：
+
+    * **连不上**（`ok=False`）→ `pytest.fail`：本守卫按 Property 1 必须连库，
+      禁静态冻结表，连不上判红而非 skip —— skip 会让整组判据静默空转；
+    * **连上了但空库**（CI bootstrap：261 迁移后 `report_config` / `account_chart`
+      零业务行，种子靠后端 `/seed` 端点而 CI 无后端）→ **显式 skip 并写明缘由**
+      —— 与 `test_i_cycle_row_code_evidence.py` 的 `live` fixture 同一口径：
+      skip 理由是环境事实而非掩盖失败。
+    """
     global _SNAP
     if _SNAP is None:
         s = Snapshot()
@@ -227,6 +239,11 @@ def snap() -> Snapshot:
             f"无法连库取 report_config / account_chart 快照：{_SNAP.error}\n"
             "本守卫按 Property 1 要求必须连库（禁静态冻结表），"
             "连不上时判红而非 skip —— skip 会让整组判据静默空转。"
+        )
+    if not _SNAP.code_rows and not _SNAP.chart:
+        pytest.skip(
+            "bootstrap 空库：report_config / account_chart 均无业务数据 "
+            "（种子靠后端 /seed 端点，本环境无后端）—— 真库数据判据待有后端种子的环境"
         )
     return _SNAP
 

@@ -141,6 +141,13 @@ def _require_db() -> None:
             "本守卫按 Requirement 11.2 必须连库（禁静态冻结表），"
             "连不上时判红而非 skip —— skip 会让整组判据静默空转。"
         )
+    if not _SNAP.by_code:
+        # bootstrap 空库（CI：261 迁移后 report_config 零业务行，种子靠后端
+        # /seed 端点而 CI 无后端）—— 显式 skip 并写明缘由，与
+        # test_i_cycle_row_code_evidence.py 的 live fixture 同口径。
+        pytest.skip(
+            "bootstrap 空库无 report_config 业务数据 —— 真库数据判据待有后端种子的环境"
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -110,7 +110,17 @@ def _install_single_rule_binding(monkeypatch, rule: PushRule, item_ids: list[str
 
 
 async def _seed_items(env: Env, item_ids: list[str]) -> None:
+    from datetime import datetime, timezone
+
     async with env.factory() as db:
+        # PG 上 updated_at 是 timestamptz（asyncpg 严格类型），必须传 datetime；
+        # SQLite 列是 TEXT，传 str。按引擎绑定列类型。
+        is_pg = db.get_bind().dialect.name == "postgresql"
+        stale_ts = (
+            datetime(2026, 9, 1, 8, 0, 0, tzinfo=timezone.utc)
+            if is_pg
+            else "2026-09-01 08:00:00.000000+00:00"
+        )
         await db.execute(
             sa.text(
                 "INSERT INTO checklist_responses "
@@ -124,7 +134,7 @@ async def _seed_items(env: Env, item_ids: list[str]) -> None:
                     "w": str(env.wp_id),
                     "i": item_id,
                     "r": "old",
-                    "t": "2026-09-01 08:00:00.000000+00:00",
+                    "t": stale_ts,
                 }
                 for item_id in item_ids
             ],

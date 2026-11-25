@@ -6,6 +6,7 @@ checklist_responses，与生产写入适配器同一 uuid 传参口径）。取�
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from contextlib import asynccontextmanager
 from decimal import Decimal
@@ -40,6 +41,22 @@ CREATE TABLE checklist_responses (
     conclusion TEXT, remark TEXT, wp_ref TEXT, updated_by TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    content_version INTEGER NOT NULL DEFAULT 1,
+    UNIQUE (wp_id, item_id)
+)
+"""
+
+#: PG 复核专用：时间列用 timestamptz（生产 schema 口径，V235 起.updated_at 参与
+#: CAS 版本推导，TEXT 列会让 asyncpg 拒收生产 adapter 写入的 datetime）。
+CHECKLIST_DDL_PG = """
+CREATE TABLE checklist_responses (
+    id TEXT PRIMARY KEY NOT NULL,
+    project_id TEXT NOT NULL,
+    wp_id TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    conclusion TEXT, remark TEXT, wp_ref TEXT, updated_by TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     content_version INTEGER NOT NULL DEFAULT 1,
     UNIQUE (wp_id, item_id)
 )
@@ -155,11 +172,45 @@ class Env:
 
 @asynccontextmanager
 async def make_env(monkeypatch, extra_tables=()):
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    # B2 真 PG 复核开关（默认 SQLite 内存库，行为不变）：设 GT_TEST_PG_URL 指向
+    # 一次性库时，同一份判据/夹具在真 PG 上跑（DDL 的 TEXT/BOOLEAN/CURRENT_TIMESTAMP
+    # 在 PG 上同义；JSONB 列已由 SQLiteTypeCompiler.visit_JSONB 别名兼容）。
+    # 未设置时零行为变化。
+    engine_url = os.environ.get("GT_TEST_PG_URL", "").strip() or "sqlite+aiosqlite:///:memory:"
+    engine = create_async_engine(engine_url, echo=False)
     # 推送规则的本项目有效定义在公式治理内核（formula_setting / 待确认事项），引擎每次运行都读
     # （spec formula-governance-coverage-closure R2.4）
     tables = [Project.__table__, DisclosureNote.__table__, FormulaPushRun.__table__, FormulaPushState.__table__,
               FormulaSetting.__table__, FormulaSyncItem.__table__, *extra_tables]
+    # 真 PG 复核：ORM 表有 FK 依赖链（projects→users、disclosure_notes→
+    # ledger_datasets/working_paper→wp_index 等），裸建会 UndefinedTableError。
+    # 拓扑序建表：Base.metadata.create_all 自带拓扑排序，把**全部依赖表**交给它即可；
+    # accounting_standards 是幽灵 FK（全仓无 ORM 定义、生产里由迁移建的表）⇒
+    # 测试环境建最小占位表。
+    if engine_url.startswith("postgresql"):
+        from app.models.base import Base as _B
+        from app.models.core import User  # noqa: F401
+
+        # 依赖闭包：从目标表沿 FK 收集 metadata 里存在的所有表（create_all 需要完整闭包）
+        closure: set = set()
+
+        def _collect(table) -> None:
+            if table.name in closure:
+                return
+            closure.add(table.name)
+            for fk in table.foreign_keys:
+                target_name = fk.target_fullname.split(".", 1)[0]
+                if target_name in _B.metadata.tables:
+                    _collect(_B.metadata.tables[target_name])
+
+        for t in list(tables):
+            _collect(t)
+        tables = [_B.metadata.tables[name] for name in closure]
+        async_engine_extra_ddl = (
+            "CREATE TABLE IF NOT EXISTS accounting_standards (id UUID PRIMARY KEY)"
+        )
+    else:
+        async_engine_extra_ddl = None
     # V235 起读调整数（adj_net_batch → effective_excluded_group_ids）按财务处理事件与客户已入账标记筛分录组：
     # 有调整分录表就要有这两张表，否则 binding 报缺表、整张底稿回滚、运行记 partial
     from app.models.adjustment_review_models import AdjustmentClientBooking, AdjustmentTreatmentEvent
@@ -167,26 +218,52 @@ async def make_env(monkeypatch, extra_tables=()):
     if any(getattr(t, "name", None) == "adjustments" for t in tables):
         tables += [m.__table__ for m in (AdjustmentTreatmentEvent, AdjustmentClientBooking) if m.__table__ not in tables]
     async with engine.begin() as conn:
+        if async_engine_extra_ddl:
+            await conn.execute(sa.text(async_engine_extra_ddl))
         await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=tables))
-        await conn.execute(sa.text(
-            "CREATE TABLE wp_index (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, wp_code TEXT NOT NULL, "
-            "is_deleted BOOLEAN NOT NULL DEFAULT 0)"
-        ))
-        await conn.execute(sa.text(
-            "CREATE TABLE working_paper (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, wp_index_id TEXT NOT NULL, "
-            "status TEXT NOT NULL DEFAULT 'draft', is_deleted BOOLEAN NOT NULL DEFAULT 0)"
-        ))
-        await conn.execute(sa.text(CHECKLIST_DDL))
+        # wp_index / working_paper：SQLite 路径靠裸 DDL 建（ORM 表集里没有）；
+        # PG 路径的 FK 依赖闭包已把这两张 ORM 表建出来 ⇒ 跳过裸 DDL 防 DuplicateTable。
+        if not engine_url.startswith("postgresql"):
+            await conn.execute(sa.text(
+                "CREATE TABLE wp_index (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, wp_code TEXT NOT NULL, "
+                "is_deleted BOOLEAN NOT NULL DEFAULT 0)"
+            ))
+            await conn.execute(sa.text(
+                "CREATE TABLE working_paper (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, wp_index_id TEXT NOT NULL, "
+                "status TEXT NOT NULL DEFAULT 'draft', is_deleted BOOLEAN NOT NULL DEFAULT 0)"
+            ))
+        # checklist_responses 不被任何 ORM 表 FK 引用 ⇒ 依赖闭包不会带出它，
+        # 两种引擎都要建。🔴 PG 分支的时间列必须是 timestamptz（与生产 schema
+        # 一致）：生产 adapter 写 datetime.now()，TEXT 列在 asyncpg 严格类型下
+        # 直接 DataError —— SQLite 没有严格类型所以原 DDL 能跑，照抄到 PG 就是
+        # 假夹具。
+        if engine_url.startswith("postgresql"):
+            await conn.execute(sa.text(
+                CHECKLIST_DDL_PG
+            ))
+        else:
+            await conn.execute(sa.text(CHECKLIST_DDL))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     pid, wp_id, idx = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
     async with factory() as db:
         db.add(Project(id=pid, name=f"推送项目_{YEAR}", client_name="测试客户", project_type=ProjectType.annual,
                        status=ProjectStatus.created, audit_year=YEAR, template_type="listed"))
         await db.flush()
-        await db.execute(sa.text("INSERT INTO wp_index (id, project_id, wp_code) VALUES (:i, :p, 'E1')"),
-                         {"i": str(idx), "p": str(pid)})
-        await db.execute(sa.text("INSERT INTO working_paper (id, project_id, wp_index_id) VALUES (:w, :p, :i)"),
-                         {"w": str(wp_id), "p": str(pid), "i": str(idx)})
+        # PG 路径用 ORM 表（wp_index.wp_name / working_paper.file_path+source_type
+        # 为 NOT NULL）；SQLite 裸 DDL 无这些列，按引擎区分列清单。
+        if engine_url.startswith("postgresql"):
+            await db.execute(sa.text(
+                "INSERT INTO wp_index (id, project_id, wp_code, wp_name) VALUES (:i, :p, 'E1', 'E1')"
+            ), {"i": str(idx), "p": str(pid)})
+            await db.execute(sa.text(
+                "INSERT INTO working_paper (id, project_id, wp_index_id, file_path, source_type) "
+                "VALUES (:w, :p, :i, '', 'template')"
+            ), {"w": str(wp_id), "p": str(pid), "i": str(idx)})
+        else:
+            await db.execute(sa.text("INSERT INTO wp_index (id, project_id, wp_code) VALUES (:i, :p, 'E1')"),
+                             {"i": str(idx), "p": str(pid)})
+            await db.execute(sa.text("INSERT INTO working_paper (id, project_id, wp_index_id) VALUES (:w, :p, :i)"),
+                             {"w": str(wp_id), "p": str(pid), "i": str(idx)})
         await db.commit()
     e = Env(factory, pid, wp_id)
 

@@ -29,7 +29,14 @@ async def _with_session(fn):
             await s.execute(text("SET TRANSACTION READ ONLY"))
             try:
                 pid = (await s.execute(text("SELECT id::text FROM projects WHERE name = :n"),
-                                       {"n": _PROJECT_NAME})).scalar_one()
+                                       {"n": _PROJECT_NAME})).scalar_one_or_none()
+                if pid is None:
+                    # 🔴 2026-11-24：本项目（安徽骨科医院_2025）是共享库的真实业务项目；
+                    # CI 一次性空库没有它 —— 环境事实，显式 skip 而非 NoResultFound 红。
+                    pytest.skip(
+                        f"本库无真实项目「{_PROJECT_NAME}」—— 判据按共享库真实数据设计，"
+                        "空库（CI bootstrap）显式 skip"
+                    )
                 return await fn(s, pid)
             finally:
                 await s.rollback()

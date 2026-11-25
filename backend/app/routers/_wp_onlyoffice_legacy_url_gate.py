@@ -89,6 +89,21 @@ _BINDING_STATES_REFUSING_LEGACY = frozenset({"migrated", "retired"})
 _BINDING_STATES_KEEPING_INDEPENDENT = frozenset({"pending", "out_of_scope"})
 
 
+def binding_verdict(
+    *, source_wp_code: str, sheet_name: str, whole_workbook: bool,
+    project_id: UUID | None = None,
+    source_wp_codes: Iterable[str] | None = None,
+) -> tuple[str, dict[str, Any] | None]:
+    """`_binding_verdict` 的公开名（宿主路由 4.2 分支按台账口径读取 binding 快照）。"""
+    return _binding_verdict(
+        source_wp_code=source_wp_code,
+        sheet_name=sheet_name,
+        whole_workbook=whole_workbook,
+        project_id=project_id,
+        source_wp_codes=source_wp_codes,
+    )
+
+
 def _binding_verdict(
     *, source_wp_code: str, sheet_name: str, whole_workbook: bool,
     project_id: UUID | None = None,

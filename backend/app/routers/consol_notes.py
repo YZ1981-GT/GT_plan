@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import check_consol_lock, require_project_access
 from app.core.database import get_db
+from app.models.core import User
 
 router = APIRouter(
     prefix="/api/consolidation/notes",

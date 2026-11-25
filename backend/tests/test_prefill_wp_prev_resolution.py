@@ -366,6 +366,11 @@ class TestResolverCharacterization:
 
     def test_aligned_wp_anchors_now_resolve(self, snap: _Snapshot) -> None:
         """至少一条已对齐锚点真取到数（部分明细表确实未编制，不要求全部有值；一条都没有 = 链路是死的）。"""
+        if not snap.total_parsed or snap.probe_project_id is None:
+            pytest.skip(
+                "bootstrap 空库无 working_paper/D 循环底稿 —— 真库数据判据待有后端种子的环境"
+            )
+
         aligned = {k: v for k, v in snap.wp_results.items() if k not in _WP_PROBES_EXPECTED_NONE}
         assert aligned, "已对齐 probe 集合为空，characterization 空转"
         assert any(v is not None for v in aligned.values()), (
@@ -378,6 +383,10 @@ class TestResolverCharacterization:
 
         原先 L1 只取两个实参、把第二参（表名）当列名取，而预载层按锚点存值 ⇒ 已对齐、已录入的锚点也恒为 0、ok=True
         （formula-fetch-followup-defect-closure 6.5）。"""
+        if not snap.total_parsed or snap.probe_project_id is None:
+            pytest.skip(
+                "bootstrap 空库无 working_paper/D 循环底稿 —— 真库数据判据待有后端种子的环境"
+            )
         assert snap.wp_l1_results, "WP probe 一条都没经 L1 求值，断言空转"
         for args, (ok, value, errors) in snap.wp_l1_results.items():
             loaded = snap.wp_results[args]
@@ -393,6 +402,10 @@ class TestResolverCharacterization:
 
     def test_prev_three_args_value_or_reason(self, snap: _Snapshot) -> None:
         """三参 PREV 取上年同底稿数：有上年数据 ⇒ 值；没有 ⇒ 空 + 原因（不为 0，原因与上年来源一致）。"""
+        if not snap.total_parsed or snap.probe_project_id is None:
+            pytest.skip(
+                "bootstrap 空库无 working_paper/D 循环底稿 —— 真库数据判据待有后端种子的环境"
+            )
         assert snap.prev_results, "PREV probe 一条都没跑到"
         source_pid, source_reason = snap.prev_source
         for args, (value, reason) in snap.prev_results.items():

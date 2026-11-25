@@ -24,6 +24,7 @@ import os
 from datetime import datetime, timezone
 from collections import defaultdict
 from typing import Any, Callable, Coroutine
+from uuid import UUID
 
 from pydantic import Field
 

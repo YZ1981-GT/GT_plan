@@ -14,6 +14,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.schemas.export_unit_policy import ExportUnitPolicy
 from app.models.report_models import (
     AuditReport,
     AuditReportTemplate,
@@ -169,7 +170,7 @@ class ReportBodyService:
         project_id: UUID,
         year: int,
         *,
-        export_policy: "ExportUnitPolicy",
+        export_policy: ExportUnitPolicy,
         report_date: date | None = None,
     ) -> dict:
         """按 Placeholder_Mapping_Registry 填充自动/财务类占位符。

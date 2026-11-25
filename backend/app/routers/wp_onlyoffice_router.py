@@ -129,6 +129,7 @@ async def _gate_editor(
 # 旧式 URL 停止签发门抽到伴生模块（行数门：本文件 1947 行 > 白名单基线 1820 +5%）。
 # 🔴 调用点名字保持 `_refuse_legacy_url_when_room_ready`，语义与判据完全不变。
 from app.routers._wp_onlyoffice_legacy_url_gate import (  # noqa: E402
+    binding_verdict as _binding_verdict,
     refuse_legacy_url_when_room_ready as _refuse_legacy_url_when_room_ready,
 )
 

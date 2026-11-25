@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false
+  },
+  "include": [
+    "src/composables/useTemplatePublications.ts",
+    "src/composables/useCustomIngestionWizard.ts",
+    "src/views/extension/CustomTemplatePublications.vue",
+    "src/views/extension/CustomIngestionWizard.vue",
+    "src/views/extension/__tests__/CustomTemplatePublications.spec.ts",
+    "src/composables/__tests__/regionDecisions.spec.ts",
+    "src/composables/__tests__/useTemplatePublications.spec.ts",
+    "src/composables/__tests__/customIngestionWizardStages.spec.ts",
+    "src/composables/__tests__/useCustomIngestionWizard.spec.ts",
+    "src/composables/__tests__/useAiCapabilities.spec.ts",
+    "src/composables/__tests__/useAiHostContext.spec.ts",
+    "src/composables/__tests__/useAgingConfig.property.test.ts",
+    "src/composables/__tests__/useCControlTestData.spec.ts",
+    "src/composables/__tests__/dSalesCycleLabelGuard.spec.ts"
+  ]
+}

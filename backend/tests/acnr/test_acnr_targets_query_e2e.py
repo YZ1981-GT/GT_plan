@@ -197,8 +197,13 @@ async def test_builder_year_is_filled_from_project_and_required_when_unknown(wor
 
 
 def _token_free(body: dict) -> dict:
-    """计数凭证（count_token，顶层与 meta 里各一份）含签发时刻（exp 到秒）：两次请求跨秒即不同。比较时换成去掉 exp 的载荷
-    （查询摘要 / 总数 / 身份仍逐字比较）。"""
+    """执行期字段归一化：count_token 含签发时刻（exp 到秒），两次请求跨秒即不同；``run`` 是每次
+    执行的唯一 id、``version`` 是查询请求的指纹（targets 不同必然不同）。比较「除 acnr_results 外
+    逐字段相等」时把它们排除（run/version 本就不是本判据关心的内容字段）。
+
+    🔴 2026-11-24：fa1429538 给响应补了「路由提交的 run 记录 + 构建器 vector_hash 指纹」
+    （spec platform-capacity T5 走查），本判据比较器未同步 ⇒ 干净检出必红。
+    """
     import base64
     import json as _json
 
@@ -211,6 +216,8 @@ def _token_free(body: dict) -> dict:
         return data
 
     out = dict(body)
+    out.pop("run", None)
+    out.pop("version", None)
     if "count_token" in out:
         out["count_token"] = payload(out["count_token"])
     if isinstance(out.get("meta"), dict) and "count_token" in out["meta"]:

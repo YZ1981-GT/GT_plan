@@ -91,14 +91,17 @@ _PARAM_SEG = re.compile(r"^\{.*\}$")
 _BASE_IE_MODULES = 101           # X-3 前: 99（+1 X-3 +1 D2-vc）/ 立项: 102
 _BASE_NO_DECORATOR_MODULES = 63  # X-3 不变（X-3 模块自带 `@router.`）/ 立项: 未记
 _BASE_FACTORY_PREFIXES = 62      # X-3 不变（X-3 不走 create_cycle_import_export_router）
-_BASE_THREE_STATE_ROUTES = 356   # X-3 前: 308（+48）/ 立项: 314
+_BASE_THREE_STATE_ROUTES = 358   # 2026-11-24 实测同步（并发 spec +2：export-template/export-data）
+                                 # X-3 前: 308（+48）/ 立项: 314
 _BASE_GROUPS = 123               # X-3 前: 107（+16）/ 我的第 1 轮: 87 / 第 2 轮: 85
 _BASE_FULL3_PREFIXES = 116       # X-3 前: 100（+16）/ 立项: 36 / 第 1 轮: 81 / 第 2 轮: 80
 _BASE_SHAPE_A = 101              # X-3 前: 85（+16，X-3 全走形态 A）
 _BASE_SHAPE_B = 22               # X-3 不变（X-3 无形态 B 端点）
 _BASE_ROUTE_KINDS = {            # X-3 前: 106 / 102 / 100（三态各 +16）
-    "export-template": 122,
-    "export-data": 118,
+    # 2026-11-24：并发 spec 新增 1 条 export-template 与 1 条 export-data 路由
+    # （import-data 保持 11）⇒ 基线按实测同步 123 / 119。
+    "export-template": 123,
+    "export-data": 119,
     "import-data": 116,
 }
 #: X-3 增量的可复算分解（供反向自检与 spec 实录交叉核对；不是独立事实源）
@@ -574,22 +577,25 @@ class TestBaselineRejectsStaleFigures:
         )
 
     def test_x3_delta_is_internally_consistent(self) -> None:
-        """🔴 X-3 增量的算术自洽：4 个上调值 − X-3 前的值 == 16 / 16 / 16 / 48。
+        """🔴 X-3 增量的算术自洽（对 X-3 **变化轴**逐项核对）。
 
-        这条让 4 个新基线**不是魔法数**：只要有人单改其中一个，算术就对不上。
+        这条让基线**不是魔法数**：只要有人单改其中一个，算术就对不上。
         16 = `len(_X3_SHAPE_A_PREFIXES)`（= `X3_SHEET_SPECS` 的 16 张 sheet），
-        48 = 16 × 3（三态）。三态分布逐项也必须各 +16。
+        48 = 16 × 3（三态）。
+
+        🔴 2026-11-24：`_BASE_THREE_STATE_ROUTES` / `_BASE_ROUTE_KINDS` 含并发 spec
+        的 +2（1 条 export-template + 1 条 export-data），已不在「X-3 增量」轴上 ——
+        它们的自洽由 `test_three_state_route_counts`（counts == 基线 == 总和）与
+        `test_baseline_not_reverted`（≠ X-3 前值）钉住，本条只对纯 X-3 轴断言。
         """
         n = len(_X3_SHAPE_A_PREFIXES)
         assert n == 16, f"X-3 前缀集规模变化: {n}"
         assert _BASE_GROUPS - _PRE_X3_BASELINES["groups"] == n
         assert _BASE_FULL3_PREFIXES - _PRE_X3_BASELINES["full3_prefixes"] == n
         assert _BASE_SHAPE_A - _PRE_X3_BASELINES["shape_a"] == n
-        assert _BASE_THREE_STATE_ROUTES - _PRE_X3_BASELINES["three_state_routes"] == n * 3
-        for kind, before in _PRE_X3_BASELINES["route_kinds"].items():
-            assert _BASE_ROUTE_KINDS[kind] - before == n, (
-                f"{kind} 增量 != {n}: {_BASE_ROUTE_KINDS[kind]} - {before}"
-            )
+        assert _BASE_ROUTE_KINDS["import-data"] - _PRE_X3_BASELINES["route_kinds"]["import-data"] == n
+        # 总和自洽：基线内部一致（counts 总和 == _BASE_THREE_STATE_ROUTES 在
+        # test_three_state_route_counts 里对着 app 现算断言，这里锁死常量两侧）
         assert sum(_BASE_ROUTE_KINDS.values()) == _BASE_THREE_STATE_ROUTES
 
     def test_task25_targets_are_registered_but_not_yet_applied(self) -> None:
