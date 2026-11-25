@@ -492,7 +492,7 @@ async function handleOCR(row: any, file: any): Promise<void> {
   if (!file?.raw) return
   const formData = new FormData()
   formData.append('file', file.raw)
-  rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowKey))
+  rowEv.append(formData, EVIDENCE_SHEET, rowEvidenceCell(row.rowKey), row)
   try {
     // 按底稿识别、附件挂到本行。原先 `/d4/contract-ocr` 少 /api 又没带底稿 id（后端没有这条路由，恒失败），
     // 读的 text 字段也不存在 —— 识别全文在 ocr_text
