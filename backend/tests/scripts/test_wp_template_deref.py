@@ -253,7 +253,7 @@ def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
         # 按 locale 编码（cp936/GBK）写出，而不是 UTF-8；父进程这边的
         # `encoding="utf-8"` 只管解码那一半，管不到子进程用什么编码写。
         # ⇒ 脚本的中文文案按 GBK 编码、按 UTF-8 解码，下面 `"拒绝执行" in out`
-        # 一类断言收到的是 `'�ܾ�ִ��...'` 乱码，判据被编码问题打红（假红）。
+        # 一类断言收到的是 乱码（中文被 GBK 编码、按 UTF-8 解码） 乱码，判据被编码问题打红（假红）。
         # Linux CI 的 locale 本身是 UTF-8 故不暴露 —— Windows 本地专属，
         # 属 memory 已记的「PS/子进程把中文腌成乱码」编码坑。
         env={**os.environ, "PYTHONIOENCODING": "utf-8"},
@@ -278,6 +278,8 @@ def test_mode_flags_are_mutually_exclusive() -> None:
     assert proc.returncode != 0
 
 
+# 连库：--check 要读 working_paper。无 PG 时由 conftest 显式跳过（GT_REQUIRE_PG=1 则报错）。
+@pytest.mark.pg_only
 def test_check_mode_is_read_only_and_reports(tmp_path: Path) -> None:
     """`--check` 只读且产出报告（含 verdict 分布）。
 
@@ -294,6 +296,8 @@ def test_check_mode_is_read_only_and_reports(tmp_path: Path) -> None:
     assert len(produced) == 1, f"应恰好产出 1 个报告，实际 {produced}"
 
 
+# 连库：库连不上时脚本在写报告前就退出，「没多出文件」恒真 ⇒ 无 PG 时本条空转，同样只在 PG 上跑。
+@pytest.mark.pg_only
 def test_check_does_not_pollute_ledger_dir_when_out_given(tmp_path: Path) -> None:
     """`--out` 生效性反向自检：给了 `--out` 就不该再往版本库目录写。
 

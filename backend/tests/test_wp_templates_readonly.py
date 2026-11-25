@@ -343,6 +343,8 @@ def db_snapshot() -> dict[str, object]:
     return asyncio.run(_collect())
 
 
+# 以下三条度量开发库里的迁移成果（956 份），CI 的空库 / 无库环境无从验证 ⇒ pg_only。
+@pytest.mark.pg_only
 @pytest.mark.xfail(reason="真库仍有 1 份底稿 file_path 指向模板库，需运行 fix_wp_template_deref 迁移脚本", strict=False)
 def test_no_workpaper_points_into_template_library(db_snapshot) -> None:  # noqa: ANN001
     """🔴 库里不得再有 `file_path` 指向模板库（Task 19 迁移成果）。
@@ -358,6 +360,7 @@ def test_no_workpaper_points_into_template_library(db_snapshot) -> None:  # noqa
     )
 
 
+@pytest.mark.pg_only
 def test_no_file_path_shared_across_projects(db_snapshot) -> None:  # noqa: ANN001
     """同一 `file_path` 不得被多个项目共用（Task 19 迁移成果）。
 
@@ -371,6 +374,7 @@ def test_no_file_path_shared_across_projects(db_snapshot) -> None:  # noqa: ANN0
     )
 
 
+@pytest.mark.pg_only
 def test_migration_result_still_in_place(db_snapshot) -> None:  # noqa: ANN001
     """迁移成果规模不得缩水 —— 防有人批量改回或删记录。
 

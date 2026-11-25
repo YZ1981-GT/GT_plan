@@ -438,6 +438,17 @@ async def main_async(args: argparse.Namespace) -> int:
         _print_report("rollback", result, out_dir=out_dir)
         return 0
 
+    # 🔴 破坏性闸门放在连库之前：原先先 `_load_rows()` 再判 `--confirm-destructive`，
+    #    库连不上时脚本直接崩溃 ⇒ 「无确认参数必须拒绝」这条安全判据随数据库可用性
+    #    时真时假（CI 无库时 test_apply_without_confirm_is_refused 红在 OSError 上）。
+    #    拒绝不需要任何库里的事实；规模数字留给 --dry-run 看。
+    if args.apply and not args.confirm_destructive:
+        print(
+            "拒绝执行：--apply 属破坏性操作（复制模板文件到项目目录 + 改写 file_path），"
+            "必须显式加 --confirm-destructive；先用 --dry-run 查看将复制的文件数与体量"
+        )
+        return 2
+
     rows = await _load_rows()
     built = _build_plan(rows)
     plan = built["plan"]
@@ -472,15 +483,7 @@ async def main_async(args: argparse.Namespace) -> int:
         _print_report("dryrun", base_payload, out_dir=out_dir)
         return 0
 
-    # ─── apply ────────────────────────────────────────────────────────────
-    if not args.confirm_destructive:
-        print(
-            "拒绝执行：--apply 属破坏性操作（复制 "
-            f"{base_payload['copy_mb']} MB + 改写 {len(plan)} 条 file_path），"
-            "必须显式加 --confirm-destructive"
-        )
-        return 2
-
+    # ─── apply（确认闸门已在连库前检查）────────────────────────────────────
     verdict_before = _verdict_distribution(rows)
     result = await _apply(plan, ledger_path=LEDGER_DIR)
 
