@@ -54,6 +54,13 @@ vi.mock('../sync/useWorkpaperSyncBridge', () => ({
         bridge.mode.value = 'oo'
         bridge.state.value = 'oo_editing'
       }),
+      // 未改动离开（clean close）：只 leave，不重载表单（没有 OO 改动可回读），见 useD4SyncMode.switchMode
+      leaveWithoutSaving: vi.fn(async () => {
+        bridge.mode.value = 'html'
+        bridge.state.value = 'html_idle'
+        bridge.descriptor.value = null
+      }),
+      reloadAfterApplied: vi.fn(async () => {}),
       switchToHtml: vi.fn(async () => {
         try {
           await options.reloadHtml(7)
@@ -136,12 +143,25 @@ describe('D4-29 bidirectional lifecycle', () => {
     await choose(w, 2)
     expect(mocks.read).toHaveBeenCalledTimes(1)
   })
-  it('allows leaving oo_editing and reloads before showing matrix', async () => {
+  it('未改动离开 oo_editing：clean close 直接回表单，不重载也不保存', async () => {
+    const w = mountDetail()
+    await choose(w, 2)
+    expect(mocks.bridge.state.value).toBe('oo_editing')
+    await choose(w, 1)
+    expect(mocks.bridge.leaveWithoutSaving).toHaveBeenCalledTimes(1)
+    expect(mocks.bridge.switchToHtml).not.toHaveBeenCalled()
+    expect(mocks.reload).not.toHaveBeenCalled()
+    expect(w.find('.matrix-table').exists()).toBe(true)
+    expect(w.findComponent({ name: 'WorkpaperSyncEditorHost' }).exists()).toBe(false)
+  })
+  it('有改动离开 oo_editing：先回读再显示矩阵', async () => {
     const w = mountDetail()
     await choose(w, 2)
     expect(mocks.bridge.state.value).toBe('oo_editing')
     expect(w.findAll('nav button')[1].attributes('disabled')).toBeUndefined()
+    mocks.bridge.dirty.value = true
     await choose(w, 1)
+    expect(mocks.bridge.leaveWithoutSaving).not.toHaveBeenCalled()
     expect(mocks.reload).toHaveBeenCalledTimes(1)
     expect(w.find('.matrix-table').exists()).toBe(true)
     expect(w.findComponent({ name: 'WorkpaperSyncEditorHost' }).exists()).toBe(false)
@@ -149,6 +169,7 @@ describe('D4-29 bidirectional lifecycle', () => {
   it('retains editor when reverse reload fails', async () => {
     const w = mountDetail()
     await choose(w, 2)
+    mocks.bridge.dirty.value = true // 有改动才会真回读；未改动走 clean close 不触发 reload
     mocks.reload.mockRejectedValueOnce(new Error('回读失败测试'))
     await choose(w, 0)
     expect(w.findComponent({ name: 'WorkpaperSyncEditorHost' }).exists()).toBe(true)

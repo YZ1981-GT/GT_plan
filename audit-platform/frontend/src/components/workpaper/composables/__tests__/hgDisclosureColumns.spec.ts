@@ -48,19 +48,21 @@ describe('H/G 循环披露 _columns 覆盖', () => {
     expect(cls.map((c) => c.label)).toEqual(['项目', '期末余额', '上年年末余额', '备注'])
   })
 
-  it('G7 长期股权投资 listed/soe 列头由配置派生（每表首列为「项目」标签列）', () => {
+  it('G7 长期股权投资 listed/soe 列头由配置派生（每表首列为标签列，key 用平台惯例 label）', () => {
     const listed = buildG7ListedColumns()
     const soe = buildG7SoeColumns()
     expect(Object.keys(listed).length).toBeGreaterThan(0)
     expect(Object.keys(soe).length).toBeGreaterThan(0)
-    for (const defs of Object.values(listed)) {
+    // 标签列 key 统一为平台惯例 'label'（见 g7ListedDisclosureModel 裁决注释）；
+    // 显示文字取 table.labelHeader，缺省「项目」。
+    for (const defs of [...Object.values(listed), ...Object.values(soe)]) {
       expect(defs[0].is_label).toBe(true)
-      expect(defs[0].key).toBe('项目')
+      expect(defs[0].key).toBe('label')
+      expect(typeof defs[0].label).toBe('string')
+      expect(defs[0].label.length).toBeGreaterThan(0)
     }
-    for (const defs of Object.values(soe)) {
-      expect(defs[0].is_label).toBe(true)
-      expect(defs[0].key).toBe('项目')
-    }
+    // 显示文字逐字取模板（如「被投资单位」「项  目」），不归一化
+    expect(listed['长期股权投资'][0].label).toBe('被投资单位')
     // 长期股权投资变动表列头源对齐（取自 movementColumns 配置）
     const mv = listed['长期股权投资']
     expect(mv.map((c) => c.label)).toContain('期初余额（账面价值）')

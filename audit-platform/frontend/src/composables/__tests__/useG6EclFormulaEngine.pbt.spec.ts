@@ -244,7 +244,9 @@ describe('Feature: g6-other-bond-investment-ecl, Property 6: 列式转置数据�
   const columnDataGen = () =>
     fc.array(
       fc.record({
-        header: fc.string({ minLength: 1 }),
+        // 前提「每列都有非空列头」按 trim 后判：纯空白列头在生产里回退为「投资N」，不属于本性质的定义域
+        // （原 minLength:1 会生成 ' '，seed -1262608423 反例即此）
+        header: fc.string({ minLength: 1 }).filter((s) => s.trim().length > 0),
         values: fc.array(fc.string()),
       }),
       { minLength: 1, maxLength: 20 },

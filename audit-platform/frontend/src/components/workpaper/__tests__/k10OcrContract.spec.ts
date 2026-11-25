@@ -45,7 +45,7 @@ describe('K10 行级识别契约', () => {
     const script = [...sfc.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join('\n')
     const body = functionBody(stripJsComments(script), 'handleOCR')
     expect(body).toContain('`/api/workpapers/${props.wpId}/d4/contract-ocr`')
-    expect(body).toMatch(/rowEv\.append\(formData, EVIDENCE_SHEET, rowEvidenceCell\(row\.rowKey\)\)/)
+    expect(body).toMatch(/rowEv\.append\(formData, EVIDENCE_SHEET, rowEvidenceCell\(row\.rowKey\)(?:, row)?\)/)
     const reads = [...body.matchAll(/\bres\?\.(\w+)/g)].map((m) => m[1])
     expect(reads).toContain('ocr_text')
     expect(reads.filter((f) => !fields.has(f))).toEqual([])

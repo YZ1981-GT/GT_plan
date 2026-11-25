@@ -131,7 +131,8 @@ describe('循环程序表对齐 D4A', () => {
 
   it('a-program-console 经 GtCycleAProgramRouter 分发循环 *A', () => {
     const router = fs.readFileSync(path.join(WP_ROOT, 'GtCycleAProgramRouter.vue'), 'utf-8')
-    const registry = fs.readFileSync(path.join(WP_ROOT, 'htmlRendererRegistry.ts'), 'utf-8')
+    // PAC T20 起注册拆在 registry/entries/<domain>.ts（a-program-console 在 programs 域）
+    const registry = fs.readFileSync(path.join(WP_ROOT, 'registry/entries/programs.ts'), 'utf-8')
     expect(router).toContain('CycleStandaloneProcedureShell')
     expect(router).toContain('GtAProgramConsole')
     expect(registry).toContain('GtCycleAProgramRouter')

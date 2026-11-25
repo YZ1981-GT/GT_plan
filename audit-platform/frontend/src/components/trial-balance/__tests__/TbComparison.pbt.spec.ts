@@ -39,18 +39,10 @@ vi.mock('@/utils/http', () => ({
   default: { get: (...a: any[]) => httpGetMock(...a) },
 }))
 
-// ─── Mock xlsx 动态 import（P6 导出，避免真实写盘） ───────────────────────────
-const bookNewMock = vi.fn(() => ({}))
-const aoaToSheetMock = vi.fn(() => ({}))
-const bookAppendMock = vi.fn()
-const writeFileMock = vi.fn()
-vi.mock('xlsx', () => ({
-  utils: {
-    book_new: (...a: any[]) => bookNewMock(...a),
-    aoa_to_sheet: (...a: any[]) => aoaToSheetMock(...a),
-    book_append_sheet: (...a: any[]) => bookAppendMock(...a),
-  },
-  writeFile: (...a: any[]) => writeFileMock(...a),
+// ─── Mock Excel 导出单一入口（f049a11f6 起 Excel 调用收敛到 useExcelIO；P6 导出，避免真实写盘） ──
+const exportMultiSheetDataMock = vi.fn(async () => {})
+vi.mock('@/composables/useExcelIO', () => ({
+  exportMultiSheetData: (...a: any[]) => exportMultiSheetDataMock(...a),
 }))
 
 import { useTbComparison } from '@/composables/useTbComparison'
@@ -101,7 +93,7 @@ beforeEach(() => {
   getTrialBalanceMock.mockResolvedValue([])
   httpGetMock.mockReset()
   httpGetMock.mockResolvedValue({ data: { items: [] } })
-  bookNewMock.mockClear(); aoaToSheetMock.mockClear(); bookAppendMock.mockClear(); writeFileMock.mockClear()
+  exportMultiSheetDataMock.mockClear()
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -363,9 +355,10 @@ describe('P6 Export Correctness (导出含全部对比列 + 变动列)', () => {
     await (wrapper.vm as any).doExport()
     await flushPromises()
 
-    expect(writeFileMock).toHaveBeenCalledTimes(1)
-    expect(aoaToSheetMock).toHaveBeenCalledTimes(1)
-    const aoa = aoaToSheetMock.mock.calls[0][0] as any[][]
+    expect(exportMultiSheetDataMock).toHaveBeenCalledTimes(1)
+    const arg = (exportMultiSheetDataMock.mock.calls[0] as any[])[0]
+    expect(arg.sheets).toHaveLength(1)
+    const aoa = arg.sheets[0].rows as any[][]
     const headers = aoa[0]
     expect(headers).toContain('科目编码')
     expect(headers).toContain('科目名称')

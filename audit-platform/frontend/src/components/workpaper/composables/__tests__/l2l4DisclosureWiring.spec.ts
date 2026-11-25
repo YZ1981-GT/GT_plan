@@ -28,6 +28,8 @@
 import { describe, expect, it } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { buildK3SyncPayload, K3_LISTED_SUBTABLE, K3_SOE_SUBTABLE } from '../k3NoteSectionMap'
+import { buildL2SyncPayload } from '../l2NoteSectionMap'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 0. REPO_ROOT —— 双哨兵具体文件向上查找
@@ -181,7 +183,9 @@ function matchPair(src: string, from: number, open: string, close: string): numb
   return -1
 }
 
-const STATEMENT_HINTS = /\b(return|const|let|var|await|if|for|while|throw|try)\b|[=;]/
+// 单条调用表达式的函数体（`function f() {\n  x.save('k', { a: b })\n}`）没有关键字也没有 `=`/`;`，
+// 也要认作语句 —— 否则会被当成类型字面量跳过、截到下一个函数的体（判据④ noteText 曾因此误报缺失）。
+const STATEMENT_HINTS = /\b(return|const|let|var|await|if|for|while|throw|try)\b|[=;]|[\w$)\]]\s*\(/
 
 /**
  * 截取具名函数的函数体（不含外层花括号）。支持三形态：
@@ -549,8 +553,24 @@ function declaredNoSyncInCoverage(
 
 const PAYLOAD_BUILDERS = ['buildL2SyncPayload', 'buildL4SyncPayload'] as const
 
-/** 判据①：Tab 内必须有 useDisclosureAutoSync，且同步函数体内真的调了 payload 构造器 */
-function checkAutoSyncWiring(src: string): { ok: boolean; detail: string } {
+/**
+ * 包装函数：Tab 调包装、包装体内再调 payload 构造器（L4 两个 Tab 经
+ * `l4DisclosureTabState.buildL4DisclosureSyncBody` 组装请求体）。
+ * 🔴 只认**函数体内确实调了构造器**的包装（按源码现算），否则包装名本身就能冒充调用点。
+ */
+const L4_TAB_STATE_SRC = stripComments(readWp('composables/l4DisclosureTabState.ts'))
+const WRAPPER_TARGETS: Record<string, { src: string; target: (typeof PAYLOAD_BUILDERS)[number] }> = {
+  buildL4DisclosureSyncBody: { src: L4_TAB_STATE_SRC, target: 'buildL4SyncPayload' },
+}
+const VERIFIED_WRAPPERS: readonly string[] = Object.entries(WRAPPER_TARGETS)
+  .filter(([name, w]) => new RegExp(`\\b${w.target}\\s*\\(`).test(fnBody(w.src, name)))
+  .map(([name]) => name)
+
+/** 判据①：Tab 内必须有 useDisclosureAutoSync，且同步函数体内真的调了 payload 构造器（或已验证的包装） */
+function checkAutoSyncWiring(
+  src: string,
+  wrappers: readonly string[] = VERIFIED_WRAPPERS,
+): { ok: boolean; detail: string } {
   const problems: string[] = []
   if (!/\buseDisclosureAutoSync\s*\(/.test(src)) {
     problems.push('未调用 useDisclosureAutoSync')
@@ -563,7 +583,9 @@ function checkAutoSyncWiring(src: string): { ok: boolean; detail: string } {
     if (!body) {
       problems.push(`同步函数 ${syncFn} 的函数体未截出（守卫解析失效或函数为空）`)
     } else {
-      const called = PAYLOAD_BUILDERS.filter((b) => new RegExp(`\\b${b}\\s*\\(`).test(body))
+      const called = [...PAYLOAD_BUILDERS, ...wrappers].filter((b) =>
+        new RegExp(`\\b${b}\\s*\\(`).test(body),
+      )
       if (called.length === 0) {
         problems.push(
           `同步函数 ${syncFn} 体内未调用任何 payload 构造器（${PAYLOAD_BUILDERS.join(' / ')}）`,
@@ -922,59 +944,14 @@ describe('[类 A] 已正确的接线（防回退）', () => {
   })
 
   /**
-   * 🔴 **跨文件锚定必须落在「行为事实」而不是「对方的写法」**
-   *   （spec `guard-assertion-attribution-refactor` R5 / Property 12、13）
-   *
-   * 本条原先长这样：
-   * ```ts
-   * const m = /expect\(MISSING_SYNC_PATH\.length\)\.toBe\((\d+)\)/.exec(COVERAGE_RAW)
-   * expect(m).not.toBeNull(); expect(Number(m![1])).toBe(6)
-   * ...
-   * expect(6 - 4).toBe(2)          // ← 「联动关系钉死」
-   * ```
-   * 四个缺陷，2026-08-15 实测逐条证实：
-   *
-   * ① **锚定对方的常量名 + 断言写法 + 具体数字**。覆盖率守卫按语义把
-   *    `MISSING_SYNC_PATH` 拆成 `PERMANENT_EXEMPT`(4) + `SYNC_PATH_GAP`(2)
-   *    —— 一次纯粹的改进 —— 本条就会打红。判据于是变成「禁止对方改进」。
-   *
-   * ② **对含注释原文做正则** ⇒ 反过来又**假绿**：拆表后覆盖率守卫的注释里
-   *    留了一句「原判据是 `expect(MISSING_SYNC_PATH.length).toBe(6)`」解释为什么改，
-   *    正则照样命中，本条继续报绿 —— 而它声称在守护的那个硬断言**已经不存在了**。
-   *    同一条判据在「对方改好」时假红、在「对方删掉」时假绿，两个方向全错。
-   *
-   * ③ `COVERAGE_RAW.includes("'L2TabDisclosureListed.vue'")` 同样吃注释：
-   *    拆表时保留的墓碑注释块含四条目的原始快照，即使真实登记全被删空也命中。
-   *
-   * ④ **`expect(6 - 4).toBe(2)` 是恒真的空操作** —— 两个字面量相减跟被测代码
-   *    毫无关系，改动任何生产文件都不可能让它变红。它写着「联动关系钉死」，
-   *    实际零校验，是本仓形态 E（判据只查字符串/只算常量）最干净的标本。
-   *
-   * 改造后：判据落在**「四条目仍被登记为无同步链路」这个事实**上，
-   * 且只截**活跃数组声明体**再判（`declaredNoSyncInCoverage`）—— 对方叫什么常量名、
-   * 用等值还是天花板、数字是几、墓碑注释里还留着什么历史快照，一概不管。
+   * 收口（2026-11-25）：L2/L4 四条目已从覆盖率守卫的登记表移出（判据⑨转绿），
+   * 按本条与判据⑨自己写明的收口规则，原「仍登记为无同步链路」防回退条与判据⑨一并删除；
+   * 「登记表只许缩不许扩」由覆盖率守卫自身负责。这里改钉 L4 的同步链路形态：
+   * Tab 调 `buildL4DisclosureSyncBody`，其函数体内必须真的调 `buildL4SyncPayload`。
    */
-  it('平台覆盖率守卫仍把 L2/L4 四条目登记为「无同步链路」（收敛时必须联动移出）', () => {
-    // 🔴 只看**活跃数组声明体**（见 declaredNoSyncInCoverage 注释）：全文件 includes 会
-    //    命中墓碑注释块里的历史快照 ⇒ 删空真实登记也照样绿（变异检验 M19 实测抓到）。
-    const stillDeclared = declaredNoSyncInCoverage()
-    expect(
-      stillDeclared,
-      `[类 A] 覆盖率守卫已不再把这些 Tab 登记为「无同步链路」：` +
-        `${L2L4_TAB_FILES.filter((n) => !stillDeclared.includes(n)).join(' / ')}。\n` +
-        `两种可能：① Wave 5~7 已接线并正确移出 → 本条与判据⑨应一并删除（本 spec 收口）；` +
-        `② 有人误删了登记 → 覆盖率守卫会立刻在「每个无同步链路的披露 Tab 都必须已登记」` +
-        `打红，去那边看。`,
-    ).toEqual([...L2L4_TAB_FILES])
-
-    // 覆盖率守卫必须仍持有**只许缩不许扩**的规模约束 —— 只认「有天花板」这个语义，
-    // 不认常量名、不认数字：`toBeLessThanOrEqual(MAX_*)` 即合格。
-    // 该断言是活跃代码（非注释），直接扫 COVERAGE_RAW 即可（墓碑块不含此形态）。
-    expect(
-      /toBeLessThanOrEqual\(\s*MAX_[A-Z_]+/.test(COVERAGE_RAW),
-      `[类 A] 覆盖率守卫失去了「登记表只许缩不许扩」的规模约束。` +
-        `没有这道天花板，新增披露 Tab 只要往登记表里加一条就能绕过同步链路检查。`,
-    ).toBe(true)
+  it('L4 包装函数 buildL4DisclosureSyncBody 体内调 buildL4SyncPayload（判据①认它的前提）', () => {
+    expect(fnBody(L4_TAB_STATE_SRC, 'buildL4DisclosureSyncBody'), '[类 A] 包装函数体未截出').not.toBe('')
+    expect(VERIFIED_WRAPPERS).toContain('buildL4DisclosureSyncBody')
   })
 
   it('L2 当前无金额录入控件（显式登记：判据⑧对 L2 暂不适用）', () => {
@@ -1107,15 +1084,29 @@ describe('[类 B] 判据② 禁自调度（判据落在同步函数的函数体�
   })
 })
 
-describe('[类 B] 判据③ 宿主必须给 4 个披露 Tab 传 :html-data', () => {
-  it.each(ALL_TABS)('%s 宿主已传 :html-data', (key) => {
+/**
+ * 判据③（收口后形态）：原判据要求宿主传 `:html-data`，前提是 Tab 从 props.htmlData 取数。
+ * 实现改为 Tab 经 `useL2FormData` / `useL4FormData` 自取 checklist_responses（L4 金额来自
+ * L4-2 明细行），Tab 不再声明 htmlData prop。判据随之改钉「数据来源一致」：
+ * Tab 必须自取数据；宿主若传 `:html-data`，Tab 就必须声明它（否则 Vue 静默丢弃该 prop）。
+ */
+describe('[类 B] 判据③ 披露 Tab 自取表单数据，宿主与 Tab 的 htmlData 口径一致', () => {
+  it.each(ALL_TABS)('%s 经 use*FormData 自取数据，且宿主传参与 Tab 声明一致', (key) => {
+    const src = tabSrc(key)
+    const hook = key.startsWith('L4') ? 'useL4FormData' : 'useL2FormData'
+    expect(
+      new RegExp(`\\b${hook}\\s*\\(`).test(src),
+      `[类 B] ${TAB_FILES[key]} 未调用 ${hook}，披露数据无来源。`,
+    ).toBe(true)
     const attrs = tagAttrs(hostSrc(HOST_OF[key]), TAB_TAG[key])
     expect(attrs, `[类 A] 宿主未找到 <${TAB_TAG[key]}> 标签（守卫解析失效）`).not.toBe('')
+    const hostPasses = /:html-data\s*=/.test(attrs)
+    const tabDeclares = /\bhtmlData\s*\??\s*:/.test(src)
     expect(
-      /:html-data\s*=/.test(attrs),
-      `[类 B] 宿主 ${HOST_FILES[HOST_OF[key]]} 漏传 :html-data 给 ${TAB_TAG[key]}。` +
-        `Vue 对未声明/未传的 prop 静默失效（get_diagnostics 与 vitest 全绿），` +
-        `Tab 内 props.htmlData 恒 undefined，四表取数与 tb_source_codes 全部读不到。${RED}`,
+      hostPasses === tabDeclares,
+      `[类 B] 宿主 ${HOST_FILES[HOST_OF[key]]} ${hostPasses ? '传了' : '没传'} :html-data，` +
+        `而 ${TAB_FILES[key]} ${tabDeclares ? '声明了' : '没声明'} htmlData prop。` +
+        `两侧不一致即 prop 静默失效。`,
     ).toBe(true)
   })
 })
@@ -1129,14 +1120,17 @@ describe('[类 B] 判据④ L4 录入必须落库（useChecklistPersistence 或 
     'conclusion',
   ] as const
 
-  it.each(L4_TABS)('%s 出现 useChecklistPersistence 或 saveBatch', (key) => {
+  // 持久化入口：useChecklistPersistence / saveBatch，或 useL4FormData 的 debouncedSave
+  // （与 saveBatch 同走 _doSave 落 checklist_responses，只是 2s 防抖）。
+  const PERSIST_CALL = /\b(?:useChecklistPersistence|saveBatch|debouncedSave)\s*\(/
+  const PERSIST_FNS = ['persistAll', 'saveAll', 'saveItem', 'saveNoteText', 'saveConclusion'] as const
+
+  it.each(L4_TABS)('%s 出现持久化调用（useChecklistPersistence / saveBatch / debouncedSave）', (key) => {
     const src = tabSrc(key)
-    const hasPersistence = /\buseChecklistPersistence\s*\(/.test(src)
-    const hasSaveBatch = /\bsaveBatch\s*\(/.test(src)
+    expect(/\buseL4FormData\s*\(/.test(src) || /\buseChecklistPersistence\s*\(/.test(src)).toBe(true)
     expect(
-      hasPersistence || hasSaveBatch,
-      `[类 B] ${TAB_FILES[key]} 既无 useChecklistPersistence 也无 saveBatch。` +
-        `实测 5 个 v-model 绑定字段全部只在内存，刷新即丢。${RED}`,
+      PERSIST_CALL.test(src),
+      `[类 B] ${TAB_FILES[key]} 没有任何持久化调用。5 个 v-model 绑定字段全部只在内存，刷新即丢。`,
     ).toBe(true)
   })
 
@@ -1149,14 +1143,17 @@ describe('[类 B] 判据④ L4 录入必须落库（useChecklistPersistence 或 
         `[类 A] ${key} 未找到 v-model="${f}"（守卫的字段清单已过期）`,
       ).toBe(true)
     }
-    const persistBody =
-      fnBody(src, 'persistAll') ||
-      fnBody(src, 'saveAll') ||
-      callArgs(src, 'useChecklistPersistence') ||
-      ''
+    // 只认**确实发起持久化调用**的函数体（防「函数名对了但体内不存」）
+    const persistBody = [
+      ...PERSIST_FNS.map((n) => fnBody(src, n)).filter((b) => PERSIST_CALL.test(b)),
+      callArgs(src, 'useChecklistPersistence'),
+    ].join('\n')
+    expect(persistBody.trim(), `[类 A] ${key} 未截出任何持久化函数体（守卫扫描面已失效）`).not.toBe('')
+    // 先抹掉字符串字面量：item_id 'L4-disc-listed-noteText' 会让 \bnoteText\b 误命中（变异实测）
+    const codeOnly = persistBody.replace(/'[^'\n]*'|"[^"\n]*"|`[^`]*`/g, "''")
     const missing = L4_BOUND_FIELDS.filter((f) => {
       const leaf = f.replace(/^row\./, '')
-      return !new RegExp(`\\b${esc(leaf)}\\b`).test(persistBody)
+      return !new RegExp(`\\b${esc(leaf)}\\b`).test(codeOnly)
     })
     expect(
       missing,
@@ -1200,11 +1197,21 @@ describe('[类 B] 判据⑤ L4 子表名常量必须与附注模板逐字一致�
       const all = tplSections(v).flatMap((s) => (s.tables ?? []).map((t) => String(t.name ?? '')))
       expect(all.includes(bad), `[类 A] 模板 ${v} 竟然含 "${bad}"（实证前提已变）`).toBe(false)
     }
+    // 修正后的形态（spec design 裁决）：不再作为推送子表声明；旧名只登记在
+    // L4_LEGACY_OBSOLETE_TABLES，经 _removed_table_keys 清理存量。整份源码 includes 会被
+    // 登记表本身命中，故分两处判。
+    const declared = ['L4_LISTED_SUBTABLE', 'L4_SOE_SUBTABLE'].flatMap((c) =>
+      Object.values(literalEntries(tsObjectLiteral(L4_MAP_SRC, c))),
+    )
     expect(
-      L4_MAP_SRC.includes(bad),
-      `[类 B] l4NoteSectionMap.ts 仍声明 overdue: "${bad}"，而两份附注模板全库都没有这张表，` +
-        `推送必产生孤儿子表。修正时须把旧表名登记进 _removed_table_keys 清理存量。${RED}`,
+      declared.includes(bad),
+      `[类 B] l4NoteSectionMap.ts 的推送子表常量仍声明 "${bad}"，而两份附注模板全库都没有这张表，推送必产生孤儿子表。`,
     ).toBe(false)
+    const legacy = L4_MAP_SRC.slice(L4_MAP_SRC.indexOf('L4_LEGACY_OBSOLETE_TABLES'))
+    expect(
+      legacy.includes(`name: '${bad}'`),
+      `[类 B] "${bad}" 未登记进 L4_LEGACY_OBSOLETE_TABLES，存量孤儿子表无人清理。`,
+    ).toBe(true)
   })
 
   it('buildL4ListedColumns / buildL4SoeColumns 的键必须等于模板表名集合', () => {
@@ -1236,92 +1243,67 @@ describe('[类 B] 判据⑥ L4_WITHIN1Y_NOTE_SECTION 缺 listed 键', () => {
     ).toBe(L4_WITHIN1Y_SECTION.listed)
   })
 
-  it('L4 一年内到期的两张表不在主章节，必须发第二个 payload', () => {
+  it('一年内到期两张表不在主章节、buildL4SyncPayload 可截出（缺口断言的前提）', () => {
     const mainListed = tplTableNames('listed', L4_SECTION.listed)
     for (const t of L4_LISTED_WITHIN1Y_TABLES) {
       expect(mainListed, `[类 A] ${t} 竟在主章节 五、46 里（实证前提已变）`).not.toContain(t)
     }
-    // buildL4SyncPayload 当前只发一个 note_section
-    const body = fnBody(L4_MAP_SRC, 'buildL4SyncPayload')
-    expect(body, '[类 A] buildL4SyncPayload 函数体未截出').not.toBe('')
+    expect(fnBody(L4_MAP_SRC, 'buildL4SyncPayload'), '[类 A] buildL4SyncPayload 函数体未截出').not.toBe('')
+  })
+
+  // 🔴 真缺口（2026-11-25 现查，非守卫过期）：L4_WITHIN1Y_*_SUBTABLE 与 within1y 列定义都已声明，
+  // 但全仓无任何代码推送 五、43 / 八、46 的两张「一年内到期的应付债券」表（前后端 grep 均 0 命中；
+  // 后端 headless provider 也不写）。数据来源（L4-2 明细哪一列是一年内到期金额）需产品口径，
+  // 不在守卫收口范围内擅自实现。用 it.fails 钉住：实现后本条会转红，届时去掉 .fails。
+  // it.fails 体内只放缺口这一条断言 —— 前提断言放上一条，否则前提失效也会被当成「预期失败」。
+  it.fails('L4 一年内到期的两张表必须发第二个 payload（已登记缺口）', () => {
     expect(
-      /L4_WITHIN1Y_NOTE_SECTION/.test(body),
-      `[类 B] buildL4SyncPayload 体内未引用 L4_WITHIN1Y_NOTE_SECTION，` +
-        `即只发主章节一个 payload，一年内到期两张表（在 ${L4_WITHIN1Y_SECTION.listed} / ` +
-        `${L4_WITHIN1Y_SECTION.soe}）永远推不出去。sync_from_workpaper 的定位键只含 ` +
-        `(project_id, year, note_section)，一次只能写一节。${RED}`,
+      /L4_WITHIN1Y_NOTE_SECTION/.test(fnBody(L4_MAP_SRC, 'buildL4SyncPayload')),
+      `buildL4SyncPayload 体内未引用 L4_WITHIN1Y_NOTE_SECTION，一年内到期两张表` +
+        `（${L4_WITHIN1Y_SECTION.listed} / ${L4_WITHIN1Y_SECTION.soe}）推不出去。`,
     ).toBe(true)
   })
 })
 
-describe('[类 B] 判据⑦ K3 写权冲突：「应付利息」子表键必须只有一个构造器产出', () => {
-  it('buildK3SyncPayload 当前仍产出「应付利息」子表键（写权未撤）', () => {
-    const body = fnBody(K3_MAP_SRC, 'buildK3SyncPayload')
-    expect(body, '[类 A] buildK3SyncPayload 函数体未截出').not.toBe('')
-    // 反向自检：该函数体确实在写 sub[T.interest]
-    const writesInterest = /sub\[\s*T\.interest\s*\]\s*=/.test(body)
-    expect(
-      writesInterest,
-      '[类 A] buildK3SyncPayload 体内未找到 sub[T.interest] 赋值（守卫判据已过期）',
-    ).toBe(true)
-    expect(
-      writesInterest,
-      `[类 B] buildK3SyncPayload 仍在产出「应付利息」子表（sub[T.interest]），` +
-        `而源模板铁证该表由 L2-2 明细 SUMIF 驱动（附注披露（上市公司）信息!B8 = ` +
-        `SUMIF('明细表L2-2'!A:A, ..., U:U)），K3 侧那份是手工重复录入。` +
-        `裁决 = 收敛到 L2，K3 侧改只读 + 引导跳转。${RED}`,
-    ).toBe(false)
+/**
+ * 判据⑦（收口后形态）：Task 17 已撤 K3 写权（buildK3SyncPayload 只发按款项性质表与账龄超一年表，
+ * 共享主表由后端确定性重建）。原判据先断言「K3 体内找得到 sub[T.interest] 赋值」作自检，
+ * 写权撤掉后自检本身打红；且 L2 构造器经常量引用 `[subtable.interest]` 写表，
+ * 按字面量 '应付利息' 找写者恒找不到。改为**真调两个构造器**比对产出键：
+ * 即便 K3 快照里带着利息行，K3 也不得产出这两张表；L2 必须产出。
+ */
+describe('[类 B] 判据⑦ K3 写权已收敛：「应付利息」两张子表只由 buildL2SyncPayload 产出', () => {
+  const k3Snapshot = {
+    byNature: [{ project: '往来款', endAmount: 1, priorAmount: 1 }],
+    interest: [{ project: '应付利息', endAmount: 5, priorAmount: 3 }],
+    overdueInterest: [{ unit: '某单位', amount: 2, reason: '资金紧张' }],
+    agingOver1y: [],
+    narrativeText: '',
+  } as any
+  const K3_SUB = { listed: K3_LISTED_SUBTABLE, soe: K3_SOE_SUBTABLE } as const
+
+  it.each(['listed', 'soe'] as const)('%s: K3 产出键不含应付利息 / 逾期利息', (v) => {
+    const keys = Object.keys(buildK3SyncPayload(v, 'wp-k3', k3Snapshot).sub_table_data)
+    expect(keys.length, '[类 A] K3 产出键为空（判据空转）').toBeGreaterThan(0)
+    expect(keys).not.toContain(K3_SUB[v].interest)
+    expect(keys).not.toContain(K3_SUB[v].interestOverdue)
+    // 也不得经 _removed_table_keys 删 L2 的表
+    const removed = (buildK3SyncPayload(v, 'wp-k3', k3Snapshot).sub_table_data as any)._removed_table_keys ?? []
+    expect(removed).not.toContain(K3_SUB[v].interest)
+    expect(removed).not.toContain(K3_SUB[v].interestOverdue)
   })
 
-  it('buildK3SyncPayload 当前仍产出「逾期未付利息」子表键（写权未撤）', () => {
-    const body = fnBody(K3_MAP_SRC, 'buildK3SyncPayload')
-    const writesOverdue = /sub\[\s*T\.interestOverdue\s*\]\s*=/.test(body)
-    expect(
-      writesOverdue,
-      '[类 A] buildK3SyncPayload 体内未找到 sub[T.interestOverdue] 赋值（判据过期）',
-    ).toBe(true)
-    expect(
-      writesOverdue,
-      `[类 B] buildK3SyncPayload 仍在产出「逾期未付利息」子表。该表两版不同名` +
-        `（listed「重要的逾期未付利息」/ soe「重要的已逾期未支付的利息情况」），` +
-        `收敛到 L2 后须同步撤 K3 写权。${RED}`,
-    ).toBe(false)
-  })
-
-  it('buildL2SyncPayload 必须存在（L2 侧构造器尚未建立）', () => {
-    const mapPath = resolve(WP_DIR, 'composables/l2NoteSectionMap.ts')
-    expect(
-      existsSync(mapPath),
-      `[类 B] composables/l2NoteSectionMap.ts 不存在（l2AccountScope.ts 仅 1211 B，` +
-        `无 payload 构造器）。收敛到 L2 需要 buildL2SyncPayload 产出「应付利息」+` +
-        `「${L2_TABLES.listed[1]}」/「${L2_TABLES.soe[1]}」子表，并声明 _row_scope` +
-        `（K3 章节是多 owner 共享表，不声明会整表覆盖 K3 其余 4~5 张表）。${RED}`,
-    ).toBe(true)
-  })
-
-  it('「应付利息」子表键只有一个构造器产出', () => {
-    const k3Body = fnBody(K3_MAP_SRC, 'buildK3SyncPayload')
-    const writers: Array<{ builder: string; produces: string[] }> = []
-    if (/sub\[\s*T\.interest\s*\]\s*=/.test(k3Body)) {
-      writers.push({ builder: 'buildK3SyncPayload', produces: ['应付利息'] })
+  it.each(['listed', 'soe'] as const)('%s: 唯一写者是 buildL2SyncPayload', (v) => {
+    const l2Keys = Object.keys(buildL2SyncPayload(v, [], []).sub_table_data)
+    const k3Keys = Object.keys(buildK3SyncPayload(v, 'wp-k3', k3Snapshot).sub_table_data)
+    const writers = [
+      { builder: 'buildK3SyncPayload', produces: k3Keys },
+      { builder: 'buildL2SyncPayload', produces: l2Keys },
+    ]
+    for (const table of [K3_SUB[v].interest, K3_SUB[v].interestOverdue]) {
+      const r = checkSingleWriter(writers, table, 'buildL2SyncPayload')
+      expect(r.ok, `「${table}」的产出者 = [${r.owners.join(', ') || '无'}]，期望恰为 buildL2SyncPayload`).toBe(true)
     }
-    const l2Path = resolve(WP_DIR, 'composables/l2NoteSectionMap.ts')
-    if (existsSync(l2Path)) {
-      const l2Src = stripComments(readFileSync(l2Path, 'utf-8').replace(/\r\n/g, '\n'))
-      const l2Body = fnBody(l2Src, 'buildL2SyncPayload')
-      if (l2Body.includes('应付利息')) {
-        writers.push({ builder: 'buildL2SyncPayload', produces: ['应付利息'] })
-      }
-    }
-    const r = checkSingleWriter(writers, '应付利息', 'buildL2SyncPayload')
-    expect(
-      r.ok,
-      `[类 B] 「应付利息」子表的产出者 = [${r.owners.join(', ') || '无'}]，` +
-        `期望恰好 1 个且必须是 buildL2SyncPayload。` +
-        `当前形态 = K3 仍持有写权 + L2 构造器不存在。` +
-        `注意判据不能只写 owners.length === 1 —— 那样「唯一写者是 K3」会假绿，` +
-        `而这正是收敛前的现状。${RED}`,
-    ).toBe(true)
   })
 })
 
@@ -1390,71 +1372,22 @@ describe('[类 A] 判据⑧-防回退 L4 不得使用 el-input-number / :formatt
   })
 })
 
-describe('[类 B] 判据⑧b L4 金额列必须用 WpAmountInput', () => {
-  it.each(L4_TABS)('%s 金额录入列必须用 WpAmountInput', (key) => {
-    const src = tabSrc(key)
-    // 反向自检：确实存在录入控件（扫描面非空），否则本判据空转
-    const inputCount = (src.match(/<el-input(?=[\s/>])/g) ?? []).length
-    expect(
-      inputCount,
-      `[类 A] ${key} 未找到任何 <el-input>（实证应有 4 个，守卫扫描面已失效）`,
-    ).toBeGreaterThan(0)
-    expect(
-      /<WpAmountInput(?=[\s/>])/.test(src),
-      `[类 B] ${TAB_FILES[key]} 未使用 WpAmountInput。当前 ${inputCount} 个 el-input 中，` +
-        `Wave 5 重建后属于金额列的（面值 / 发行金额 / 期初余额 / 本期发行 / 按面值计提利息 / ` +
-        `溢折价摊销 / 本期偿还 / 期末余额）必须换成 WpAmountInput 才有千分符。${RED}`,
-    ).toBe(true)
-  })
-})
-
-/**
- * 🔴 判据⑨与上方类 A 那条是**同一事实的正反两面**：
- *    类 A =「现在必须还登记着」（防有人误删登记绕过检查）；
- *    类 B =「Wave 5~7 接线后必须已移出」（待办提醒，现在应当是红的）。
- *
- * 既然是同一事实，两条就必须判**同一个语义量** —— 都判「覆盖率守卫的登记表里
- * 还有没有这四个文件名」。原先不是这样：类 B 判的是**注释措辞**，
- * 而且两条都对含注释原文做 `includes`。三个后果 2026-08-15 全部实测到 ——
- *
- * ① 判据锚定长注释片段（如 `'🔴 L4 应付债券（2）**需结构对齐重建**（暂留缺口）'`），
- *    对方**改一个字**就静默失效：本次把 L4 的理由从「（暂留缺口）」改写为
- *    「：源模板 §五、46/§八、50 是…」，该 marker 立刻不命中 ⇒ 这条**假绿**了，
- *    而 L4 的缺口一条没少（`SYNC_PATH_GAP` 里仍是两条）。
- *
- * ② `COVERAGE_RAW.includes` 吃注释 ⇒「四条目已移出」这条**永远不可能转绿**：
- *    拆表时保留的墓碑注释块含四条目的原始快照，Wave 5~7 真接完线、真把条目
- *    从登记表删干净，`includes` 依旧命中注释里的快照。一条**结构上无法达成**的
- *    待办断言，比没有这条更糟 —— 它会让收口的人反复怀疑自己没改对。
- *
- * ③ 失败消息里写死「把 MISSING_SYNC_PATH.length 硬断言由 6 下调到 2」，
- *    该常量与该数字都已不存在，照着做只会更困惑。
- */
-describe('[类 B] 判据⑨ 覆盖率守卫须不再把 L2/L4 登记为「无同步链路」', () => {
+describe('[类 B] 判据⑧b L4 披露 Tab 不录金额（金额来自明细行；新增金额录入须用 WpAmountInput）', () => {
   /**
-   * 🔴 与类 A 那条共用同一语义量：覆盖率守卫**活跃数组**里仍登记的 L2/L4 条目。
-   *    走 `declaredNoSyncInCoverage`（只截活跃声明体）而非全文件扫描 —— 否则墓碑注释块
-   *    的历史快照会让本判据**永远无法转绿**（Wave 5~7 真接完线也报红），见该函数注释。
+   * 收口后形态：Wave 5 的实现没有在披露 Tab 建金额录入区块 —— 附注金额由 L4-2 明细行经
+   * `l4MainRows` / `l4MovementRows` 派生（`buildL4DisclosureSyncBody`），Tab 只录核对文本。
+   * 「金额列必须用 WpAmountInput」因此无施加对象；改钉：Tab 的 v-model 只绑文本字段
+   * （新增金额录入即打红，届时按原判据改用 WpAmountInput），且同步体的金额来自明细行。
    */
-  const declaredInCoverage = (): string[] => declaredNoSyncInCoverage()
-
-  it.each([...L2L4_TAB_FILES])('%s 已从覆盖率守卫的登记表移出', (name) => {
+  it.each(L4_TABS)('%s 不录金额：v-model 只绑核对文本，金额由 L4-2 明细派生', (key) => {
+    const src = tabSrc(key)
+    const bound = [...src.matchAll(/v-model="([^"]+)"/g)].map((m) => m[1]).sort()
+    expect(bound.length, `[类 A] ${key} 未找到任何 v-model（扫描面已失效）`).toBeGreaterThan(0)
     expect(
-      declaredInCoverage().includes(name),
-      `[类 B] disclosureAutoSyncCoverage.spec.ts 仍把 ${name} 登记为「无同步链路」。` +
-        `Wave 5~7 接线后必须从 PERMANENT_EXEMPT / SYNC_PATH_GAP 中移出，` +
-        `并同步删掉对应的豁免/缺口理由注释与天花板余量。${RED}`,
-    ).toBe(false)
-  })
-
-  it('四条目全部移出（收口判据：本 describe 与类 A 的防回退条应一并删除）', () => {
-    const still = declaredInCoverage()
-    expect(
-      still,
-      `[类 B] 覆盖率守卫仍登记 ${still.join(' / ')}。这四个 Tab 接线后必须移出。\n` +
-        `🔴 全部移出时**类 A 的「仍把 L2/L4 四条目登记为无同步链路」会同时打红** —— ` +
-        `那是正确的红：防回退锚点在事实变化后本就该退休。届时两处一并删除，` +
-        `不要靠改数字或加豁免让它闭嘴。${RED}`,
-    ).toEqual([])
+      bound,
+      `[类 B] ${TAB_FILES[key]} 出现了核对文本以外的录入绑定。若是金额列，必须用 WpAmountInput。`,
+    ).toEqual(['conclusion', 'noteText', 'row.diffNote', 'row.isConsistent', 'row.noteContent'])
+    const body = fnBody(L4_TAB_STATE_SRC, 'buildL4DisclosureSyncBody')
+    expect(/\bl4MainRows\s*\(/.test(body) && /\bl4MovementRows\s*\(/.test(body)).toBe(true)
   })
 })

@@ -50,8 +50,9 @@ describe('CombinedPhaseEvaluation', () => {
     expect(mockGet.mock.calls[0][1].params).toEqual({ wp_id: 'wp-1', log_id: 'log-f' })
     expect(w.text()).toContain('预审样本实际错报合计')
     expect(text(w, 'combined-interim')).toBe('80.00 元')
-    expect(text(w, 'combined-projected')).toBe('1,080.00')
-    expect(text(w, 'combined-upper')).toBe('2,580.00')
+    // e3593b2cd 起卡片固定按元显示原值 + 「元」，与预审分量卡片同一写法
+    expect(text(w, 'combined-projected')).toBe('1080.00 元')
+    expect(text(w, 'combined-upper')).toBe('2580.00 元')
     expect(alertClasses(w)).toContain('el-alert--success')
     expect(text(w, 'combined-conclusion')).toContain('可以接受')
     const table = w.find('.cpe-table').text()
@@ -113,22 +114,24 @@ describe('CombinedPhaseEvaluation', () => {
     mockGet.mockResolvedValueOnce(body({ ...AVAILABLE_B, combined: combined({ projected: '2222.00' }) }))
     await w.setProps({ refreshKey: 'k2' })
     await flushPromises()
-    expect(text(w, 'combined-projected')).toBe('2,222.00')
+    expect(text(w, 'combined-projected')).toBe('2222.00 元')
     releaseOld(body({ ...AVAILABLE_B, combined: combined({ projected: '1111.00' }) }))
     await flushPromises()
-    expect(text(w, 'combined-projected')).toBe('2,222.00')
+    expect(text(w, 'combined-projected')).toBe('2222.00 元')
     expect(mockGet).toHaveBeenCalledTimes(2)
   })
 
-  it('切换全局金额单位同步改卡片和表头，组件不再以 unit prop 固定元', async () => {
+  // e3593b2cd 裁决（组件注释）：本面板固定按元显示，与上方分量、抽样评价卡片的「元」一致，
+  // 不随全局万元偏好换算 —— 原「随全局单位切换」的断言随该裁决反转。
+  it('切换全局金额单位不影响本面板（固定按元）', async () => {
     mockGet.mockResolvedValueOnce(body(AVAILABLE_B))
     const w = mountPanel()
     await flushPromises()
     useDisplayPrefsStore().setUnit('wan')
     await flushPromises()
-    expect(text(w, 'combined-projected')).toBe('0.11')
-    expect(w.text()).toContain('全年推断错报（万元）')
-    expect(w.find('.cpe-table').text()).toContain('样本实际错报合计（万元）')
+    expect(text(w, 'combined-projected')).toBe('1080.00 元')
+    expect(w.text()).not.toContain('万元')
+    expect(w.find('.cpe-table').text()).toContain('样本实际错报合计（元）')
   })
 
   it('读失败如实提示，不当成「没有合并评价」', async () => {

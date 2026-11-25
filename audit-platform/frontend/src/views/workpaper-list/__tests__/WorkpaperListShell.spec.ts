@@ -270,12 +270,14 @@ describe('WorkpaperListShell', () => {
   })
 
   describe('角色 Tab 可见性', () => {
+    // 44951521d 起委派矩阵/看板/依赖图收进「更多视图」下拉（moreTabOptions，按角色过滤），
+    // 核心 Tab 留在 visibleTabs ⇒ 可见 Tab 取两者之并；只看 visibleTabs 会让隐藏判据恒真。
     test('auditor 隐藏 DelegationMatrix Tab', async () => {
       mockRole = 'auditor'
       const wrapper = mountShell()
       await flushPromises()
       const vm = wrapper.vm as any
-      const tabValues = vm.visibleTabs.map((t: any) => t.value)
+      const tabValues = [...vm.visibleTabs, ...vm.moreTabOptions].map((t: any) => t.value)
       expect(tabValues).not.toContain('matrix')
     })
 
@@ -284,7 +286,7 @@ describe('WorkpaperListShell', () => {
       const wrapper = mountShell()
       await flushPromises()
       const vm = wrapper.vm as any
-      const tabValues = vm.visibleTabs.map((t: any) => t.value)
+      const tabValues = [...vm.visibleTabs, ...vm.moreTabOptions].map((t: any) => t.value)
       expect(tabValues).not.toContain('matrix')
     })
 
@@ -293,7 +295,7 @@ describe('WorkpaperListShell', () => {
       const wrapper = mountShell()
       await flushPromises()
       const vm = wrapper.vm as any
-      const tabValues = vm.visibleTabs.map((t: any) => t.value)
+      const tabValues = [...vm.visibleTabs, ...vm.moreTabOptions].map((t: any) => t.value)
       expect(tabValues).toContain('matrix')
       expect(tabValues.length).toBeGreaterThanOrEqual(5)
     })
@@ -303,7 +305,7 @@ describe('WorkpaperListShell', () => {
       const wrapper = mountShell()
       await flushPromises()
       const vm = wrapper.vm as any
-      const tabValues = vm.visibleTabs.map((t: any) => t.value)
+      const tabValues = [...vm.visibleTabs, ...vm.moreTabOptions].map((t: any) => t.value)
       expect(tabValues).toContain('matrix')
     })
 
@@ -312,7 +314,7 @@ describe('WorkpaperListShell', () => {
       const wrapper = mountShell()
       await flushPromises()
       const vm = wrapper.vm as any
-      const tabValues = vm.visibleTabs.map((t: any) => t.value)
+      const tabValues = [...vm.visibleTabs, ...vm.moreTabOptions].map((t: any) => t.value)
       expect(tabValues).toContain('matrix')
     })
   })

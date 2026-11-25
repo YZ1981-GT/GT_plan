@@ -81,12 +81,22 @@ describe('OnlyOfficeEditor — Task 21.2 降级行为', () => {
   beforeEach(() => {
     mockFetchHealth.mockReset()
     mockFetchConfig.mockReset()
+    delete (window as any).DocsAPI
   })
 
-  it('OnlyOffice 可用时渲染 iframe（需求 6.1）', async () => {
+  // a60198b6a 起编辑器经 OnlyOffice JS API（DocsAPI.DocEditor）挂载，不再自拼 iframe src；
+  // 测试替身直接提供 window.DocsAPI（真实环境由 api.js 注入）
+  function stubDocsApi() {
+    const DocEditor = vi.fn(function (this: any) { this.destroyEditor = vi.fn() })
+    ;(window as any).DocsAPI = { DocEditor }
+    return DocEditor
+  }
+
+  it('OnlyOffice 可用时经 DocsAPI 挂编辑器，config 带 JWT（需求 6.1）', async () => {
+    const DocEditor = stubDocsApi()
     mockFetchHealth.mockResolvedValue({ available: true, enabled: true })
     mockFetchConfig.mockResolvedValue({
-      config: {},
+      config: { documentType: 'word', document: { key: 'k1' } },
       token: 'jwt-token-123',
       mode: 'edit',
       documentType: 'word',
@@ -95,9 +105,12 @@ describe('OnlyOfficeEditor — Task 21.2 降级行为', () => {
     const wrapper = mountEditor()
     await flushPromises()
 
-    const iframe = wrapper.find('.onlyoffice-editor__iframe')
-    expect(iframe.exists()).toBe(true)
-    expect(iframe.attributes('src')).toContain('documenteditor')
+    expect(DocEditor).toHaveBeenCalledTimes(1)
+    const [, config] = DocEditor.mock.calls[0] as any[]
+    expect(config.token).toBe('jwt-token-123')
+    expect(config.documentType).toBe('word')
+    expect(config.document).toEqual({ key: 'k1' })
+    expect(wrapper.find('.el-alert-stub').exists()).toBe(false)
   })
 
   it('OnlyOffice 不可用时降级显示警告（需求 28.1）', async () => {
@@ -148,20 +161,22 @@ describe('OnlyOfficeEditor — Task 21.2 降级行为', () => {
     expect(preview.attributes('data-type')).toBe('docx')
   })
 
-  it('cell 类型（xlsx）使用 spreadsheet editor URL（需求 6.2）', async () => {
+  it('cell 类型（xlsx）把后端 config 的 documentType 原样交给 DocsAPI（需求 6.2）', async () => {
+    const DocEditor = stubDocsApi()
     mockFetchHealth.mockResolvedValue({ available: true, enabled: true })
     mockFetchConfig.mockResolvedValue({
-      config: {},
+      config: { documentType: 'cell' },
       token: 'jwt-token-xlsx',
       mode: 'edit',
       documentType: 'cell',
     })
 
-    const wrapper = mountEditor()
+    mountEditor()
     await flushPromises()
 
-    const iframe = wrapper.find('.onlyoffice-editor__iframe')
-    expect(iframe.exists()).toBe(true)
-    expect(iframe.attributes('src')).toContain('spreadsheet')
+    expect(DocEditor).toHaveBeenCalledTimes(1)
+    const [, config] = DocEditor.mock.calls[0] as any[]
+    expect(config.documentType).toBe('cell')
+    expect(config.token).toBe('jwt-token-xlsx')
   })
 })

@@ -71,12 +71,24 @@ describe('底稿字号接线', () => {
     expect(fontVar(true)).toBe('')
   })
 
-  it('GtWpRenderer 根元素绑定解构出来的 fontStyle', () => {
+  /**
+   * 接线（2026-11-06 起的口径）：218d6e20c / e3593b2cd 把 `--wp-font-size` 收口到全局根变量 ——
+   * `useDisplayPreferencesRuntime` 在 `document.documentElement` 上与 `--gt-display-font-size` 同步设置，
+   * 由 `DefaultLayout` 安装；底稿路由全在 DefaultLayout 之下（standalone 路由里没有底稿页），
+   * GtWpRenderer 根元素不再逐个绑定。这里钉住新接线，并继续禁止「绑嵌套 runtime.fontStyle」这一错误写法。
+   */
+  it('字号变量由全局显示运行时写到根元素，DefaultLayout 安装；GtWpRenderer 不绑嵌套 runtime.fontStyle', () => {
+    const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
+    const runtimeSrc = readFileSync(resolve(SRC, 'composables/useDisplayPreferencesRuntime.ts'), 'utf-8')
+    expect(runtimeSrc).toMatch(/root\.style\.setProperty\(\s*'--wp-font-size'\s*,/)
+    const layoutSrc = readFileSync(resolve(SRC, 'layouts/DefaultLayout.vue'), 'utf-8')
+    expect(layoutSrc).toMatch(/\buseDisplayPreferencesRuntime\s*\(\s*\)/)
+    const standaloneSrc = readFileSync(resolve(SRC, 'router/domains/standalone.ts'), 'utf-8')
+    expect(standaloneSrc, '底稿页挂到了 DefaultLayout 之外，根变量不再覆盖它').not.toMatch(/[Ww]orkpaper/)
+
     const source = readFileSync(RENDERER_PATH, 'utf-8')
     const rootTag = /<div\s+class="gt-wp-renderer"[\s\S]*?>/.exec(source)?.[0] ?? ''
     expect(rootTag, '找不到 .gt-wp-renderer 根元素').not.toBe('')
-    expect(rootTag).toMatch(/:style="fontStyle"/)
     expect(rootTag).not.toMatch(/:style="runtime\./)
-    expect(source).toMatch(/const\s*\{[^}]*\bfontStyle\b[^}]*\}\s*=\s*runtime/)
   })
 })

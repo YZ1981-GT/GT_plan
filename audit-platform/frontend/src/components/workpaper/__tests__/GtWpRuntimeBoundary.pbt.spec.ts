@@ -75,9 +75,12 @@ vi.mock('@/components/workpaper/composables/useWorkpaperReviewProvide', () => ({
   },
 }))
 
-vi.mock('@/composables/useWpRenderer', async () => {
+vi.mock('@/composables/useWpRenderer', async (importOriginal) => {
+  // 只替换 useWpRenderer；resolveRenderSheet / resolveWorkpaperSheetContext 等纯函数保留真实实现
+  const actual = await importOriginal<typeof import('@/composables/useWpRenderer')>()
   const { computed: vueComputed, ref: vueRef } = await import('vue')
   return {
+    ...actual,
     useWpRenderer: () => {
       const renderConfig = vueRef({
         wp_id: 'wp-runtime',

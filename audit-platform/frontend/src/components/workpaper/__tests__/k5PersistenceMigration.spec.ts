@@ -79,6 +79,8 @@ describe('K5 persistence migration', () => {
       '/api/workpapers/wp-k5/checklist-responses',
       {
         project_id: 'project-real',
+        // 严格 CAS：checklistCas.save 恒带 require_if_match（ae068294e / 4390aaaa3）
+        require_if_match: true,
         items: [{
           item_id: 'K5-4-rows',
           remark: JSON.stringify(rows),

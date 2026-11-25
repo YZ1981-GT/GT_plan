@@ -353,13 +353,14 @@ describe('集成测试 — 账面核对差异计算', () => {
       conclusion: null,
       remark: '10000000',
     })
-    allResponses.value.set('L4-L4-2-rows', {
-      item_id: 'L4-L4-2-rows',
+    // 明细行真实存储键 'L4-2-rows'（useL4Detail.ITEM_ROWS），合计 = 期末摊余成本（本金+利息调整+应计利息）
+    allResponses.value.set('L4-2-rows', {
+      item_id: 'L4-2-rows',
       conclusion: null,
       remark: JSON.stringify([
-        { auditedAmount: 5000000 },
-        { auditedAmount: 3000000 },
-        { auditedAmount: 2000000 },
+        { beginCostPrincipal: 5000000 },
+        { beginCostPrincipal: 3000000 },
+        { beginCostPrincipal: 2000000 },
       ]),
     })
 
@@ -377,13 +378,14 @@ describe('集成测试 — 账面核对差异计算', () => {
       conclusion: null,
       remark: '10000000',
     })
-    allResponses.value.set('L4-L4-2-rows', {
-      item_id: 'L4-L4-2-rows',
+    // 明细行真实存储键 'L4-2-rows'（useL4Detail.ITEM_ROWS），合计 = 期末摊余成本（本金+利息调整+应计利息）
+    allResponses.value.set('L4-2-rows', {
+      item_id: 'L4-2-rows',
       conclusion: null,
       remark: JSON.stringify([
-        { auditedAmount: 5000000 },
-        { auditedAmount: 3000000 },
-        { auditedAmount: 1990000 }, // 少了10000
+        { beginCostPrincipal: 5000000 },
+        { beginCostPrincipal: 3000000 },
+        { beginCostPrincipal: 1990000 }, // 少了10000
       ]),
     })
 

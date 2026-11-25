@@ -42,10 +42,12 @@ const arbCycleCode = fc.constantFrom(...ALL_CYCLE_CODES)
 const arbIndex = fc.integer({ min: 1, max: 30 })
 
 /** Arbitrary field name (alphanumeric, non-empty) */
-const arbFieldName = fc.stringOf(
-  fc.constantFrom(...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('')),
-  { minLength: 1, maxLength: 20 },
-)
+// fast-check v4 移除了 fc.stringOf，改用 fc.string({ unit }) —— 语义相同（按给定字符集组串）
+const arbFieldName = fc.string({
+  unit: fc.constantFrom(...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('')),
+  minLength: 1,
+  maxLength: 20,
+})
 
 /** WT fields from the composable */
 const WT_FIELD_NAMES = ['method', 'interviewee', 'procedure', 'evidence', 'result', 'asDesigned', 'deficiencyFound'] as const

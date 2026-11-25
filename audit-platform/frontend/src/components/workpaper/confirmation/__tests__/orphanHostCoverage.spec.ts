@@ -220,7 +220,10 @@ function indexOne(index: ScanIndex, file: string, code: string): void {
     pushHit(index.imports, tail, file)
     if (tail.endsWith('.ts')) pushHit(index.imports, tail.slice(0, -3), file)
   }
-  if (file.replace(/\\/g, '/').endsWith('htmlRendererRegistry.ts'))
+  // PAC T20 后 componentType → 组件的 dynamic import 拆到 registry/entries/*.ts，
+  // htmlRendererRegistry.ts 只剩组装 barrel；两处都是宿主级入口
+  const norm = file.replace(/\\/g, '/')
+  if (norm.endsWith('htmlRendererRegistry.ts') || /\/workpaper\/registry\/entries\/[^/]+\.ts$/.test(norm))
     index.registries.push({ path: file, code })
 }
 
@@ -333,10 +336,15 @@ describe('自检：扫描面与判据非空（解析失效必须打红而非空�
     //    但那时失败信息会指向「几十个组件突然没宿主」而非真因，故在这里先把真因钉死。
     expect(GLOBAL_INDEX.tags.size).toBeGreaterThan(500)
     expect(GLOBAL_INDEX.imports.size).toBeGreaterThan(500)
-    expect(GLOBAL_INDEX.registries.length).toBe(1)
-    expect(GLOBAL_INDEX.registries[0].path.replace(/\\/g, '/')).toMatch(
-      /components\/workpaper\/htmlRendererRegistry\.ts$/,
-    )
+    // 入口 = 组装 barrel + registry/entries 下每个域文件（PAC T20 拆分后 dynamic import 在后者）
+    const entryFiles = fs.readdirSync(path.join(WP, 'registry', 'entries')).filter((f) => f.endsWith('.ts'))
+    expect(entryFiles.length).toBeGreaterThan(0)
+    const regPaths = GLOBAL_INDEX.registries.map((r) => r.path.replace(/\\/g, '/'))
+    expect(regPaths.length).toBe(1 + entryFiles.length)
+    expect(regPaths.some((p) => /components\/workpaper\/htmlRendererRegistry\.ts$/.test(p))).toBe(true)
+    for (const f of entryFiles) {
+      expect(regPaths.some((p) => p.endsWith(`/components/workpaper/registry/entries/${f}`)), f).toBe(true)
+    }
   })
 
   it('被扫目标名全是纯标识符（保证「token 全等」与旧「正则负向断言」等价）', () => {

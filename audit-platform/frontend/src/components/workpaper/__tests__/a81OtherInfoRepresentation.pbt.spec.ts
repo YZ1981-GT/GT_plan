@@ -193,8 +193,10 @@ describe('Feature: a8-1-other-info-representation, Property 3: 文件清单增�
 
           for (const op of ops) {
             if (op.type === 'add') {
+              // addFile 对 trim 后为空的名称忽略（见上方「adding empty file」用例），仅真正新增才计数
+              const addBefore = files.length
               files = addFile(files, op.value)
-              expectedAdds++
+              if (files.length > addBefore) expectedAdds++
             } else {
               const before = files.length
               files = removeFile(files, op.index)

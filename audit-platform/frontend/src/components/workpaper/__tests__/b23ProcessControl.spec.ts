@@ -887,3 +887,46 @@ describe('B23 — 保存行为', () => {
     scope.stop()
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EventBus（承接旧 8 流程模型 b23ProcessControl.pbt 的 Property 8；a25ddebfe 起按循环 code 建模）
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('B23 — EventBus 事件', () => {
+  function capture(type: string) {
+    const got: any[] = []
+    const handler = (e: Event) => got.push((e as CustomEvent).detail)
+    window.addEventListener(type, handler)
+    return { got, stop: () => window.removeEventListener(type, handler) }
+  }
+
+  it('结论变化发射 process:control-concluded（含新旧结论），相同结论不发', async () => {
+    const { ctrl } = await makeCtrl()
+    const code = B23_CYCLES[0].code
+    const ev = capture('process:control-concluded')
+    try {
+      ctrl.setConclusion(code, '设计有效且已实施')
+      expect(ev.got).toHaveLength(1)
+      expect(ev.got[0]).toMatchObject({ cycleCode: code, cycleName: B23_CYCLES[0].name, newConclusion: '设计有效且已实施' })
+      ctrl.setConclusion(code, '设计有效且已实施')
+      expect(ev.got).toHaveLength(1)
+      ctrl.setConclusion(code, '设计无效')
+      expect(ev.got).toHaveLength(2)
+      expect(ev.got[1]).toMatchObject({ oldConclusion: '设计有效且已实施', newConclusion: '设计无效' })
+    } finally {
+      ev.stop()
+    }
+  })
+
+  it('publishWalkthroughCompleted 发射本循环的穿行汇总（无穿行时有效率为 1）', async () => {
+    const { ctrl } = await makeCtrl()
+    const code = B23_CYCLES[1].code
+    const ev = capture('process:walkthrough-completed')
+    try {
+      ctrl.publishWalkthroughCompleted(code)
+      expect(ev.got).toEqual([{ cycleCode: code, cycleName: B23_CYCLES[1].name, controlPointCount: 0, effectiveRate: 1 }])
+    } finally {
+      ev.stop()
+    }
+  })
+})

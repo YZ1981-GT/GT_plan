@@ -168,7 +168,11 @@ describe('主入口与共享组件', () => {
       ),
     )
     expect(route).toContain('_j1_disclosure_import_export')
-    expect(route).toMatch(/methods=\["GET", "POST"\]/)
+    // 2026-11-14 起两个导出路由拆成 @router.get + @router.post（各自 operationId，同一 handler）
+    for (const ep of ['export-template', 'export-data']) {
+      expect(route).toMatch(new RegExp(`@router\\.get\\(\\s*"/api/workpapers/\\{wp_id\\}/j1/${ep}"`))
+      expect(route).toMatch(new RegExp(`@router\\.post\\(\\s*"/api/workpapers/\\{wp_id\\}/j1/${ep}"`))
+    }
     expect(route).toMatch(/def _resolve_sheet_type\(/)
     // 三处分派：导出模板 / 导出数据 / 导入
     expect(route.match(/in _DISC_SHEET_TYPES/g)?.length).toBe(3)

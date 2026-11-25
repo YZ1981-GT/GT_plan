@@ -116,13 +116,17 @@ describe('DeliverableCenter：一键全套接闸门 + 附注预检去重', () =>
   const CENTER = stripComments(readSrc('audit-platform/frontend/src/views/DeliverableCenter.vue'))
   const API = stripComments(readSrc('audit-platform/frontend/src/services/deliverableApi.ts'))
 
-  it('一键全套命中闸门弹确认框，确认后带 confirm_inconsistent=true 重发', () => {
+  // bb29a49f6 起一键全套改为正式三件套任务：先 checkTrioReadiness（附注 is_stale 为硬阻断），
+  // blocked 时提示原因、不建任务；旧 startFullDeliverables + 确认框路径已整体移除。
+  // （「从未同步」章节不再在一键全套前确认 —— 已登记为待拍板的口径收窄。）
+  it('一键全套先过三件套 readiness，blocked 不建任务', () => {
     const run = functionBody(CENTER, 'runGenerateFull')
-    expect(run).toContain('buildNoteConsistencyMessage(pending)')
-    expect(run).toContain('await startFullDeliverables(true)')
-    const start = functionBody(CENTER, 'startFullDeliverables')
-    expect(start).toMatch(/confirm_inconsistent:\s*confirmInconsistent/)
-    expect(start).toContain('notesInconsistencyFromError(e)')
+    const readiness = run.indexOf('await checkTrioReadiness(')
+    const create = run.indexOf('await createTrioJob(')
+    expect(readiness).toBeGreaterThan(-1)
+    expect(create).toBeGreaterThan(readiness)
+    expect(run.slice(readiness, create)).toMatch(/status\s*===\s*'blocked'[\s\S]*return/)
+    expect(CENTER).not.toMatch(/\bstartFullDeliverables\s*\(/)
   })
 
   it('一键全套请求静默全局拦截器（否则 409 先弹通用提示，5xx 重跑整套）', () => {

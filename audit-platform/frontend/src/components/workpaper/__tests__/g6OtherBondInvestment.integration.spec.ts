@@ -113,9 +113,9 @@ describe('G6 集成: 科目 / 事件 bus / API 前缀', () => {
 
 describe('G6 集成: 注册表 ECL -> InvestmentEcl', () => {
   it('htmlRendererRegistry imports GtG6OtherBondInvestmentEcl', () => {
-    const registryPath = resolve(__dirname, '../htmlRendererRegistry.ts')
-    const src = readFileSync(registryPath, 'utf-8')
-    expect(src).toContain("import('./GtG6OtherBondInvestmentEcl.vue')")
+    // PAC T20 起 componentType → 组件的 dynamic import 拆在 registry/entries/<domain>.ts
+    const src = readFileSync(resolve(__dirname, '../registry/entries/specialized.ts'), 'utf-8')
+    expect(src).toContain("import('../../GtG6OtherBondInvestmentEcl.vue')")
   })
 })
 

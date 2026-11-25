@@ -55,7 +55,20 @@ function vitestExclude(): string[] | null {
   return items.every((item): item is string => item !== null) ? items : null
 }
 
+/** testDir 是否被 exclude 覆盖：自身或任一上级目录有 `<dir>/**`（e2e/formula-hub 由 e2e/** 覆盖） */
+function coveredByExclude(dir: string, exclude: readonly string[]): boolean {
+  const parts = dir.split('/')
+  return parts.some((_, i) => exclude.includes(`${parts.slice(0, i + 1).join('/')}/**`))
+}
+
 describe('Playwright 用例目录排除在 vitest 之外', () => {
+  it('自检：上级目录的 /** 覆盖子目录；同名前缀的兄弟目录不算覆盖', () => {
+    expect(coveredByExclude('e2e/formula-hub', ['e2e/**'])).toBe(true)
+    expect(coveredByExclude('e2e', ['e2e/**'])).toBe(true)
+    expect(coveredByExclude('e2e-uat', ['e2e/**'])).toBe(false)
+    expect(coveredByExclude('e2e/formula-hub', ['e2e/other/**'])).toBe(false)
+  })
+
   it('自检：能找到主配置与独立配置、能读出 vitest 的 exclude（判据不空转）', () => {
     expect(PLAYWRIGHT_CONFIGS).toContain('playwright.config.ts')
     expect(PLAYWRIGHT_CONFIGS).toContain('playwright.readonly-uat.config.ts')
@@ -73,7 +86,7 @@ describe('Playwright 用例目录排除在 vitest 之外', () => {
     expect(exclude, 'vitest.config.ts 的 test.exclude 必须是字符串字面量数组').not.toBeNull()
     const missing = PLAYWRIGHT_CONFIGS
       .map((file) => ({ file, dir: testDirOf(file) }))
-      .filter(({ dir }) => dir !== null && !exclude!.includes(`${dir}/**`))
+      .filter(({ dir }) => dir !== null && !coveredByExclude(dir, exclude!))
       .map(({ file, dir }) => `${file} → ${dir}/**`)
     expect(missing, 'vitest 会把这些 Playwright 用例当单测跑、整文件报错；请加进 vitest.config.ts 的 exclude').toEqual([])
   })

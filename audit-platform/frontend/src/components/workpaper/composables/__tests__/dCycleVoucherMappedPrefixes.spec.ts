@@ -259,16 +259,17 @@ describe('源码级接线：D3~D7 凭证检查 inject→dSlotQueryCodes→pullSa
 
 // ─── D2 当前状态的反向自检（确认 D2 走的是另一条路径）──────────────────────
 
-describe('D2 现状：走 dCycleScope 直接取兜底码（不走 inject）', () => {
-  it('D2TabVoucherCheck 不含 inject("tbSourceCodes")', () => {
+describe('D2 现状：抽凭码走 dCycleScope，挂凭前缀经 inject 走 dSlotQueryCodes', () => {
+  it('D2TabVoucherCheck 经 inject("tbSourceCodes") 取映射码（f9fd397b1 统一全 D 循环）', () => {
     const d2Path = path.join(WP_ROOT, 'd2/D2TabVoucherCheck.vue')
     if (!fs.existsSync(d2Path)) {
       // D2 可能在后续批次才改
       return
     }
     const src = stripComments(fs.readFileSync(d2Path, 'utf-8'))
-    // D2 当前不走 inject('tbSourceCodes') —— 走的是 dCycleScope('D2')?.queryCodes()
-    expect(src).not.toMatch(/inject\s*[<(].*['"]tbSourceCodes['"]/)
+    // 抽凭 account-code 仍走 dCycleScope('D2')；挂凭匹配前缀经 inject 走 dSlotQueryCodes
+    expect(src).toMatch(/inject\s*[<(].*['"]tbSourceCodes['"]/)
+    expect(src).toContain("dSlotQueryCodes('D2'")
     expect(src).toContain("dCycleScope('D2')")
   })
 })

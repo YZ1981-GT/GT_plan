@@ -121,7 +121,10 @@ describe('Feature: formula-management-library, Property 19: 前端引擎三类�
         const fSum = sumRange(extractColumnRange(grid, 'F', 7, 17))
         expect(before['18:E']).toBeCloseTo(eSum, 5)
         expect(before['18:F']).toBeCloseTo(fSum, 5)
-        expect(before['24:C']).toEqual(safeDivide(fSum, eSum))
+        // 按 workbook 实读（40561d2c6）：C24 = F19；C25 = C24/C23，C23「当期营业收入」是人工输入。
+        // 本生成器不产 C 列 ⇒ C23 视为 0 ⇒ C25 为 null（不是旧的 F19/E19 逐行占比）。
+        expect(before['23:C']).toBeCloseTo(fSum, 5)
+        expect(before['24:C']).toEqual(safeDivide(fSum, 0))
       }),
       { numRuns: 20 },
     )

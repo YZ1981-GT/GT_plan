@@ -123,16 +123,18 @@ describe('validate', () => {
     expect(result.errors.some(e => e.message.includes('未知函数'))).toBe(true)
   })
 
-  it('TB 参数数量错误', () => {
-    const result = validate("TB('1001')")
+  it('TB 参数数量错误（列名可省，1~2 个参数）', () => {
+    // 参数范围以后端函数目录为准（formula_function_catalog.py → generated/formulaFunctionCatalog.ts，de31e7bf6）
+    expect(validate("TB('1001')").valid).toBe(true)
+    const result = validate("TB()")
     expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.message.includes('2 个参数'))).toBe(true)
+    expect(result.errors.some(e => e.message.includes('1~2 个参数'))).toBe(true)
   })
 
   it('TB 参数过多', () => {
     const result = validate("TB('1001','期末','多余')")
     expect(result.valid).toBe(false)
-    expect(result.errors.some(e => e.message.includes('2 个参数'))).toBe(true)
+    expect(result.errors.some(e => e.message.includes('1~2 个参数'))).toBe(true)
   })
 
   it('ROW 只需 1 个参数', () => {
@@ -232,9 +234,12 @@ describe('新增函数识别与校验（wiring-closure T11）', () => {
     expect(tokens[0].value).toBe('SUM_TB')
   })
 
-  it('SUM_TB 参数校验 = 2', () => {
+  it('SUM_TB 参数校验 = 1~2（列名可省）', () => {
+    // 参数范围以后端函数目录为准（formula_function_catalog.py → generated/formulaFunctionCatalog.ts，de31e7bf6）
     expect(validate("SUM_TB('1001~1099','期末余额')").valid).toBe(true)
-    expect(validate("SUM_TB('1001~1099')").valid).toBe(false)
+    expect(validate("SUM_TB('1001~1099')").valid).toBe(true)
+    expect(validate("SUM_TB()").valid).toBe(false)
+    expect(validate("SUM_TB('1001~1099','期末余额','多余')").valid).toBe(false)
   })
 
   it('PREV 被识别（PRIOR 的官方名称）', () => {
@@ -252,13 +257,16 @@ describe('新增函数识别与校验（wiring-closure T11）', () => {
     expect(validate("IF(ROW('BS-001'), 0)").valid).toBe(false)
   })
 
-  it('knownFunctions 包含全部 21 个', () => {
+  it('knownFunctions 按引擎分：L1 含 20 个报表/底稿函数，PRIOR 只属附注引擎', () => {
+    // 目录按引擎拆分后（de31e7bf6），PRIOR 是附注执行器专属，L1 下给「改用 PREV」提示
     const names = knownFunctions().map(f => f.name)
     for (const fn of ['TB', 'SUM_TB', 'WP', 'NOTE', 'ROW', 'SUM_ROW', 'REPORT',
-      'ADJ', 'AUX', 'PREV', 'PRIOR', 'ABS', 'ROUND', 'MAX', 'MIN', 'IF',
+      'ADJ', 'AUX', 'PREV', 'ABS', 'ROUND', 'MAX', 'MIN', 'IF',
       'LEDGER', 'LEDGER_DETAIL', 'TB_AUX', 'COUNT_LEDGER', 'PLACEHOLDER']) {
       expect(names).toContain(fn)
     }
+    expect(names).not.toContain('PRIOR')
+    expect(knownFunctions('note').map(f => f.name)).toContain('PRIOR')
   })
 
   it('cursorContext 在 SUM_TB 参数位正确', () => {
@@ -271,15 +279,19 @@ describe('新增函数识别与校验（wiring-closure T11）', () => {
 // ── unified-formula-registry Phase 1：底稿专用函数 ────────────────────────
 
 describe('底稿专用函数识别（unified-formula-registry P1-T4）', () => {
-  it('LEDGER 被识别且参数校验 = 3', () => {
+  it('LEDGER 被识别且参数校验 = 2~3（范围可省）', () => {
+    // 参数范围以后端函数目录为准（formula_function_catalog.py → generated/formulaFunctionCatalog.ts，de31e7bf6）
     expect(tokenize("LEDGER('1001','借','全年')")[0].type).toBe('function')
     expect(validate("LEDGER('1001','借','全年')").valid).toBe(true)
-    expect(validate("LEDGER('1001','借')").valid).toBe(false)
+    expect(validate("LEDGER('1001','借')").valid).toBe(true)
+    expect(validate("LEDGER('1001')").valid).toBe(false)
   })
 
-  it('LEDGER_DETAIL 被识别且参数校验 = 3', () => {
+  it('LEDGER_DETAIL 被识别且参数校验 = 1~3（期间 / 金额条件可省）', () => {
     expect(validate("LEDGER_DETAIL('6001','12月','>=100000')").valid).toBe(true)
-    expect(validate("LEDGER_DETAIL('6001')").valid).toBe(false)
+    expect(validate("LEDGER_DETAIL('6001')").valid).toBe(true)
+    expect(validate("LEDGER_DETAIL()").valid).toBe(false)
+    expect(validate("LEDGER_DETAIL('6001','12月','>=100000','多余')").valid).toBe(false)
   })
 
   it('TB_AUX 被识别且参数校验 = 3', () => {
@@ -294,8 +306,10 @@ describe('底稿专用函数识别（unified-formula-registry P1-T4）', () => {
     expect(validate("COUNT_LEDGER('1001','借','全年')").valid).toBe(false)
   })
 
-  it('PLACEHOLDER 被识别且参数 = 0', () => {
+  it('PLACEHOLDER 被识别且参数 = 0~1', () => {
+    // 参数范围以后端函数目录为准（formula_function_catalog.py → generated/formulaFunctionCatalog.ts，de31e7bf6）
     expect(validate("PLACEHOLDER()").valid).toBe(true)
-    expect(validate("PLACEHOLDER('arg')").valid).toBe(false)
+    expect(validate("PLACEHOLDER('说明')").valid).toBe(true)
+    expect(validate("PLACEHOLDER('a','b')").valid).toBe(false)
   })
 })

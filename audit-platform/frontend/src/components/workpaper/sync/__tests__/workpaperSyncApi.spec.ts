@@ -47,6 +47,7 @@ import {
   readEntrySyncReadiness,
   readStoreProjection,
   requestForcesave,
+  abandonConflicts,
   resolveConflicts,
   resolveEntryIdentity,
   retryOperation,
@@ -182,6 +183,8 @@ describe('多段 entry_id 的 URL 拼接', () => {
 
 /** 每个 endpoint 的驱动器：真调 client method 一次。 */
 const DRIVERS: Record<string, () => Promise<unknown>> = {
+  abandon_conflicts: () =>
+    abandonConflicts(SCOPE, { operationId: UUID(30), reason: '旧冲突集已由人工核对，作废' }).catch(() => null),
   adopt_substrate: () => adoptSubstrate(SCOPE, { dryRun: true }).catch(() => null),
   ensure_first_publication: () => ensureFirstPublication(SCOPE).catch(() => null),
   create_pending_mutation: () =>

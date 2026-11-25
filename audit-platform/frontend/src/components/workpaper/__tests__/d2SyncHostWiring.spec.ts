@@ -157,7 +157,9 @@ describe('统一桥必须真的消费宿主传入的钩子', () => {
   })
 
   it('capability 不支持 oo 时拒绝进入（不得降级为照样开编辑器）', () => {
-    expect(bridgeSrc).toMatch(/supportedModesForCapability\(\s*options\.capability\s*\)/)
+    // 3713d9c0e 起 capability 可为 Ref，经 capabilityOf()（unref）读取，再判是否支持 oo
+    expect(bridgeSrc).toMatch(/supportedModesForCapability\(\s*capabilityOf\(\)\s*\)\.includes\(\s*'oo'\s*\)/)
+    expect(bridgeSrc).toMatch(/function\s+capabilityOf\(\)[^{]*\{\s*return\s+unref\(\s*options\.capability\s*\)/)
     expect(bridgeSrc).toContain('bridge_mode_not_supported')
   })
 })

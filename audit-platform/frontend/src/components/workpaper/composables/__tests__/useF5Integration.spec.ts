@@ -7,6 +7,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { ref } from 'vue'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from '../useF1FormData'
 import { useF5Adjudication } from '../useF5Adjudication'
 import { useF5CostRollforward } from '../useF5CostRollforward'
@@ -207,11 +208,13 @@ describe('F5 集成 — EventBus substantive:adjudicated(6401) 传递', () => {
     })
     const adj = useF5Adjudication({ wpId: ref('w'), projectId: ref('p'), allResponses, isReadonly: ref(false) })
 
+    // 发布走 eventBus（useF5Adjudication 注释：crossWpEventBridge 运行时再转发到 window；
+    // 单测不装桥，故直接订阅 eventBus —— 与 F5-7 等组件内消费方同一通道）
     let received: any = null
-    const handler = (e: Event) => { received = (e as CustomEvent).detail }
-    window.addEventListener('substantive:adjudicated', handler)
+    const handler = (detail: any) => { received = detail }
+    eventBus.on('substantive:adjudicated', handler)
     adj.publishAdjudicated()
-    window.removeEventListener('substantive:adjudicated', handler)
+    eventBus.off('substantive:adjudicated', handler)
 
     expect(received).toBeTruthy()
     expect(received.accountCode).toBe('6401')

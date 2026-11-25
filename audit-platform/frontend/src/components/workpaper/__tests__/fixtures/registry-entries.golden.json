@@ -2489,5 +2489,149 @@
     ],
     "contextProps": "standard",
     "domain": "core"
+  },
+  {
+    "componentType": "s1-regulation-record",
+    "importPath": "./s-checklist/S1RegulationRecordSheet.vue",
+    "icon": "📋",
+    "label": "S1 法规考虑记录表",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s8-adjudication",
+    "importPath": "./s-checklist/S8AdjudicationSheet.vue",
+    "icon": "📋",
+    "label": "S8 租赁审定表",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s9-adjudication",
+    "importPath": "./s-checklist/S9AdjudicationSheet.vue",
+    "icon": "📋",
+    "label": "S9 电子商务审定表",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s9-internal-control",
+    "importPath": "./s-checklist/S9InternalControlSheet.vue",
+    "icon": "🔍",
+    "label": "S9 内部控制调查表",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s9-legal-regulations",
+    "importPath": "./s-checklist/S9LegalRegulationsSheet.vue",
+    "icon": "⚖️",
+    "label": "S9 电子商务法律法规",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s9-program-description",
+    "importPath": "./s-checklist/S9ProgramDescriptionSheet.vue",
+    "icon": "📝",
+    "label": "S9 程序说明",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s10-adjudication",
+    "importPath": "./s-checklist/S10AdjudicationSheet.vue",
+    "icon": "📋",
+    "label": "S10 环境事项审定表",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s10-internal-control",
+    "importPath": "./s-checklist/S10InternalControlSheet.vue",
+    "icon": "🔍",
+    "label": "S10 环境内控调查表",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s10-environmental-regulations",
+    "importPath": "./s-checklist/S10EnvironmentalRegulationsSheet.vue",
+    "icon": "🌿",
+    "label": "S10 环境法规",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s17-nonrecurring-detail",
+    "importPath": "./s-checklist/S17NonRecurringDetailSheet.vue",
+    "icon": "📊",
+    "label": "S17 非经常性损益明细",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s17-reconciliation",
+    "importPath": "./s-checklist/S17ReconciliationSheet.vue",
+    "icon": "🔄",
+    "label": "S17 非经常性损益核对表",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
+  },
+  {
+    "componentType": "s17-tax-impact",
+    "importPath": "./s-checklist/S17TaxImpactSheet.vue",
+    "icon": "🧾",
+    "label": "S17 所得税影响",
+    "emits": [
+      "save",
+      "completed"
+    ],
+    "contextProps": "standard",
+    "domain": "specialized"
   }
 ]

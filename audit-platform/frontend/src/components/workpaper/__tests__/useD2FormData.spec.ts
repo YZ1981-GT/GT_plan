@@ -36,6 +36,8 @@ describe('useD2FormData.saveItemsFromEvent', () => {
     expect(putCalls.map(([, body]) => body)).toEqual([
       {
         project_id: 'proj-test',
+        // 严格 CAS：checklistCas.save 恒带 require_if_match（ae068294e / 4390aaaa3）
+        require_if_match: true,
         items: [{
           item_id: 'D2-detail-rows',
           conclusion: null,
@@ -45,6 +47,8 @@ describe('useD2FormData.saveItemsFromEvent', () => {
       },
       {
         project_id: 'proj-test',
+        // 严格 CAS：checklistCas.save 恒带 require_if_match（ae068294e / 4390aaaa3）
+        require_if_match: true,
         items: [{
           item_id: 'D2-adj-reason',
           conclusion: null,

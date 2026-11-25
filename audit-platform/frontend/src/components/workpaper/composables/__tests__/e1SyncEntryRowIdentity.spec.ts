@@ -451,7 +451,8 @@ describe('BP-4 characterization：E1 复用 G1 sheet 解析器（修好后本节
   })
 
   it('实况：G1 编码能拿到 G1 的真实表名 —— 证明解析器本身没坏，坏的是被 E1 复用', () => {
-    expect(resolveG1SheetLabel('G1A', [], undefined)).toBe('交易性金融资产实质性程序表G1A')
+    // 尾部空格是源模板 tab 名事实（g1SheetLabels.ts 注释），不得 trim
+    expect(resolveG1SheetLabel('G1A', [], undefined)).toBe('交易性金融资产实质性程序表G1A ')
     expect(extractG1SheetCode('审定表G1-1')).toBe('G1-1')
   })
 })

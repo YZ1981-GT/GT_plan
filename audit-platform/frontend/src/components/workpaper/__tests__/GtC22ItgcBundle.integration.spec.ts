@@ -487,7 +487,9 @@ describe('集成：C21 IT专业成员评估 Tab（Req 8.1/8.2/8.3）', () => {
     await flushPromises()
     const vm = wrapper.vm as any
     // 激活 C21 Tab
-    vm.active = 'C21'
+    // 经 activeSection setter 切换（与页签点击同路径，会按 section 设默认 renderMode=online-edit）；
+    // 直接写 active 绕过 setter，renderMode 仍是 structured ⇒ 只会显示「开发中」占位
+    vm.activeSection = 'C21'
     await flushPromises()
     expect(vm.activeSection).toBe('C21')
     // GtOnlyOfficeSheet 渲染（stub）
@@ -499,7 +501,9 @@ describe('集成：C21 IT专业成员评估 Tab（Req 8.1/8.2/8.3）', () => {
     const wrapper = mountIntegration()
     await flushPromises()
     const vm = wrapper.vm as any
-    vm.active = 'C21'
+    // 经 activeSection setter 切换（与页签点击同路径，会按 section 设默认 renderMode=online-edit）；
+    // 直接写 active 绕过 setter，renderMode 仍是 structured ⇒ 只会显示「开发中」占位
+    vm.activeSection = 'C21'
     await flushPromises()
     const oo = wrapper.find('.onlyoffice-stub')
     expect(oo.exists()).toBe(true)
@@ -514,12 +518,14 @@ describe('集成：C21 IT专业成员评估 Tab（Req 8.1/8.2/8.3）', () => {
     const wrapper = mountIntegration()
     await flushPromises()
     const vm = wrapper.vm as any
-    vm.active = 'C21'
+    // 经 activeSection setter 切换（与页签点击同路径，会按 section 设默认 renderMode=online-edit）；
+    // 直接写 active 绕过 setter，renderMode 仍是 structured ⇒ 只会显示「开发中」占位
+    vm.activeSection = 'C21'
     await flushPromises()
-    // GtOnlyOfficeSheet 收到 sheetName='C21'（对应源模板 sheet tab 名，
-    // OnlyOffice 原生保留该 sheet 的命名区域数据验证/下拉选项）
+    // 🔴 CC-63：传册内真实 sheet 名（与 wpCode 脱钩），按原始字面量，不归一化；
+    // OnlyOffice 原生保留该 sheet 的命名区域数据验证/下拉选项
     const oo = wrapper.find('.onlyoffice-stub')
-    expect(oo.attributes('data-sheet')).toBe('C21')
+    expect(oo.attributes('data-sheet')).toBe('C21 具有信息技术专业技能的项目组成员')
   })
 
   it('Req 8.3：C21 与其余 Tab 一致地透传 readonly', async () => {
@@ -542,7 +548,9 @@ describe('集成：C21 IT专业成员评估 Tab（Req 8.1/8.2/8.3）', () => {
     })
     await flushPromises()
     const vm = wrapper.vm as any
-    vm.active = 'C21'
+    // 经 activeSection setter 切换（与页签点击同路径，会按 section 设默认 renderMode=online-edit）；
+    // 直接写 active 绕过 setter，renderMode 仍是 structured ⇒ 只会显示「开发中」占位
+    vm.activeSection = 'C21'
     await flushPromises()
     const oo = wrapper.find('.onlyoffice-stub')
     expect(oo.exists()).toBe(true)
@@ -553,7 +561,9 @@ describe('集成：C21 IT专业成员评估 Tab（Req 8.1/8.2/8.3）', () => {
     const wrapper = mountIntegration()
     await flushPromises()
     const vm = wrapper.vm as any
-    vm.active = 'C21'
+    // 经 activeSection setter 切换（与页签点击同路径，会按 section 设默认 renderMode=online-edit）；
+    // 直接写 active 绕过 setter，renderMode 仍是 structured ⇒ 只会显示「开发中」占位
+    vm.activeSection = 'C21'
     await flushPromises()
     const oo = wrapper.find('.onlyoffice-stub')
     expect(oo.exists()).toBe(true)

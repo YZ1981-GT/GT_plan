@@ -29,10 +29,8 @@ describe('useDisplayPrefsStore', () => {
       const store = useDisplayPrefsStore()
       store.setDensity('compact')
       expect(store.density).toBe('compact')
-
-      // 验证持久化
-      const raw = JSON.parse(localStorage.getItem('gt_display_prefs')!)
-      expect(raw.density).toBe('compact')
+      // 持久化自 218d6e20c 起是账号级（服务端 + gt_display_prefs:v3:<userId> 缓存），
+      // 由 stores/__tests__/displayPrefsSync.spec.ts 覆盖；旧单键 gt_display_prefs 已废弃。
     })
 
     it('tableDensity 返回 el-table size 值', () => {
@@ -72,12 +70,10 @@ describe('useDisplayPrefsStore', () => {
       expect(store.getFixedColumns('nonexistent')).toEqual([])
     })
 
-    it('fixedColumns 持久化到 localStorage', () => {
+    it('setFixedColumns 后同页读回（持久化见 displayPrefsSync.spec.ts）', () => {
       const store = useDisplayPrefsStore()
       store.setFixedColumns('report-view', ['row_name'])
-
-      const raw = JSON.parse(localStorage.getItem('gt_display_prefs')!)
-      expect(raw.fixedColumns['report-view']).toEqual(['row_name'])
+      expect(store.getFixedColumns('report-view')).toEqual(['row_name'])
     })
 
     it('多页面固定列互不干扰', () => {
@@ -155,28 +151,8 @@ describe('useDisplayPrefsStore', () => {
     })
   })
 
-  describe('localStorage 恢复', () => {
-    it('从 localStorage 恢复偏好', () => {
-      localStorage.setItem('gt_display_prefs', JSON.stringify({
-        amountUnit: 'yuan',
-        fontSize: 'lg',
-        density: 'comfortable',
-        showZero: true,
-        decimals: 4,
-        negativeRed: false,
-        highlightThreshold: 0,
-        fixedColumns: { 'test-page': ['col1'] },
-      }))
-
-      const store = useDisplayPrefsStore()
-      expect(store.amountUnit).toBe('yuan')
-      expect(store.fontSize).toBe('lg')
-      expect(store.density).toBe('comfortable')
-      expect(store.showZero).toBe(true)
-      expect(store.decimals).toBe(4)
-      expect(store.getFixedColumns('test-page')).toEqual(['col1'])
-    })
-  })
+  // 原「从旧单键 gt_display_prefs 恢复偏好」随 218d6e20c 账号级偏好改造废弃
+  // （旧键内容按设计不迁移，见 displayPrefsSync.spec.ts「旧键的内容不迁移到新键」），用例删除。
 })
 
 describe('displayPrefs 格式化统一出口', () => {
@@ -217,9 +193,10 @@ describe('displayPrefs 格式化统一出口', () => {
       expect(store.fmt(10000, { rawUnit: true })).toBe('10,000.00')
     })
 
-    it('rawUnit + showZero=false + 值为0 → "—"', () => {
+    // 零值按审计惯例显示「-」（与 GtAmountCell / displayPrefsSync 同口径）；「—」只用于缺值/非数字
+    it('rawUnit + showZero=false + 值为0 → "-"', () => {
       const store = useDisplayPrefsStore()
-      expect(store.fmt(0, { rawUnit: true })).toBe('—')
+      expect(store.fmt(0, { rawUnit: true })).toBe('-')
     })
   })
 

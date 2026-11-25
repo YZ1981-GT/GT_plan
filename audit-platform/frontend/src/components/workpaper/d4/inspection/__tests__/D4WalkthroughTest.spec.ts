@@ -22,13 +22,14 @@ function createMockItem(overrides: Partial<TransactionItem> = {}): TransactionIt
     id: 't-test-1',
     indexNo: 'D4-14-1',
     label: '测试交易事项',
-    voucher: { month: '6', date: '2025-06-01', number: 'PZ-001', productName: '产品A', quantity: '100', amount: 50000, accountingDate: '2025-06-02' },
-    contract: { number: 'HT-001', productName: '产品A', amount: 50000, approver: '张三', confirmor: '李四' },
-    delivery: { date: '2025-06-01', productName: '产品A', amount: 50000, warehouseKeeper: '王五' },
-    shipping: { date: '2025-06-02', productName: '产品A', amount: 50000 },
-    receipt: { date: '2025-06-03', productName: '产品A', amount: 50000 },
-    invoice: { date: '2025-06-04', number: 'FP-001', amount: 50000 },
-    other: { description: '出口报关单', indexNo: 'IX-01' },
+    // 字段集随 3e894ed48（D4-14 路线A全受管）对齐模板物理列，夹具填满全部必填字段
+    voucher: { month: '6', customerName: '客户甲', date: '2025-06-01', number: 'PZ-001', productName: '产品A', quantity: '100', amount: 50000, accountingDate: '2025-06-02' },
+    contract: { date: '2025-05-20', number: 'HT-001', productName: '产品A', amount: 50000, approver: '张三', confirmor: '李四' },
+    delivery: { date: '2025-06-01', number: 'CK-001', productName: '产品A', quantity: '100', amount: 50000, warehouseKeeper: '王五', shippingApprover: '赵六' },
+    shipping: { date: '2025-06-02', number: 'YS-001', productName: '产品A', quantity: '100', amount: 50000, company: '某物流', address: '某地' },
+    receipt: { date: '2025-06-03', productName: '产品A', quantity: '100', amount: 50000, signer: '钱七', sealType: '公章', sealEntity: '客户甲' },
+    invoice: { date: '2025-06-04', number: 'FP-001', productName: '产品A', quantity: '100', amount: 50000 },
+    other: { description: '出口报关单', indexNo: 'IX-01', anomalyNote: '' },
     consistencyScore: 100,
     consistencyDetails: {
       amountMatch: { isConsistent: true, values: [], mismatchDimensions: [] },
@@ -47,13 +48,13 @@ function createEmptyItem(overrides: Partial<TransactionItem> = {}): TransactionI
     id: 't-empty-1',
     indexNo: 'D4-14-1',
     label: '空白事项',
-    voucher: { month: '', date: '', number: '', productName: '', quantity: '', amount: 0, accountingDate: '' },
-    contract: { number: '', productName: '', amount: 0, approver: '', confirmor: '' },
-    delivery: { date: '', productName: '', amount: 0, warehouseKeeper: '' },
-    shipping: { date: '', productName: '', amount: 0 },
-    receipt: { date: '', productName: '', amount: 0 },
-    invoice: { date: '', number: '', amount: 0 },
-    other: { description: '', indexNo: '' },
+    voucher: { month: '', customerName: '', date: '', number: '', productName: '', quantity: '', amount: 0, accountingDate: '' },
+    contract: { date: '', number: '', productName: '', amount: 0, approver: '', confirmor: '' },
+    delivery: { date: '', number: '', productName: '', quantity: '', amount: 0, warehouseKeeper: '', shippingApprover: '' },
+    shipping: { date: '', number: '', productName: '', quantity: '', amount: 0, company: '', address: '' },
+    receipt: { date: '', productName: '', quantity: '', amount: 0, signer: '', sealType: '', sealEntity: '' },
+    invoice: { date: '', number: '', productName: '', quantity: '', amount: 0 },
+    other: { description: '', indexNo: '', anomalyNote: '' },
     consistencyScore: 0,
     consistencyDetails: null,
     conclusion: '',
@@ -79,46 +80,41 @@ describe('D4WalkthroughCard', () => {
       ])
     })
 
-    it('记账凭证 has 7 fields', () => {
-      const voucher = DIMENSION_GROUPS.find(g => g.key === 'voucher')!
-      expect(voucher.fields).toHaveLength(7)
-      expect(voucher.fields.map(f => f.key)).toEqual([
-        'month', 'date', 'number', 'productName', 'quantity', 'amount', 'accountingDate',
+    // 字段集 = D4-14 模板物理列（3e894ed48 路线A全受管后的口径）
+    const keysOf = (k: string) => DIMENSION_GROUPS.find(g => g.key === k)!.fields.map(f => f.key)
+
+    it('记账凭证 8 fields', () => {
+      expect(keysOf('voucher')).toEqual([
+        'month', 'customerName', 'date', 'number', 'productName', 'quantity', 'amount', 'accountingDate',
       ])
     })
 
-    it('销售合同 has 5 fields', () => {
-      const contract = DIMENSION_GROUPS.find(g => g.key === 'contract')!
-      expect(contract.fields).toHaveLength(5)
-      expect(contract.fields.map(f => f.key)).toEqual([
-        'number', 'productName', 'amount', 'approver', 'confirmor',
+    it('销售合同 6 fields', () => {
+      expect(keysOf('contract')).toEqual(['date', 'number', 'productName', 'amount', 'approver', 'confirmor'])
+    })
+
+    it('出库单 7 fields', () => {
+      expect(keysOf('delivery')).toEqual([
+        'date', 'number', 'productName', 'quantity', 'amount', 'warehouseKeeper', 'shippingApprover',
       ])
     })
 
-    it('出库单 has 4 fields', () => {
-      const delivery = DIMENSION_GROUPS.find(g => g.key === 'delivery')!
-      expect(delivery.fields).toHaveLength(4)
+    it('运输单 7 fields', () => {
+      expect(keysOf('shipping')).toEqual(['date', 'number', 'productName', 'quantity', 'amount', 'company', 'address'])
     })
 
-    it('运输单 has 3 fields', () => {
-      const shipping = DIMENSION_GROUPS.find(g => g.key === 'shipping')!
-      expect(shipping.fields).toHaveLength(3)
+    it('签收单 7 fields', () => {
+      expect(keysOf('receipt')).toEqual(['date', 'productName', 'quantity', 'amount', 'signer', 'sealType', 'sealEntity'])
     })
 
-    it('签收单 has 3 fields', () => {
-      const receipt = DIMENSION_GROUPS.find(g => g.key === 'receipt')!
-      expect(receipt.fields).toHaveLength(3)
+    it('发票 5 fields', () => {
+      expect(keysOf('invoice')).toEqual(['date', 'number', 'productName', 'quantity', 'amount'])
     })
 
-    it('发票 has 3 fields', () => {
-      const invoice = DIMENSION_GROUPS.find(g => g.key === 'invoice')!
-      expect(invoice.fields).toHaveLength(3)
-    })
-
-    it('其他支持性文件 has 2 fields', () => {
-      const other = DIMENSION_GROUPS.find(g => g.key === 'other')!
-      expect(other.fields).toHaveLength(2)
-      expect(other.fields.map(f => f.key)).toEqual(['description', 'indexNo'])
+    it('其他支持性文件 3 fields（anomalyNote 可选，不参与完整性判定）', () => {
+      expect(keysOf('other')).toEqual(['description', 'indexNo', 'anomalyNote'])
+      const item = createMockItem()
+      expect(isDimensionComplete({ ...item.other, anomalyNote: '' }, 'other')).toBe(true)
     })
   })
 
@@ -212,7 +208,7 @@ describe('D4WalkthroughMatrix', () => {
 
     it('mixed: some complete, some not', () => {
       const item = createMockItem({
-        delivery: { date: '', productName: '', amount: 0, warehouseKeeper: '' },
+        delivery: { date: '', number: '', productName: '', quantity: '', amount: 0, warehouseKeeper: '', shippingApprover: '' },
       })
       expect(isDimensionComplete(item.voucher, 'voucher')).toBe(true)
       expect(isDimensionComplete(item.delivery, 'delivery')).toBe(false)

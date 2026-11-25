@@ -105,7 +105,9 @@ describe('useB22BControlMatrix — 12 列 Control_Point 模型 (P2)', () => {
     scope.stop()
   })
 
-  it('持久化 item_id 结构 = B22B-row-count + B22B-row-{n}-{field}（12 字段/行，且不传 project_id）', async () => {
+  // BC-53 改造（26e5ef994）：行身份在行对象内（rowId），只写一条 B22B-rows（JSON 数组）
+  // + B22B-row-count（降级为校验值）；旧 B22B-row-{n}-{field} 只在迁移时回读（见「loadAll 按 count 重建」）。
+  it('持久化 item_id 结构 = B22B-rows（JSON 行数组，12 字段 + rowId）+ B22B-row-count（且不传 project_id）', async () => {
     const scope = effectScope()
     await scope.run(async () => {
       const c = useB22BControlMatrix(ref('wp-1'), ref('proj-1'))
@@ -119,12 +121,14 @@ describe('useB22BControlMatrix — 12 列 Control_Point 模型 (P2)', () => {
       expect(body).not.toHaveProperty('project_id')
 
       const ids: string[] = body.items.map((it: any) => it.item_id)
-      expect(ids).toContain('B22B-row-count')
-      for (const f of CONTROL_POINT_FIELDS) {
-        expect(ids).toContain(`B22B-row-0-${f}`)
-      }
-      // 每行恰好 12 个字段 item + 1 个 count
-      expect(body.items.filter((it: any) => it.item_id.startsWith('B22B-row-0-'))).toHaveLength(12)
+      expect([...ids].sort()).toEqual(['B22B-row-count', 'B22B-rows'])
+      // 不再按下标展开逐字段键
+      expect(ids.some((id) => /^B22B-row-\d+-/.test(id))).toBe(false)
+      const rows = JSON.parse(body.items.find((it: any) => it.item_id === 'B22B-rows').remark)
+      expect(rows).toHaveLength(1)
+      for (const f of CONTROL_POINT_FIELDS) expect(rows[0]).toHaveProperty(f)
+      expect(typeof rows[0].rowId).toBe('string')
+      expect(rows[0].rowId.length).toBeGreaterThan(0)
       const countItem = body.items.find((it: any) => it.item_id === 'B22B-row-count')
       expect(countItem.remark).toBe('1')
     })
@@ -145,8 +149,8 @@ describe('useB22BControlMatrix — 12 列 Control_Point 模型 (P2)', () => {
       await flushPromises()
       expect(mockPut).toHaveBeenCalled()
       const body = mockPut.mock.calls[mockPut.mock.calls.length - 1][1]
-      const elItem = body.items.find((it: any) => it.item_id === 'B22B-row-0-element')
-      expect(elItem.remark).toBe('控制环境')
+      const rowsItem = body.items.find((it: any) => it.item_id === 'B22B-rows')
+      expect(JSON.parse(rowsItem.remark)[0].element).toBe('控制环境')
     })
     scope.stop()
   })

@@ -82,7 +82,8 @@ describe('TraceSourcePopover', () => {
     const wrapper = mountPopover()
     expect(wrapper.text()).toContain('来源报表行')
     expect(wrapper.text()).toContain('货币资金')
-    expect(wrapper.text()).toContain('¥5,000,000.00')
+    // 金额统一走 displayPrefs.fmt（5e31c0c0d 起不带 ¥ 前缀）
+    expect(wrapper.text()).toContain('5,000,000.00')
   })
 
   it('renders tb_accounts list with code, name, amount, pct', () => {
@@ -91,12 +92,12 @@ describe('TraceSourcePopover', () => {
     // Account 1
     expect(wrapper.text()).toContain('1001')
     expect(wrapper.text()).toContain('库存现金')
-    expect(wrapper.text()).toContain('¥50,000.00')
+    expect(wrapper.text()).toContain('50,000.00')
     expect(wrapper.text()).toContain('1.0%')
     // Account 2
     expect(wrapper.text()).toContain('1002')
     expect(wrapper.text()).toContain('银行存款')
-    expect(wrapper.text()).toContain('¥4,950,000.00')
+    expect(wrapper.text()).toContain('4,950,000.00')
     expect(wrapper.text()).toContain('99.0%')
   })
 

@@ -9,6 +9,7 @@ import { reactive } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import OcrConfirmDialog from '@/components/attachment/OcrConfirmDialog.vue'
 import BatchUploadResultDialog from '@/components/attachment/BatchUploadResultDialog.vue'
+import { clearAuthedObjectUrlCache } from '@/composables/useAuthedObjectUrl'
 
 const apiMock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }))
 const msg = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn() }))
@@ -171,6 +172,8 @@ describe('原件预览走已鉴权请求 + 文本框不盖住按钮', () => {
   beforeEach(() => {
     apiMock.get.mockReset()
     apiMock.post.mockReset()
+    // useAuthedObjectUrl 有模块级 blob 缓存（d0eb6c65d）：不清会让上一例缓存的原件顶替本例的 403 / 首次读取
+    clearAuthedObjectUrlCache()
     ;(URL as any).createObjectURL = vi.fn(() => 'blob:ocr-preview')
     ;(URL as any).revokeObjectURL = vi.fn()
   })
