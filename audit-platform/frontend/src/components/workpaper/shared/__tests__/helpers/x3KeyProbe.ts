@@ -58,6 +58,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { resolveConstLiteral } from './constLiteral'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 作业面与路径
@@ -607,11 +608,9 @@ export function extractFunctionBody(src: string, name: string): string | null {
   return null
 }
 
-/** 取模块级 `const NAME = '字面量'`（同时兼容 `export const`）。 */
-export function resolveConstLiteral(src: string, name: string): string | null {
-  const m = src.match(new RegExp(`(?:export\\s+)?(?:const|let|var)\\s+${name}\\s*=\\s*['"\`]([^'"\`]*)['"\`]`))
-  return m ? m[1] : null
-}
+// resolveConstLiteral（含常量别名链）已抽到伴生模块 constLiteral.ts —— 本文件已超 1500 行门禁，
+// 新增能力不再往里加；此处 re-export 保持外部 import 路径不变。
+export { resolveConstLiteral } from './constLiteral'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 四形态提取器

@@ -2028,3 +2028,9 @@ backend/tests/acnr/_status_doc_checks.py 807
 #   test_acnr_status_doc_statements.py —— HEAD 790 行；本批 +12 行为状态文档新增「更新行」
 #   登记判据（每句文档陈述一条可证伪判据），登记键须逐字与文档一致，拆分会让对照跨文件。
 backend/tests/acnr/test_acnr_status_doc_statements.py 803
+# 2026-11-25 登记（HEAD 1743 行即已超 1500，此前未登记；本批改动净减 1 行，不是本批引入的规模）：
+#   x3KeyProbe.ts —— X-3 调整分录键探针（四形态提取器 + 机制识别 + 写入列实测 + 清单读取）。
+#   本批把新增的常量别名链解析抽到伴生模块 helpers/constLiteral.ts 而不是往里加；
+#   拆分方向：probeSheet 逐 sheet 探测 / 机制 ①② 探针 / 清单读取（declaredKeys 等）各抽一个伴生模块，
+#   现状耦合点是 collectWriteSites → resolveKeyExpr → probeSheet 同一条判据链，需配 x3 守卫整体回归。
+audit-platform/frontend/src/components/workpaper/shared/__tests__/helpers/x3KeyProbe.ts 1742
