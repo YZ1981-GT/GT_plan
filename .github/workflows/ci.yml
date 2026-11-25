@@ -35,6 +35,13 @@ jobs:
       GT_PERF_DISPOSABLE_DB: "YES"
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 🔴 2026-11-25：必须完整历史。backend/tests/acnr/_status_doc_checks.py 的
+          #    `_task_states_at(96fba2c49)` 用 `git show <旧提交>:tasks.md` 取证；浅克隆（默认
+          #    depth=1）取不到该提交 ⇒ 返回空表 ⇒ 判据恒不成立 ⇒ `-x` 在第 98 个用例处整 job 中止
+          #    （连续数轮 CI 红的真因，本地有完整历史故 18 passed）。同类先例见下方
+          #    gitleaks / migration-compat 两个 job。
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -70,6 +77,8 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 同 backend-tests：含读历史提交的取证型用例（见该 job 注释）
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

@@ -2883,8 +2883,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install openpyxl
-        run: pip install openpyxl
+      - name: Install openpyxl + pytest
+        # 2026-11-25 修复：本 job 只装了 openpyxl，后续 `python -m pytest` 报
+        # `No module named pytest`（连续 12+ 轮 CI 假红）。对齐 h-cycle-four-table
+        # 的形态：先试 requirements.txt，失败再退最小依赖集。
+        run: pip install -r backend/requirements.txt 2>/dev/null || pip install openpyxl pytest
       - name: Fraud risk preset source fidelity (openpyxl 直读源模板)
         # Task 27：19 条迹象文字 ↔ 六张 fraud-risk sheet 交叉锁死
         run: python -m pytest backend/tests/test_fraud_risk_presets_source_fidelity.py -q
@@ -5552,9 +5555,10 @@ jobs:
         # 不传整循环 --check：循环内含 not_self_closing（带 slot 的金额列，本批不处理）、
         # 兜底 skip（label 无关键词，交人工）与并发在改的 M 文件，整循环 confirmed≠0 属预期技术债。
         # 🔴 与迁移的 .vue 同批入库后 CI 绿。
+        # 2026-10-14 commit 14b510221 把 D5TabDetail.vue 重命名为 D5TabVoucherCheck.vue，本清单同步。
         run: >-
           python backend/scripts/check/audit_amount_input_columns.py --check-files
-          "s5-debt-restructuring/S5AdjudicationSheet.vue,s-checklist/S17NonRecurringDetailSheet.vue,j1/core/J1DetailSection.vue,f5-cost-of-sales/F5TabAdjudication.vue,d5/D5TabDetail.vue,g1-trading-financial-assets/core/G1TabAdjudication.vue,h6/core/H6TabDetail.vue,confirmation/diffReconcile/DiffReconcileMaster.vue,ExpenseAnalysisDialog.vue,GtContingentLiability.vue"
+          "s5-debt-restructuring/S5AdjudicationSheet.vue,s-checklist/S17NonRecurringDetailSheet.vue,j1/core/J1DetailSection.vue,f5-cost-of-sales/F5TabAdjudication.vue,d5/D5TabVoucherCheck.vue,g1-trading-financial-assets/core/G1TabAdjudication.vue,h6/core/H6TabDetail.vue,confirmation/diffReconcile/DiffReconcileMaster.vue,ExpenseAnalysisDialog.vue,GtContingentLiability.vue"
 
 
   # ═══════════════════════════════════════════════════════════════════════════
