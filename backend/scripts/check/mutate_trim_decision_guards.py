@@ -243,6 +243,11 @@ MUTATIONS: tuple[Mutation, ...] = (
         "    if False:",
         "探测目标为空时仍须记 degradation",
         expect_red=("test_trim_decision_context",),
+        # 2026-11-25：报表行维度（5fa18a7a8）加了同形的 `if not codes:` ⇒ 全文 2 处、
+        # ANCHOR-MISS。按模块约定用自身唯一的 scope + 相对偏移定位底稿录入维度那一处
+        # （scope 行 → `)]` → 空行 → `if not codes:`），框架会核对该行等于 anchor。
+        scope='            "底稿已录入探测目标清单查询失败，本次不使用「底稿已有录入」保护判据",',
+        offset=3,
     ),
     Mutation(
         "T10-14",
