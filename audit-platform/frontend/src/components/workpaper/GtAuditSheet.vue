@@ -468,13 +468,12 @@
 <script setup lang="ts">
 import WpAmountInput from './shared/WpAmountInput.vue'
 import { ref, watch, computed } from 'vue'
-import { ElMessage } from 'element-plus'
-import { confirmDangerous } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useAuditSheetColumns } from '@/composables/useAuditSheetColumns'
 import { useAuditSheetSections } from '@/composables/useAuditSheetSections'
 import { useAuditSheetTable } from '@/composables/useAuditSheetTable'
-import { useAutoColumnWidth } from '@/composables/useAutoColumnWidth'
+import { useAuditSheetAutoWidth } from '@/composables/useAuditSheetAutoWidth'
+import { useAuditSheetToolbarActions } from '@/composables/useAuditSheetToolbarActions'
 import type {
   AuditSheetSchema,
   AuditSheetRow,
@@ -600,101 +599,26 @@ const {
 buildTableData()
 watch(() => props.htmlData, () => { buildTableData(); buildSections() }, { deep: true })
 
-// ─── 自适应列宽：将各列显示值投影为 composable 可消费的平铺行 ────────────
-const gasDisplayRows = computed(() =>
-  tableData.value
-    .filter((r: any) => !r.isSection)
-    .map((r: any) => ({
-      opening_unadjusted: displayOpeningUnadjusted(r),
-      opening_audited: openingAudited(r),
-      current_unadjusted: displayCurrentUnadjusted(r),
-      adj_amount: displayAdj(r),
-      reclass_amount: displayReclass(r),
-      audited: auditedAmount(r),
-      change_amount: changeAmount(r),
-    })),
-)
-const { colWidth: gasColWidth } = useAutoColumnWidth({
-  rows: gasDisplayRows,
-  columns: [
-    { field: 'opening_unadjusted', header: '期初未审' },
-    { field: 'opening_audited',    header: '期初审定' },
-    { field: 'current_unadjusted', header: '本期未审' },
-    { field: 'adj_amount',         header: '账项调整' },
-    { field: 'reclass_amount',     header: '重分类' },
-    { field: 'audited',            header: '审定数' },
-    { field: 'change_amount',      header: '变动额' },
-  ],
+// ─── 自适应列宽（composable：useAuditSheetAutoWidth，按各列显示值估算）───
+const { colWidth: gasColWidth } = useAuditSheetAutoWidth({
+  tableData,
+  values: {
+    opening_unadjusted: displayOpeningUnadjusted, opening_audited: openingAudited,
+    current_unadjusted: displayCurrentUnadjusted, adj_amount: displayAdj,
+    reclass_amount: displayReclass, audited: auditedAmount, change_amount: changeAmount,
+  },
   formatter: fmtNum,
 })
 
-// ─── 工具栏：公式 / 还原 ───
-/**
- * 公式按钮：emit open-formula 携带 sheetName 上下文。
- * 后续接 FormulaEditDialog（由父组件监听打开）。readonly 时不触发。
- */
-function onOpenFormula() {
-  if (props.readonly) return
-  emit('open-formula', { sheetName: props.sheetName })
-}
-
-/**
- * 还原按钮：二次确认后 emit restore。
- * 本组件 props 驱动、无 render-config 取数能力，由父组件（useWpRenderer）
- * 重新从后端拉取模板默认行并经 htmlData 回流。readonly 时不触发。
- */
-async function onRestore() {
-  if (props.readonly) return
-  try {
-    await confirmDangerous('还原将丢弃当前编辑，恢复模板默认行，是否继续？', '还原确认')
-  } catch {
-    // 用户取消
-    return
-  }
-  emit('restore')
-  ElMessage.success('正在恢复模板默认行…')
-}
-
-// ─── 发布到试算表（P0-项3：显式确认 + 二次确认，中文）───
-const publishing = ref(false)
-
-/**
- * 发布审定数到试算表：区别于保存。普通保存不再自动回写 trial_balance，
- * 必须经本操作显式确认（后端再校验发布权限 + 幂等）。
- */
-async function onPublishToTb() {
-  if (props.readonly || publishing.value) return
-  try {
-    await confirmDangerous(
-      '发布后将把本审定表各科目的审定数写入试算表（trial_balance），并触发报表/错报评价等下游重算。确认发布？',
-      '发布到试算表确认',
-    )
-  } catch {
-    return // 用户取消
-  }
-  publishing.value = true
-  try {
-    const { api } = await import('@/services/apiProxy')
-    const resp: any = await api.post(
-      `/api/workpapers/${props.wpId}/audit-determination/publish-to-tb`,
-      { sheet_name: props.sheetName, html_data: props.htmlData },
-    )
-    ElMessage.success(resp?.message || '已发布到试算表')
-  } catch (err: any) {
-    const status = err?.response?.status
-    if (status === 403) {
-      ElMessage.error('无发布权限（需底稿编辑权）')
-    } else if (status === 423) {
-      ElMessage.error('项目已被合并锁定，无法发布')
-    } else if (status === 400) {
-      ElMessage.error(err?.response?.data?.detail || err?.response?.data?.message || '当前 sheet 无可发布的审定数')
-    } else {
-      ElMessage.error('发布失败，请稍后重试')
-    }
-  } finally {
-    publishing.value = false
-  }
-}
+// ─── 工具栏：公式 / 还原 / 发布到试算表（composable：useAuditSheetToolbarActions）───
+const { onOpenFormula, onRestore, onPublishToTb, publishing } = useAuditSheetToolbarActions({
+  readonly: () => props.readonly,
+  wpId: () => props.wpId,
+  sheetName: () => props.sheetName,
+  htmlData: () => props.htmlData,
+  emitOpenFormula: (payload) => emit('open-formula', payload),
+  emitRestore: () => emit('restore'),
+})
 
 // ─── 表格样式 ───
 const headerStyle = {
