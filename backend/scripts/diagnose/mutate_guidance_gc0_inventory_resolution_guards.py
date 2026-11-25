@@ -146,9 +146,8 @@ def _eol_bytes(payload: bytes, fragment: bytes) -> bytes:
     CI 绿」，让这套变异检验在开发机上完全空转。
     """
     eol = b"\r\n" if b"\r\n" in payload else b"\n"
-    if eol == b"\n":
-        return fragment
-    return fragment.replace(b"\r\n", b"\n").replace(b"\n", eol)
+    normalized = fragment.replace(b"\r\n", b"\n")
+    return normalized if eol == b"\n" else normalized.replace(b"\n", eol)
 
 
 def _assert_anchor(mutation: Mutation) -> None:
@@ -175,9 +174,12 @@ def _apply(mutation: Mutation) -> None:
 def _restore(mutation: Mutation) -> None:
     path = ROOT / mutation.relative_path
     payload = path.read_bytes()
-    if payload.count(mutation.replacement) != 1:
+    replacement = _eol_bytes(payload, mutation.replacement)
+    if payload.count(replacement) != 1:
         raise RuntimeError(f"{mutation.mutation_id}: restore anchor 不唯一")
-    path.write_bytes(payload.replace(mutation.replacement, mutation.original, 1))
+    path.write_bytes(
+        payload.replace(replacement, _eol_bytes(payload, mutation.original), 1)
+    )
 
 
 def _run_test(mutation: Mutation) -> tuple[bool, str]:
