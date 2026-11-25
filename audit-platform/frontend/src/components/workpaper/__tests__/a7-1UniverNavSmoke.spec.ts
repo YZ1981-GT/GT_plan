@@ -30,6 +30,8 @@ vi.mock('vue-router', () => ({
 // Mock apiProxy — GtIndexChip 经 ACNR resolve_instance 跳转
 const mockResolveInstance = vi.fn()
 vi.mock('@/services/acnr', () => ({
+  // GtIndexChip 读 getProjectRegistryFailure（项目级目录治理失败态）；测试无此失败 ⇒ null，与真实函数「无失败」返回值一致。
+  getProjectRegistryFailure: () => null,
   useAcnr: () => ({
     resolve: vi.fn(),
     resolveInstance: (...args: unknown[]) => mockResolveInstance(...args),

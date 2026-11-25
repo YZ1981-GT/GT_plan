@@ -51,6 +51,8 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }))
 vi.mock('@/services/acnr', () => ({
+  // GtIndexChip 读 getProjectRegistryFailure（项目级目录治理失败态）；测试无此失败 ⇒ null，与真实函数「无失败」返回值一致。
+  getProjectRegistryFailure: () => null,
   useAcnr: () => ({ resolveIndexBatched: (...a: unknown[]) => mockBatch(...a), resolveInstance: vi.fn() }),
 }))
 
@@ -84,8 +86,7 @@ const NON_DISPLAY_READS: Allowed[] = [
   { file: 'components/formula/FormulaManagerDialog.vue', owner: 'matchesSheetIdentity', receiver: 's', prop: 'sheet_name', count: 1, reason: '按目录 sheet_name 与别名做身份等值匹配，不是显示' },
   { file: 'components/formula/FormulaManagerDialog.vue', owner: 'loadWpFormulas', receiver: 'it', prop: 'sheet_name', count: 3, reason: '底稿公式（wp_formula）条目自带的 sheet_name，保存回源字段' },
   { file: 'components/formula/FormulaManagerDialog.vue', owner: 'currentRows', receiver: 'r', prop: 'account_name', count: 1, reason: '试算表行的科目名称' },
-  { file: 'components/formula/FormulaManagerDialog.vue', owner: 'paramPickerTbItems', receiver: 'a', prop: 'account_name', count: 1, reason: '试算表地址的科目名称' },
-  { file: 'components/formula/FormulaManagerDialog.vue', owner: 'onFormulaEditSave', receiver: 'row', prop: 'sheet_name', count: 1, reason: '底稿公式保存请求体 sheet_name（PUT /workpapers/{wp_id}/formulas 必填）' },
+  { file: 'components/formula/FormulaManagerDialog.vue', owner: 'onFormulaEditSave', receiver: 'row', prop: 'sheet_name', count: 2, reason: '底稿公式保存请求体 sheet_name（PUT /workpapers/{wp_id}/formulas 必填）：新建时先按单元格引用 / 行自带身份求 sheet，再写回行；两处都是结构身份，不拼显示名' },
   { file: 'components/formula/FormulaManagerDialog.vue', owner: 'onSaveAllFormulas', receiver: 'row', prop: 'sheet_name', count: 1, reason: '同上（批量保存）' },
   { file: 'components/formula/FormulaEditDialog.vue', owner: 'openSourceBrowserForTB', receiver: 'r', prop: 'account_name', count: 1, reason: '试算表行的科目名称' },
   { file: 'components/formula/FormulaRefPicker.vue', owner: 'filteredTbRows', receiver: 'r', prop: 'account_name', count: 1, reason: '试算表行的科目名称（搜索）' },

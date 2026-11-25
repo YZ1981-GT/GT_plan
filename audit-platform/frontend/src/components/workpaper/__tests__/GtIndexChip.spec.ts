@@ -31,6 +31,8 @@ vi.mock('vue-router', () => ({
 const mockAcnrResolve = vi.fn()
 const mockAcnrResolveInstance = vi.fn()
 vi.mock('@/services/acnr', () => ({
+  // GtIndexChip 读 getProjectRegistryFailure（项目级目录治理失败态）；测试无此失败 ⇒ null，与真实函数「无失败」返回值一致。
+  getProjectRegistryFailure: () => null,
   useAcnr: () => ({
     // R15：chip 走批量解析 resolveIndexBatched(indexRef, projectId)；这里转成原 resolve 的对象参数，既有断言不变
     resolveIndexBatched: (indexRef: string, projectId?: string) =>

@@ -19,6 +19,8 @@ import AcnrCandidatesHint from '../AcnrCandidatesHint.vue'
 // ─── 桩：chip 依赖的 SDK 与路由 ───
 const resolveIndexBatched = vi.fn()
 vi.mock('@/services/acnr', () => ({
+  // GtIndexChip 读 getProjectRegistryFailure（项目级目录治理失败态）；测试无此失败 ⇒ null，与真实函数「无失败」返回值一致。
+  getProjectRegistryFailure: () => null,
   useAcnr: () => ({
     resolveIndexBatched,
     resolveInstance: vi.fn(),
