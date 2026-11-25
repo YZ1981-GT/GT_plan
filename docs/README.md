@@ -22,7 +22,7 @@
 
 | 文件 | 说明 |
 |------|------|
-| `workpaper-developer-guide.md` | 底稿组件开发指南（Runtime Boundary 模式） |
+| `function-point-inventory.md` | 功能点清单：按功能域拆解 183 项，包含页面入口、后端逻辑、权限、导入校验、自动同步、性能、审计、异常回滚和工时估算模板 |
 
 ## 使用说明
 
