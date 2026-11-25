@@ -6017,6 +6017,17 @@ jobs:
           python-version: "3.12"
       - name: Install Python dependencies
         run: python -m pip install -r backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install frontend deps（R4 复核门现算 sourceDigest 要跑 mount discoverer）
+        # 2026-11-25：R4 的 approved_source_digest 复核门经 generate_workpaper_sync_manifest
+        # .discover_source() 起 `node discover-workpaper-sync-mounts.mjs`，后者 import
+        # @typescript-eslint/parser 与 vue-eslint-parser。原先本 job 没装前端依赖 ⇒
+        # 取 current sourceDigest 抛错 ⇒ approved_matches_current=False ⇒ R4 恒红
+        # （本机有 node_modules 所以恒绿，形成「本机绿、CI 红」）。
+        working-directory: audit-platform/frontend
+        run: npm ci
       - name: "[projection-lane] 范围边界与 capability 纪律（--offline，只读）"
         run: python backend/scripts/check/check_projection_lane_adjudication.py --offline
       - name: "[projection-lane] 变异锚点静态自检（九条，--check-anchors 只读）"
