@@ -1093,6 +1093,22 @@ async def resolve_entry_identity(
     _, wp_code = await _load_wp_or_404(db, wp_id)
     if authorized_project_id != project_id:
         raise HTTPException(status_code=403, detail="底稿项目授权上下文不一致")
+    # 🔴 2026-11-25：authorize_wp_read 只是项目成员级校验（不含委派 / 复核人白名单 /
+    #    History_Only 等可见性规则）。本端点返回该底稿的 room 身份与已发布 representation
+    #    摘要，必须过平台统一的 wp 可见性门，与其余 sync 端点同一 entrypoint/action。
+    from app.routers._wp_gate import enforce_wp_gate
+
+    await enforce_wp_gate(
+        db,
+        current_user,
+        entrypoint=_VISIBILITY_ENTRYPOINT,
+        action=_VISIBILITY_READ_ACTION,
+        method="GET",
+        wp_id=wp_id,
+        project_id=project_id,
+        route_name=ENTRY_IDENTITY_PREFIX + "/entry-identity",
+        entry_family="workpaper",
+    )
 
     from app.services.wp_template_finder import find_template_file_any
 

@@ -238,6 +238,18 @@ class ActionNotPermittedError(SyncActionForbiddenError):
     error_code = "sync_action_not_permitted"
 
 
+class SyncReadonlyAccessError(SyncActionForbiddenError):
+    """平台可见性门判定本用户对该底稿**只读**（复核人 / History_Only 等）—— 可见但不可写。
+
+    🔴 2026-11-25 补：visibility 探针一直把 `enforce_wp_gate` 的 `readonly` 观测带回来，
+    但阶段 ⑤ 只按 `workflow_locked` 拦写、`authorize` 回调只校验 action 词汇表 ⇒
+    只读用户可以调用 materialize / resolve / rollback 等写端点。与 workflow 锁定（业务终态，
+    423）分型：这是**访问权限**不足，按 403 处理。
+    """
+
+    error_code = "sync_readonly_access"
+
+
 class VisibilityProbeFailedError(SyncEndpointGuardError):
     """visibility 探针自身失败 —— **不得**降级为「无此限制」。
 
@@ -841,6 +853,16 @@ class SyncEndpointGuard:
                 f"scope 可见但写 action={request.action!r} 不被允许（423 Locked，与 404 分型）；"
                 f"只读 action（{sorted(self._read_only_actions)}）仍放行，"
                 "否则归档底稿连冲突/timeline 都看不了"
+            )
+        if (
+            bool(observed.get("readonly"))
+            and str(request.action) not in self._read_only_actions
+        ):
+            self.refused += 1
+            raise SyncReadonlyAccessError(
+                f"wp {wp_id} 对当前用户只读（平台可见性门判定 readonly）—— "
+                f"写 action={request.action!r} 不被允许（403）；"
+                f"只读 action（{sorted(self._read_only_actions)}）仍放行"
             )
         verdict = self._authorize(candidate)
         if inspect.isawaitable(verdict):

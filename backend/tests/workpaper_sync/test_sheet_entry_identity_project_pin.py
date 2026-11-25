@@ -29,7 +29,18 @@ PROJECT = uuid.uuid4()
 WP = uuid.uuid4()
 
 
+def _allow_wp_gate(monkeypatch) -> None:
+    """鉴权替身：端点 2026-11-25 补接 wp 可见性门，本用例只测 representation pin。"""
+    from app.routers import _wp_gate
+
+    async def fake_gate(_db, _user, **_kw):
+        return SimpleNamespace(readonly=False)
+
+    monkeypatch.setattr(_wp_gate, "enforce_wp_gate", fake_gate)
+
+
 def test_entry_identity_pins_artifact_reader_to_requested_workpaper(monkeypatch) -> None:
+    _allow_wp_gate(monkeypatch)
     """目标底稿的 representation pin 必须覆盖 artifact reader，且请求结束后清理。"""
     app = FastAPI()
     app.include_router(ROUTER.router)

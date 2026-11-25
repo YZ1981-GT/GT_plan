@@ -17,6 +17,25 @@ PROJECT = uuid.uuid4()
 WP = uuid.uuid4()
 
 
+@pytest.fixture(autouse=True)
+def _gate_calls(monkeypatch) -> list[dict]:
+    """本文件测端点的业务分支，鉴权全部替身（authorize_wp_read 已替换）。
+
+    2026-11-25 端点补接了平台 wp 可见性门 ``enforce_wp_gate``；这里同样替身并记录调用，
+    门本身的判定由 wp_visibility 自己的测试覆盖。接线与拒绝路径见文件末两条用例。
+    """
+    from app.routers import _wp_gate
+
+    calls: list[dict] = []
+
+    async def fake_gate(_db, _user, **kw):
+        calls.append(kw)
+        return SimpleNamespace(readonly=False)
+
+    monkeypatch.setattr(_wp_gate, "enforce_wp_gate", fake_gate)
+    return calls
+
+
 def test_pending_sheet_does_not_fabricate_xlsx_sheet_entry(monkeypatch) -> None:
     """K11 的 provider binding 未审核 ⇒ 端点必须返回 pending，且不伪造 room 身份。
 
@@ -382,3 +401,66 @@ def test_draining_binding_still_reads_artifact(monkeypatch) -> None:
     # ② 读取失败仍降级成 typed pending（不抛 500）
     assert body["status"] == "pending"
     assert body["error_code"] == "current_representation_missing"
+
+
+def _identity_app(monkeypatch) -> TestClient:
+    app = FastAPI()
+    app.include_router(ROUTER.router)
+
+    async def fake_db():
+        yield object()
+
+    async def fake_user():
+        return SimpleNamespace(id=uuid.uuid4())
+
+    async def fake_authorize(_db, _user, _wp_id):
+        return PROJECT
+
+    async def fake_load(_db, _wp_id):
+        return SimpleNamespace(project_id=PROJECT), "K11"
+
+    app.dependency_overrides[ROUTER.get_db] = fake_db
+    app.dependency_overrides[ROUTER.get_current_user] = fake_user
+    monkeypatch.setattr(deps, "authorize_wp_read", fake_authorize)
+    monkeypatch.setattr(wp_onlyoffice_router, "_load_wp_or_404", fake_load)
+    return TestClient(app)
+
+
+def test_entry_identity_passes_the_platform_wp_visibility_gate(monkeypatch, _gate_calls) -> None:
+    """项目成员级校验之外，必须过 wp 可见性门（委派 / 复核人白名单 / History_Only）。"""
+    response = _identity_app(monkeypatch).get(
+        f"/api/projects/{PROJECT}/workpapers/{WP}/sync/entry-identity",
+        params={"sheet_name": "资产减值损失检查表K11"},
+    )
+    assert response.status_code == 200
+    assert len(_gate_calls) == 1, _gate_calls
+    call = _gate_calls[0]
+    assert call["wp_id"] == WP and call["project_id"] == PROJECT
+    assert call["entrypoint"] == ROUTER._VISIBILITY_ENTRYPOINT
+    assert call["action"] == ROUTER._VISIBILITY_READ_ACTION and call["method"] == "GET"
+
+
+def test_entry_identity_gate_denial_is_404_before_any_binding_work(monkeypatch) -> None:
+    """门拒绝 ⇒ 404，且不得走到 binding 解析 / 已发布 artifact 读取（不泄露 entry 事实）。"""
+    from app.routers import _wp_gate
+    from app.services.wp_visibility.denial import ExternalNotFound
+
+    async def deny(_db, _user, **_kw):
+        raise ExternalNotFound()
+
+    touched: list[str] = []
+
+    def boom(*_a, **_k):
+        touched.append("resolver")
+        raise AssertionError("gate denial must stop before binding resolution")
+
+    monkeypatch.setattr(_wp_gate, "enforce_wp_gate", deny)
+    from app.services.workpaper_sync import sheet_open_bindings
+
+    monkeypatch.setattr(sheet_open_bindings.SheetOpenBindingResolver, "resolve", boom)
+    response = _identity_app(monkeypatch).get(
+        f"/api/projects/{PROJECT}/workpapers/{WP}/sync/entry-identity",
+        params={"sheet_name": "资产减值损失检查表K11"},
+    )
+    assert response.status_code == 404
+    assert touched == []
