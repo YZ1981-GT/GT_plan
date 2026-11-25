@@ -5813,7 +5813,12 @@ jobs:
           | tee /tmp/dsh_backend_phase_a.txt
           && python -c "import re,sys; t=open('/tmp/dsh_backend_phase_a.txt',encoding='utf-8',errors='replace').read(); p=sum(map(int,re.findall(r'(\d+) passed',t))); s=sum(map(int,re.findall(r'(\d+) skipped',t))); print('phase_a passed=%d skipped=%d floor=508'%(p,s)); sys.exit(0 if (p>=508 and s==0) else 1)"
       - name: Assert non-PG guards actually ran (anti silent-skip)
-        # 其余 6 个文件实测基线 189 passed / 0 skipped（PG 与 sqlite 下同值）。
+        # 其余 6 个文件实测基线 179 passed / 15 skipped（PG 与 sqlite 下同值）。
+        # 🔴 2026-11-25：531a6d7cc 把 test_dsh_discovery_task27.py 里依赖 DSH vendor SDK
+        #    的 15 条改成显式 skip（vendor 是需人工 pin 安装的外部依赖，CI 上不存在），
+        #    但本步仍要求 skipped==0 ⇒ 恒红。改为：只放行原因为「DSH vendor SDK 未安装」
+        #    且**恰好 15 条**的 skip（多一条少一条都打红，新增 vendor 依赖须同步改这里），
+        #    其余任何 skip 仍打红；passed 底线按现测 179。
         run: >-
           python -m pytest
           backend/tests/test_ai_chat_mcp_router.py
@@ -5824,7 +5829,7 @@ jobs:
           backend/tests/test_dsh_discovery_task27.py
           -q -rs --tb=no
           | tee /tmp/dsh_backend_rest.txt
-          && python -c "import re,sys; t=open('/tmp/dsh_backend_rest.txt',encoding='utf-8',errors='replace').read(); p=sum(map(int,re.findall(r'(\d+) passed',t))); s=sum(map(int,re.findall(r'(\d+) skipped',t))); print('rest passed=%d skipped=%d floor=189'%(p,s)); sys.exit(0 if (p>=189 and s==0) else 1)"
+          && python -c "import re,sys; t=open('/tmp/dsh_backend_rest.txt',encoding='utf-8',errors='replace').read(); p=sum(map(int,re.findall(r'(\d+) passed',t))); s=sum(map(int,re.findall(r'(\d+) skipped',t))); v=sum(map(int,re.findall(r'^SKIPPED \[(\d+)\][^\n]*DSH vendor SDK',t,re.M))); print('rest passed=%d skipped=%d vendor_skipped=%d floor=179 vendor_expected=15'%(p,s,v)); sys.exit(0 if (p>=179 and v==15 and s==v) else 1)"
 
   dsh-agent-panel-frontend:
     # DSH Agent Panel Integration — 前端跨阶段守卫
