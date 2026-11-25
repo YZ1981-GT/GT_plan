@@ -60,6 +60,7 @@ from app.services.evidence_governance.secure_attachment_gateway import (
     StorageBoundaryResolver,
 )
 from app.services.evidence_governance.scope_guard import ProjectYearScopeGuard
+from app.services.wp_visibility.entry_integration import enforce_attachment_wp_visibility
 from app.services.evidence_governance.version_manager import (
     AttachmentVersionManager,
 )
@@ -302,6 +303,13 @@ async def read_attachment_content(
 
     vid = _parse_uuid(version_id, "version_id") if version_id else None
 
+    # 附件挂在底稿上时，读字节前必须过 wp 可见性门（委派 / 复核人白名单 / History_Only）；
+    # 未挂任何底稿的项目级附件由下方 scope 链负责（enforce_attachment_wp_visibility 返回 None）。
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=aid,
+        action="attach_download", method="GET", entrypoint="attachment.download",
+    )
+
     gateway = _build_gateway(db)
     result = await gateway.read_attachment_content(
         attachment_id=aid,
@@ -448,6 +456,12 @@ async def replace_attachment_version(
 
     idem_key = idempotency_key or f"attachment:replace:{aid}:{body.new_content_hash}"
 
+    # 替换内容属于写：挂在底稿上的附件须对其中至少一份底稿可写见（上传口径）。
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=aid,
+        action="attach_upload", method="POST", entrypoint="attachment.upload",
+    )
+
     mgr = AttachmentVersionManager(db)
     result = await mgr.replace_version(
         attachment_id=aid,
@@ -510,6 +524,11 @@ async def assess_attachment_impact(
         object_id=aid,
         requested_project_id=pid,
         requested_year=year,
+    )
+    # 影响报告列出下游引用与正式产出，同样属于该底稿的内容面。
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=aid,
+        action="attach_read", method="GET", entrypoint="attachment.read",
     )
 
     mgr = AttachmentVersionManager(db)

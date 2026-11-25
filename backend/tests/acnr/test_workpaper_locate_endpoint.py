@@ -31,6 +31,24 @@ async def world(monkeypatch: pytest.MonkeyPatch):
         yield w
 
 
+@pytest.fixture(autouse=True)
+def wp_gate_calls(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
+    """2026-11-25 端点在项目级鉴权之后补接了 wp 可见性门 ``enforce_wp_gate``。
+
+    SQLite 权限世界缺可见性域的表（委派 / epoch），门在这里无法按生产口径判定，故替身为放行并
+    记录调用；门本身的判定由 wp_visibility 的测试覆盖。接线与拒绝路径见文件末两条用例。
+    """
+    from app.routers import _wp_gate
+
+    calls: list[dict] = []
+
+    async def allow(_db, _user, **kw):
+        calls.append(kw)
+
+    monkeypatch.setattr(_wp_gate, "enforce_wp_gate", allow)
+    return calls
+
+
 async def _workpaper(world, *, deleted: bool = False) -> tuple[WorkingPaper, WpIndex]:
     idx = WpIndex(project_id=world.target.id, wp_code="E1", wp_name="货币资金")
     world.db.add(idx)
@@ -151,3 +169,33 @@ def test_locate_calls_project_gate_with_readonly():
              and getattr(c.func, "id", getattr(c.func, "attr", None)) == "assert_project_permission"]
     assert calls, "定位端点没有调用 assert_project_permission"
     assert any(isinstance(a, ast.Constant) and a.value == "readonly" for c in calls for a in c.args)
+
+
+async def test_member_also_passes_the_wp_visibility_gate(world, wp_gate_calls):
+    """项目级 readonly 之外必须过 wp 可见性门（read_detail，与编辑页同口径）。"""
+    wp, _ = await _workpaper(world)
+    user = (await world.readonly_member()).user
+    async with world.client(acnr_module.router, user=user) as client:
+        resp = await client.get(_url(wp.id))
+    assert resp.status_code == 200, resp.text
+    assert len(wp_gate_calls) == 1, wp_gate_calls
+    call = wp_gate_calls[0]
+    assert call["wp_id"] == wp.id and call["project_id"] == world.target.id
+    assert (call["entrypoint"], call["action"], call["method"]) == ("workpaper.detail", "read_detail", "GET")
+
+
+async def test_wp_gate_denial_is_404_without_project_id(world, monkeypatch):
+    """成员但对该底稿不可见（未委派等）⇒ 404，且不回 project_id / wp_code。"""
+    from app.routers import _wp_gate
+    from app.services.wp_visibility.denial import ExternalNotFound
+
+    async def deny(_db, _user, **_kw):
+        raise ExternalNotFound()
+
+    monkeypatch.setattr(_wp_gate, "enforce_wp_gate", deny)
+    wp, _ = await _workpaper(world)
+    user = (await world.readonly_member()).user
+    async with world.client(acnr_module.router, user=user) as client:
+        resp = await client.get(_url(wp.id))
+    assert resp.status_code == 404, resp.text
+    assert str(world.target.id) not in resp.text and "E1" not in resp.text

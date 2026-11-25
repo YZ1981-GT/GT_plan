@@ -361,12 +361,58 @@ async def test_batch_refresh_requires_edit_membership_of_body_project(world, who
     import app.routers.row_name_alignment_router as row_alignment
     import app.services.workpaper_refresh_service as refresh_service
 
-    stub = world.stub(refresh_service, "batch_refresh_workpapers", returns=[])
-    identity = await world.identity(who)
-    resp = await _send(world, row_alignment.router, identity.user, "post", "/api/workpapers/batch-refresh",
-                       json={"project_id": str(PID), "wp_ids": [str(WP)]})
+    import app.services.wp_visibility.entry_integration as wp_entry
+
+    # 本用例只测「请求体项目 edit」这道门；逐份底稿的 wp 可见性门（2026-11-25 补接）在
+    # SQLite 世界里缺可见性域的表、无法按生产口径判定，故放行，判定见下一条用例。
+    async def _allow_wp(*_a, **_k):
+        return object()
+
+    _patch = pytest.MonkeyPatch()
+    _patch.setattr(wp_entry, "gate_wp", _allow_wp)
+    try:
+        stub = world.stub(refresh_service, "batch_refresh_workpapers", returns=[])
+        identity = await world.identity(who)
+        resp = await _send(world, row_alignment.router, identity.user, "post", "/api/workpapers/batch-refresh",
+                           json={"project_id": str(PID), "wp_ids": [str(WP)]})
+    finally:
+        _patch.undo()
     assert resp.status_code == status, resp.text
     assert stub.count == calls  # 被拦下的请求一次刷新都没有
+
+
+async def test_batch_refresh_skips_workpapers_denied_by_wp_gate(world):
+    """项目 edit 通过、但某份底稿对当前用户不可见 / 只读 ⇒ 该份不刷新，按单份失败回报，其余照常。"""
+    import uuid as _uuid
+
+    import app.routers.row_name_alignment_router as row_alignment
+    import app.services.workpaper_refresh_service as refresh_service
+    import app.services.wp_visibility.entry_integration as wp_entry
+    from app.services.wp_visibility.denial import ExternalNotFound
+
+    visible, hidden = _uuid.uuid4(), _uuid.uuid4()
+
+    async def _gate(_db, _user, *, wp_id, **_k):
+        if wp_id == hidden:
+            raise ExternalNotFound()
+        return object()
+
+    _patch = pytest.MonkeyPatch()
+    _patch.setattr(wp_entry, "gate_wp", _gate)
+    try:
+        stub = world.stub(refresh_service, "batch_refresh_workpapers", returns=[])
+        identity = await world.identity("edit_member")
+        resp = await _send(world, row_alignment.router, identity.user, "post", "/api/workpapers/batch-refresh",
+                           json={"project_id": str(PID), "wp_ids": [str(visible), str(hidden)]})
+    finally:
+        _patch.undo()
+    assert resp.status_code == 200, resp.text
+    assert stub.count == 1
+    args, _kwargs = stub.calls[0]
+    assert list(args[2]) == [visible], "被门拒绝的底稿不得交给刷新服务"
+    body = resp.json()
+    failed = [r for r in body["results"] if not r["ok"]]
+    assert [r["wp_id"] for r in failed] == [str(hidden)]
 
 
 @pytest.mark.parametrize(("who", "status"), [

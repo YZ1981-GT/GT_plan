@@ -2034,3 +2034,8 @@ backend/tests/acnr/test_acnr_status_doc_statements.py 803
 #   拆分方向：probeSheet 逐 sheet 探测 / 机制 ①② 探针 / 清单读取（declaredKeys 等）各抽一个伴生模块，
 #   现状耦合点是 collectWriteSites → resolveKeyExpr → probeSheet 同一条判据链，需配 x3 守卫整体回归。
 audit-platform/frontend/src/components/workpaper/shared/__tests__/helpers/x3KeyProbe.ts 1742
+# 2026-11-25 登记（HEAD 883 行即已超 800，此前未登记；本批 +11 行为两处回函件 wp 可见性门接线）：
+#   confirmations.py —— 函证路由（台账 / 回函匹配队列 / OCR 比对 / 回填 / 附件挂载）。
+#   拆分方向：「回函匹配队列 + 指派」与「OCR 比对 + 回填」两组端点各抽一个子 router
+#   （router_registry 同前缀挂载，路由级 confirmation_project_gate 随子 router 一并携带）。
+backend/app/routers/confirmations.py 894

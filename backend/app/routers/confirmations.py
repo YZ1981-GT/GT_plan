@@ -25,6 +25,7 @@ from app.services.confirmation_types import ConfirmTypeStr
 from app.services.attachment_service import AttachmentService
 from app.services.attachment_upload_policy import UploadRejected
 from app.services.workpaper_evidence_intake import read_upload_limited
+from app.services.wp_visibility.entry_integration import enforce_attachment_wp_visibility
 
 router = APIRouter(
     prefix="/projects/{project_id}/confirmations",
@@ -179,6 +180,11 @@ async def assign_match(
     cid = uuid.UUID(body.confirmation_id)
     paired = uuid.UUID(body.paired_outbound_id) if body.paired_outbound_id else None
     actor_user_id = getattr(user, "id", None)
+    # 回函件已挂底稿时，指派前必须对其中至少一份底稿可见（路由级门只校验项目归属）。
+    await enforce_attachment_wp_visibility(
+        db, user, attachment_id=aid,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
 
     try:
         result = await confirmation_evidence_service.assign_match(
@@ -768,6 +774,11 @@ async def extract_and_compare(
     权限：本项目 edit；回函件须属于本项目（路由级门）
     """
     aid = uuid.UUID(attachment_id)
+    # 识别会读取回函件全文并写 ocr_fields_cache：已挂底稿时须对其中至少一份底稿可见。
+    await enforce_attachment_wp_visibility(
+        db, user, attachment_id=aid,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
 
     try:
         await ensure_reply_text(db, aid)

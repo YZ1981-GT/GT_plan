@@ -453,6 +453,16 @@ async def acnr_locate_workpaper(
         raise HTTPException(status_code=410, detail={
             "error_code": "WORKPAPER_IN_RECYCLE_BIN", "message": "底稿已移入回收站",
             "project_id": str(row.project_id)})
+    # 项目成员级校验之外再过 wp 可见性门（委派 / 复核人白名单 / History_Only）：对当前用户
+    # 不可见的底稿不得经短链泄露其 wp_code（与编辑页本身的门同口径，不可见即 404）。
+    from app.routers._wp_gate import enforce_wp_gate
+
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.detail", action="read_detail", method="GET",
+        wp_id=wp_id, project_id=row.project_id,
+        route_name="/api/acnr/workpapers/{wp_id}/locate", entry_family="workpaper",
+    )
     return {"wp_id": str(wp_id), "project_id": str(row.project_id), "wp_code": row.wp_code}
 
 

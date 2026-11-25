@@ -283,26 +283,54 @@ async def batch_refresh(
     逐个底稿是否属于该项目由 service 校验（不属于的记失败、不写）。
     """
     from app.services.workpaper_refresh_service import batch_refresh_workpapers
+    from app.services.wp_visibility.denial import ExternalNotFound
+    from app.services.wp_visibility.entry_integration import gate_wp
 
     await assert_project_permission(db, _user, body.project_id, "edit")
-    results = await batch_refresh_workpapers(db, body.project_id, body.wp_ids)
+    # 项目 edit 之外，逐份底稿过 wp 可见性门（写口径）：对当前用户不可见 / 只读的底稿不刷新，
+    # 按单份失败回报（与 service 对「不属于本项目」的处理同形），不让整批 404。
+    # 用 gate_wp（显式授权，拒绝会记安全审计），不用只做可见集过滤的 try_gate_wp。
+    allowed: list[UUID] = []
+    denied: list[UUID] = []
+    for wid in body.wp_ids:
+        try:
+            await gate_wp(
+                db, _user,
+                entrypoint="workpaper.parsed_data_write", action="save_parsed_data", method="PUT",
+                wp_id=wid, entry_family="bulk",
+            )
+        except ExternalNotFound:
+            denied.append(wid)
+        else:
+            allowed.append(wid)
+    results = await batch_refresh_workpapers(db, body.project_id, allowed) if allowed else []
     await db.commit()
 
-    success = sum(1 for r in results if r.ok)
-    failed = sum(1 for r in results if not r.ok)
+    items = [
+        {
+            "wp_id": r.wp_id,
+            "wp_code": r.wp_code,
+            "ok": r.ok,
+            "error": r.error,
+            "auto_matched": r.auto_matched,
+            "pending": r.pending,
+        }
+        for r in results
+    ] + [
+        {
+            "wp_id": str(wid),
+            "wp_code": "",
+            "ok": False,
+            "error": "底稿不存在或无权刷新",
+            "auto_matched": 0,
+            "pending": 0,
+        }
+        for wid in denied
+    ]
+    success = sum(1 for it in items if it["ok"])
     return {
-        "total": len(results),
+        "total": len(items),
         "success": success,
-        "failed": failed,
-        "results": [
-            {
-                "wp_id": r.wp_id,
-                "wp_code": r.wp_code,
-                "ok": r.ok,
-                "error": r.error,
-                "auto_matched": r.auto_matched,
-                "pending": r.pending,
-            }
-            for r in results
-        ],
+        "failed": len(items) - success,
+        "results": items,
     }

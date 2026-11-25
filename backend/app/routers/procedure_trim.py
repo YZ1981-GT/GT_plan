@@ -433,6 +433,23 @@ class ProgramRowRestoreRequest(BaseModel):
     request_id: str | None = None
 
 
+async def _gate_program_row_write(db: AsyncSession, user, pid: UUID, wp_id: UUID, route: str) -> None:
+    """程序行的裁剪 / 恢复 / 取任务都改写该底稿的程序表行 ⇒ 过 wp 可见性门（写）。
+
+    委派人依赖（require_project_delegator_pid）只证明是本项目的委派人，不含底稿级可见性
+    （委派范围 / 复核人只读 / History_Only）。委派人在矩阵里是 supervisor_scope，持有
+    ``workpaper.dedicated_subroute`` 的 ``dedicated_write``；不经 ``dedicated_wp_gate`` 依赖
+    是因为它在写时还会强制编辑锁，而「取 / 建任务」原本不受编辑锁约束。
+    """
+    from app.routers._wp_gate import enforce_wp_gate
+
+    await enforce_wp_gate(
+        db, user,
+        entrypoint="workpaper.dedicated_subroute", action="dedicated_write", method="POST",
+        wp_id=wp_id, project_id=pid, route_name=route, entry_family="workpaper",
+    )
+
+
 @router.post("/{pid}/procedure-trim/workpapers/{wp_id}/program-rows/not-applicable")
 async def trim_program_row(
     pid: UUID,
@@ -447,6 +464,7 @@ async def trim_program_row(
     from app.routers._wp_gate import enforce_edit_lock_for_content_write
     from app.services.procedure_row_trim_service import trim_row
 
+    await _gate_program_row_write(db, user, pid, wp_id, "program-rows/not-applicable")
     if not body.reason.strip():
         raise HTTPException(status_code=422, detail="裁剪理由必填")
     # 改程序表这一行：编辑锁在别人或本人另一个窗口手里 ⇒ 423（spec workpaper-multi-window-lock-gaps R3.2）
@@ -482,6 +500,7 @@ async def ensure_program_row_task(
     """
     from app.services.procedure_row_trim_service import ensure_row_task_for_delegation
 
+    await _gate_program_row_write(db, user, pid, wp_id, "program-rows/task")
     try:
         result = await ensure_row_task_for_delegation(db, pid, wp_id, body.sheet_name, body.program_no)
     except Exception:
@@ -505,6 +524,7 @@ async def restore_program_row(
     from app.routers._wp_gate import enforce_edit_lock_for_content_write
     from app.services.procedure_row_trim_service import restore_row
 
+    await _gate_program_row_write(db, user, pid, wp_id, "program-rows/restore")
     # 改程序表这一行：编辑锁在别人或本人另一个窗口手里 ⇒ 423（spec workpaper-multi-window-lock-gaps R3.2）
     await enforce_edit_lock_for_content_write(db, user, request, wp_id)
     try:
