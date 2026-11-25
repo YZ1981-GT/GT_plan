@@ -11,7 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        # 🔴 必须 pgvector 镜像：空库引导的 create_all 含 VECTOR(1024) 列（见下方 Bootstrap 步骤）
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
@@ -50,9 +51,25 @@ jobs:
         run: |
           pip install "uv>=0.7"
           uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
-      - name: Run migrations (populate PG schema for contract tests)
-        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://test:test@localhost:5432/audit_test').run_pending())"
+      # 🔴 2026-11-25：原先空库**只跑迁移**。平台基础 schema 由 ORM create_all 建，
+      #    backend/migrations/V*.sql 绝大多数是 ALTER 增量 ⇒ 空库直接跑迁移大批
+      #    `relation "xxx" does not exist`，而 run_pending() 照常返回、步骤恒绿 ⇒
+      #    `projects` 等基础表根本不存在，连库用例（如 acnr/test_acnr_targets_query_e2e）
+      #    在 -x 下整 job 中止。改为与 governance 各连库 job 相同的空库引导，且迁移失败即停。
+      #    API_BASE_URL 指向不可达端口：init_tables.py 建完表会尝试调后端种子端点。
+      - name: Bootstrap schema (create_all -> migrations)
         working-directory: backend
+        env:
+          PGPASSWORD: test
+          PYTHONPATH: ${{ github.workspace }}/backend
+          API_BASE_URL: http://127.0.0.1:9
+        run: |
+          set -euo pipefail
+          psql -h localhost -U test -d audit_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python scripts/seed/init_tables.py
+          psql -h localhost -U test -d audit_test -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
+          psql -h localhost -U test -d audit_test -c "DROP TABLE IF EXISTS ai_chat_action_receipts, ai_chat_tool_calls, ai_chat_attachments, ai_chat_runs CASCADE;"
+          python -c "import asyncio,sys; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://test:test@localhost:5432/audit_test').run_pending()); print('migrations executed:', len(r.executed), 'failed:', [f.version for f in r.failed]); sys.exit(1 if r.failed else 0)"
       - name: Run tests (exclude integration/e2e)
         run: |
           python -m pytest backend/tests/ \
@@ -64,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16  # 同 backend-tests：空库引导含 VECTOR 列
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: test_audit
@@ -86,11 +103,21 @@ jobs:
         run: |
           pip install "uv>=0.7"
           uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
-      - name: Run migrations (populate PG schema for column contract test)
+      # 同 backend-tests：空库先 create_all 再迁移，迁移失败即停（原先只跑迁移，基础表不存在且恒绿）
+      - name: Bootstrap schema (create_all -> migrations)
+        working-directory: backend
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_audit
-        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/test_audit').run_pending())"
-        working-directory: backend
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{ github.workspace }}/backend
+          API_BASE_URL: http://127.0.0.1:9
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d test_audit -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python scripts/seed/init_tables.py
+          psql -h localhost -U postgres -d test_audit -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
+          psql -h localhost -U postgres -d test_audit -c "DROP TABLE IF EXISTS ai_chat_action_receipts, ai_chat_tool_calls, ai_chat_attachments, ai_chat_runs CASCADE;"
+          python -c "import asyncio,sys; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/test_audit').run_pending()); print('migrations executed:', len(r.executed), 'failed:', [f.version for f in r.failed]); sys.exit(1 if r.failed else 0)"
       - name: Run PG-only tests
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_audit
