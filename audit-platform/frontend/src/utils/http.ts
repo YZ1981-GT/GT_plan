@@ -8,6 +8,7 @@ import axios, { type AxiosRequestConfig, type AxiosResponse, type InternalAxiosR
 import NProgress from 'nprogress'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { getAuthToken, getRefreshToken } from './authToken'
 import { versionBridge } from '@/composables/useVersionCheck'
 import { claimClientInstanceId, getClientInstanceId, isClientInstanceSettled } from './clientInstance'
 import { refIssueDetailText } from './formulaRefIssues'
@@ -497,11 +498,11 @@ http.interceptors.response.use(
       // 多窗口：先检查 token 是否已被其他窗口刷新（BroadcastChannel 广播到达后
       // auth store 会同步更新 sessionStorage，这里直接读即可）
       // spec: multi-window-ledger-workbench Phase 2 Task 11
-      const freshToken = sessionStorage.getItem('token')
+      const freshToken = getAuthToken()
       if (freshToken && freshToken !== (originalRequest.headers?.Authorization as string)?.replace('Bearer ', '')) {
         // 其他窗口已刷新 token，直接用新 token 重试，不再触发 refresh
         authStore.token = freshToken
-        authStore.refreshToken = sessionStorage.getItem('refreshToken') || authStore.refreshToken
+        authStore.refreshToken = getRefreshToken() || authStore.refreshToken
         originalRequest._retry = true
         originalRequest.headers = originalRequest.headers ?? {}
         originalRequest.headers.Authorization = `Bearer ${freshToken}`

@@ -23,6 +23,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import { claimClientInstanceId } from '@/utils/clientInstance'
+import { getAuthHeaders } from '@/utils/authToken'
 
 /** 锁冲突信息（他人持锁时由 acquire 409 / SSE 推送返回） */
 export interface LockConflictInfo {
@@ -207,10 +208,8 @@ export function useEditingLock(options: EditingLockOptions) {
     // 用 fetch + keepalive 保证请求在页面卸载后仍能发出。
     const id = heldId.value
     if (!id || !isMine.value) return
-    const token = sessionStorage.getItem('token')
     const instanceId = sessionStorage.getItem('gt-client-instance-id')
-    const headers: Record<string, string> = {}
-    if (token) headers['Authorization'] = `Bearer ${token}`
+    const headers: Record<string, string> = { ...getAuthHeaders() }
     if (instanceId) headers['X-Client-Instance'] = instanceId
     try {
       fetch(`/api/editing-locks/${resourceType}/${id}`, {

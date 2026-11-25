@@ -146,6 +146,19 @@ export const useAuthStore = defineStore('auth', {
       })
     },
 
+    /**
+     * 新标签页会话接力：把别的已登录标签页交来的会话写进本页（store 与 sessionStorage 同步写）。
+     * 调用方负责先推进请求身份纪元（advanceRequestIdentityEpoch）。
+     */
+    applyHandoffSession(session: { token: string; refreshToken: string; user?: any }) {
+      this.token = session.token
+      this.refreshToken = session.refreshToken
+      this.user = session.user ?? null
+      sessionStorage.setItem('token', session.token)
+      sessionStorage.setItem('refreshToken', session.refreshToken)
+      if (session.user) sessionStorage.setItem('user', JSON.stringify(session.user))
+    },
+
     async fetchUserProfile() {
       // 使用带拦截器的 http 实例，自动附加 token + 401 刷新
       const { data } = await http.get(API.users.me)

@@ -11,6 +11,7 @@
  */
 
 import { getClientInstanceId } from './clientInstance'
+import { getAuthToken } from './authToken'
 import { toCloneable } from './cloneable'
 
 // ── 消息类型 ──
@@ -101,7 +102,7 @@ let _handoff: Promise<void> = Promise.resolve()
  *    （spec attachment-confirmation-evidence-loop 浏览器走查实测；同一处另有回执带响应式 user 发不出去的缺陷）。
  */
 export function startSessionHandoff(apply: (session: HandoffSession) => void | Promise<void>): Promise<void> {
-  if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('token')) return _handoff
+  if (getAuthToken()) return _handoff
   _handoff = requestSession()
     .then(async (session) => {
       if (session) await apply(session)

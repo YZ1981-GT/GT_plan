@@ -36,6 +36,21 @@ export function getAuthToken(): string {
   }
 }
 
+/** 当前 refresh token；未登录返回空串（读取顺序同 getAuthToken）。 */
+export function getRefreshToken(): string {
+  try {
+    const token = useAuthStore().refreshToken
+    if (token) return token
+  } catch {
+    // Pinia 未激活 → 回退 sessionStorage
+  }
+  try {
+    return sessionStorage.getItem('refreshToken') || ''
+  } catch {
+    return ''
+  }
+}
+
 /** 原生请求用的鉴权头；未登录返回空对象（不发送 `Bearer ` 空串）。 */
 export function getAuthHeaders(): Record<string, string> {
   const token = getAuthToken()

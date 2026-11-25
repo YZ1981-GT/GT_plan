@@ -63,15 +63,9 @@ app.use(VueQueryPlugin, { queryClient })
 startSessionHandoff(async (session) => {
   // 新窗口取得的是另一逻辑会话的起点，先作废本页可能已有的匿名/旧订阅者。
   advanceRequestIdentityEpoch()
-  sessionStorage.setItem('token', session.token)
-  sessionStorage.setItem('refreshToken', session.refreshToken)
-  if (session.user) sessionStorage.setItem('user', JSON.stringify(session.user))
-  // Pinia store 在 app.use(createPinia()) 后可用，手动同步
+  // Pinia store 在 app.use(createPinia()) 后可用；store 与 sessionStorage 由同一动作写（token 单一入口）
   const { useAuthStore } = await import('./stores/auth')
-  const authStore = useAuthStore()
-  authStore.token = session.token
-  authStore.refreshToken = session.refreshToken
-  authStore.user = session.user
+  useAuthStore().applyHandoffSession(session)
 })
 
 app.use(router)
