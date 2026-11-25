@@ -72,7 +72,9 @@ MUTATIONS = MUTATIONS + (
        "    const k6AssetCodes = k6QueryCodes((props.htmlData as any)?.tb_source_codes)\n", "",
        "删掉 K6 资产码集 —— 审定回写/TB 取数就抛"),
     _m("M08", "components/workpaper/d2/D2TabAnalysis.vue",
-       "import { createExcelJsWorkbook, loadExcelJsWorkbook } from '../composables/useExcelIO'\n", "",
+       # 2026-11-25：import 已改成别名 `@/composables/useExcelIO`（相对路径会让 Vite
+       # 解析失败，见该文件第 20~25 行注释），锚点随之更新。
+       "import { createExcelJsWorkbook, loadExcelJsWorkbook } from '@/composables/useExcelIO'\n", "",
        "删掉 ExcelJS 两个入口 —— 导出/导入 xlsx 就抛"),
     _m("M09", "components/workpaper/confirmation/GtConfirmationSummary.vue",
        "import { ElMessage, ElMessageBox } from 'element-plus'",
