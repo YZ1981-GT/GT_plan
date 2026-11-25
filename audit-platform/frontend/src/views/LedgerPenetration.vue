@@ -433,7 +433,7 @@
           v-model:keyword="tabLedgerKeyword"
           v-model:amount-dir="tabLedgerAmountDir"
           placeholder="搜索摘要 / 凭证号 / 对方科目..."
-          @search="loadTabLedgerLedger()"
+          @search="loadTabLedger()"
         />
         <div class="gt-filter-spacer" />
         <el-tooltip v-if="!tabLedgerAccount" content="浏览全部科目时不显示余额；选择具体科目后显示期初、累计余额和月合计" placement="bottom">

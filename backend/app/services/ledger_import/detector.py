@@ -984,15 +984,14 @@ def _detect_header_row(rows: list[list[str]]) -> tuple[int, list[str]]:
                 filled_top.append(last)
 
             merged: list[str] = []
-            for t, b in zip(filled_top, bottom_padded):
+            for top_cell, t, b in zip(top_padded, filled_top, bottom_padded):
                 if t and b and t != b:
                     merged.append(f"{t}.{b}")
                 elif b:
                     merged.append(b)
-                elif t:
-                    merged.append(t)
                 else:
-                    merged.append("")
+                    # 两层都空的列不能继承左侧标题，否则无标题的备注列会被识别为金额列。
+                    merged.append(top_cell)
 
             # --- Task 4.2: 3 层合并表头检测 ---
             # 检查 next_idx+1 是否也是表头行（第三层）
@@ -1032,15 +1031,13 @@ def _detect_header_row(rows: list[list[str]]) -> tuple[int, list[str]]:
                             filled_mid.append(last_m)
 
                         final_merged: list[str] = []
-                        for mid_val, third_val in zip(filled_mid, third_padded):
+                        for mid_cell, mid_val, third_val in zip(merged, filled_mid, third_padded):
                             if mid_val and third_val and mid_val != third_val:
                                 final_merged.append(f"{mid_val}.{third_val}")
                             elif third_val:
                                 final_merged.append(third_val)
-                            elif mid_val:
-                                final_merged.append(mid_val)
                             else:
-                                final_merged.append("")
+                                final_merged.append(mid_cell)
 
                         three_layer_merged = True
                         return third_idx + 1, final_merged

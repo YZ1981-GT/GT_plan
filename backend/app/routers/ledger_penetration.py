@@ -1200,14 +1200,25 @@ async def validate_data(
 
     从数据库查询做校验，比预览阶段更准确（有完整的辅助明细账数据）。
     校验项：
-    1. 科目余额表内部勾稽（期初+借-贷=期末）
-    2. 辅助余额表内部勾稽
-    3. 科目余额表 vs 辅助余额表（每个维度类型汇总应等于科目余额）
-    4. 序时账 vs 科目余额表（按科目汇总借贷发生额）
+    1. 科目余额表内部勾稽（借方口径加借减贷，贷方口径加贷减借）
+    2. 科目余额表 vs 辅助余额表
+    3. 序时账 vs 科目余额表（按科目汇总借贷发生额）
     """
     import sqlalchemy as sa
     from decimal import Decimal
     from app.models.audit_platform_models import TbAuxBalance, TbBalance, TbLedger
+    from app.services.ledger_import.sign_convention_types import CURRENT_SIGN_CONVENTION
+
+    def signed_balance(table, period: str):
+        amount = sa.func.coalesce(table.c[f"{period}_balance"], 0)
+        direction = table.c[f"{period}_direction"]
+        is_v2 = table.c.sign_convention_version == CURRENT_SIGN_CONVENTION
+        # v2 的方向是实际方向。先恢复借正贷负，再汇总，避免反向明细也被加上。
+        return sa.case(
+            (sa.and_(is_v2, direction == "credit"), -sa.func.abs(amount)),
+            (sa.and_(is_v2, direction == "debit"), sa.func.abs(amount)),
+            else_=amount,
+        )
 
     findings = []
 
@@ -1216,10 +1227,13 @@ async def validate_data(
     bal_rows = await db.execute(
         sa.select(
             bal_tbl.c.account_code,
-            bal_tbl.c.opening_balance,
+            signed_balance(bal_tbl, "opening").label("opening_net"),
             bal_tbl.c.debit_amount,
             bal_tbl.c.credit_amount,
-            bal_tbl.c.closing_balance,
+            signed_balance(bal_tbl, "closing").label("closing_net"),
+            bal_tbl.c.opening_direction,
+            bal_tbl.c.closing_direction,
+            bal_tbl.c.sign_convention_version,
         ).where(
             await get_active_filter(db, bal_tbl, project_id, year),
             sa.or_(
@@ -1235,23 +1249,33 @@ async def validate_data(
     bal_map = {}
     bal_errors = 0
     for r in bal_data:
-        code, opening, debit, credit, closing = r
-        opening = opening or Decimal(0)
+        code, opening_net, debit, credit, closing_net, opening_dir, closing_dir, sign_version = r
         debit = debit or Decimal(0)
         credit = credit or Decimal(0)
-        closing = closing or Decimal(0)
-        bal_map[code] = {"opening": opening, "debit": debit, "credit": credit, "closing": closing}
-        # 损益类科目（5xxx/6xxx）期初期末天然为0，只检查有期初或期末的科目
-        is_income_expense = str(code).startswith('5') or str(code).startswith('6')
-        if is_income_expense:
-            continue  # 损益类不做勾稽检查
-        expected = opening + debit - credit
-        if abs(expected - closing) > Decimal("1.00"):  # 容差 1 元（四舍五入）
+        credit_basis = (
+            sign_version == CURRENT_SIGN_CONVENTION
+            and (closing_dir if closing_net else opening_dir) == "credit"
+        )
+        bal_map[code] = {
+            "debit": debit, "credit": credit, "closing": closing_net,
+            "credit_basis": credit_basis,
+        }
+        # 损益类科目（5xxx/6xxx）结转后不检查余额连续性。
+        if str(code).startswith(("5", "6")):
+            continue
+
+        expected = opening_net + debit - credit
+        formula = "期初+借-贷"
+        if credit_basis:
+            expected, closing_net = -expected, -closing_net
+            formula = "期初+贷-借"
+        difference = abs(expected - closing_net)
+        if difference > Decimal("1.00"):  # 容差 1 元（四舍五入）
             bal_errors += 1
             if bal_errors <= 3:
                 findings.append({
                     "level": "error", "category": "余额表勾稽",
-                    "message": f"{code}: 期初+借-贷={expected:.2f}, 期末={closing:.2f}, 差额={abs(expected-closing):.2f}",
+                    "message": f"{code}: {formula}={expected:.2f}, 期末={closing_net:.2f}, 差额={difference:.2f}",
                 })
     if bal_errors > 3:
         findings.append({"level": "error", "category": "余额表勾稽",
@@ -1267,7 +1291,7 @@ async def validate_data(
             aux_tbl.c.account_code,
             aux_tbl.c.aux_type,
             sa.func.count().label("cnt"),
-            sa.func.sum(sa.func.coalesce(aux_tbl.c.closing_balance, 0)).label("total_closing"),
+            sa.func.sum(signed_balance(aux_tbl, "closing")).label("total_closing"),
         )
         .where(await get_active_filter(db, aux_tbl, project_id, year))
         .group_by(aux_tbl.c.account_code, aux_tbl.c.aux_type)
@@ -1293,9 +1317,11 @@ async def validate_data(
         if abs(diff) > Decimal("1.00"):  # 容差 1 元
             cross_errors += 1
             if cross_errors <= 3:
+                display_sign = -1 if bal_map[code]["credit_basis"] else 1
                 findings.append({
                     "level": "warning", "category": "余额表vs辅助余额表",
-                    "message": f"{code}: 主表期末={b_closing:.2f}, 辅助({best_type})汇总={best_closing:.2f}, 差额={abs(diff):.2f}",
+                    "message": f"{code}: 主表期末={display_sign * b_closing:.2f}, "
+                               f"辅助({best_type})汇总={display_sign * best_closing:.2f}, 差额={abs(diff):.2f}",
                 })
     if cross_errors > 3:
         findings.append({"level": "warning", "category": "余额表vs辅助余额表",
