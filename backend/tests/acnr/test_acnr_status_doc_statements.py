@@ -36,16 +36,15 @@ import pytest
 from app.services.acnr import catalog_integrity as ci
 from tests.acnr._status_doc_checks import (
     _DESIGN, _FE_GUARD_REL, _GEN_REL, _LINKAGE_REL, _RESOLVER_REL, _STALE_REL, _STATUS_GUARD_REL, _SUBSECTIONS,
-    _TABLE_HEADERS, _THIS_REL, _V2_REL, H_ERRATA, H_INTRO, H_PARALLEL, H_VERSION, NON_WP_TO_V1, PLANNED_EMPTY_OR_OPEN, PLANNED_ROWS_OPEN,
-    RESOLVER_DOC_OK,
+    _TABLE_HEADERS, _THIS_REL, _V2_REL, H_ERRATA, H_INTRO, H_PARALLEL, H_VERSION, NON_WP_TO_V1, PLANNED_EMPTY_OR_OPEN, RESOLVER_DOC_OK,
     SCHEMA_FOLLOWS_CONTRACT, SPEC_TASKS, T31_HINT_MODULE, T31_HINT_TEST, T31_REASON_CHECKS,
     T31_REASON_SYMBOLS, V1_BYPASS, Check, Unit, _ci_job_runs, _short_link_route_ok,
     _component_tests_present, _exact_identity_is_pure, _exact_identity_only_release_imports, _production_importers_of,
     _full_resolve_step1_uses_exact_identity,
     _generator_assigns_utc_timestamp, _orphan_verdicts_released, _parsed, _resolve_instance_binds_wp_code,
     _schema_file_is_generated, _sentences, _stale_impact_route, _task_ids, _units_and_structure_problems,
-    _versions_are_timestamps, absent, calls, claim, defines, design_quote, exists, fact_eq, fact_ne, gc_runtime_rows, has_tests,
-    in_planned, lock_rows, not_calls, not_imports, outside_unchanged, quote_at, task_done, task_open, task_open_at,
+    _versions_are_timestamps, calls, claim, defines, design_quote, exists, fact_eq, gc_runtime_rows, has_tests,
+    lock_rows, not_calls, not_imports, outside_unchanged, quote_at, task_done, task_open, task_open_at,
 )
 from tests.acnr.test_acnr_architecture_status_doc import (
     _REPO, H_COMPONENTS, H_FACTS, H_PLANNED, _cells, _claim_legacy_forwarding, _claim_stale_authz,

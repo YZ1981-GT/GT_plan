@@ -243,7 +243,6 @@ EMPTY_STORE_PAYLOAD: Final[str] = '[]'
 
 from app.services.workpaper_sync.phase5_b22a_store_merge import (  # noqa: E402
     html_store_payload,
-    merge_projection_into_store_rows,
 )
 
 
@@ -505,7 +504,6 @@ async def publish_pilot_definitions(publisher: Any) -> Any:
     authority model goes first as the bundle required child. The publisher owns
     order / payload validation / DAG preconditions / slot normalization; this
     shell only orchestrates and re-checks the two one-way digest links."""
-    import uuid
 
     from app.services.workpaper_sync.models import DefinitionKind
 
@@ -590,7 +588,6 @@ async def publish_pilot_definitions(publisher: Any) -> Any:
 
 async def resolve_published_frozen_definitions(*, session: Any, representation: Any, contract: Any) -> Any:
     """Read frozen definitions from the published representation (Task 75 observer)."""
-    from pathlib import Path as _Path
     from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
     from app.services.workpaper_sync.published_identity_observer import (
         observe_published_frozen_definitions,

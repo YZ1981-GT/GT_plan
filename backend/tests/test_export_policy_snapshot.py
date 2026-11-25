@@ -235,7 +235,6 @@ async def test_create_export_task_persists_snapshot():
     🔴 只测 `build_policy_snapshot` 会漏掉「构造了但没传进去」——
     这正是本轮变异 B5 的形态（只折算不标注）。
     """
-    import sqlalchemy as sa
 
     from app.models.report_models import ExportTask, ExportTaskType
     from app.services.pdf_export_engine import PDFExportEngine

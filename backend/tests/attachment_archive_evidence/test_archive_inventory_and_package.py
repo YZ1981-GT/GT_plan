@@ -372,12 +372,6 @@ async def test_deliverable_policy_pair_missing_is_missing(world, tmp_path):
 @pytest_asyncio.fixture
 async def version_world(monkeypatch, tmp_path):
     """在 ``world`` 之上补建 content version / representation / artifact / entry state。"""
-    from app.models.workpaper_sync_models import (
-        WorkpaperArtifact,
-        WorkpaperContentRepresentation,
-        WorkpaperContentVersion,
-        WorkpaperSyncEntryState,
-    )
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(settings, "STORAGE_ROOT", str(tmp_path / "storage"))

@@ -18,7 +18,6 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -40,7 +39,6 @@ from app.services.report_freshness import (
     formula_for,
     load_effective_formula_state,
     row_status,
-    status_note,
 )
 
 router = APIRouter(

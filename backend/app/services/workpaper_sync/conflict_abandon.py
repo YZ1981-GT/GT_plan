@@ -66,14 +66,13 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Final, Mapping, Sequence
+from typing import Any, Final, Sequence
 
 import sqlalchemy as sa
 
 from app.models.workpaper_sync_models import (
     WorkpaperSyncConflict,
     WorkpaperSyncOperation,
-    WorkpaperSyncOperationEvent,
 )
 from app.services.workpaper_sync.models import (
     ActorType,

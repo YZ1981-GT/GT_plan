@@ -26,7 +26,6 @@ import hashlib
 import io
 import json
 import tempfile
-from pathlib import Path
 
 import pytest
 from openpyxl import load_workbook

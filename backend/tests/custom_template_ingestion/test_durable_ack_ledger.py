@@ -24,7 +24,6 @@ from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401  —— 触发 ORM 注册
-from app.models.base import Base
 from app.models.guidance_handoff_ack_models import (
     ACK_ACCEPTED,
     ACK_CONSUMER_ENTRY_NAMESPACE,

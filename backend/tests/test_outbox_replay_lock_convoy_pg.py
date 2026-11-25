@@ -186,8 +186,7 @@ async def test_handler_runs_after_replay_releases_the_outbox_row_lock(
             account_codes=["1122"], entry_group_id=uuid.uuid4(),
             extra={"origin": "manual", "operator_id": str(world["actor_id"])},
         )
-        publication = await DurableEventOutboxService.enqueue_event(db, event)
-        outbox_id = publication.outbox_id
+        await DurableEventOutboxService.enqueue_event(db, event)
         await db.commit()
 
     observations: list[dict[str, object]] = []

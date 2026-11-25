@@ -14,7 +14,6 @@ Properties:  P1（任意 bundle 读回 digest 相等）· P4（能力只有一�
 from __future__ import annotations
 
 import ast
-import inspect
 import uuid
 from pathlib import Path
 

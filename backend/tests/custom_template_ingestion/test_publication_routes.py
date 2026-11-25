@@ -21,7 +21,6 @@ import uuid
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -189,7 +188,6 @@ def _client(
 
     pubs = publications or []
     from app.services.custom_template_ingestion import publication_registry_store as store
-    from app.services.custom_template_ingestion import instantiate_from_publication as inst
 
     def _list(session, *, organization_id, states=None):
         return [

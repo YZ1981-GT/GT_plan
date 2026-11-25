@@ -394,7 +394,6 @@ async def test_kind_and_state_are_asserted_before_resolving() -> None:
     本用例让 resolver **按 kind/state 校验**：reader 传错就拒，且 reader 自己该先拒的
     （candidate）不该走到 resolver。
     """
-    from types import SimpleNamespace
 
     from app.services.workpaper_sync.sheet_published_artifact import (
         PublishedSheetArtifactError,

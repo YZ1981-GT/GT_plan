@@ -50,7 +50,6 @@ from app.services.custom_template_ingestion.publication_registry_store import (
 from app.services.custom_template_ingestion.workbook_instance import (
     ProjectWorkbookInstance,
     SheetSeed,
-    WorkbookInstanceError,
     create_workbook_instance,
 )
 from app.services.guidance_gid import StableSheetIdentity

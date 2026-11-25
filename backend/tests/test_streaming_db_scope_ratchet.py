@@ -19,7 +19,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
 
 _BACKEND = Path(__file__).resolve().parents[1]
 _SCRIPT = _BACKEND / "scripts" / "check" / "check_streaming_db_scope.py"

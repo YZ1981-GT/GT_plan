@@ -25,10 +25,8 @@ SQL 改 state」时逐字写着 `UPDATE`，用子串判据会把自己判成违�
 from __future__ import annotations
 
 import ast
-import inspect
 import uuid
 from pathlib import Path
-from typing import Any
 
 import pytest
 

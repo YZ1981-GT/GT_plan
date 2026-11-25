@@ -27,7 +27,7 @@ from app.services.ledger_import.recovery_classifier import (
     assert_rebuild_cleanup_needed,
     decide_recovery,
 )
-from app.services.ledger_import.attempt_service import BaseToken, SealEvidence
+from app.services.ledger_import.attempt_service import BaseToken
 
 
 # ── 假 db：只支持本模块用到的两种 execute 形态 ─────────────

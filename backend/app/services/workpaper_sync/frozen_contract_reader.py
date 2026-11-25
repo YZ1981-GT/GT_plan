@@ -52,7 +52,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workpaper_sync_models import WorkpaperSyncDefinitionArtifact
 from app.services.workpaper_sync.contracts import (
-    ContractError,
     SyncContract,
     parse_contract,
 )

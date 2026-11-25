@@ -15,10 +15,7 @@
 """
 from __future__ import annotations
 
-import hashlib
-import json
 import tempfile
-import uuid
 
 import pytest
 from sqlalchemy import text
@@ -151,7 +148,6 @@ async def test_other_users_objects_are_404_not_403(business_real_user, picks, ex
 
     变异靶子：把 SQL 里的 `AND user_id = :uid` 去掉 ⇒ 别人的对象变成可见，这条打红。
     """
-    from tests.advanced_query_linkage.business_client import business_client
 
     project = await picks.resolve("ledger_month_export")
     artifact_id, run_id = await _seal_one(business_real_user, project)
@@ -172,7 +168,6 @@ async def test_other_users_objects_are_404_not_403(business_real_user, picks, ex
         assert rows == 0, "前置：该运行不属于第二个账号"
         return
 
-    import app.core.redis as core_redis
     from app.routers import custom_query, query_evidence
     from tests.authz_world import build_app
 

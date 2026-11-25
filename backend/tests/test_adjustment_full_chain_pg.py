@@ -35,8 +35,6 @@ from decimal import Decimal
 import pytest
 import pytest_asyncio
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool
 
 from tests.test_adjustment_concurrency_and_rls_pg import (  # noqa: F401 - fixture 复用
     ACCEPT_URL_ENV,
@@ -105,7 +103,6 @@ async def handler_sessions_bound_to_accept_db(monkeypatch):
 
     engine = create_async_engine(_accept_url(), poolclass=NullPool)
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    original = handlers_impl.async_session_factory
     monkeypatch.setattr(handlers_impl, "async_session_factory", factory)
     assert handlers_impl.async_session_factory is factory
     try:
@@ -224,7 +221,7 @@ async def test_approve_commits_tb_and_delivers_events_to_real_handlers(
     from app.services.workpaper_sync.outbox import DurableEventOutboxService
 
     sessions = chain_world["sessions"]
-    project_id, actor_id = chain_world["project_id"], chain_world["actor_id"]
+    project_id = chain_world["project_id"]
     group_id, reviewer_id, account_codes = await _prepare_pending_group(
         chain_world, adjustment_no="AJE-CHAIN-FULL-1",
     )
@@ -515,7 +512,6 @@ async def test_chain_cases_leave_no_residual_rows(chain_world):
     变成断言，而不是靠人去看库。
     """
     sessions = chain_world["sessions"]
-    project_id = chain_world["project_id"]
     async with sessions[0]() as db:
         residual = {}
         for table in (

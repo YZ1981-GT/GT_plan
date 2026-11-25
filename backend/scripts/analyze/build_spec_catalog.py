@@ -436,7 +436,6 @@ def render() -> tuple[str, dict]:
 
 def render_domain_sections(ctx: dict) -> str:
     lines: list[str] = []
-    dom_names = ctx["dom_names"]
     for dom in DOMAINS:
         items = ctx["by_key"][dom["key"]]
         if not items:
@@ -484,7 +483,7 @@ def main() -> int:
     active_n = sum(1 for r in ctx["rows"] if r["active"])
     print(f"已生成 {CATALOG}")
     print(f"  spec 总数 {len(ctx['rows'])}（活跃 {active_n} / 归档 {len(ctx['rows']) - active_n}）")
-    print(f"  域分布: " + ", ".join(f"{k}={len(v)}" for k, v in ctx['by_key'].items()))
+    print("  域分布: " + ", ".join(f"{k}={len(v)}" for k, v in ctx['by_key'].items()))
     if ctx["unclassified"]:
         print(f"  ⚠ 未归类 {len(ctx['unclassified'])}: " + ", ".join(r["name"] for r in ctx["unclassified"][:10]))
     return 0

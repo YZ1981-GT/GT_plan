@@ -31,7 +31,6 @@ if str(_HERE.parents[3]) not in sys.path:  # pragma: no cover - 脚本自举
 
 from backend.scripts.check.mutate_common import (  # noqa: E402
     Mutation,
-    run_group,
     run_named_guard,
 )
 

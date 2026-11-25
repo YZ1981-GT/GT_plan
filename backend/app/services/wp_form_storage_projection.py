@@ -51,7 +51,7 @@ import logging
 import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 logger = logging.getLogger(__name__)
 

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import pytest
 
 from app.routers.wp_render_config_sheet_classify import (
     INDEX_CLASS_PREFIX,

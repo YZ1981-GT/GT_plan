@@ -50,8 +50,8 @@ def test_catalog_is_not_drifted() -> None:
 def test_catalog_links_resolve() -> None:
     """CATALOG 内每条内部链接目标必须存在。"""
     text = CATALOG.read_text(encoding="utf-8")
-    links = [l for l in re.findall(r"\]\(([^)]+)\)", text) if not l.startswith("http")]
-    missing = [l for l in links if not (CATALOG.parent / l).exists()]
+    links = [lk for lk in re.findall(r"\]\(([^)]+)\)", text) if not lk.startswith("http")]
+    missing = [lk for lk in links if not (CATALOG.parent / lk).exists()]
     assert not missing, f"{len(missing)} 条链接点不开，前 5：{missing[:5]}"
 
 

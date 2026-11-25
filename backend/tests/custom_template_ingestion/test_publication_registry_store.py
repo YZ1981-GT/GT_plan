@@ -24,7 +24,6 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from app.models.base import Base
 from app.models.custom_template_publication import (
     CustomTemplatePublication,
     CustomTemplatePublicationPin,

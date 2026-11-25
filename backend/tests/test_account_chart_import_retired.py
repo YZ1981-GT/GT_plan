@@ -17,7 +17,6 @@ spec platform-global-display-settings-closure 任务 8 / 复核记录模式②�
 from __future__ import annotations
 
 import uuid
-from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient

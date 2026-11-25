@@ -18,7 +18,6 @@ PDF create 带 `password` 字段，校验失败时会把明文密码回显进 42
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 from fastapi import FastAPI

@@ -9,10 +9,7 @@ spec: `onlyoffice-sheet-open-via-published-artifact` Phase 1.6 / 1.7 / 批 2
 from __future__ import annotations
 
 import json
-import uuid
-from pathlib import Path
 
-from app.services.workpaper_sync.sheet_open_bindings import SheetOpenBindingResolver
 
 
 def _write_bindings(tmp_path, rows: list[dict]):

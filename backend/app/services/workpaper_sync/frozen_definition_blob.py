@@ -41,7 +41,7 @@ import json
 import uuid
 from collections.abc import Mapping as AbcMapping
 from pathlib import Path
-from typing import Any, Final, Mapping
+from typing import Any, Mapping
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession

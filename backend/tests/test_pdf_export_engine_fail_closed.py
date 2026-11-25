@@ -96,7 +96,7 @@ class TestExecuteExportFailsClosed:
     async def test_conversion_unavailable_marks_failed_and_raises(self, tmp_path, monkeypatch):
         """转换链不可用 ⇒ 任务 failed + error_message + 上抛（路由据此 503）。"""
         mod = _engine_module()
-        from app.models.report_models import ExportTask, ExportTaskStatus, ExportTaskType
+        from app.models.report_models import ExportTaskStatus
 
         class _Task:
             id = UUID("aaaaaaaa-0000-0000-0000-000000000001")

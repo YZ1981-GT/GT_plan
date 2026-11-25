@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import warnings
 
-import pytest
 
 
 def test_openapi_generation_emits_no_pydantic_json_schema_warning() -> None:
@@ -155,7 +154,7 @@ def test_all_nine_fields_updated_together() -> None:
     ]
     for name in expected:
         line = next(
-            (l for l in body.split("\n") if l.strip().startswith(f"{name}:")),
+            (ln for ln in body.split("\n") if ln.strip().startswith(f"{name}:")),
             None,
         )
         assert line is not None, f"DisplayPreferencesPatch 缺少字段 {name}"

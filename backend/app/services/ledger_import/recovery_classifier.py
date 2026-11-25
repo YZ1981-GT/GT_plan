@@ -31,7 +31,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.dataset_models import LedgerImportAttempt
 from app.services.ledger_import.attempt_service import (
-    BaseToken,
     SealEvidence,
     can_activation_only,
 )

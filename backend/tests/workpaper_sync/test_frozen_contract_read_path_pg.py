@@ -19,7 +19,6 @@ spec frozen-contract-read-path · Requirements 1.1~1.4 · Property 1
 from __future__ import annotations
 
 import os
-import uuid
 
 import pytest
 

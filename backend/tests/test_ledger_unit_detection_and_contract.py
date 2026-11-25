@@ -29,7 +29,6 @@ from app.services.ledger_import.unit_normalization import (
     UnitContractError,
     build_confirmed_unit_contract,
     classify_unit_label,
-    compute_evidence_digest,
     factor_for,
     parse_persisted_unit_contract,
     summarize_detected_units,

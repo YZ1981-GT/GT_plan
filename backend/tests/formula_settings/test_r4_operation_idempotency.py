@@ -18,7 +18,6 @@ from ._r4_test_data import T0, operation_row, outbox_row, snapshot_pair
 
 @pytest.fixture
 async def operation_world(monkeypatch):
-    from app.workers import consol_operation_worker
 
     async def snapshot(_db, project_id, year, operation_id):
         return snapshot_pair(project_id, year, operation_id)

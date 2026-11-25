@@ -15,7 +15,6 @@ from app.core.database import get_db
 from app.deps import assert_project_permission, readable_project_ids, require_project_access
 from app.models.audit_platform_schemas import (
     AccountChartResponse,
-    AccountImportResult,
     AccountTreeNode,
 )
 from app.models.core import User

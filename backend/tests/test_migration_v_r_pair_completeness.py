@@ -11,7 +11,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
 
 MIGRATIONS = Path(__file__).resolve().parents[1] / "migrations"
 _VERSION = re.compile(r"^([VR])(\d+)__.+\.sql$", re.IGNORECASE)

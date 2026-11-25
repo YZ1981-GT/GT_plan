@@ -20,7 +20,6 @@ from tests.workpaper_sync._test_workpaper_sync_program_milestones_criteria impor
     _WRITER_GATE_PATH,
     _load_module,
     _CORE,
-    _CORE_TASKS_REL,
     _CORE_ACTIVE_TASKS,
     _CORE_EXPECTED_REL,
     _STATE_NAMES,

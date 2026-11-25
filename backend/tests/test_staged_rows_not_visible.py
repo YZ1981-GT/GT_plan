@@ -19,7 +19,6 @@ test_staged_rows_not_visible.py
 
 from __future__ import annotations
 
-import ast
 import inspect
 import re
 from pathlib import Path
