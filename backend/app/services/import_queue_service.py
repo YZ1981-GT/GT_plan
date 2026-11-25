@@ -317,6 +317,43 @@ class ImportQueueService:
             return None
 
     @staticmethod
+    async def _prune_stale_active_set(db: AsyncSession) -> None:
+        """按库里真实在跑的导入批次清理全局活跃集合里的残留成员。
+
+        active_set 没有 TTL，只靠 release_lock_async 移除成员：进程被杀 / 容器重启 /
+        提交后建作业前抛错等路径都不会走到释放，成员会永久残留，攒满上限后所有项目
+        都报「系统繁忙」。这里以 DB 为准（调用方已先跑 _expire_stale_jobs）：集合里
+        没有 processing 批次的项目一律移除。成员先写 DB 批次再 SADD，所以不会误删
+        正在建锁的其他 worker。尽力而为，失败只记日志。
+        """
+        redis = await ImportQueueService._get_redis()
+        if redis is None:
+            return
+        try:
+            members = await redis.smembers(_REDIS_ACTIVE_SET_KEY)
+            member_ids = {
+                m.decode() if isinstance(m, (bytes, bytearray)) else str(m)
+                for m in (members or [])
+            }
+            if not member_ids:
+                return
+            result = await db.execute(
+                select(ImportBatch.project_id)
+                .where(
+                    ImportBatch.data_type == IMPORT_JOB_DATA_TYPE,
+                    ImportBatch.status == ImportStatus.processing,
+                )
+                .distinct()
+            )
+            active_ids = {str(pid) for pid in result.scalars().all()}
+            stale = sorted(member_ids - active_ids)
+            if stale:
+                await redis.srem(_REDIS_ACTIVE_SET_KEY, *stale)
+                logger.warning("清理导入活跃集合残留成员 %d 个: %s", len(stale), stale)
+        except Exception as e:
+            logger.warning("清理导入活跃集合失败: %s", e)
+
+    @staticmethod
     async def _redis_add_to_active_set(project_id: UUID) -> None:
         """将项目加入全局活跃集合。"""
         redis = await ImportQueueService._get_redis()
@@ -405,7 +442,8 @@ class ImportQueueService:
                     return False, "项目正在导入中（DB 锁检测）", None
             # redis_result is True → Redis 锁已获取
 
-            # Step 2: 检查全局并发上限
+            # Step 2: 检查全局并发上限（先按 DB 清掉集合里的残留成员）
+            await ImportQueueService._prune_stale_active_set(db)
             redis_active = await ImportQueueService._redis_check_global_concurrency()
             if redis_active is not None:
                 if redis_active >= _MAX_CONCURRENT_IMPORTS:

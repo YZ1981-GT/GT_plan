@@ -836,73 +836,92 @@ class LedgerImportApplicationService:
         if not ok:
             raise HTTPException(status_code=409, detail=msg)
 
-        from app.services.import_artifact_service import ImportArtifactService
+        try:
+            from app.services.import_artifact_service import ImportArtifactService
 
-        artifact = await ImportArtifactService.get_by_upload_token(
-            db,
-            project_id=project_id,
-            upload_token=resolved_token,
-        )
-        created_by = UUID(user_id) if user_id else None
+            artifact = await ImportArtifactService.get_by_upload_token(
+                db,
+                project_id=project_id,
+                upload_token=resolved_token,
+            )
+            created_by = UUID(user_id) if user_id else None
 
-        # 账套导入 attempt（spec platform-global-display-settings-closure 任务 8）。
-        # 🔴 在**建 job 之前**落 attempt：attempt 是恢复的唯一证据，job 先落而 attempt
-        #    后落会让「job 已在队列、attempt 不存在」这段窗口里的重启无法判定该重跑还是接管。
-        # 🔴 base token 由唯一入口 `resolve_base_token` 解析（detect 侧同口径），
-        #    三次 CAS（submit / seal / activation）都以它为基准。
-        from app.services.ledger_import.attempt_service import create_attempt
-        from app.services.ledger_import.base_token_resolver import resolve_base_token
+            # 账套导入 attempt（spec platform-global-display-settings-closure 任务 8）。
+            # 🔴 在**建 job 之前**落 attempt：attempt 是恢复的唯一证据，job 先落而 attempt
+            #    后落会让「job 已在队列、attempt 不存在」这段窗口里的重启无法判定该重跑还是接管。
+            # 🔴 base token 由唯一入口 `resolve_base_token` 解析（detect 侧同口径），
+            #    三次 CAS（submit / seal / activation）都以它为基准。
+            from app.services.ledger_import.attempt_service import create_attempt
+            from app.services.ledger_import.base_token_resolver import resolve_base_token
 
-        base_token = await resolve_base_token(db, project_id=project_id, year=year or 0)
-        confirmation_payload = confirmation_options(parsed_unit_confirmation)
-        attempt = await create_attempt(
-            db,
-            project_id=project_id,
-            year=year or 0,
-            upload_token=resolved_token,
-            payload_style="account_chart" if payload_style == "account_chart" else "ledger",
-            unit_confirmation=dict(confirmation_payload),
-            base=base_token,
-            unit_contract_digest=(
-                # 🔴 真实字段名是 `unit_evidence_digest`（不是 contract_digest）——
-                # 本 spec 复核时按命名习惯猜过一次，实测报 AttributeError。
-                # 该字段是用户确认时的证据指纹；dataset 侧的 contract digest 由
-                # `resolve_base_token` 从 source_summary 读，两者不混用。
-                getattr(parsed_unit_confirmation, "unit_evidence_digest", None)
-                if parsed_unit_confirmation is not None
-                else None
-            ),
-            bundle_digest=None,  # seal 时冻结（bundle 在 pipeline 里流式写完才算得出）
-            created_by=created_by,
-        )
+            base_token = await resolve_base_token(db, project_id=project_id, year=year or 0)
+            confirmation_payload = confirmation_options(parsed_unit_confirmation)
+            attempt = await create_attempt(
+                db,
+                project_id=project_id,
+                year=year or 0,
+                upload_token=resolved_token,
+                payload_style="account_chart" if payload_style == "account_chart" else "ledger",
+                unit_confirmation=dict(confirmation_payload),
+                base=base_token,
+                unit_contract_digest=(
+                    # 🔴 真实字段名是 `unit_evidence_digest`（不是 contract_digest）——
+                    # 本 spec 复核时按命名习惯猜过一次，实测报 AttributeError。
+                    # 该字段是用户确认时的证据指纹；dataset 侧的 contract digest 由
+                    # `resolve_base_token` 从 source_summary 读，两者不混用。
+                    getattr(parsed_unit_confirmation, "unit_evidence_digest", None)
+                    if parsed_unit_confirmation is not None
+                    else None
+                ),
+                bundle_digest=None,  # seal 时冻结（bundle 在 pipeline 里流式写完才算得出）
+                created_by=created_by,
+            )
 
-        import_job = await ImportJobService.create_job(
-            db,
-            project_id=project_id,
-            year=year or 0,
-            artifact_id=artifact.id if artifact else None,
-            custom_mapping=parsed_mapping,
-            options={
-                "payload_style": payload_style,
-                "queue_batch_id": str(job_batch_id) if job_batch_id is not None else None,
-                "upload_token": resolved_token,
-                "force_activate": False,
-                "append": append_options,
-                # attempt id 进 options：pipeline / 恢复入口据此取 attempt 证据，
-                # 不必按 project+year 反查（反查会取到并发提交的另一条 attempt）。
-                "attempt_id": str(attempt.id),
-                **confirmation_payload,
-            },
-            created_by=created_by,
-        )
-        await ImportJobService.transition(
-            db,
-            import_job.id,
-            JobStatus.queued,
-            progress_pct=0,
-            progress_message="导入作业已排队",
-        )
-        await db.commit()
+            import_job = await ImportJobService.create_job(
+                db,
+                project_id=project_id,
+                year=year or 0,
+                artifact_id=artifact.id if artifact else None,
+                custom_mapping=parsed_mapping,
+                options={
+                    "payload_style": payload_style,
+                    "queue_batch_id": str(job_batch_id) if job_batch_id is not None else None,
+                    "upload_token": resolved_token,
+                    "force_activate": False,
+                    "append": append_options,
+                    # attempt id 进 options：pipeline / 恢复入口据此取 attempt 证据，
+                    # 不必按 project+year 反查（反查会取到并发提交的另一条 attempt）。
+                    "attempt_id": str(attempt.id),
+                    **confirmation_payload,
+                },
+                created_by=created_by,
+            )
+            await ImportJobService.transition(
+                db,
+                import_job.id,
+                JobStatus.queued,
+                progress_pct=0,
+                progress_message="导入作业已排队",
+            )
+            await db.commit()
+        except BaseException:
+            # 拿到导入锁之后、作业入队之前任何异常都要还锁；否则全局活跃集合残留，
+            # 攒满上限后所有项目都报「系统繁忙」。
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+            if job_batch_id is not None:
+                await ImportQueueService.fail_job(
+                    project_id,
+                    job_batch_id,
+                    db,
+                    message="导入作业提交失败",
+                    year=year,
+                )
+            else:
+                await ImportQueueService.release_lock_async(project_id)
+            raise
 
         ImportQueueService.update_progress(project_id, 1, "导入作业已排队")
         if settings.LEDGER_IMPORT_IN_PROCESS_RUNNER_ENABLED:

@@ -2,6 +2,14 @@
 
 > 「写入业务」「读取业务」按写 / 读这张表的代码文件归类到业务域，括号里是文件数。静态扫描，可能漏掉经通用函数读写的情况。
 
+## 怎么看这张表
+
+- **业务域编号**：D01 用户、组织与权限 / D02 项目与项目管理 / D03 账表导入与数据集 / D04 科目映射与试算表 / D05 调整分录与错报 / D06 报表、审计报告与交付件 / D07 附注 / D08 公式、取数与查询 / D09 底稿 / D10 底稿在线编辑同步 / D11 合并 / D12 附件、证据、函证与归档 / D13 复核、质控与签字门禁 / D14 AI 与知识库 / D15 后台任务与基础设施。
+- **括号里的数字**是有几个代码文件写（或读）这张表，只表示被多少地方用到，不是行数，也不是重要程度。例：`D09（220）` = 底稿相关的 220 个文件读这张表。
+- **「未扫到」**表示静态扫描没找到直接写（读）它的代码，不等于没人用。账表四张表（`tb_balance` 等）是导入时批量写库，扫描认不出来，已手工改正。
+- 一张表放在哪个业务域，是按它所在的代码文件划分的，个别表放得不合适（如 `logs`、`notifications` 放在 D01），以使用方为准。
+- 字段含义见 [附录 F](appendix-f-field-dictionary.md)。
+
 ## D01 用户、组织与权限（20 张）
 
 | 表 | 说明 | 写入业务 | 读取业务 |
@@ -14,7 +22,7 @@
 | `partner_rotation_overrides` | 合伙人轮换 Override | D13（1） | D13（1） |
 | `project_assignments` | 项目团队委派 | D13（1）、D01（1） | D09（11）、D01（10）、D13（9）、D02（5）、D08（3）、D15（3）、D05（1） |
 | `project_creation_grants` | admin 授予 manager 对一个精确 USCC 的项目创建权。 | D01（1） | D01（1） |
-| `project_user_level_backfill` |  | 未扫到 | 未扫到 |
+| `project_user_level_backfill` | 迁移备份表：合伙人、经理项目级别回填前的旧值（V203），业务不用 | 未扫到 | 未扫到 |
 | `project_users` | 项目成员关联 | D13（1）、D15（1）、D01（1） | D15（10）、D12（8）、D08（6）、D01（5）、D13（4）、D02（2）、D09（2）、D06（1）、D05（1）、D14（1）、D10（1） |
 | `staff_members` | 全局人员库 | D01（3） | D09（19）、D13（9）、D01（8）、D02（4）、D08（4）、D15（4）、D05（2）、D12（1）、D07（1）、D06（1） |
 | `sys_dept` | 部门组织架构 | D01（1） | D01（2）、D15（1） |
@@ -31,30 +39,30 @@
 
 | 表 | 说明 | 写入业务 | 读取业务 |
 |---|---|---|---|
-| `audit_findings` |  | 未扫到 | D15（1） |
-| `audit_plans` |  | D09（1） | D09（1） |
-| `audit_procedures` |  | 未扫到 | 未扫到 |
+| `audit_findings` | 审计发现事项 | 未扫到 | D15（1） |
+| `audit_plans` | 审计计划 | D09（1） | D09（1） |
+| `audit_procedures` | 审计程序（旧计划模块） | 未扫到 | 未扫到 |
 | `budget_hours` | 预算工时 | 未扫到 | 未扫到 |
-| `check_ins` |  | D06（1） | D06（1） |
-| `forum_comments` |  | D15（1） | D15（1） |
-| `forum_posts` |  | D15（1） | D15（1） |
-| `going_concern_evaluations` |  | 未扫到 | D13（1）、D02（1） |
-| `going_concern_indicators` |  | 未扫到 | D13（1） |
-| `interim_survival_checks` |  | D15（1） | D15（1）、D12（1） |
+| `check_ins` | 现场签到 | D06（1） | D06（1） |
+| `forum_comments` | 论坛评论 | D15（1） | D15（1） |
+| `forum_posts` | 论坛帖子 | D15（1） | D15（1） |
+| `going_concern_evaluations` | 持续经营评价 | 未扫到 | D13（1）、D02（1） |
+| `going_concern_indicators` | 持续经营迹象 | 未扫到 | D13（1） |
+| `interim_survival_checks` | 预审样本在重导账套后的存续核对汇总（每底稿每账套版本一行计数） | D15（1） | D15（1）、D12（1） |
 | `issue_tickets` | 统一问题单（对齐 v2 4.5.15A） | D09（3）、D13（2）、D15（2）、D02（2）、D01（1） | D02（6）、D13（5）、D15（4）、D09（2）、D01（1） |
-| `management_letters` |  | 未扫到 | 未扫到 |
+| `management_letters` | 管理建议书 | 未扫到 | 未扫到 |
 | `pbc_checklist` | PBC 清单项 | D02（1） | D02（1）、D01（1） |
 | `project_batch_import_plans` | 一次上传产生的规范化计划、预览与可重放最终回执。 | D02（1） | D02（1） |
-| `project_classification_v219_backup` |  | 未扫到 | 未扫到 |
+| `project_classification_v219_backup` | 迁移备份表：项目质控分类拆分前的旧值（V219），业务不用 | 未扫到 | 未扫到 |
 | `project_sync` | 项目同步状态 | 未扫到 | 未扫到 |
 | `project_timeline` | 项目时间线/里程碑 | 未扫到 | D13（1） |
 | `projects` | 审计项目 | D07（3）、D15（2）、D02（2）、D08（1）、D11（1） | D09（220）、D08（29）、D15（28）、D13（27）、D02（21）、D06（18）、D07（18）、D11（17）、D12（14）、D14（12）、D01（12）、D04（8）、D03（3）、D10（3）、D05（1） |
 | `related_party_registry` | 关联方主数据（项目级）。 | D13（1） | D09（22）、D13（2） |
 | `related_party_transactions` | 关联方交易明细。 | D13（1）、D07（1） | D13（2） |
-| `risk_assessments` |  | 未扫到 | 未扫到 |
-| `risk_matrix_records` |  | 未扫到 | 未扫到 |
-| `se_checklist` |  | 未扫到 | 未扫到 |
-| `subsequent_events` |  | D02（1） | D02（1） |
+| `risk_assessments` | 风险评估 | 未扫到 | 未扫到 |
+| `risk_matrix_records` | 风险矩阵记录 | 未扫到 | 未扫到 |
+| `se_checklist` | 期后事项检查表 | 未扫到 | 未扫到 |
+| `subsequent_events` | 期后事项 | D02（1） | D02（1） |
 | `sync_logs` | 同步日志 | 未扫到 | 未扫到 |
 | `task_events` | 事件总线与补偿队列 | D09（2）、D15（1）、D02（1） | D02（2）、D09（1） |
 | `task_tree_nodes` | 四级任务树节点：unit/account/workpaper/evidence | 未扫到 | D02（2） |
@@ -74,11 +82,11 @@
 | `import_jobs` | 导入作业 — 关注任务执行过程 | D03（3） | D03（9）、D15（1） |
 | `ledger_datasets` | 业务级数据集版本 | D03（2） | D03（14）、D15（3）、D12（2）、D09（2）、D14（2）、D05（1）、D13（1）、D08（1）、D06（1）、D04（1） |
 | `ledger_import_attempts` | 一次账套导入 attempt 的最小不可变合同与状态记录。 | D03（1） | D03（2） |
-| `tb_aux_balance` | 辅助余额表 | 未扫到 | D09（6）、D03（5）、D15（5）、D07（4）、D08（3）、D14（2）、D06（1）、D04（1）、D13（1） |
-| `tb_aux_balance_summary` |  | D03（1） | D03（2） |
-| `tb_aux_ledger` | 辅助明细账 — 按 year 分区 | 未扫到 | D07（2）、D09（1）、D03（1）、D12（1） |
-| `tb_balance` | 科目余额表 | 未扫到 | D09（52）、D03（12）、D15（6）、D06（2）、D13（2）、D07（1）、D05（1）、D02（1）、D14（1）、D04（1） |
-| `tb_ledger` | 序时账（总账明细）— 按 year 分区 | 未扫到 | D09（9）、D03（6）、D12（3）、D15（3）、D14（2）、D05（1）、D07（1）、D08（1）、D13（1） |
+| `tb_aux_balance` | 辅助余额表 | D03 账表导入（批量写库，扫描没识别出来） | D09（6）、D03（5）、D15（5）、D07（4）、D08（3）、D14（2）、D06（1）、D04（1）、D13（1） |
+| `tb_aux_balance_summary` | 辅助余额汇总（导入激活后按维度重建，查账页辅助余额用） | D03（1） | D03（2） |
+| `tb_aux_ledger` | 辅助明细账 — 按 year 分区 | D03 账表导入（批量写库，扫描没识别出来） | D07（2）、D09（1）、D03（1）、D12（1） |
+| `tb_balance` | 科目余额表 | D03 账表导入（批量写库，扫描没识别出来） | D09（52）、D03（12）、D15（6）、D06（2）、D13（2）、D07（1）、D05（1）、D02（1）、D14（1）、D04（1） |
+| `tb_ledger` | 序时账（总账明细）— 按 year 分区 | D03 账表导入（批量写库，扫描没识别出来） | D09（9）、D03（6）、D12（3）、D15（3）、D14（2）、D05（1）、D07（1）、D08（1）、D13（1） |
 
 ## D04 科目映射与试算表（13 张）
 
@@ -88,12 +96,12 @@
 | `account_mapping` | 科目映射关系 | D15（1）、D04（1） | D15（5）、D03（5）、D04（4）、D05（2）、D02（1）、D06（1） |
 | `aging_segments` | 账龄段枚举配置（每个底稿一条，关联 wp_index_id） | D04（2）、D09（1） | D04（1） |
 | `bad_debt_detail_rows` | 坏账准备明细表 D2-3 嵌套行（父行与子行统一存储） | D04（2） | D04（2）、D08（1）、D09（1） |
-| `custom_account_packages` |  | D04（1） | D04（1） |
+| `custom_account_packages` | 项目级 / 事务所级自定义科目工作包 | D04（1） | D04（1） |
 | `materiality` | 重要性水平 | D04（1） | D13（7）、D09（5）、D05（2）、D08（1）、D04（1）、D02（1） |
 | `report_line_mapping` | 报表行次映射（标准科目→报表行次） | D04（3） | D04（3）、D06（2）、D15（2）、D07（1）、D05（1）、D09（1） |
 | `t_account_entries` | T型账户分录 | D04（1） | D04（1） |
 | `t_accounts` | T型账户 | D04（1） | D04（1） |
-| `tb_change_history` |  | D15（1） | D15（1） |
+| `tb_change_history` | 试算表变更历史 | D15（1） | D15（1） |
 | `tb_publish_ack` | 审定表→试算表"发布"耐久确认/幂等表（对应迁移 V162）。 | D15（1）、D04（1） | D04（2） |
 | `trial_balance` | 试算表（四列结构） | D09（4）、D15（3）、D04（3）、D05（1）、D03（1） | D09（54）、D15（18）、D08（10）、D07（9）、D06（9）、D04（7）、D13（5）、D03（5）、D14（3）、D11（3）、D05（2）、D02（1） |
 | `trial_balance_snapshots` | 试算平衡表版本快照 - 记录每次审定表变更时的试算表完整状态 | D04（1） | D04（1） |
@@ -105,10 +113,10 @@
 | `adjustment_client_bookings` | 客户已入账的追加式标记/撤销历史。 | D05（1） | D05（1） |
 | `adjustment_collaboration` | 调整分录协作记录（分录组级转派→知晓→补充→确认）。 | D05（1） | D05（2） |
 | `adjustment_collaboration_event` | 协作历史事件（append-only，仅 INSERT）。 | D05（1） | D05（1） |
-| `adjustment_editing_locks` |  | D15（1） | D15（1） |
+| `adjustment_editing_locks` | 调整分录编辑锁 | D15（1） | D15（1） |
 | `adjustment_entries` | 调整分录明细行（独立于 adjustments 头表） | D09（1）、D05（1） | D05（4）、D15（4）、D13（1）、D08（1）、D09（1） |
-| `adjustment_import_batches` |  | 未扫到 | 未扫到 |
-| `adjustment_import_group_results` |  | 未扫到 | 未扫到 |
+| `adjustment_import_batches` | 调整分录 Excel 导入批次 | 未扫到 | 未扫到 |
+| `adjustment_import_group_results` | 调整分录导入的逐笔结果 | 未扫到 | 未扫到 |
 | `adjustment_review_tasks` | 一笔调整分录的一轮持久化复核任务。 | D05（1） | D05（2） |
 | `adjustment_treatment_events` | 调整财务处理的追加式事件，不覆盖历史。 | D05（1） | D05（1） |
 | `adjustments` | 审计调整分录（AJE / RJE） | D05（2）、D09（1） | D05（11）、D15（6）、D13（4）、D09（3）、D04（2）、D14（1）、D06（1）、D12（1）、D02（1）、D01（1） |
@@ -134,7 +142,7 @@
 | `regulatory_filing` | 监管备案 | D06（1） | D06（1） |
 | `report_config` | 报表格式配置（行次定义+取数公式）；V199 formula_version：全局行 = 定义版本、 | D08（2）、D15（1）、D06（1） | D08（8）、D06（4）、D03（3）、D11（2）、D15（2）、D04（2）、D09（1） |
 | `report_config_baseline` | 报表配置主模板回填候选（项目优化→主模板评审通道） | D06（1） | D06（2） |
-| `report_format_templates` |  | D06（1） | D06（1） |
+| `report_format_templates` | 报表格式模板 | D06（1） | D06（1） |
 | `report_generation_run` | 一次报表计算的不可变运行摘要与规范行快照。 | D11（1）、D06（1） | D11（2） |
 | `report_snapshot` | 报表数据快照（导出时从快照读取，不重复计算） | D06（1） | D06（2）、D13（1） |
 | `word_export_task` | Word导出主任务 | D06（2）、D15（1） | D06（12）、D15（2）、D12（1） |
@@ -147,14 +155,14 @@
 | `account_note_mapping` | 科目→附注行映射 — 维护科目名称到附注表格行的映射关系 | D07（1） | D07（1）、D05（1） |
 | `disclosure_notes` | 财务报表附注 | D07（8）、D15（2） | D07（45）、D15（11）、D08（8）、D14（7）、D13（4）、D11（3）、D06（3）、D09（3）、D03（1）、D02（1）、D12（1） |
 | `group_note_template_baseline` | 集团附注模板基线（D6） | D07（1） | D07（1） |
-| `group_note_templates` |  | D07（1） | D07（1） |
+| `group_note_templates` | 集团附注模板 | D07（1） | D07（1） |
 | `note_account_mappings` | 附注科目对照映射 — 报表行次 → 附注章节 → 表格的三级映射 | D07（1） | D07（2）、D08（1）、D15（1） |
 | `note_content_template_versions` | 模板的不可变正文快照。 | D07（1） | D07（1） |
 | `note_content_templates` | 个人或集团可见的附注内容模板目录。 | D07（1） | D07（1） |
 | `note_formula_run` | 一个章节一次附注公式执行的可查询运行记录。 | D07（1） | 未扫到 |
 | `note_section_instances` | 附注章节实例（裁剪后的章节） | D07（1） | D07（1） |
-| `note_section_locks` |  | D07（1） | D07（1） |
-| `note_section_templates` |  | D07（1） | D07（1） |
+| `note_section_locks` | 附注章节锁 | D07（1） | D07（1） |
+| `note_section_templates` | 附注章节模板 | D07（1） | D07（1） |
 | `note_section_version_tree` | 章节版本树（D11） | D07（1） | D07（1） |
 | `note_text_batch_applications` | 一次成功的附注正文原子批量应用审计。 | D07（1） | D07（1） |
 | `note_trim_schemes` | 附注裁剪方案 | D15（1）、D07（1） | D15（1）、D07（1） |
@@ -191,8 +199,8 @@
 | 表 | 说明 | 写入业务 | 读取业务 |
 |---|---|---|---|
 | `account_package_program_status` | 科目工作包程序状态 | D04（1） | D04（1） |
-| `checklist_responses` |  | D09（65）、D10（5）、D13（2）、D15（2）、D03（1） | D09（226）、D13（6）、D10（5）、D08（5）、D15（4）、D03（2）、D14（1）、D02（1）、D12（1）、D11（1）、D06（1） |
-| `custom_workbook_unit_authorities` |  | 未扫到 | 未扫到 |
+| `checklist_responses` | 底稿网页表单逐项填写内容（每张底稿每个填写项一行），网页底稿的核心存储 | D09（65）、D10（5）、D13（2）、D15（2）、D03（1） | D09（226）、D13（6）、D10（5）、D08（5）、D15（4）、D03（2）、D14（1）、D02（1）、D12（1）、D11（1）、D06（1） |
+| `custom_workbook_unit_authorities` | 自定义底稿工作簿的金额单位（定下后不可改） | 未扫到 | 未扫到 |
 | `editing_locks` | 通用编辑锁 | D15（1） | D15（1） |
 | `gt_wp_coding` | 致同底稿编码 | D09（1） | D09（3） |
 | `guidance_consumer_ack` | durable、幂等的 ConsumerAck ledger 行。 | D15（1） | 未扫到 |
@@ -200,7 +208,7 @@
 | `guidance_handoff_visibility` | finalize visibility saga 的 guidance 侧视图。 | D15（1） | 未扫到 |
 | `guidance_publication` | guidance 发布主体。 | D15（1） | 未扫到 |
 | `guidance_publication_event` | 发布生命周期事件。 | D15（1） | 未扫到 |
-| `procedure_instance_identity_v217_backup` |  | 未扫到 | 未扫到 |
+| `procedure_instance_identity_v217_backup` | 迁移备份表：程序实例身份归一前的旧值，业务不用 | 未扫到 | 未扫到 |
 | `procedure_instances` | 审计程序实例（裁剪后的程序步骤） | D09（3）、D13（1） | D09（15）、D15（3）、D13（2） |
 | `procedure_operation_previews` | 敏感操作 server-side 一次性预览凭证（裁剪/委派/转派）。 | D09（1） | D09（1） |
 | `procedure_row_definition_revisions` | Revision membership: 哪些 definition_key 属于 (templat | 未扫到 | 未扫到 |
@@ -212,8 +220,8 @@
 | `procedure_trim_schemes` | 审计程序裁剪方案 | D09（1） | D09（2） |
 | `project_guidance_supplement` | 项目级 guidance 补充。 | D02（1） | 未扫到 |
 | `project_template_selections` | 项目模板选择记录 | D09（1） | D09（1） |
-| `project_workbook_instance` |  | 未扫到 | D15（1） |
-| `project_workbook_sheet_entry` |  | 未扫到 | D15（1） |
+| `project_workbook_instance` | 项目整册工作簿实例（多张底稿合在一个 Excel 文件里） | 未扫到 | D15（1） |
+| `project_workbook_sheet_entry` | 整册工作簿内各 sheet 对应的底稿 | 未扫到 | D15（1） |
 | `project_workpaper_sheet_override` | 项目级底稿 sheet 归类覆盖 | 未扫到 | D09（1） |
 | `sampled_vouchers` | 抽样凭证（抽凭联动） | D03（1） | D12（2）、D03（1） |
 | `sampling_config` | 抽样配置 | D12（1） | D12（1） |
@@ -221,7 +229,7 @@
 | `template_library` | 模板库条目 | D09（1） | D09（4） |
 | `working_paper` | 底稿文件 | D09（19）、D08（6）、D15（3）、D12（1）、D11（1）、D01（1）、D10（1）、D14（1） | D09（233）、D13（30）、D15（29）、D08（29）、D10（22）、D14（21）、D12（16）、D02（11）、D07（8）、D03（6）、D06（6）、D04（4）、D11（3）、D05（2）、D01（2） |
 | `workpaper_delegation_history` | History_Set 唯一来源：append-only 委派历史快照。 | D15（1） | D15（1）、D08（1） |
-| `workpaper_editing_locks` |  | 未扫到 | 未扫到 |
+| `workpaper_editing_locks` | 【已删除】迁移 V075 已删掉这张表，库里不存在 | 未扫到 | 未扫到 |
 | `workpaper_extraction_log` | 底稿提取日志 — 记录截止测试/抽凭引擎的执行留痕和填充前快照，支持撤销功能。 | D03（1） | D12（4）、D03（1）、D13（1）、D15（1） |
 | `workpaper_field_overrides` | 统一字段覆盖值 | D09（1）、D15（1） | D15（1）、D09（1） |
 | `workpaper_generation_items` | 生成操作内的一份底稿及其可恢复文件 manifest。 | D09（1） | D09（2） |
@@ -232,16 +240,16 @@
 | `workpaper_row_name_mapping_target` | 映射目标身份明细（让身份可 SQL 查询：判 stale / 多对一交集）。 | D04（1） | D04（1） |
 | `workpaper_sheet_classification` | 底稿 sheet 归类（9 类：A~I） | 未扫到 | D09（2） |
 | `workpaper_snapshots` | 底稿版本快照 — field-level 数据版本历史，支持时间线展示、diff 对比、回滚。 | D15（1） | D15（1）、D09（1） |
-| `workpaper_template_override_version` |  | 未扫到 | 未扫到 |
+| `workpaper_template_override_version` | 底稿模板覆盖层的版本 | 未扫到 | 未扫到 |
 | `workpaper_template_version` | 底稿模板版本 | 未扫到 | D09（1） |
 | `wp_access_security_outbox` | 内部安全审计发件箱（append-only）：保留真实拒绝原因，对外统一 404/429。 | D15（1） | 未扫到 |
 | `wp_cross_ref` | 底稿交叉引用 | 未扫到 | D09（5）、D15（1）、D13（1） |
 | `wp_edit_sessions` | 底稿编辑时间采集（WOPI lock/unlock 自动记录）。 | 未扫到 | 未扫到 |
 | `wp_export_snapshot` | 底稿导出快照 — 记录每次导出时的内容哈希，用于导入冲突检测 | D09（1） | D03（1）、D09（1） |
 | `wp_index` | 底稿索引 | D09（8）、D15（2）、D11（1） | D09（90）、D08（30）、D13（20）、D15（20）、D12（15）、D14（13）、D07（8）、D06（8）、D02（5）、D10（5）、D05（5）、D03（4）、D04（3）、D01（2）、D11（2） |
-| `wp_migration_snapshots` |  | D09（1） | D09（1） |
+| `wp_migration_snapshots` | 底稿模板迁移前快照 | D09（1） | D09（1） |
 | `wp_recommendation_feedback` | 底稿推荐反馈记录（采纳/跳过/手动添加）。 | 未扫到 | 未扫到 |
-| `wp_sheet_locks` |  | D09（1） | D09（1） |
+| `wp_sheet_locks` | 网页底稿 sheet 级协作锁 | D09（1） | D09（1） |
 | `wp_template` | 底稿模板 | D09（1） | D09（3） |
 | `wp_template_custom` | 自定义底稿模板 | D09（1） | D09（1） |
 | `wp_template_meta` | 模板元数据（命名区域定义） | D09（1） | 未扫到 |
@@ -269,7 +277,7 @@
 | `working_paper_oo_client_confirmation` | DocEditor `onDocumentReady` 后的 descriptor 逐项确认。 | D10（1） | D10（4） |
 | `working_paper_oo_close_intent` | clean close intent；只有 reconciler 可把 deterministic  | D10（1） | D10（4） |
 | `working_paper_oo_close_intent_event` | close intent 的 append-only eligibility/leader time | D10（1） | D10（2） |
-| `working_paper_oo_content_revision` |  | 未扫到 | 未扫到 |
+| `working_paper_oo_content_revision` | 底稿在线编辑（OnlyOffice）内容修订号 | 未扫到 | 未扫到 |
 | `working_paper_oo_participant` | 逐用户 participant lease。`closing` 是 close intent 创建时 | D10（1） | D10（7） |
 | `working_paper_oo_room` | 共享 OO room：server last-applied 与 client-confirmed  | D10（1） | D10（11） |
 | `working_paper_pending_mutation` | HTML flush 产生的短 TTL 单次逻辑消费 mutation token。 | D10（1） | D10（2） |
@@ -302,19 +310,19 @@
 | `consol_note_formula` | 合并附注单元格取数公式（语法同报表公式：TB / SUM_TB / REPORT / ROW）。 | D11（1）、D08（1） | D11（3）、D08（2） |
 | `consol_note_mapping_binding` | 企业级绑定——记录每家企业确认使用哪条规则，以及绑定时的来源结构指纹。 | D11（1） | D11（11） |
 | `consol_note_mapping_rule` | 映射规则。mappings JSONB 格式： | D11（1） | D11（6） |
-| `consol_note_mapping_rule_template` |  | 未扫到 | 未扫到 |
-| `consol_note_structure_lock` |  | 未扫到 | 未扫到 |
-| `consol_note_structure_lock_entity` |  | 未扫到 | 未扫到 |
+| `consol_note_mapping_rule_template` | 【已删除】迁移 V253 已删掉这张表，库里不存在 | 未扫到 | 未扫到 |
+| `consol_note_structure_lock` | 【已删除】迁移 V253 已删掉这张表，库里不存在 | 未扫到 | 未扫到 |
+| `consol_note_structure_lock_entity` | 【已删除】迁移 V253 已删掉这张表，库里不存在 | 未扫到 | 未扫到 |
 | `consol_note_template_binding` | 项目绑定到某一模板版本——一个项目一个章节只绑一个版本。 | D11（1） | D11（7） |
 | `consol_note_template_push_log` | 合并附注模板推送日志 —— 仅 ORM 映射，写入走 raw SQL。 | D11（1） | 未扫到 |
-| `consol_note_value_confirmation` |  | 未扫到 | 未扫到 |
+| `consol_note_value_confirmation` | 【已删除】迁移 V253 已删掉这张表，库里不存在 | 未扫到 | 未扫到 |
 | `consol_operation` | 一次可恢复、可比较输入版本的合并运行。 | D11（1） | D11（4）、D08（1） |
 | `consol_push_run` | 合并推送运行记录（公式管理「合并推送」页）。 | D11（2） | D11（1） |
 | `consol_query_template` | 自定义查询模板 | D11（1） | D11（1） |
 | `consol_scope` | 合并范围表 | D11（2） | D11（2）、D08（1）、D07（1） |
 | `consol_scope_confirmation_nodes` | 某确认版本中的角色投影；不是 projects 或金额数据的副本。 | D11（1） | 未扫到 |
 | `consol_scope_confirmations` | 合并企业树版本（V183 起名「范围确认」；V206 起推送时自动记录，手动记录仍可）。 | D11（1） | D11（3） |
-| `consol_snapshots` |  | D11（1） | D06（1）、D11（1） |
+| `consol_snapshots` | 合并数据快照 | D11（1） | D06（1）、D11（1） |
 | `consol_trial` | 合并试算表 | D11（2）、D15（1） | D11（5）、D15（1） |
 | `consol_workpaper_instance` | 合并项目/年度与 A3-CONSOL 薄底稿壳的关联及最近正式产物指针。 | D11（1） | D11（1） |
 | `consol_worksheet` | 合并差额表 — 每个企业树节点 × 科目 × 年度一行。 | D11（1） | D11（7）、D15（1） |
@@ -332,13 +340,13 @@
 | 表 | 说明 | 写入业务 | 读取业务 |
 |---|---|---|---|
 | `ai_content_governance` | AiContentGovernance（design §4.6 / AIEvidenceGate；R | D12（1） | D14（1）、D12（1） |
-| `archive_checklists` |  | 未扫到 | 未扫到 |
+| `archive_checklists` | 归档检查清单 | 未扫到 | 未扫到 |
 | `archive_jobs` | 归档编排作业 | D12（1） | D12（2） |
 | `archive_manifest_edges` | ArchiveManifestEdge（design §4.6；R11/P23）—— manifes | D12（1） | D12（1） |
 | `archive_manifest_entries` | ArchiveManifestEntry（design §4.6；R11/P23）—— manife | D12（1） | D12（1） |
 | `archive_manifests` | ArchiveManifest（design §4.6/§5.5；R11/P24）—— sealed | D12（2） | D12（1） |
-| `archive_modifications` |  | 未扫到 | 未扫到 |
-| `asset_blobs` |  | D15（1） | D15（1） |
+| `archive_modifications` | 归档后修改记录 | 未扫到 | 未扫到 |
+| `asset_blobs` | 文件字节存储（附件、AI 资源共用，内容不可变） | D15（1） | D15（1） |
 | `attachment_lineage` | 附件溯源关联 | D12（1） | D12（2）、D02（1） |
 | `attachment_versions` | 不可变内容快照（design §4.3）。 | D12（5）、D14（1） | D12（11）、D05（1）、D02（1） |
 | `attachment_working_paper` | 附件-底稿关联 | D12（1） | D12（3）、D11（1）、D02（1） |
@@ -347,16 +355,16 @@
 | `confirmation_action_log` | 函证操作审计留痕（append-only，DB 触发器禁 UPDATE/DELETE） | D12（2） | 未扫到 |
 | `confirmation_ai_check` | 函证AI检查 | 未扫到 | 未扫到 |
 | `confirmation_attachment_link` | 函证↔附件关联（含角色、强配对、匹配状态） | D12（1） | D12（2）、D13（1）、D02（1） |
-| `confirmation_attachments` |  | 未扫到 | 未扫到 |
+| `confirmation_attachments` | 函证附件（旧函证模块） | 未扫到 | 未扫到 |
 | `confirmation_letters` | 询证函模板/内容 | 未扫到 | 未扫到 |
-| `confirmation_lists` |  | 未扫到 | 未扫到 |
-| `confirmation_results` |  | 未扫到 | 未扫到 |
+| `confirmation_lists` | 函证清单（旧函证模块） | 未扫到 | 未扫到 |
+| `confirmation_results` | 函证结果（旧函证模块） | 未扫到 | 未扫到 |
 | `confirmation_summaries` | 询证函汇总 | 未扫到 | 未扫到 |
 | `confirmations` | 函证记录 | D12（1） | D12（4）、D04（1）、D13（1）、D02（1） |
 | `evidence_audit_command_roots` | command-root（design §7.1；R12/P25）—— 每敏感命令+幂等键+scop | 未扫到 | 未扫到 |
 | `evidence_audit_transitions` | command-root 的多行 transition 审计（design §7.1；R12/P25 | D12（1） | D12（1） |
 | `evidence_dependencies` | 统一依赖图的动态边 source→target（design §4.4；R9/P20）。 | D12（2） | D12（4） |
-| `evidence_hash_checks` |  | D06（1） | D06（2）、D12（1） |
+| `evidence_hash_checks` | 取证包完整性校验 | D06（1） | D06（2）、D12（1） |
 | `evidence_inbox` | inbox（design §5.4；R12）—— 按 event_id 幂等消费，避免重复副作用。 | 未扫到 | 未扫到 |
 | `evidence_links` | 证据链 | D12（1） | D12（6）、D14（1）、D11（1）、D02（1） |
 | `evidence_migration_checkpoints` | 迁移 checkpoint（design §8.2 M1；R14/P28）—— batch_key  | D12（1） | D12（1） |
@@ -384,7 +392,7 @@
 | 表 | 说明 | 写入业务 | 读取业务 |
 |---|---|---|---|
 | `audit_check_signoff` | 审计检查复核门禁签认（audit-check-review-gate-hardening / V12 | D13（1） | D13（1） |
-| `cell_annotations` |  | D02（2） | D02（3）、D13（2）、D09（1）、D06（1） |
+| `cell_annotations` | 单元格批注 | D02（2） | D02（3）、D13（2）、D09（1）、D06（1） |
 | `consistency_gate_acknowledgements` | 门禁逐项确认留痕表 | D14（1） | D14（1）、D13（1） |
 | `cross_check_results` | 跨科目校验结果 | D08（3） | D08（2）、D09（1） |
 | `eqcr_disagreement_resolutions` | EQCR 与项目组意见不一致时触发的合议结论。 | D13（1） | D13（2） |
@@ -402,8 +410,8 @@
 | `qc_inspections` | 质控抽查批次 | D13（1） | D13（2） |
 | `qc_rule_definitions` | QC 规则定义表 — 元数据 + 开关 | D13（1） | D13（6） |
 | `review_checklist_records` | 复核检查表记录（A21~A25 各级勾选+意见） | D13（1） | D13（1） |
-| `review_conversations` |  | D09（1）、D13（1） | D09（2）、D13（2）、D02（1）、D15（1） |
-| `review_messages` |  | D13（2）、D09（1） | D13（3）、D09（2）、D15（1） |
+| `review_conversations` | 复核会话 | D09（1）、D13（1） | D09（2）、D13（2）、D02（1）、D15（1） |
+| `review_messages` | 复核会话消息 | D13（2）、D09（1） | D13（3）、D09（2）、D15（1） |
 | `review_records` | 复核批注 | D13（1） | D13（3）、D12（2）、D02（2）、D15（2）、D01（1） |
 | `review_templates` | 复核意见模板 | D13（1） | D13（1） |
 | `review_threads` | V095: 复核对话线程 — 每个底稿区域一个线程 | D13（1） | D13（1） |
@@ -422,10 +430,10 @@
 | `ai_chat_action_receipts` | note save / adopt 的通用幂等收据（Req 8.2/8.3 · Property 2 | D14（1） | D14（1） |
 | `ai_chat_attachments` | 会话附件 metadata（Req 7.3）。 | D14（1） | D14（1） |
 | `ai_chat_history` | AI对话历史 | 未扫到 | 未扫到 |
-| `ai_chat_mcp_call_log` |  | 未扫到 | 未扫到 |
-| `ai_chat_mcp_token_revocations` |  | 未扫到 | 未扫到 |
+| `ai_chat_mcp_call_log` | AI 对话调用工具的日志 | 未扫到 | 未扫到 |
+| `ai_chat_mcp_token_revocations` | AI 工具调用令牌的吊销记录 | 未扫到 | 未扫到 |
 | `ai_chat_message` | AI问答消息（详细消息记录） | D14（3） | D14（5） |
-| `ai_chat_run_resources` |  | D14（1） | D14（1） |
+| `ai_chat_run_resources` | AI 对话一次运行引用的文件 | D14（1） | D14（1） |
 | `ai_chat_runs` | Chat Run —— 一次模型/Agent 执行的持久化摘要。 | D14（3） | D14（4） |
 | `ai_chat_session` | AI问答会话（会话维度聚合） | D14（3） | D14（3） |
 | `ai_chat_tool_calls` | 工具调用摘要（Req 11.10：每次调用产生 started + finished/failed  | 未扫到 | 未扫到 |
@@ -437,8 +445,8 @@
 | `ai_knowledge_base` | AI知识库文档索引 | 未扫到 | 未扫到 |
 | `ai_model_config` | AI模型配置 | D14（2）、D15（1） | D14（3）、D15（1）、D12（1） |
 | `ai_plugins` | AI插件 | D14（1） | D14（1） |
-| `ai_task_items` |  | D14（1） | D14（3） |
-| `ai_task_jobs` |  | 未扫到 | D14（3）、D13（1） |
+| `ai_task_items` | AI 批量任务的逐项 | D14（1） | D14（3） |
+| `ai_task_jobs` | AI 批量任务 | 未扫到 | D14（3）、D13（1） |
 | `ai_workpaper_fills` | AI底稿填充记录 | D02（1） | D02（1） |
 | `ai_workpaper_tasks` | AI底稿填充任务 | D02（1） | D02（1） |
 | `document_extracted` | 单据结构化提取数据 | D14（1） | D14（1） |
@@ -446,7 +454,7 @@
 | `document_scan` | 单据扫描件 | D14（1） | D15（1） |
 | `evidence_chain` | 证据链 | 未扫到 | 未扫到 |
 | `knowledge_documents` | 知识库文档 | D14（2） | D14（12）、D07（1）、D15（1） |
-| `knowledge_evidence_promotions` |  | D14（1） | D14（1） |
+| `knowledge_evidence_promotions` | 附件转存为知识库文档的记录 | D14（1） | D14（1） |
 | `knowledge_folders` | 知识库文件夹（树形目录） | D14（2） | D14（9） |
 | `knowledge_index` | 知识库索引 | D14（2）、D15（2） | D14（3）、D15（1） |
 | `wp_ai_generations` | AI生成历史记录，完整留痕每次生成的prompt/model/输出/确认信息。 | D09（1） | D13（1）、D09（1） |
@@ -457,23 +465,23 @@
 |---|---|---|---|
 | `acnr_invalidation_epoch` | ACNR Durable_Epoch — per-project 失效计数器（DB 权威，Redis | D08（1） | D08（1） |
 | `acnr_invalidation_outbox` | ACNR Invalidation_Outbox — 业务变更同事务写入，dispatcher 至少 | D08（1） | D08（1） |
-| `app_audit_log` |  | D13（3）、D02（3）、D01（2） | D02（1） |
+| `app_audit_log` | 轻量操作审计（密码确认、EQCR 判断、质控报告导出） | D13（3）、D02（3）、D01（2） | D02（1） |
 | `audit_chain_head` | 每条审计链的事务内权威链尾。 | D15（1） | 未扫到 |
 | `audit_log_entries` | 审计日志条目 — 不可变追加式 | D15（2） | D15（4）、D08（3）、D11（2）、D09（2）、D02（1）、D13（1） |
 | `background_job_items` | 后台长任务明细项。 | D15（1） | D15（1） |
 | `background_jobs` | 后台长任务主表（批量刷新/生成/提交/下载等）。 | D15（1） | D13（1）、D15（1） |
 | `chain_executions` | 全链路执行记录 | D15（1）、D07（1） | D15（1）、D07（1） |
 | `cross_module_conflicts` | 跨模块冲突调解记录 — 上游数据变更与手工覆盖的冲突追踪 | D15（1） | D15（2） |
-| `data_snapshots` |  | D07（1） | D07（1） |
-| `event_cascade_log` |  | D15（1） | D15（2） |
+| `data_snapshots` | 附注相关数据快照 | D07（1） | D07（1） |
+| `event_cascade_log` | 事件级联执行日志 | D15（1） | D15（2） |
 | `feature_flags` | Feature flag 功能开关（zero-downtime-deployment 组件 8）。 | D15（1） | D15（1） |
-| `offline_conflicts` |  | D15（1） | D15（1） |
-| `platform_job_attempts` |  | D15（1） | 未扫到 |
-| `platform_jobs` |  | D15（1） | D15（2）、D06（1） |
-| `schema_drift_log` |  | D15（1） | D15（1） |
-| `schema_migration_failures` |  | D15（1） | D15（1） |
-| `schema_version` |  | D15（1） | D15（1） |
-| `system_settings` |  | 未扫到 | D15（2）、D13（1） |
+| `offline_conflicts` | 离线编辑冲突与人工合并队列 | D15（1） | D15（1） |
+| `platform_job_attempts` | 后台任务的每次执行记录 | D15（1） | 未扫到 |
+| `platform_jobs` | 后台任务（导出、批量处理等） | D15（1） | D15（2）、D06（1） |
+| `schema_drift_log` | 表结构与代码不一致的检测记录 | D15（1） | D15（1） |
+| `schema_migration_failures` | 数据库迁移执行失败记录 | D15（1） | D15（1） |
+| `schema_version` | 已执行的数据库迁移版本 | D15（1） | D15（1） |
+| `system_settings` | 系统级键值配置 | 未扫到 | D15（2）、D13（1） |
 | `time_machine_snapshots` | 时光机增量快照 — RFC 6902 JSON Patch 反向 diff | D15（1） | D15（1） |
-| `version_line_stamps` |  | D02（1） | D02（1） |
+| `version_line_stamps` | 报表 / 底稿等的版本链戳记 | D02（1） | D02（1） |
 

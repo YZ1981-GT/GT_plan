@@ -18,6 +18,7 @@
 | [appendix-d-api-list.md](appendix-d-api-list.md)（Excel 版 `appendix-d-api-list.csv`） | 全部 2676 个接口：方法、路径、说明、代码位置、鉴权、前端引用 |
 | [appendix-d2-api-gaps.md](appendix-d2-api-gaps.md) | 90 个无鉴权依赖的接口、210 个前端写了但后端没有的路径 |
 | [appendix-e-table-business.md](appendix-e-table-business.md) | 逐表的业务关系：每张表被哪些业务写、哪些业务读 |
+| [appendix-f-field-dictionary.md](appendix-f-field-dictionary.md) | 核心 19 张表逐字段说明：存什么、取值（翻成中文）、从哪来 |
 | [06-reading-plan.md](06-reading-plan.md) | 三天源码阅读清单：每天的函数、行号、要看什么、要能讲清的问题，附追科目的只读 SQL |
 
 ## 关键数字
