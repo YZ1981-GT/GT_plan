@@ -223,7 +223,7 @@ function handlePushToA13() {
       description: `${i.indexNo || i.delivery.number || '事项'} 三维核对不一致（发货单/发票/记账凭证品名·数量·金额存在差异）${i.remark ? `：${i.remark}` : ''}`,
       indexRef: i.indexNo || 'D4-15',
     }))
-  pushToA13(misItems, '6001', '营业收入')
+  pushToA13(misItems)
 }
 
 // ─── Row class for inconsistent highlight ────────────────────────────

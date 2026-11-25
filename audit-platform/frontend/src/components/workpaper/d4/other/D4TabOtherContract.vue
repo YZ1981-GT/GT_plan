@@ -127,12 +127,39 @@ async function genConclusion() { if (props.isReadonly || !aiAvailable.value) ret
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 
 // ─── expose 给 GtWpRenderer 工具栏委托 ────────────────────────────────
-function handleExportTemplate() { exportTemplate('D4-34-rental' as any) }
-function handleExportData() { exportData('D4-34-rental' as any) }
+// 后端 d4/import-data 只认分区 sheet（D4-34-rental / D4-34-consult），导出模板与数据同样按区
+async function pickZone(action: string): Promise<'rental' | 'consult' | null> {
+  try {
+    await ElMessageBox.confirm(`请选择${action}的区域`, `${action} — D4-34`, {
+      confirmButtonText: '房屋租赁', cancelButtonText: '咨询业务',
+      distinguishCancelAndClose: true, type: 'info',
+    })
+    return 'rental'
+  } catch (e: any) {
+    return e === 'cancel' ? 'consult' : null
+  }
+}
+async function handleExportTemplate() {
+  const z = await pickZone('导出模板')
+  if (z === 'rental') await exportTemplate('D4-34-rental')
+  else if (z === 'consult') await exportTemplate('D4-34-consult')
+}
+async function handleExportData() {
+  const z = await pickZone('导出数据')
+  if (z === 'rental') await exportData('D4-34-rental')
+  else if (z === 'consult') await exportData('D4-34-consult')
+}
 async function handleImportClick() {
+  const z = await pickZone('导入')
+  if (!z) return
   const input = document.createElement('input')
   input.type = 'file'; input.accept = '.xlsx'
-  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-34', f) }
+  input.onchange = async () => {
+    const f = input.files?.[0]
+    if (!f) return
+    if (z === 'rental') await importData('D4-34-rental', f)
+    else await importData('D4-34-consult', f)
+  }
   input.click()
 }
 function fmtAmt(v: number): string { return v ? v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—' }

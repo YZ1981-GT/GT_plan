@@ -14,6 +14,7 @@
 import { ref, computed, watch, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useD4InspectionWriteback, type D4MisstatementItem } from '../../composables/useD4InspectionWriteback'
+import { D4_MAIN_REVENUE_STANDARD, D4_REVENUE_ACCOUNT_NAME } from '../../composables/d4AccountScope'
 
 /** 候选发现（由各底稿从其数据派生；纯描述、无金额方向） */
 export interface D4IpoFinding {
@@ -140,7 +141,7 @@ function handlePush() {
     ElMessage.warning('无已完成人工认定的发现（需勾选并填写方向/金额/证据）')
     return
   }
-  const ok = pushToA13(items, props.accountCode || '6001', props.accountName || '营业收入')
+  const ok = pushToA13(items, props.accountCode || D4_MAIN_REVENUE_STANDARD, props.accountName || D4_REVENUE_ACCOUNT_NAME)
   if (ok) {
     dialogVisible.value = false
     emit('pushed', items.length)

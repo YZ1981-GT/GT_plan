@@ -55,9 +55,11 @@ export type D4ImportableSheet =
   | 'D4-31'
   | 'D4-32'
   | 'D4-33'
-  | 'D4-34'
+  | 'D4-34-rental'
+  | 'D4-34-consult'
   | 'D4-35'
-  | 'D4-36'
+  | 'D4-36-forward'
+  | 'D4-36-backward'
 
 export interface D4ImportResult {
   rowCount: number

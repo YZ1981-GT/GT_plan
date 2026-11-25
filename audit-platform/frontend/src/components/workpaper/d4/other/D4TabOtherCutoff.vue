@@ -144,12 +144,39 @@ async function genConclusion() { if (props.isReadonly || !aiAvailable.value) ret
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 
 // ─── expose 给 GtWpRenderer 工具栏委托 ────────────────────────────────
-function handleExportTemplate() { exportTemplate('D4-36-forward' as any) }
-function handleExportData() { exportData('D4-36-forward' as any) }
+// 后端 d4/import-data 只认分区 sheet（D4-36-forward / D4-36-backward），导出模板与数据同样按区
+async function pickZone(action: string): Promise<'forward' | 'backward' | null> {
+  try {
+    await ElMessageBox.confirm(`请选择${action}的区域`, `${action} — D4-36`, {
+      confirmButtonText: '账到单据', cancelButtonText: '单据到账',
+      distinguishCancelAndClose: true, type: 'info',
+    })
+    return 'forward'
+  } catch (e: any) {
+    return e === 'cancel' ? 'backward' : null
+  }
+}
+async function handleExportTemplate() {
+  const z = await pickZone('导出模板')
+  if (z === 'forward') await exportTemplate('D4-36-forward')
+  else if (z === 'backward') await exportTemplate('D4-36-backward')
+}
+async function handleExportData() {
+  const z = await pickZone('导出数据')
+  if (z === 'forward') await exportData('D4-36-forward')
+  else if (z === 'backward') await exportData('D4-36-backward')
+}
 async function handleImportClick() {
+  const z = await pickZone('导入')
+  if (!z) return
   const input = document.createElement('input')
   input.type = 'file'; input.accept = '.xlsx'
-  input.onchange = async () => { const f = input.files?.[0]; if (f) await importData('D4-36', f) }
+  input.onchange = async () => {
+    const f = input.files?.[0]
+    if (!f) return
+    if (z === 'forward') await importData('D4-36-forward', f)
+    else await importData('D4-36-backward', f)
+  }
   input.click()
 }
 function rowClass({ row }: { row: CutoffRow }) { return row.isCrossing === '×' ? 'row-crossing' : '' }

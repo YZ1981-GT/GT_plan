@@ -217,7 +217,7 @@ function handlePushToA13() {
       description: `单据到账截止跨期：发货单${r.deliveryDate || ''}／凭证${r.voucherDate || ''}${r.remark ? `（${r.remark}）` : ''}`,
       indexRef: 'D4-18',
     }))
-  pushToA13(items, '6001', '营业收入')
+  pushToA13(items)
 }
 
 // ─── Persistence ─────────────────────────────────────────────────────

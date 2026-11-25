@@ -12,6 +12,7 @@
 import { computed, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
+import { D4_MAIN_REVENUE_STANDARD, D4_REVENUE_ACCOUNT_NAME } from './d4AccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -79,8 +80,9 @@ export function useD4InspectionWriteback(options: UseD4InspectionWritebackOption
    */
   function pushToA13(
     items: D4MisstatementItem[],
-    accountCode = '6001',
-    accountName = '营业收入',
+    // 默认 = 主营业务收入（单一真源 d4AccountScope，Property 24 禁写死科目码）
+    accountCode: string = D4_MAIN_REVENUE_STANDARD,
+    accountName: string = D4_REVENUE_ACCOUNT_NAME,
   ): boolean {
     if (readonly.value) return false
     if (!items.length) {

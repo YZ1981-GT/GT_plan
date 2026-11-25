@@ -153,7 +153,7 @@ function handlePushToA13() {
         indexRef: r.taxIndex || 'D4-16',
       }
     })
-  pushToA13(items, '6001', '营业收入')
+  pushToA13(items)
 }
 
 // ─── Persistence ─────────────────────────────────────────────────────

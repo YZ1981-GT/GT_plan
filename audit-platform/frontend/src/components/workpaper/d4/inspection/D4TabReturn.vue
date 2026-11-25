@@ -249,7 +249,7 @@ function handlePushToA13() {
     description: `销售退货异常：${r.customerName || ''} ${r.productName || ''}${r.returnReason ? `（${r.returnReason}）` : ''}`,
     indexRef: r.indexRef || 'D4-20',
   }))
-  pushToA13(items, '6001', '营业收入')
+  pushToA13(items)
 }
 
 // ─── Persistence ─────────────────────────────────────────────────────

@@ -119,7 +119,7 @@ function handlePushToA13() {
     description: `${t.label || t.indexNo || '事项'} 穿行测试${t.conclusion || '存在异常'}`,
     indexRef: t.indexNo || 'D4-14',
   }))
-  pushToA13(misItems, '6001', '营业收入')
+  pushToA13(misItems)
 }
 
 // ─── D4-14 sync bridge（统一走 useD4SyncMode，见其文件头注释） ─────────

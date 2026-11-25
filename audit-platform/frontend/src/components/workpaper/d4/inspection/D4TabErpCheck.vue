@@ -239,7 +239,7 @@ async function handlePushToA13() {
   const amount = Number(amountStr)
   if (!amount) { ElMessage.info('差异金额为 0，无需推送'); return }
   const desc = (conclusionText.value || '').trim() || 'ERP 系统核对存在差异'
-  pushToA13([{ amount, description: `账面与ERP核对差异：${desc}`, indexRef: 'D4-13' }], '6001', '营业收入')
+  pushToA13([{ amount, description: `账面与ERP核对差异：${desc}`, indexRef: 'D4-13' }])
 }
 
 defineExpose({ handleExportTemplate, handleExportData, handleImportClick })

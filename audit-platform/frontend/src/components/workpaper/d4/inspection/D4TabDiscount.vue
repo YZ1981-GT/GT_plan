@@ -167,7 +167,7 @@ async function handlePushToA13() {
   const amount = parseFloat(amountStr)
   if (!amount) { ElMessage.info('金额为 0，无需推送'); return }
   const desc = (auditConclusion.value || auditNote.value || '').trim() || '销售折扣与折让记录存在错报'
-  pushToA13([{ amount, description: `销售折扣与折让：${desc}`, indexRef: 'D4-19' }], '6001', '营业收入')
+  pushToA13([{ amount, description: `销售折扣与折让：${desc}`, indexRef: 'D4-19' }])
 }
 
 // ─── Persistence ─────────────────────────────────────────────────────

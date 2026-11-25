@@ -17,9 +17,10 @@
  *    - D4-36 跨期金额是取证金额（forward 取 docAmount / backward 取 voucherAmount），人工认定。
  */
 import { parseNum } from './useD4FormulaEngine'
+import { D4_OTHER_REVENUE_STANDARD } from './d4AccountScope'
 
 // ─── 科目口径常量（单一真源，守卫锁死防照抄 6001）───────────────────────────
-export const D4_OTHER_ACCOUNT_CODE = '6051' as const
+export const D4_OTHER_ACCOUNT_CODE = D4_OTHER_REVENUE_STANDARD
 export const D4_OTHER_ACCOUNT_NAME = '其他业务收入' as const
 
 /** 待推送候选项（未认定金额前的中间形态） */
