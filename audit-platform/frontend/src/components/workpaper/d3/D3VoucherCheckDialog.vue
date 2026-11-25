@@ -200,7 +200,7 @@ async function onOcrUpload(file: File): Promise<boolean> {
     const fd = new FormData()
     fd.append('file', file)
     // 凭证挂到本行（行级证据：D3-7 · row:{区段}-{行 id}），弹窗里的小眼睛按同一位置读取（spec attachment-inline-preview）
-    if (evidenceCell.value) rowEv.append(fd, D3_7_EVIDENCE_SHEET, evidenceCell.value)
+    if (evidenceCell.value) rowEv.append(fd, D3_7_EVIDENCE_SHEET, evidenceCell.value, props.row)
     const res = await http.post(
       `/api/workpapers/${props.wpId}/d4/contract-ocr`,
       fd,

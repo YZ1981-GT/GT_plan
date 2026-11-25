@@ -86,6 +86,13 @@
               <span :class="cellClass(row)" :title="row.isFromCrossSheet ? '来源：D3-2明细表聚合' : ''">
                 {{ fmtAmount(row.currentUnadjusted) }}
               </span>
+              <!-- 逐格四态覆盖徽标（Task 14）：S2/S4 才渲染，S1/S3 无条目 -->
+              <DerivedCellOverrideBadge
+                :overrides="row.cellOverrides"
+                field="currentUnadjusted"
+                :readonly="isReadonly"
+                @restore="restoreDerivedValue(section.sectionKey === 'by-nature' ? 'nature' : 'aging', row.rowKey, 'currentUnadjusted')"
+              />
             </template>
           </el-table-column>
           <el-table-column label="期末AJE" width="100">
@@ -236,6 +243,7 @@ import { computed, inject, toRef, type Ref } from 'vue'
 import { Download } from '@element-plus/icons-vue'
 import { isChangeRateExceeding } from '../composables/useD3FormulaEngine'
 import { useD3Adjudication } from '../composables/useD3Adjudication'
+import DerivedCellOverrideBadge from '../shared/DerivedCellOverrideBadge.vue'
 import { useD3AiGenerate } from '../composables/useD3AiGenerate'
 import { useD3TabImportExport } from '../composables/useD3TabImportExport'
 import { useAuditContext } from '@/composables/useAuditContext'
@@ -286,6 +294,7 @@ const {
   contractLiabilityWarning,
   auditNotes,
   updateCell,
+  restoreDerivedValue,
 } = useD3Adjudication({
   allResponses: allResponsesRef,
   wpId: wpIdRef,

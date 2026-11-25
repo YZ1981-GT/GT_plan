@@ -28,6 +28,7 @@ import { resolveTbAmountWithSeed } from './dCycleTbSeed'
 import { D3_NATURE_CATEGORIES, D3_NATURE_LABEL_TO_KEY } from './d3NatureCategories'
 import type { ChecklistResponse } from './useD3FormData'
 import type { useD3CrossSheet } from './useD3CrossSheet'
+import { resolvePerCellDerivedState, type DerivedCellState } from './shared/dynamicAdjudicationRows'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,14 @@ export interface AdjudicationRow {
   reasonAnalysis: string
   isFromCrossSheet: boolean
   isEditable: boolean
+  /**
+   * 逐格覆盖态（spec d3-sync-coverage-via-row-table-engine Task 14）：仅派生格
+   * `currentUnadjusted`（来源 D3-2 跨 sheet 聚合）在 S2/S4 时有值；S1/S3 不产生条目。
+   */
+  cellOverrides?: Record<
+    string,
+    { state: DerivedCellState; stored: number; snap: number; derived: number }
+  >
 }
 
 export interface AdjudicationSection {
@@ -135,6 +144,39 @@ function getResponseStr(allResponses: Map<string, ChecklistResponse>, itemId: st
   return allResponses.get(itemId)?.remark || ''
 }
 
+/** 派生快照键（四态状态机的 `snap`）—— 与 D1/D4/D5/D6/D7 同款 `{itemId}-snap`。 */
+function snapItemId(section: string, rowKey: string, field: string): string {
+  return `${makeItemId(section, rowKey, field)}-snap`
+}
+
+/** 读一格数值；空/非数 → null（stored 与 snap 的 null 语义对称）。 */
+function readCellOrNull(allResponses: Map<string, ChecklistResponse>, itemId: string): number | null {
+  const raw = allResponses.get(itemId)?.remark
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * 派生格四态解析（共享 `resolvePerCellDerivedState`，含 snap===null 降级）。
+ * 🔴 读侧（buildRow）与写侧（syncDerivedCellsIntoStore）必须同调本函数，否则 snap 永不落地。
+ * 替代原 `crossSheetCurrent !== 0 ? crossSheetCurrent : manual`：那套写法分不清人工覆盖与派生跟随，
+ * 且派生值恰为 0 时把手工值当派生用、派生非 0 时无条件盖掉手工值。
+ */
+function resolveD3DerivedCell(
+  allResponses: Map<string, ChecklistResponse>,
+  section: string,
+  rowKey: string,
+  field: string,
+  derived: number,
+) {
+  return resolvePerCellDerivedState(
+    readCellOrNull(allResponses, makeItemId(section, rowKey, field)),
+    readCellOrNull(allResponses, snapItemId(section, rowKey, field)),
+    derived,
+  )
+}
+
 function buildRow(
   section: string,
   rowKey: string,
@@ -150,9 +192,13 @@ function buildRow(
   const priorAje = getResponseNum(allResponses, makeItemId(section, rowKey, 'priorAje'))
   const priorRje = getResponseNum(allResponses, makeItemId(section, rowKey, 'priorRje'))
 
-  // Current: crossSheet fills currentUnadjusted (from D3-2), or manual edit
-  const manualCurrent = getResponseNum(allResponses, makeItemId(section, rowKey, 'currentUnadjusted'))
-  const currentUnadjusted = crossSheetCurrent !== 0 ? crossSheetCurrent : manualCurrent
+  // Current：派生格（D3-2 跨 sheet 聚合）四态 —— S1/S3 跟随派生，S2/S4 保留人工/OO 覆盖值
+  const cur = resolveD3DerivedCell(allResponses, section, rowKey, 'currentUnadjusted', crossSheetCurrent)
+  const currentUnadjusted = cur.display
+  const cellOverrides: AdjudicationRow['cellOverrides'] =
+    cur.state === 'S2' || cur.state === 'S4'
+      ? { currentUnadjusted: { state: cur.state, stored: cur.stored ?? 0, snap: cur.snap ?? 0, derived: cur.derived } }
+      : undefined
   const currentAje = getResponseNum(allResponses, makeItemId(section, rowKey, 'currentAje')) + eventAje
   const currentRje = getResponseNum(allResponses, makeItemId(section, rowKey, 'currentRje')) + eventRje
 
@@ -180,6 +226,7 @@ function buildRow(
     reasonAnalysis,
     isFromCrossSheet,
     isEditable: true,
+    ...(cellOverrides ? { cellOverrides } : {}),
   }
 }
 
@@ -268,6 +315,66 @@ export function useD3Adjudication(options: UseD3AdjudicationOptions) {
       },
     ]
   })
+
+  // ─── 派生格逐格落库 + snap 维护（四态状态机，Task 14）─────────────────────
+  //
+  // 🔴 S4 可达性取决于 snap 怎么维护（d4CellOverrideRender 教训）：watch 派生源变化 →
+  //    幂等把派生值写进 stored + snap，仅对未覆盖格（S1/S3）；覆盖格（S2/S4）不写，
+  //    冻结 snap 在覆盖发生时的派生值。
+
+  /** 全部派生格：性质区按 label 取 D3-2 聚合，账龄区按段 key 取聚合。 */
+  function _derivedCells(): Array<{ section: string; rowKey: string; derived: number }> {
+    const natureAgg = crossSheet.natureAggregation.value
+    const agingByKey = crossSheet.agingByKey.value
+    return [
+      ...NATURE_ROWS.map(({ rowKey, label }) => ({
+        section: 'nature', rowKey, derived: natureAgg[label]?.current ?? 0,
+      })),
+      ...crossSheet.agingSegments.value.map((seg) => ({
+        section: 'aging',
+        rowKey: LEGACY_AGING_ROWKEY[seg.key] ?? seg.key,
+        derived: agingByKey.current[seg.key] ?? 0,
+      })),
+    ]
+  }
+
+  /** 幂等写一格（值未变则不写，避免无谓 save）。 */
+  function _writeCellIfChanged(itemId: string, value: number): void {
+    const next = String(value)
+    if (allResponses.value.get(itemId)?.remark === next) return
+    debouncedSave(itemId, { remark: next })
+  }
+
+  function syncDerivedCellsIntoStore(): void {
+    if (isReadonly.value) return
+    const field = 'currentUnadjusted'
+    for (const { section, rowKey, derived } of _derivedCells()) {
+      const r = resolveD3DerivedCell(allResponses.value, section, rowKey, field, derived)
+      if (r.state === 'S2' || r.state === 'S4') continue // 冻结 snap，不跟随上游
+      // 从未写过且派生为 0：不落 0（打开底稿不该批量写零；snap===null 降级仍能识别后续手工值）
+      if (derived === 0 && r.stored === null && r.snap === null) continue
+      _writeCellIfChanged(snapItemId(section, rowKey, field), derived)
+      _writeCellIfChanged(makeItemId(section, rowKey, field), derived)
+    }
+  }
+
+  watch(
+    () => _derivedCells().map((c) => `${c.section}:${c.rowKey}=${c.derived}`).join('|'),
+    () => { syncDerivedCellsIntoStore() },
+    { immediate: true },
+  )
+
+  /**
+   * 恢复取数：把某派生格从覆盖态（S2/S4）退回 S1。只影响被点那一格：stored ← derived、
+   * snap ← derived（当前派生值），**当场**写对，不靠下一 tick 自愈。
+   */
+  function restoreDerivedValue(section: 'nature' | 'aging', rowKey: string, field: string = 'currentUnadjusted'): void {
+    if (isReadonly.value) return
+    const cell = _derivedCells().find((c) => c.section === section && c.rowKey === rowKey)
+    if (!cell) return
+    _writeCellIfChanged(makeItemId(section, rowKey, field), cell.derived)
+    _writeCellIfChanged(snapItemId(section, rowKey, field), cell.derived)
+  }
 
   // ─── Trial Balance Amount ────────────────────────────────────────────
 
@@ -453,9 +560,12 @@ export function useD3Adjudication(options: UseD3AdjudicationOptions) {
     // 操作
     updateCell,
     publishAdjudicated,
+    // 派生格逐格覆盖：恢复取数（只影响被点一格）
+    restoreDerivedValue,
     // EventBus
     onAdjustmentCreated,
     // Internal (for testing)
+    _syncDerivedCellsIntoStore: syncDerivedCellsIntoStore,
     _eventAjeAccum: eventAjeAccum,
     _eventRjeAccum: eventRjeAccum,
   }

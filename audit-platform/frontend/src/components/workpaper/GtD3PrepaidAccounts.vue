@@ -195,6 +195,7 @@ import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // G5-1 Phase 5 D3 canary：D3-2 明细走统一双向路径（descriptor → WorkpaperSyncEditorHost），
 // 与 GtD1NotesReceivable / GtD7ContractLiabilities 同构；其余 sheet 仍走 useD3EntryDualMode。
 import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { isD3OoWiredRowsSheet, isD3ManagedAdjudicationSheet } from './sync/d3ManagedSheets'
 import { readStoreProjection } from './sync/workpaperSyncApi'
 import { capabilityForEntry } from './sync/workpaperSyncCapability'
 import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
@@ -314,7 +315,10 @@ const ooSheetName = computed(() =>
 // store-projection + phase5_d3 的 _resolve_json_path/_set_json_path 处理。
 const D3_SYNC_ENTRY_ID = 'xlsx/gt-d3-prepaid-accounts'
 const D3_MANAGED_SHEET_KEY = 'd32-managed'
-const isD3DetailSheet = computed(() => currentSheet.value === 'D3-2')
+// 受管 sheet 判定从单一来源 d3ManagedSheets 派生（不写死短码）：rows 桥只认真正接了 OO 直写的行表；
+// D3-1 审定表是 adjudication kind 的第二套 gating，绝不并进 rows 桥（两 sheet 共桥会切错桥）。
+const isD3DetailSheet = computed(() => isD3OoWiredRowsSheet(currentSheet.value))
+const isD3AdjudicationSyncSheet = computed(() => isD3ManagedAdjudicationSheet(currentSheet.value))
 const syncSwitching = ref(false)
 /** 统一宿主实例 —— 切回结构化视图前用它 forceSave()（内部走 room forcesave）。 */
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
@@ -367,7 +371,11 @@ const renderModeOptions = computed(() => [
   {
     label: '在线编辑',
     value: 'onlyoffice' as const,
-    disabled: isD3DetailSheet.value ? isReadonly.value : !dualMode.ooAvailable.value,
+    // 三分支：rows 桥按只读门控；D3-1 审定表 adapter 未注册（裁决 F5）⇒ 暂禁在线编辑，
+    // 保持结构化视图，不落 legacy 假双向；其余 sheet 沿用 dualMode 可用性。
+    disabled: isD3DetailSheet.value
+      ? isReadonly.value
+      : isD3AdjudicationSyncSheet.value || !dualMode.ooAvailable.value,
   },
 ])
 
