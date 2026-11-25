@@ -33,6 +33,8 @@ export const COVERAGE_SET: readonly CoverageEntry[] = [
   { method: 'POST', pathTemplate: '/api/disclosure-notes/generate' },
   { method: 'POST', pathTemplate: '/api/disclosure-notes/{}/{}/auto-trim' },
   { method: 'POST', pathTemplate: '/api/disclosure-notes/{}/{}/offline-import/execute' },
+  // 离屏披露手工触发（ee84fb84e，后端 require_note_edit_access review 级，清册 category E）
+  { method: 'POST', pathTemplate: '/api/disclosure-notes/{}/{}/headless-refresh' },
   { method: 'POST', pathTemplate: '/api/disclosure-notes/{}/{}/pull-from-workpapers' },
   { method: 'POST', pathTemplate: '/api/disclosure-notes/{}/{}/refresh-all-bindings' },
   { method: 'POST', pathTemplate: '/api/disclosure-notes/{}/{}/refresh-from-workpapers' },

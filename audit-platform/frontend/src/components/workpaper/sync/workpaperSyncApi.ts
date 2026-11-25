@@ -1233,8 +1233,30 @@ export async function resolveEntryIdentity(
   })
 }
 
+/**
+ * 冲突集显式作废（后端 `abandon_conflicts`，R3.3；项目级 review 门）。
+ * 作废人由服务端取当前用户，不从请求体读；`reason` 必填（后端 AbandonReasonRequiredError），
+ * 前端先拒空，免得发出必然 4xx 的请求。operationId 规则同 retryOperation。
+ */
+export async function abandonConflicts(
+  scope: WorkpaperSyncEntryScope,
+  input: { readonly operationId: string | null | undefined; readonly reason: string },
+): Promise<Record<string, unknown>> {
+  const id = String(input.operationId ?? '').trim()
+  if (id === '') refuse('abandon_requires_operation', '作废冲突集需要既有 operation id')
+  const reason = String(input.reason ?? '').trim()
+  if (reason === '') refuse('abandon_requires_reason', '作废冲突集必须填写原因')
+  return request({
+    endpoint: 'abandon_conflicts',
+    scope,
+    params: { operation_id: id },
+    body: { reason },
+  })
+}
+
 /** 全部 client method 名 → endpoint 名。判据用它证明「每条路由都有唯一消费方」。 */
 export const WORKPAPER_SYNC_CLIENT_ENDPOINTS = Object.freeze({
+  abandonConflicts: 'abandon_conflicts',
   adoptSubstrate: 'adopt_substrate',
   createPendingMutation: 'create_pending_mutation',
   readEntrySyncReadiness: 'read_entry_readiness',
