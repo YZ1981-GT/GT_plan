@@ -346,7 +346,11 @@ _ACCOUNT_ADDITIONS: dict[tuple[str, str], tuple[str, ...]] = {
     ("H8", "明细表H8-2"): ("1651", "1652"),
     ("H9", "审定表H9-1"): ("2651",),
     ("H9", "租赁负债明细表H9-2"): ("2651",),
-    ("H0", "函证结果汇总表H0-1"): ("1651", "2651"),
+    # 2026-11-25：H0 函证结果汇总表H0-1 **不**在此补码。H0 的 account_codes 是九品种
+    # 参考码（一品种一码，与 h0_book_amounts.H0_MATRIX_CATEGORY_SPECS 等长，
+    # test_h0_prefill_presets 钉死 == 9 且不重复）；H0 取数走 semantic_account_resolver
+    # 按 h{n}_account_scope 语义规格解析，已覆盖 1651/2651 双族，往参考码里塞 alternate
+    # 既无运行时作用、又破坏 H0 的不变量（两份 spec 的 --check 互相打红）。
 }
 
 
