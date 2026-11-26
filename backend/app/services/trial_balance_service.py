@@ -741,6 +741,14 @@ class TrialBalanceService:
                 return None
             try:
                 result = fe_execute(adj_formula, ctx)
+                # 求值失败（缺数 / 引用不存在）不得冒充 0：退回默认路径并留痕
+                if not result.ok or result.value is None:
+                    import logging as _log
+                    _log.getLogger(__name__).warning(
+                        "调整列公式求值失败: %s（%s），退回默认路径",
+                        adj_formula, "；".join(result.errors) or result.state,
+                    )
+                    return None
                 return result.value
             except Exception:
                 # fail-open：公式求值失败不应阻断整行，退回默认路径
@@ -760,6 +768,7 @@ class TrialBalanceService:
             # V179: 调整列公式（净额），有值时以公式为准，无值退回默认科目码反解
             aje_formula = getattr(rc_row, "aje_formula", None)
             rje_formula = getattr(rc_row, "rje_formula", None)
+            formula_error: str | None = None
 
             if formula:
                 # 有公式：用统一公式引擎执行（L1 内核，ctx 由上方 L2 预载）
@@ -774,7 +783,24 @@ class TrialBalanceService:
                     row_cache={k: Decimal(str(v)) for k, v in row_values.items()},
                     adj_data=adj_data,
                 )
-                unadj = fe_execute(formula, _ctx).value
+                formula_result = fe_execute(formula, _ctx)
+                if not formula_result.ok or formula_result.value is None:
+                    # 行公式求值失败：未审 / 审定留空并写原因，不冒充 0，也不进 row_values
+                    # （引用本行的后续行据此得到「引用行未就绪」而不是把失败当 0 累加）。
+                    formula_error = "；".join(formula_result.errors) or f"公式求值失败（{formula_result.state}）"
+                    result_rows.append({
+                        "row_code": row_code,
+                        "row_name": rc_row.row_name,
+                        "indent": rc_row.indent_level or 0,
+                        "is_total": is_total,
+                        "is_category": ((rc_row.indent_level or 0) == 0 and not is_total),
+                        "unadjusted": None, "aje_dr": None, "aje_cr": None,
+                        "rcl_dr": None, "rcl_cr": None, "wp_adjustment": None,
+                        "audited": None,
+                        "formula_error": formula_error,
+                    })
+                    continue
+                unadj = formula_result.value
                 # ── V179 Phase 2：调整列公式优先 ──
                 # 有 aje_formula/rje_formula 时以公式为准（需求 4.3），返回净额；
                 # 无值时**完全退回**现有科目码反解路径（需求 4.2 零回归）。
@@ -971,6 +997,7 @@ class TrialBalanceService:
                 "rcl_cr": float(rcl_cr) if rcl_cr != 0 else None,
                 "wp_adjustment": float(wp_adjustment) if wp_adjustment != 0 else None,
                 "audited": float(audited) if audited != 0 else None,
+                "formula_error": formula_error,
             })
 
         return result_rows

@@ -256,3 +256,81 @@ class TestSaveSyncTracking:
         from app.services.wp_formula_service import WpFormulaService
 
         assert hasattr(WpFormulaService, "_update_sync_tracking"), "缺少 _update_sync_tracking 方法"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 5. Tier A 行为：全局层覆盖预设、停用压过预设、预填映射层不参与
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestTierABehaviorUsesEffectiveLayers:
+    """resolve_effective 的取值确实来自有效定义（不只是源码里出现了调用）。"""
+
+    @staticmethod
+    def _run(monkeypatch, cells, preset_anchor="D6-1-tb-amount"):
+        import asyncio
+
+        import app.services.d_cycle_extraction.presets as presets
+        import app.services.formula_settings.wp_effective as eff
+
+        seen: dict = {}
+
+        async def fake_effective(db, project_id, wp_id, *, include_disabled=False):
+            seen["include_disabled"] = include_disabled
+            return "D6", cells
+
+        monkeypatch.setattr(eff, "effective_cell_formulas", fake_effective)
+        monkeypatch.setattr(presets, "load_presets", lambda code: [{
+            "wp_code": "D6", "sheet_name": "D6-1", "anchor": preset_anchor,
+            "expression": "TB('1141','期末余额')", "formula_type": "auto_calc",
+            "description": "预设", "source": presets.SOURCE_PRESET, "tier": "A",
+        }] if code == "D6" else [])
+        out = asyncio.run(presets.resolve_effective(None, uuid.uuid4(), "D6", uuid.uuid4()))
+        return out, seen
+
+    def test_global_layer_overrides_preset(self, monkeypatch) -> None:
+        from app.services.formula_settings.wp_effective import CellFormula
+
+        cells = [CellFormula("D6-1", "D6-1-tb-amount", "SUM_TB('1141~1403','期末余额')", "auto_calc", "global")]
+        out, seen = self._run(monkeypatch, cells)
+        assert seen["include_disabled"] is True, "Tier A 必须取回本项目停用行"
+        assert [(b["source"], b["expression"]) for b in out] == [("custom", "SUM_TB('1141~1403','期末余额')")]
+
+    def test_project_disabled_beats_preset(self, monkeypatch) -> None:
+        from app.services.formula_settings.wp_effective import CellFormula
+
+        cells = [CellFormula("D6-1", "D6-1-tb-amount", "", "auto_calc", "project", disabled=True)]
+        out, _ = self._run(monkeypatch, cells)
+        assert [b["source"] for b in out] == ["disabled"]
+
+    def test_prefill_mapping_layer_does_not_override_tier_a_preset(self, monkeypatch) -> None:
+        from app.services.formula_settings.wp_effective import CellFormula
+
+        cells = [CellFormula("D6-1", "D6-1-tb-amount", "TB('9999','期末余额')", "auto_calc", "preset")]
+        out, _ = self._run(monkeypatch, cells)
+        assert [(b["source"], b["expression"]) for b in out] == [("preset", "TB('1141','期末余额')")]
+
+
+class TestProjectCellFormulas:
+    """停用判定纯函数：缺省口径与 Tier A 口径。"""
+
+    @staticmethod
+    def _row(expression, category=None):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(sheet_name="S", target_cell="A1", expression=expression,
+                               formula_type="auto_calc", category=category, description="")
+
+    def test_default_skips_only_empty_expression(self) -> None:
+        from app.services.formula_settings.wp_effective import project_cell_formulas
+
+        assert project_cell_formulas([self._row("  ")]) == []
+        kept = project_cell_formulas([self._row("TB('1','期末余额')", "__disabled__")])
+        assert len(kept) == 1 and kept[0].disabled is False
+
+    def test_tier_a_marks_disabled(self) -> None:
+        from app.services.formula_settings.wp_effective import project_cell_formulas
+
+        out = project_cell_formulas([self._row(""), self._row("TB('1','期末余额')", "__disabled__")],
+                                    include_disabled=True)
+        assert [c.disabled for c in out] == [True, True]

@@ -70,7 +70,8 @@ class PriorPeriodResolver:
                 if formula
                 else Decimal("0")
             )
-            if code:
+            # 求值失败（None）不进行缓存：引用本行的后续行应得到「引用行未就绪」而不是 None
+            if code and value is not None:
                 self._opening_cache[code] = value
             return value
 
@@ -80,7 +81,8 @@ class PriorPeriodResolver:
                 if formula
                 else Decimal("0")
             )
-            if code:
+            # 求值失败（None）不进行缓存：引用本行的后续行应得到「引用行未就绪」而不是 None
+            if code and value is not None:
                 self._same_prior_cache[code] = value
             return value
 
@@ -100,7 +102,8 @@ class PriorPeriodResolver:
                 if formula
                 else Decimal("0")
             )
-            if code:
+            # 求值失败（None）不进行缓存：引用本行的后续行应得到「引用行未就绪」而不是 None
+            if code and value is not None:
                 self._prior_tb_cache[code] = value
             return value
         return None

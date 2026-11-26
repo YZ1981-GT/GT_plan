@@ -41,13 +41,22 @@ class CellFormula:
     expression: str  # 不带前导「=」
     formula_type: str
     layer: str  # project / global / preset（全局已删除、回到预设）
+    category: str = ""
+    description: str = ""
+    #: 本项目行把该公式位停用（表达式为空或分类为 ``__disabled__``）；只在 ``include_disabled`` 时出现
+    disabled: bool = False
+
+
+#: 本项目行的「停用」分类（Tier A 预设被用户关掉）
+DISABLED_CATEGORY = "__disabled__"
 
 
 def _expr(text: Any) -> str:
     return str(text or "").strip().lstrip("=").strip()
 
 
-async def _load(db: AsyncSession, project_id: uuid.UUID, wp_id: uuid.UUID) -> tuple[str | None, list[CellFormula]]:
+async def _load(db: AsyncSession, project_id: uuid.UUID, wp_id: uuid.UUID, *,
+                include_disabled: bool = False) -> tuple[str | None, list[CellFormula]]:
     from app.models.formula_setting_models import FormulaSetting
     from app.models.workpaper_models import WorkingPaper, WpFormula, WpIndex
 
@@ -75,19 +84,40 @@ async def _load(db: AsyncSession, project_id: uuid.UUID, wp_id: uuid.UUID) -> tu
     own = (await db.execute(sa.select(WpFormula).where(
         WpFormula.wp_id == wp_id, WpFormula.project_id == project_id,
         WpFormula.formula_source.in_(WP_SOURCES)))).scalars().all()
-    for r in own:
-        if _expr(r.expression):
-            out[(r.sheet_name, r.target_cell)] = CellFormula(r.sheet_name, r.target_cell, _expr(r.expression),
-                                                             r.formula_type or "auto_calc", "project")
+    for cf in project_cell_formulas(own, include_disabled=include_disabled):
+        out[(cf.sheet, cf.cell)] = cf
     return code, sorted(out.values(), key=lambda c: (c.sheet, c.cell))
 
 
+def project_cell_formulas(rows: Any, *, include_disabled: bool = False) -> list[CellFormula]:
+    """本项目 ``wp_formula`` 行 → 有效定义（project 层）。纯函数，供 ``_load`` 与测试共用。
+
+    缺省口径：只有空表达式算「本项目没改这一格」；``include_disabled=True``（Tier A）时空表达式或
+    分类 ``__disabled__`` 都作为停用标记返回（``disabled=True``），压过全局 / 预设同位定义。
+    """
+    out: list[CellFormula] = []
+    for r in rows:
+        category = str(getattr(r, "category", None) or "").strip()
+        disabled = not _expr(r.expression) or (include_disabled and category == DISABLED_CATEGORY)
+        if disabled and not include_disabled:
+            continue
+        out.append(CellFormula(
+            r.sheet_name, r.target_cell, _expr(r.expression), r.formula_type or "auto_calc", "project",
+            category=category, description=str(getattr(r, "description", None) or ""), disabled=disabled))
+    return out
+
+
 async def effective_cell_formulas(db: AsyncSession, project_id: uuid.UUID,
-                                  wp_id: uuid.UUID) -> tuple[str | None, list[CellFormula]]:
-    """本底稿改过的公式位的有效定义。只读，保存点隔离：读失败（如迁移未落库）按「无改动」降级。"""
+                                  wp_id: uuid.UUID, *,
+                                  include_disabled: bool = False) -> tuple[str | None, list[CellFormula]]:
+    """本底稿改过的公式位的有效定义。只读，保存点隔离：读失败（如迁移未落库）按「无改动」降级。
+
+    ``include_disabled=True``：本项目停用行（空表达式 / ``__disabled__``）也返回（``disabled=True``），
+    供 Tier A 预设判「用户关掉了这个预设」；预填等路径缺省不返回。
+    """
     try:
         async with db.begin_nested():
-            return await _load(db, project_id, wp_id)
+            return await _load(db, project_id, wp_id, include_disabled=include_disabled)
     except Exception as exc:  # noqa: BLE001 —— 预填照原行为继续
         logger.warning("底稿有效公式读取失败，按预设预填 wp=%s: %s", wp_id, exc)
         return None, []

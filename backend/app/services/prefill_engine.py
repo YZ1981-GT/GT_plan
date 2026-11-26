@@ -171,7 +171,7 @@ async def resolve_extended_formula(
 
     ctx = await preload(db, project_id, year, [formula_text], adj_exclude_origins=frozenset())
     result = fe_execute(formula_text, ctx)
-    return result.value if result.ok else None
+    return result.value if result.ok and result.value is not None else None
 
 
 async def prefill_workpaper_real(
@@ -267,8 +267,8 @@ async def prefill_workpaper_real(
         try:
             result = fe_execute(formula_text, ctx)
 
-            if not result.ok:
-                errors.append({"cell": f["cell"], "error": "; ".join(result.errors)[:200] or "公式被拦截"})
+            if not result.ok or result.value is None:
+                errors.append({"cell": f["cell"], "error": "; ".join(result.errors)[:200] or "公式未返回数值"})
                 continue
 
             value = float(result.value)

@@ -30,10 +30,8 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.workpaper_models import WpFormula
 from app.services.d_cycle_extraction.anchor_registry import is_known_anchor
 
 logger = logging.getLogger(__name__)
@@ -176,23 +174,27 @@ def load_presets(wp_code: str) -> list[dict]:
     return [dict(b) for b in presets]
 
 
-def _is_disabled(formula: WpFormula) -> bool:
-    """判定用户 wp_formula 是否为「禁用」标记（R5.5）。"""
-    category = (formula.category or "").strip()
-    expression = (formula.expression or "").strip()
+def _is_disabled(formula: Any) -> bool:
+    """判定用户公式是否为「禁用」标记（R5.5）：分类 ``__disabled__`` 或表达式为空。"""
+    if getattr(formula, "disabled", False):
+        return True
+    category = (getattr(formula, "category", None) or "").strip()
+    expression = (getattr(formula, "expression", None) or "").strip()
     return category == _DISABLED_CATEGORY or not expression
 
 
-def _formula_to_binding(wp_code: str, formula: WpFormula) -> dict:
-    """把用户 WpFormula 转 Binding dict（custom 或 disabled）。"""
+def _formula_to_binding(wp_code: str, formula: Any) -> dict:
+    """把有效定义（``wp_effective.CellFormula``）或 ORM 行转 Binding dict（custom 或 disabled）。"""
     disabled = _is_disabled(formula)
+    sheet = getattr(formula, "sheet", None) or getattr(formula, "sheet_name", None) or ""
+    anchor = getattr(formula, "cell", None) or getattr(formula, "target_cell", None) or ""
     return {
         "wp_code": wp_code,
-        "sheet_name": (formula.sheet_name or "").strip(),
-        "anchor": (formula.target_cell or "").strip(),
-        "expression": (formula.expression or "").strip(),
-        "formula_type": (formula.formula_type or "auto_calc").strip(),
-        "description": (formula.description or "").strip(),
+        "sheet_name": str(sheet).strip(),
+        "anchor": str(anchor).strip(),
+        "expression": (getattr(formula, "expression", None) or "").strip(),
+        "formula_type": (getattr(formula, "formula_type", None) or "auto_calc").strip(),
+        "description": (getattr(formula, "description", None) or "").strip(),
         "source": SOURCE_DISABLED if disabled else SOURCE_CUSTOM,
         "tier": "A",
     }
@@ -225,18 +227,23 @@ async def resolve_effective(
             continue
         effective[anchor] = b
 
-    # 2. 用户 wp_formula 覆盖（同锚点用户 custom/disabled 取代预设）
-    try:
-        result = await db.execute(
-            sa.select(WpFormula).where(WpFormula.wp_id == _as_uuid(wp_id))
-        )
-        user_formulas = list(result.scalars().all())
-    except Exception as e:  # noqa: BLE001
-        logger.warning("resolve_effective 读取用户 wp_formula 失败: %s", e)
-        user_formulas = []
+    # 2. 有效定义覆盖（ADR-FGR-08：本项目 > 全局，与 coordinator / 预填同一来源，不直查 wp_formula）。
+    #    本项目停用行一并取回（include_disabled），同锚点禁用 > custom > 预设。
+    #    「preset」层是预填映射（prefill_formula_mapping）而非本模块的 Tier A 预设库 ⇒ 不参与覆盖。
+    from app.services.formula_settings.wp_effective import effective_cell_formulas
 
-    for formula in user_formulas:
-        anchor = (formula.target_cell or "").strip()
+    try:
+        _, cells = await effective_cell_formulas(
+            db, _as_uuid(project_id), _as_uuid(wp_id), include_disabled=True,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("resolve_effective 读取底稿有效公式失败: %s", e)
+        cells = []
+
+    for cell in cells:
+        if cell.layer == "preset":
+            continue
+        anchor = (cell.cell or "").strip()
         if not anchor:
             continue
         if not is_known_anchor(wp_code, anchor):
@@ -244,8 +251,7 @@ async def resolve_effective(
                 "d_cycle 用户公式锚点未知，丢弃: wp_code=%s anchor=%s", wp_code, anchor
             )
             continue
-        # 用户绑定覆盖同锚点预设（禁用 > custom > 预设）
-        effective[anchor] = _formula_to_binding(wp_code, formula)
+        effective[anchor] = _formula_to_binding(wp_code, cell)
 
     return sorted(
         effective.values(),

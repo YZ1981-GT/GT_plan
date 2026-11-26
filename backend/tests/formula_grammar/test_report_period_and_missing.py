@@ -13,7 +13,6 @@ Validates: R8（REPORT 期间）, R9②（缺行报错）, R9③（正则降级 
 """
 from __future__ import annotations
 
-import os
 from decimal import Decimal
 
 import pytest
@@ -48,24 +47,20 @@ def _exec(formula: str, ctx: FormulaContext | None = None) -> FormulaResult:
 
 
 def _exec_regex(formula: str, ctx: FormulaContext | None = None) -> FormulaResult:
-    """强制走正则降级路径。"""
-    old = os.environ.get("FORMULA_PARSE_MODE")
-    os.environ["FORMULA_PARSE_MODE"] = "regex"
+    """强制走正则降级路径。
+
+    🔴 不得 ``importlib.reload(formula_engine)``：重载会替换模块里的全部类（``FormulaEvalError`` 等）
+    并清空自定义函数注册表，之后的用例 ``pytest.raises(FormulaEvalError)`` 认不出新类的异常
+    ——大批量运行时一整片无关用例因此变红。直接换模块属性 ``_PARSE_MODE`` 再还原。
+    """
+    import app.services.formula_engine as mod
+
+    old = mod._PARSE_MODE
+    mod._PARSE_MODE = "regex"
     try:
-        # 重新导入以拿到正确的 _PARSE_MODE（模块级读取环境变量）
-        import importlib
-        import app.services.formula_engine as mod
-        importlib.reload(mod)
-        result = mod.execute(formula, ctx or _ctx(_CURRENT_ROWS, _PRIOR_ROWS))
+        return mod.execute(formula, ctx or _ctx(_CURRENT_ROWS, _PRIOR_ROWS))
     finally:
-        if old is None:
-            os.environ.pop("FORMULA_PARSE_MODE", None)
-        else:
-            os.environ["FORMULA_PARSE_MODE"] = old
-        import importlib
-        import app.services.formula_engine as mod
-        importlib.reload(mod)
-    return result
+        mod._PARSE_MODE = old
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

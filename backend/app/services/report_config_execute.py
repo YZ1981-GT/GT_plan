@@ -114,9 +114,10 @@ class _TracingResolver:
 
 def _payload(result: FormulaResult, trace: list[str]) -> dict[str, Any]:
     """一次求值的返回：``ok=False`` ⇒ ``value=None``、``errors`` 非空、``error`` = 原因以「；」连接。"""
-    ok = result.ok
+    # ok 但没有数值同样按失败处理：float(None) 会让整个试算请求 500
+    ok = bool(result.ok and result.value is not None)
     errors = list(result.errors) or ([] if ok else [f"求值失败（{result.state}）"])
-    return {"value": float(result.value) if ok else None, "ok": ok, "state": result.state, "trace": trace,
+    return {"value": float(result.value) if ok and result.value is not None else None, "ok": ok, "state": result.state, "trace": trace,
             "errors": errors, "warnings": list(result.warnings), "error": None if ok else "；".join(errors)}
 
 

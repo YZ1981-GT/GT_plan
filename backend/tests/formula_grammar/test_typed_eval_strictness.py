@@ -29,13 +29,29 @@ from app.services.wp_cell_reader import WpCellRead
 
 # ── 工具 ──────────────────────────────────────────────────────────────────────
 
+_YEAR = 2025
+
+
 def _mock_db(parsed_data):
-    """构造 mock DB，scalar_one_or_none 返回 parsed_data。"""
+    """构造 mock DB：底稿来源查询（``_source_rows``）的 ``.all()`` 返回 ``(wp_id, parsed_data)``。
+
+    ``parsed_data is None`` ⇒ 查不到底稿（空列表）。
+    """
     db = AsyncMock()
     result = MagicMock()
-    result.scalar_one_or_none.return_value = parsed_data
+    result.all.return_value = [] if parsed_data is None else [(uuid.uuid4(), parsed_data)]
     db.execute = AsyncMock(return_value=result)
     return db
+
+
+@pytest.fixture(autouse=True)
+def _project_year():
+    """WPExecutor 先核对请求年度 == 项目审计年度（591517dcb）；用例统一按 2025 年项目。"""
+    with patch("app.services.project_audit_year.fetch_project_audit_year",
+               new_callable=AsyncMock, return_value=_YEAR), \
+         patch("app.services.wp_cell_reader.fetch_project_audit_year",
+               new_callable=AsyncMock, return_value=_YEAR):
+        yield
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -50,7 +66,7 @@ class TestWPExecutorTwoParamRaisesOnMissing:
         """底稿不存在 ⇒ FormulaEvalError。"""
         db = _mock_db(None)
         with pytest.raises(FormulaEvalError, match="不存在"):
-            await WPExecutor.execute(db, uuid.uuid4(), "MISSING_WP", "审定数")
+            await WPExecutor.execute(db, uuid.uuid4(), "MISSING_WP", "审定数", year=_YEAR)
 
     @pytest.mark.anyio
     async def test_cell_resolve_missing(self):
@@ -60,7 +76,7 @@ class TestWPExecutorTwoParamRaisesOnMissing:
         with patch("app.services.wp_cell_reader.resolve_wp_cell",
                     new_callable=AsyncMock, return_value=read):
             with pytest.raises(FormulaEvalError, match="B5 未录入"):
-                await WPExecutor.execute(db, uuid.uuid4(), "D1", "B5")
+                await WPExecutor.execute(db, uuid.uuid4(), "D1", "B5", year=_YEAR)
 
     @pytest.mark.anyio
     async def test_cell_resolve_blocked(self):
@@ -70,28 +86,28 @@ class TestWPExecutorTwoParamRaisesOnMissing:
         with patch("app.services.wp_cell_reader.resolve_wp_cell",
                     new_callable=AsyncMock, return_value=read):
             with pytest.raises(FormulaEvalError, match="歧义"):
-                await WPExecutor.execute(db, uuid.uuid4(), "D1", "C5")
+                await WPExecutor.execute(db, uuid.uuid4(), "D1", "C5", year=_YEAR)
 
     @pytest.mark.anyio
     async def test_column_key_missing(self):
         """列名在 parsed_data 中不存在 ⇒ FormulaEvalError。"""
         db = _mock_db({"audited_amount": 100})
-        with pytest.raises(FormulaEvalError, match="无「期初余额」的值"):
-            await WPExecutor.execute(db, uuid.uuid4(), "E1", "期初余额")
+        with pytest.raises(FormulaEvalError, match="期初余额」：来源数值为空"):
+            await WPExecutor.execute(db, uuid.uuid4(), "E1", "期初余额", year=_YEAR)
 
     @pytest.mark.anyio
     async def test_column_key_none_value(self):
         """列名存在但值为 None ⇒ FormulaEvalError。"""
         db = _mock_db({"audited_amount": None})
-        with pytest.raises(FormulaEvalError, match="无「审定数」的值"):
-            await WPExecutor.execute(db, uuid.uuid4(), "E1", "审定数")
+        with pytest.raises(FormulaEvalError, match="审定数」：来源数值为空"):
+            await WPExecutor.execute(db, uuid.uuid4(), "E1", "审定数", year=_YEAR)
 
     @pytest.mark.anyio
     async def test_column_key_empty_string(self):
         """列名存在但值为空字符串 ⇒ FormulaEvalError。"""
         db = _mock_db({"audited_amount": "  "})
-        with pytest.raises(FormulaEvalError, match="无「审定数」的值"):
-            await WPExecutor.execute(db, uuid.uuid4(), "E1", "审定数")
+        with pytest.raises(FormulaEvalError, match="审定数」：来源数值为空"):
+            await WPExecutor.execute(db, uuid.uuid4(), "E1", "审定数", year=_YEAR)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -104,21 +120,21 @@ class TestWPExecutorNormalPaths:
     @pytest.mark.anyio
     async def test_column_value_present(self):
         db = _mock_db({"audited_amount": 123.45})
-        val = await WPExecutor.execute(db, uuid.uuid4(), "E1", "审定数")
+        val = await WPExecutor.execute(db, uuid.uuid4(), "E1", "审定数", year=_YEAR)
         assert val == Decimal("123.45")
 
     @pytest.mark.anyio
     async def test_column_value_zero_is_legitimate(self):
         """真实 0 值不被当成缺数。"""
         db = _mock_db({"audited_amount": 0})
-        val = await WPExecutor.execute(db, uuid.uuid4(), "E1", "审定数")
+        val = await WPExecutor.execute(db, uuid.uuid4(), "E1", "审定数", year=_YEAR)
         assert val == Decimal("0")
 
     @pytest.mark.anyio
     async def test_column_value_string_zero(self):
         """字符串 "0" 也是合法值。"""
         db = _mock_db({"audited_amount": "0"})
-        val = await WPExecutor.execute(db, uuid.uuid4(), "E1", "审定数")
+        val = await WPExecutor.execute(db, uuid.uuid4(), "E1", "审定数", year=_YEAR)
         assert val == Decimal("0")
 
     @pytest.mark.anyio
@@ -128,8 +144,24 @@ class TestWPExecutorNormalPaths:
         read = WpCellRead("ok", Decimal("777"), None, uuid.uuid4(), "审定表")
         with patch("app.services.wp_cell_reader.resolve_wp_cell",
                     new_callable=AsyncMock, return_value=read):
-            val = await WPExecutor.execute(db, uuid.uuid4(), "D1", "B5")
+            val = await WPExecutor.execute(db, uuid.uuid4(), "D1", "B5", year=_YEAR)
         assert val == Decimal("777")
+
+
+class TestWPExecutorYearBoundary:
+    """年度边界：缺年度、年度与项目不符都必须报错，不按自然年兜底。"""
+
+    @pytest.mark.anyio
+    async def test_missing_year_raises(self):
+        db = _mock_db({"audited_amount": 1})
+        with pytest.raises(FormulaEvalError, match="缺少本次审计年度"):
+            await WPExecutor.execute(db, uuid.uuid4(), "E1", "审定数")
+
+    @pytest.mark.anyio
+    async def test_year_mismatch_raises(self):
+        db = _mock_db({"audited_amount": 1})
+        with pytest.raises(FormulaEvalError, match="年度不符"):
+            await WPExecutor.execute(db, uuid.uuid4(), "E1", "审定数", year=_YEAR - 1)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -140,8 +172,8 @@ class TestWPExecutorOtherPathsUnchanged:
     """D2-3 与三参 A1 分支的缺数行为不变。"""
 
     @pytest.mark.anyio
-    async def test_three_arg_a1_missing_returns_none(self):
-        """三参 A1 取不到 ⇒ None（不是 FormulaEvalError）。"""
+    async def test_three_arg_a1_missing_raises_with_reason(self):
+        """三参 A1 取不到 ⇒ FormulaEvalError 并透传原因（591517dcb 起与两参同口径，不再静默返回 None）。"""
         from app.services.acnr.wp_cell_target import TargetRead
 
         db = _mock_db(None)  # 不走两参 DB 查询
@@ -149,9 +181,9 @@ class TestWPExecutorOtherPathsUnchanged:
         tr = TargetRead(read=read, bound_wp_code=None)
         with patch.object(WPExecutor, "read_sheet_cell",
                           new_callable=AsyncMock, return_value=tr):
-            val = await WPExecutor.execute(
-                db, uuid.uuid4(), "E1", "审定表E1-1", field="C10")
-        assert val is None  # 不是 FormulaEvalError
+            with pytest.raises(FormulaEvalError, match="sheet 不存在"):
+                await WPExecutor.execute(
+                    db, uuid.uuid4(), "E1", "审定表E1-1", field="C10", year=_YEAR)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -196,7 +228,7 @@ class TestFourWayConsistency:
         # WPExecutor 路径
         db_exec = _mock_db(None)
         with pytest.raises(FormulaEvalError):
-            await WPExecutor.execute(db_exec, pid, "PHANTOM", "审定数")
+            await WPExecutor.execute(db_exec, pid, "PHANTOM", "审定数", year=_YEAR)
 
         # wp_ref_strict 路径（需要真 DB 查，用 mock 模拟）
         db_strict = AsyncMock()
@@ -218,7 +250,7 @@ class TestFourWayConsistency:
 
         # WPExecutor
         db_exec = _mock_db({"audited_amount": 500})
-        exec_val = await WPExecutor.execute(db_exec, pid, "E1", "审定数")
+        exec_val = await WPExecutor.execute(db_exec, pid, "E1", "审定数", year=_YEAR)
         assert exec_val == val
 
         # wp_ref_strict

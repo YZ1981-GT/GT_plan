@@ -420,7 +420,11 @@ async def resolve_trim_report_line_amounts(
         if cached is None:
             try:
                 value = await parser.execute(formula, {})
-                cached = (float(value), "")
+                if value is None:
+                    # 求值失败返回 None：float(None) 会抛 TypeError 被当成「异常」而丢掉原因
+                    cached = (None, f"报表行 {ref.row_code} {row_name} 的取数公式未返回数值")
+                else:
+                    cached = (float(value), "")
             except Exception as e:  # noqa: BLE001
                 logger.error(
                     "裁剪判据·报表行金额：公式求值失败 project=%s year=%s wp=%s "
