@@ -162,14 +162,21 @@ jobs:
           uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
       - name: Run formula suites
         working-directory: backend
+        # 排除的两类必须连真 PG（*_pg.py / formula_runtime/integration 按设计缺库即报错），
+        # 由带 PG 服务的 backend-tests 跑。
+        # 🔴 显式传给 pytest 的文件不受 --ignore 影响 ⇒ 顶层文件清单先用 grep 剔除。
         run: |
+          set -euo pipefail
+          top_files=$(ls tests/test_formula_*.py | grep -v -E '_pg\.py$')
           python -m pytest \
             tests/formula_grammar tests/formula_hub tests/formula_management \
             tests/formula_runtime tests/formula_settings tests/formula_writer_ownership \
             tests/d_cycle_extraction tests/f2_extraction \
-            tests/test_formula_*.py \
+            $top_files \
             tests/test_tb_audited_writer.py tests/test_tb_audited_write_survives_recalc.py \
             tests/test_audited_amount_direct_write_baseline.py \
+            --ignore-glob='*_pg.py' \
+            --ignore=tests/formula_runtime/integration \
             -p no:playwright -m "not pg_only" -q --tb=short
 
   ledger-import-smoke:

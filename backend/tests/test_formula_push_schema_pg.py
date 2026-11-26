@@ -74,6 +74,7 @@ async def _scenario() -> dict:
     schema = f"tmp_formula_push_{uuid.uuid4().hex[:10]}"
     v169 = _MIGRATIONS / "V169__formula_push_engine.sql"
     r169 = _MIGRATIONS / "R169__rollback_formula_push_engine.sql"
+    v248 = _MIGRATIONS / "V248__formula_push_provenance.sql"  # ORM 已声明 provenance 列
     pid, wp = uuid.uuid4(), uuid.uuid4()
     out: dict = {}
     async with engine.begin() as conn:
@@ -85,6 +86,7 @@ async def _scenario() -> dict:
                 await conn.execute(sa.text(stmt))
             out["statements"] = await _run_sql_file(conn, v169)
             out["statements_rerun"] = await _run_sql_file(conn, v169)  # 幂等
+            await _run_sql_file(conn, v248)
             out["run_cols"] = await _columns(conn, "formula_push_run")
             out["state_cols"] = await _columns(conn, "formula_push_state")
 

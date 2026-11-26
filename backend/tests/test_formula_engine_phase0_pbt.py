@@ -180,6 +180,10 @@ class TestQ3DecimalPrecision:
         formula, ctx = data
 
         result = execute(formula, ctx)
+        if not result.ok:
+            # 求值失败（如反向 / 空区间 SUM_ROW）⇒ value 为 None 且给出原因，不冒充 0（需求 2.3）
+            assert result.value is None and result.errors, (formula, result)
+            return
         assert isinstance(result.value, Decimal), (
             f"Q3 违反：result.value 类型为 {type(result.value).__name__}，非 Decimal\n"
             f"  公式: {formula}\n"
@@ -227,6 +231,11 @@ class TestQ3DecimalPrecision:
         formula, ctx = data
 
         result = _execute_regex(formula, ctx)
+        if not result.ok:
+            # 求值失败（如反向 / 空区间 SUM_ROW）⇒ value 为 None 且给出原因，不冒充 0
+            # （formula-hub-integrity-closure 需求 2.3）；Decimal 约束只对成功结果成立
+            assert result.value is None and result.errors, (formula, result)
+            return
         assert isinstance(result.value, Decimal), (
             f"Q3 违反：regex 路径 value 类型为 {type(result.value).__name__}\n"
             f"  公式: {formula}"

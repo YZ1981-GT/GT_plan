@@ -23,6 +23,7 @@ from app.services.formula_push.rules import PushRule, PushSource, PushTarget
 
 _BACKEND = Path(__file__).resolve().parents[1]
 _V169 = _BACKEND / "migrations" / "V169__formula_push_engine.sql"
+_V248 = _BACKEND / "migrations" / "V248__formula_push_provenance.sql"  # provenance 列（ORM 已声明）
 
 
 async def _run_sql_file(conn, path: Path) -> None:
@@ -112,11 +113,12 @@ async def _scenario(monkeypatch) -> dict:
                 "CREATE TABLE checklist_responses ("
                 "id UUID PRIMARY KEY DEFAULT gen_random_uuid(), project_id UUID NOT NULL, "
                 "wp_id UUID NOT NULL REFERENCES working_paper(id), item_id VARCHAR(256) NOT NULL, "
-                "remark TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), "
+                "remark TEXT, conclusion TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), "
                 "updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), "
                 "content_version INTEGER NOT NULL DEFAULT 1, UNIQUE (wp_id, item_id))"
             )
             await _run_sql_file(conn, _V169)
+            await _run_sql_file(conn, _V248)
             await conn.execute(sa.text("INSERT INTO projects (id) VALUES (:p)"), {"p": project_id})
             await conn.execute(sa.text(
                 "INSERT INTO working_paper (id, project_id) VALUES (:w, :p), (:w2, :p)"

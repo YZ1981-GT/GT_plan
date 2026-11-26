@@ -43,13 +43,28 @@ def _tb(project: Project, year: int, code: str, audited: str, opening: str = "0"
 @pytest.mark.asyncio
 async def test_prior_period_comes_from_prior_year_project_trial_balance(db: AsyncSession) -> None:
     prior, cur = _project("C1", 2024), _project("C1", 2025)
-    db.add_all([prior, cur, _tb(prior, 2024, "6601", "242169736.06"), _tb(prior, 2024, "660101", "1.00"),
+    # 上年只有两个互不为父子的子级：前缀 6601 合计两者（与试算表取数同口径：前缀含子级）
+    db.add_all([prior, cur, _tb(prior, 2024, "660101", "242169736.06"), _tb(prior, 2024, "660102", "1.00"),
                 _tb(cur, 2025, "6601", "133145053.19")])
     await db.commit()
     snap = await load_prior_pl(db, cur.id, 2025, ("6601", "1122"))
     assert snap is not None and snap.tb_data is not None and snap.reason == ""
-    assert snap.tb_data["6601"]["本期发生额"] == Decimal("242169737.06")  # 与试算表取数同口径：前缀含子级
+    assert snap.tb_data["6601"]["本期发生额"] == Decimal("242169737.06")
     assert "1122" not in snap.tb_data  # 只取损益类
+
+
+@pytest.mark.asyncio
+async def test_prior_parent_and_leaf_together_counts_leaves_only(db: AsyncSession) -> None:
+    """父行 6601 与子级 660101 并存 ⇒ 只计叶子，不把父行再加一遍（ADR-FHIC-03，F8 父子双计）。
+
+    旧断言 242169737.06 = 父 + 子，正是被修掉的双计缺陷。
+    """
+    prior, cur = _project("C1", 2024), _project("C1", 2025)
+    db.add_all([prior, cur, _tb(prior, 2024, "6601", "242169736.06"), _tb(prior, 2024, "660101", "1.00"),
+                _tb(cur, 2025, "6601", "9")])
+    await db.commit()
+    snap = await load_prior_pl(db, cur.id, 2025, ("6601",))
+    assert snap.tb_data["6601"]["本期发生额"] == Decimal("1.00")
 
 
 @pytest.mark.asyncio

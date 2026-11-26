@@ -38,6 +38,7 @@ from tests.formula_hub._pg_harness import is_disposable_database
 
 _BACKEND = Path(__file__).resolve().parents[1]
 _V169 = _BACKEND / "migrations" / "V169__formula_push_engine.sql"
+_V248 = _BACKEND / "migrations" / "V248__formula_push_provenance.sql"  # provenance 列（ORM 已声明）
 _YEAR = 2025
 
 
@@ -81,7 +82,10 @@ async def _scenario(monkeypatch) -> dict:
     from app.services.formula_push.bindings import balance_adj
 
     monkeypatch.setattr(balance_adj, "_load_template_type", no_template_type)
-    monkeypatch.setattr(push, "_broadcast", lambda result: None)
+    # SSE 广播在 formula_push.persistence（引擎经 notify_committed 调用）
+    from app.services.formula_push import persistence as push_persistence
+
+    monkeypatch.setattr(push_persistence, "_broadcast", lambda result: None)
 
     async with engine.begin() as admin:
         await admin.execute(sa.text(f'CREATE SCHEMA "{schema}"'))
@@ -114,7 +118,7 @@ async def _scenario(monkeypatch) -> dict:
                 "CREATE TABLE checklist_responses ("
                 "id UUID PRIMARY KEY, project_id UUID NOT NULL REFERENCES projects(id), "
                 "wp_id UUID NOT NULL REFERENCES working_paper(id), "
-                "item_id VARCHAR(256) NOT NULL, remark TEXT, "
+                "item_id VARCHAR(256) NOT NULL, remark TEXT, conclusion TEXT, "
                 "created_at TIMESTAMPTZ NOT NULL DEFAULT now(), "
                 "updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), "
                 "content_version INTEGER NOT NULL DEFAULT 1, "
@@ -159,6 +163,7 @@ async def _scenario(monkeypatch) -> dict:
                 "is_deleted BOOLEAN NOT NULL DEFAULT false)"
             )
             await _run_sql_file(conn, _V169)
+            await _run_sql_file(conn, _V248)
 
             # 项目与 K2 底稿。
             await conn.execute(sa.text("INSERT INTO projects (id) VALUES (:p)"), {"p": project_id})
