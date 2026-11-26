@@ -76,7 +76,9 @@ on:
 
 jobs:
   formula-e2e:
-    runs-on: ubuntu-latest
+    # 🔴 不用 ubuntu-latest：它已指向 26.04，Playwright 尚不支持（`playwright install` 直接报
+    #    "does not support chromium on ubuntu26.04-x64"，整条 job 在装浏览器步骤即红）。
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     services:
