@@ -200,6 +200,31 @@ def _row_values(row: Any) -> tuple[str, Decimal]:
     return account_code, _decimal(audited, field_name=f"{account_code}.audited_amount")
 
 
+async def write_audited_row(session: AsyncSession, row: TrialBalance, audited_amount: Decimal | None,
+                            *, now: datetime) -> None:
+    """按发布门同一口径写单行审定数：同时回算 ``wp_adjustment``，``recalc_audited`` 之后值不回退。
+
+    公式运行时审定表域（``AdjudicationMutationAdapter``）的 apply / restore 走这里，不再只改
+    ``audited_amount``（只改它的话，下一次未审数或调整分录重算会按
+    ``unadj + rje + aje + wp_adjustment`` 把值算回去，写入静默丢失）。
+    ``audited_amount is None`` ⇒ 清空：审定数置空、底稿调整归零。不 commit、不 flush。
+    """
+    unadjusted = row.unadjusted_amount or _ZERO
+    rje = row.rje_adjustment or _ZERO
+    aje = row.aje_adjustment or _ZERO
+    if audited_amount is None:
+        values: dict[str, Any] = {"audited_amount": None, "wp_adjustment": _ZERO}
+    else:
+        amount = _decimal(audited_amount, field_name=f"{row.standard_account_code}.audited_amount")
+        values = {"audited_amount": amount, "wp_adjustment": amount - (unadjusted + rje + aje),
+                  "wp_publish_base": unadjusted, "wp_published_at": now}
+    await session.execute(
+        sa.update(TrialBalance)
+        .where(TrialBalance.id == row.id, TrialBalance.is_deleted.is_(False))
+        .values(**values, updated_at=now)
+    )
+
+
 async def publish_rows(
     session: AsyncSession,
     project_id: UUID,

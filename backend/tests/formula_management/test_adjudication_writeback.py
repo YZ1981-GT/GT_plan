@@ -36,9 +36,13 @@ class FakeTBRow:
     """模拟 TrialBalance ORM 行（含 unadjusted / audited）。"""
 
     def __init__(self, code: str, unadj: float = 1000.0, audited: float | None = None):
+        self.id = uuid4()
         self.standard_account_code = code
         self.unadjusted_amount = Decimal(str(unadj))
         self.audited_amount = Decimal(str(audited)) if audited is not None else None
+        self.rje_adjustment = Decimal("0")
+        self.aje_adjustment = Decimal("0")
+        self.wp_adjustment = Decimal("0")
         self.is_deleted = False
 
 
@@ -52,7 +56,21 @@ def _mock_db_with_rows(rows: list[FakeTBRow] | None = None):
     scalars = MagicMock()
     scalars.all.return_value = rows or []
     result.scalars.return_value = scalars
-    db.execute = AsyncMock(return_value=result)
+    by_id = {row.id: row for row in rows or []}
+
+    async def _execute(stmt, *args, **kwargs):
+        # 写入经 tb_audited_writer.write_audited_row 发 UPDATE：把 SET 的值落回替身行，
+        # 用例照旧按行属性断言（audited_amount / wp_adjustment）
+        if getattr(stmt, "is_update", False):
+            params = stmt.compile().params
+            target = next((r for rid, r in by_id.items() if rid in params.values()), None)
+            if target is not None:
+                for key in ("audited_amount", "wp_adjustment"):
+                    if key in params:
+                        setattr(target, key, params[key])
+        return result
+
+    db.execute = AsyncMock(side_effect=_execute)
     return db
 
 
@@ -87,6 +105,8 @@ async def test_writeback_sets_audited_not_unadjusted():
     # 仅 audited 被回写，unadjusted 不变（Req 13.1/13.2）
     assert row.audited_amount == Decimal("1200")
     assert row.unadjusted_amount == Decimal("1000")
+    # 与发布门同口径：wp_adjustment = 审定 − (未审 + rje + aje)，recalc_audited 后值不回退
+    assert row.wp_adjustment == Decimal("200")
     assert res.updated_accounts == ["1122"]
     assert res.values["1122"] == Decimal("1200")
     # 记 last_computed_at（Req 13.3）

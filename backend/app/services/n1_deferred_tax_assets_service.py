@@ -395,49 +395,6 @@ async def get_tb_balance_for_n1(
     return result
 
 
-async def writeback_tb(
-    project_id: str, audited_amount: float, db: Any, year: int | None = None
-) -> dict[str, Any]:
-    """回写审定数到 trial_balance（科目1811，期末余额，借方/资产类）
-
-    ⚠️ DEPRECATED（无调用方）：前端 N1-1 的 TB 回写走平台标准端点
-    `PUT /api/projects/{pid}/trial-balance/writeback`（trial_balance_service，
-    含数据集/口径/审计留痕）。本函数是绕过该服务的裸 SQL 旁路，无调用方，勿新引用。
-
-    ⚠️ trial_balance 是分年度存储，必须带 year 过滤（否则跨年度全表更新）。
-
-    Requirements: 8.3
-    """
-    import sqlalchemy as sa
-
-    try:
-        resolved_year = await _resolve_year(project_id, db, year)
-        result = await db.execute(
-            sa.text(
-                "UPDATE trial_balance "
-                "SET audited_amount = :amount "
-                "WHERE project_id = :pid AND year = :year "
-                "AND standard_account_code = :code"
-            ),
-            {
-                "amount": audited_amount,
-                "pid": str(project_id),
-                "year": resolved_year,
-                "code": _N1_ACCOUNT_CODE,
-            },
-        )
-        await db.flush()
-        return {
-            "success": True,
-            "account_code": _N1_ACCOUNT_CODE,
-            "audited_amount": audited_amount,
-            "rows_affected": result.rowcount,
-        }
-    except Exception as e:  # noqa: BLE001
-        logger.error("N1 service: TB 回写失败 project_id=%s: %s", project_id, e)
-        return {"success": False, "error": str(e)}
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # 跨底稿合计（N1+N3联动，供N5递延所得税费用核对）
 # ═══════════════════════════════════════════════════════════════════════════════

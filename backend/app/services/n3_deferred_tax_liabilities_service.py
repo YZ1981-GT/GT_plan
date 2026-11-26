@@ -260,38 +260,6 @@ async def get_tb_data(
     return result
 
 
-async def writeback_tb(project_id: str, audited_amount: float, db: Any) -> dict[str, Any]:
-    """回写审定数到 trial_balance（科目2901，期末余额，贷方/负债类）
-
-    Requirements: 6.6
-    """
-    import sqlalchemy as sa
-
-    try:
-        result = await db.execute(
-            sa.text(
-                "UPDATE trial_balance "
-                "SET audited_amount = :amount "
-                "WHERE project_id = :pid AND standard_account_code = :code"
-            ),
-            {
-                "amount": audited_amount,
-                "pid": str(project_id),
-                "code": _N3_ACCOUNT_CODE,
-            },
-        )
-        await db.flush()
-        return {
-            "success": True,
-            "account_code": _N3_ACCOUNT_CODE,
-            "audited_amount": audited_amount,
-            "rows_affected": result.rowcount,
-        }
-    except Exception as e:  # noqa: BLE001
-        logger.error("N3 service: TB 回写失败 project_id=%s: %s", project_id, e)
-        return {"success": False, "error": str(e)}
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # 跨底稿合计（N1资产部分 + N3负债部分，供N5递延所得税费用核对）
 # ═══════════════════════════════════════════════════════════════════════════════

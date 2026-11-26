@@ -273,42 +273,6 @@ async def get_prior_year_amount(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-async def writeback_tb(
-    db: Any,
-    project_id: Any,
-    audited_amount: float,
-) -> dict[str, Any]:
-    """回写审定数到 trial_balance（科目6403，本期发生额，损益类借方）.
-
-    Requirements: 7.3
-    """
-    import sqlalchemy as sa
-
-    try:
-        result = await db.execute(
-            sa.text(
-                "UPDATE trial_balance "
-                "SET audited_amount = :amount "
-                "WHERE project_id = :pid AND standard_account_code = :code"
-            ),
-            {
-                "amount": audited_amount,
-                "pid": str(project_id),
-                "code": _N4_ACCOUNT_CODE,
-            },
-        )
-        await db.flush()
-        return {
-            "success": True,
-            "account_code": _N4_ACCOUNT_CODE,
-            "audited_amount": audited_amount,
-            "rows_affected": result.rowcount,
-        }
-    except Exception as e:  # noqa: BLE001
-        logger.error("N4 service: TB 回写失败 project_id=%s: %s", project_id, e)
-        return {"success": False, "error": str(e)}
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # N2 计提对应交叉验证
 # ═══════════════════════════════════════════════════════════════════════════════

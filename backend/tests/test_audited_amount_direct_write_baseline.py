@@ -38,16 +38,9 @@ _BASELINE: set[tuple[str, str]] = {
     # ── 统一重算（recalc_audited / recalc_unadjusted，Task 10 改口径后仍需写） ──
     ("services/trial_balance_service.py", "recalc_audited"),
     ("services/trial_balance_service.py", "recalc_unadjusted"),
-    # ── 冻结的无调用方直写（deprecated，0 callers） ──
-    ("services/n1_deferred_tax_assets_service.py", "writeback_tb"),
-    ("services/n2_taxes_payable_service.py", "writeback_tb"),
-    ("services/n3_deferred_tax_liabilities_service.py", "writeback_tb"),
-    ("services/n4_taxes_and_surcharges_service.py", "writeback_tb"),
-    # ── 公式运行时（CAS 突变适配器，execute_refresh 当前无调用方） ──
-    ("services/formula_runtime/adapters/adjudication.py", "apply_many"),
-    ("services/formula_runtime/adapters/adjudication.py", "restore_many"),
-    # ── 公式管理审定回写（draft_refresh_orchestrator 不直接驱动 writeback_batch） ──
-    ("services/formula_management/adjudication_writeback.py", "_write_audited"),
+    # 2026-11-26 收口：n1~n4 的 writeback_tb（0 调用方、且 UPDATE 不带年度条件）已删除；
+    # 公式运行时审定表适配器 apply/restore 与 AdjudicationWritebackService._write_audited
+    # 改经 tb_audited_writer.write_audited_row（同步回算 wp_adjustment，recalc_audited 后不回退）。
 }
 
 # 统一写入器本身 — 不计入基线（它是合法的唯一写入点）。

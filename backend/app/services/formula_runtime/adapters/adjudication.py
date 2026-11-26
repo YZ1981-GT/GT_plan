@@ -22,6 +22,7 @@ from app.services.formula_runtime.contracts import (
     FormulaMutation,
     RestoredMutation,
 )
+from app.services.tb_audited_writer import write_audited_row
 
 # ─── Locator 校验 ──────────────────────────────────────────────────────────────
 
@@ -172,8 +173,6 @@ class AdjudicationMutationAdapter:
         mutations: list[FormulaMutation],
     ) -> list[AppliedMutation]:
         """UPDATE trial_balance SET audited_amount; verify version via CAS."""
-        from sqlalchemy import update, and_
-        from app.models.audit_platform_models import TrialBalance
 
         applied: list[AppliedMutation] = []
 
@@ -198,22 +197,10 @@ class AdjudicationMutationAdapter:
                     f"expected={mutation.expected_version}, current={current_version}"
                 )
 
-            # Only write audited_amount — never touch unadjusted_amount
+            # 与发布门同口径写入：同时回算 wp_adjustment（只改 audited_amount 会在
+            # recalc_audited 时被 unadj+rje+aje+wp_adjustment 算回去，写入静默丢失）。不动未审数。
             now = datetime.now(timezone.utc)
-            stmt = (
-                update(TrialBalance)
-                .where(
-                    and_(
-                        TrialBalance.id == row.id,
-                        TrialBalance.is_deleted == False,  # noqa: E712
-                    )
-                )
-                .values(
-                    audited_amount=mutation.after_value,
-                    updated_at=now,
-                )
-            )
-            await self._session.execute(stmt)
+            await write_audited_row(self._session, row, mutation.after_value, now=now)
             await self._session.flush()
 
             new_version = _version_hash(mutation.after_value, now)
@@ -233,8 +220,6 @@ class AdjudicationMutationAdapter:
         snapshots: list[FormulaMutation],
     ) -> list[RestoredMutation]:
         """Restore before_value (audited_amount) with optimistic version check."""
-        from sqlalchemy import update, and_
-        from app.models.audit_platform_models import TrialBalance
 
         restored: list[RestoredMutation] = []
 
@@ -275,22 +260,9 @@ class AdjudicationMutationAdapter:
                 )
                 continue
 
-            # Restore before_value
+            # 还原同样经发布门口径（wp_adjustment 一并回到 before_value 对应的值）
             now = datetime.now(timezone.utc)
-            stmt = (
-                update(TrialBalance)
-                .where(
-                    and_(
-                        TrialBalance.id == row.id,
-                        TrialBalance.is_deleted == False,  # noqa: E712
-                    )
-                )
-                .values(
-                    audited_amount=snapshot.before_value,
-                    updated_at=now,
-                )
-            )
-            await self._session.execute(stmt)
+            await write_audited_row(self._session, row, snapshot.before_value, now=now)
             await self._session.flush()
 
             new_version = _version_hash(snapshot.before_value, now)

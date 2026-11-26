@@ -74,6 +74,9 @@ def _make_row(
     row.standard_account_code = account_code
     row.audited_amount = audited_amount
     row.unadjusted_amount = unadjusted_amount
+    # 写入按发布门口径回算 wp_adjustment，需要真实的调整列（MagicMock 属性会混进算式）
+    row.rje_adjustment = Decimal("0")
+    row.aje_adjustment = Decimal("0")
     row.updated_at = datetime(2025, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
     row.is_deleted = False
     return row

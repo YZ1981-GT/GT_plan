@@ -405,9 +405,15 @@ class AdjudicationWritebackService:
         if not rows:
             return 0
 
+        from datetime import datetime as _dt, timezone as _tz
+
+        from app.services.tb_audited_writer import write_audited_row
+
+        _now = _dt.now(_tz.utc)
         for row in rows:
             # 仅回写 audited_amount，不动 unadjusted_amount（Req 13.2）
-            row.audited_amount = audited
+            # 与发布门同口径：audited_amount 与 wp_adjustment 一起写（只改审定数会在 recalc_audited 被算回去）
+            await write_audited_row(self.db, row, audited, now=_now)
 
         # 仅 flush，不 commit（工程铁律）
         await self.db.flush()
