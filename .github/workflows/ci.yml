@@ -141,6 +141,37 @@ jobs:
         run: python -m pytest tests/ -m "pg_only and not perf" -v --tb=short
         working-directory: backend
 
+  formula-tests:
+    # 2026-11-26：公式域独立门禁。backend-tests 是 `pytest backend/tests/ -x` 全量，
+    # 任一域先红即整 job 中止 ⇒ 公式用例长期从未在 CI 执行（本地实跑 130 红，其中 S1 spec
+    # 标完成但生产改动从未入库，致试算表汇总 / 公式试算 500）。本 job 不带 -x、只跑公式域，
+    # 不连库（pg_only 用例自动跳过；连真库的由 backend-tests-pg 负责）。
+    runs-on: ubuntu-latest
+    env:
+      # 指向不存在的库名：经 app.main / 自建引擎的用例不会误连任何真实库
+      DATABASE_URL: postgresql+asyncpg://nobody:nobody@127.0.0.1:9/gt_formula_ci_nonexistent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
+      - name: Run formula suites
+        working-directory: backend
+        run: |
+          python -m pytest \
+            tests/formula_grammar tests/formula_hub tests/formula_management \
+            tests/formula_runtime tests/formula_settings tests/formula_writer_ownership \
+            tests/d_cycle_extraction tests/f2_extraction \
+            tests/test_formula_*.py \
+            tests/test_tb_audited_writer.py tests/test_tb_audited_write_survives_recalc.py \
+            tests/test_audited_amount_direct_write_baseline.py \
+            -p no:playwright -m "not pg_only" -q --tb=short
+
   ledger-import-smoke:
     # S6-18: v2 账表导入引擎端到端 smoke
     # 防止"单测通过但真实数据跑不通"的回归（Sprint 6 复盘教训）
