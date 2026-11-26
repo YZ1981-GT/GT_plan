@@ -1024,6 +1024,8 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
         if account_to_name:
             from datetime import date as _date
             base_date = _date(int(year), 12, 31)
+            from app.services.dataset_query import get_active_filter
+            aux_ledger_filter = await get_active_filter(db, TbAuxLedger.__table__, project_id, int(year))
             async with db.begin_nested():  # 读失败只回滚这一步，不让调用方事务停在中止状态
                 ledger_result = await db.execute(
                     sa.select(
@@ -1032,9 +1034,7 @@ async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) 
                         TbAuxLedger.debit_amount,
                         TbAuxLedger.credit_amount,
                     ).where(
-                        TbAuxLedger.project_id == project_id,
-                        TbAuxLedger.year == year,
-                        TbAuxLedger.is_deleted == sa.false(),
+                        aux_ledger_filter,
                         TbAuxLedger.voucher_date.isnot(None),
                         TbAuxLedger.account_code.in_(list(account_to_name.keys())),
                     ).limit(100000)  # 大数据量保护

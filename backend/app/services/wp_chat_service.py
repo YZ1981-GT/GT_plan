@@ -110,16 +110,11 @@ class WpChatService:
         if year:
             conditions = [await get_active_filter(db, TbLedger.__table__, project_id, year)]
         else:
-            from app.models.dataset_models import LedgerDataset, DatasetStatus
+            from app.services.dataset_query import active_rows_predicate
 
-            active_ds_subq = (
-                sa.select(LedgerDataset.id)
-                .where(LedgerDataset.project_id == project_id, LedgerDataset.status == DatasetStatus.active)
-            )
             conditions = [
                 TbLedger.project_id == project_id,
-                TbLedger.dataset_id.in_(active_ds_subq),
-                TbLedger.is_deleted == sa.false(),
+                await active_rows_predicate(db, TbLedger.__table__, project_ids=[project_id], year=None),
             ]
         if account_codes:
             conditions.append(TbLedger.account_code.in_(account_codes))

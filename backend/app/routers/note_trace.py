@@ -26,6 +26,7 @@ from app.deps import require_project_access
 from app.models.audit_platform_models import ReportLineMapping, TbBalance
 from app.models.core import User
 from app.models.report_models import DisclosureNote, FinancialReport
+from app.services.dataset_query import get_active_filter
 
 logger = logging.getLogger(__name__)
 
@@ -238,10 +239,8 @@ async def trace_note_source(
         # Query TB balances for these accounts
         tb_result = await db.execute(
             sa.select(TbBalance).where(
-                TbBalance.project_id == project_id,
-                TbBalance.year == year,
+                await get_active_filter(db, TbBalance.__table__, project_id, year),
                 TbBalance.account_code.in_(account_codes),
-                TbBalance.is_deleted == sa.false(),
             ).order_by(sa.desc(sa.func.abs(TbBalance.closing_balance)))
         )
         tb_rows = tb_result.scalars().all()
@@ -306,10 +305,8 @@ async def trace_note_source(
             if all_account_codes:
                 tb_result = await db.execute(
                     sa.select(TbBalance).where(
-                        TbBalance.project_id == project_id,
-                        TbBalance.year == year,
+                        await get_active_filter(db, TbBalance.__table__, project_id, year),
                         TbBalance.account_code.in_(all_account_codes),
-                        TbBalance.is_deleted == sa.false(),
                     ).order_by(sa.desc(sa.func.abs(TbBalance.closing_balance)))
                 )
                 tb_rows = tb_result.scalars().all()

@@ -144,8 +144,7 @@ async def _analyze_payment_patterns(
                 TbAuxBalance.account_code == TbAuxLedger.account_code,
                 TbAuxBalance.aux_type == TbAuxLedger.aux_type,
                 TbAuxBalance.aux_code == TbAuxLedger.aux_code,
-                TbAuxBalance.is_deleted == sa.false(),
-            ),
+            ),  # 生效数据集与未删除过滤由下方 WHERE 的 balance_filter 统一承担
         ).where(
             ledger_filter,
             balance_filter,

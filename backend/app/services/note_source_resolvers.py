@@ -289,10 +289,10 @@ async def resolve_ledger_sum(
         # 字段名不识别 — 兜底用 debit_amount
         column = TbLedger.debit_amount
 
+    from app.services.dataset_query import get_active_filter
+
     where = [
-        TbLedger.project_id == project_id,
-        TbLedger.year == year,
-        TbLedger.is_deleted == sa.false(),
+        await get_active_filter(db, TbLedger.__table__, project_id, year),
         TbLedger.account_code.in_(codes),
     ]
     period_where = _build_period_where_clause(binding, TbLedger, ctx)
@@ -360,10 +360,10 @@ async def resolve_aux_balance(
     if column is None:
         column = TbAuxBalance.closing_balance
 
+    from app.services.dataset_query import get_active_filter
+
     where = [
-        TbAuxBalance.project_id == project_id,
-        TbAuxBalance.year == year,
-        TbAuxBalance.is_deleted == sa.false(),
+        await get_active_filter(db, TbAuxBalance.__table__, project_id, year),
         TbAuxBalance.account_code.in_(codes),
     ]
     aux_type = binding.get("aux_type")
@@ -441,10 +441,10 @@ async def resolve_aux_ledger_aging(
         logger.warning("aux_ledger_aging: import TbAuxLedger failed: %s", err)
         return None
 
+    from app.services.dataset_query import get_active_filter
+
     where = [
-        TbAuxLedger.project_id == project_id,
-        TbAuxLedger.year == year,
-        TbAuxLedger.is_deleted == sa.false(),
+        await get_active_filter(db, TbAuxLedger.__table__, project_id, year),
         TbAuxLedger.account_code.in_(codes),
         TbAuxLedger.voucher_date.isnot(None),
     ]

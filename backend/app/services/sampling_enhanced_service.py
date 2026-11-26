@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TbLedger, TbAuxLedger
-from app.services.dataset_query import get_active_filter
+from app.services.dataset_query import active_rows_predicate, get_active_filter
 from app.services.ledger_sampling_service import (
     LedgerQueryFilters,
     LedgerSamplingService,
@@ -242,7 +242,7 @@ class AgingAnalysisService:
             conditions = [
                 TbAuxLedger.project_id == project_id,
                 TbAuxLedger.account_code == account_code,
-                TbAuxLedger.is_deleted == sa.false(),
+                await active_rows_predicate(db, TbAuxLedger.__table__, project_ids=[project_id], year=None),
             ]
 
         stmt = (

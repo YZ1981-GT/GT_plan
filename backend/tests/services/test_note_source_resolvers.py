@@ -150,8 +150,15 @@ async def test_trial_balance_sum_minus_negates():
 
 
 @pytest.mark.asyncio
-async def test_ledger_sum_year_range():
+async def test_ledger_sum_year_range(monkeypatch):
     """period_filter.mode=year_range 求和."""
+    import sqlalchemy as sa
+
+    # 生效数据集过滤另有专门用例；这里只验证聚合查询恰好执行一次，故替换掉 ledger_datasets 的探查
+    async def _fake_active_filter(*_a, **_kw):
+        return sa.true()
+
+    monkeypatch.setattr("app.services.dataset_query.get_active_filter", _fake_active_filter)
     db = _make_db_with_scalar(Decimal("8888.88"))
     ctx = _ctx(db=db)
     binding = {

@@ -177,10 +177,10 @@ async def explode_aux_balance(
         logger.warning("aux_balance_explode: import TbAuxBalance failed: %s", err)
         return []
 
+    from app.services.dataset_query import get_active_filter
+
     where = [
-        TbAuxBalance.project_id == project_id,
-        TbAuxBalance.year == year,
-        TbAuxBalance.is_deleted == sa.false(),
+        await get_active_filter(db, TbAuxBalance.__table__, project_id, year),
         TbAuxBalance.account_code.in_(codes),
     ]
     aux_type = binding.get("aux_type")

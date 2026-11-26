@@ -16,6 +16,7 @@ from app.models.adjustment_review_models import AdjustmentClientBooking
 from app.models.audit_platform_models import Adjustment, AdjustmentType, ReviewStatus, TbLedger
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.dataset_models import LedgerDataset
+from app.services.dataset_query import get_filter_with_dataset_id
 from app.services.dataset_service import DatasetService
 from app.services.voucher_identity import VoucherKey, parse_voucher_keys, voucher_keys_in
 from app.services.workpaper_sync.outbox import DurableEventOutboxService
@@ -467,11 +468,8 @@ async def suggest_bookings(
     if not account_codes:
         return []
     ledger = list((await db.execute(sa.select(TbLedger).where(
-        TbLedger.project_id == project_id,
-        TbLedger.year == year,
-        TbLedger.dataset_id == active.id,
+        get_filter_with_dataset_id(TbLedger.__table__, project_id, year, active.id),
         TbLedger.account_code.in_(account_codes),
-        TbLedger.is_deleted == sa.false(),
     ))).scalars().all())
     vouchers = group_by_voucher_key(ledger)
     results: list[dict[str, Any]] = []

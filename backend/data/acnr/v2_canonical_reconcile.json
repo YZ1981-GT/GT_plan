@@ -1,10 +1,10 @@
 {
   "description": "V2 静态数据双读对账（T22，需求 9.4）：每个节点 / 边端点的旧字段经 v2_canonical 换成规范身份，按来源文件 × 分类计数，每类附中文原因与前 20 个样本；由 backend/scripts/acnr/reconcile_v2_canonical.py --write 生成，不含时间戳。",
-  "registry_version": "20261030155451",
+  "registry_version": "20261125140047",
   "inputs": [
     {
       "path": "backend/data/acnr/global_catalog.json",
-      "sha256": "44018727f4bcc009aaf73907650d04a75c9018b6ce3d86a1b210fa87c8bc416a"
+      "sha256": "c46887e856651d5d773b9096fbe7ff79e135739eb67d2ecde3d487f2d376b9ce"
     },
     {
       "path": "backend/data/address_registry_l2_semantic.json",

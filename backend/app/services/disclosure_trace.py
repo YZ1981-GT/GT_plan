@@ -290,6 +290,7 @@ async def _gather_evidence(
     if codes and source == "ledger_sum":
         try:
             from app.models.audit_platform_models import TbLedger
+            from app.services.dataset_query import get_active_filter
             stmt = (
                 sa.select(
                     TbLedger.account_code,
@@ -299,9 +300,7 @@ async def _gather_evidence(
                     TbLedger.summary,
                 )
                 .where(
-                    TbLedger.project_id == note.project_id,
-                    TbLedger.year == note.year,
-                    TbLedger.is_deleted == sa.false(),
+                    await get_active_filter(db, TbLedger.__table__, note.project_id, note.year),
                     TbLedger.account_code.in_(codes),
                 )
                 .limit(sample_limit)
@@ -322,10 +321,9 @@ async def _gather_evidence(
     if codes and source in ("aux_balance", "aux_ledger_aging"):
         try:
             from app.models.audit_platform_models import TbAuxBalance
+            from app.services.dataset_query import get_active_filter
             where = [
-                TbAuxBalance.project_id == note.project_id,
-                TbAuxBalance.year == note.year,
-                TbAuxBalance.is_deleted == sa.false(),
+                await get_active_filter(db, TbAuxBalance.__table__, note.project_id, note.year),
                 TbAuxBalance.account_code.in_(codes),
             ]
             aux_type = binding.get("aux_type")

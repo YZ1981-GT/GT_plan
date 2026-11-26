@@ -19,7 +19,7 @@ from app.models.core import User
 from app.services.report_trace_service import ReportTraceService
 from app.services.consol_enhanced_service import ConsolLockService, IndependentModuleService
 from app.services.annotation_service import AnnotationService
-from app.services.dataset_query import get_active_filter
+from app.services.dataset_query import active_rows_predicate, get_active_filter
 
 router = APIRouter(tags=["phase10-misc"])
 
@@ -205,7 +205,11 @@ async def aux_summary(project_id: UUID, year: int | None = None, db: AsyncSessio
     if year:
         aux_conditions = [await get_active_filter(db, TbAuxBalance.__table__, project_id, year)]
     else:
-        aux_conditions = [TbAuxBalance.project_id == project_id, TbAuxBalance.is_deleted == sa.false()]
+        # 未指定年度：各年度都只取 active 数据集的行，不读被取代的版本
+        aux_conditions = [
+            TbAuxBalance.project_id == project_id,
+            await active_rows_predicate(db, TbAuxBalance.__table__, project_ids=[project_id], year=None),
+        ]
     aux_stmt = (
         sa.select(
             TbAuxBalance.account_code,
@@ -221,7 +225,10 @@ async def aux_summary(project_id: UUID, year: int | None = None, db: AsyncSessio
     if year:
         bal_conditions = [await get_active_filter(db, TbBalance.__table__, project_id, year)]
     else:
-        bal_conditions = [TbBalance.project_id == project_id, TbBalance.is_deleted == sa.false()]
+        bal_conditions = [
+            TbBalance.project_id == project_id,
+            await active_rows_predicate(db, TbBalance.__table__, project_ids=[project_id], year=None),
+        ]
     bal_stmt = (
         sa.select(TbBalance.account_code, TbBalance.account_name, TbBalance.closing_balance)
         .where(*bal_conditions)

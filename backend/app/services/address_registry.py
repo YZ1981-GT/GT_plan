@@ -911,6 +911,9 @@ async def build_aux_entries(db, project_id: str, year: int) -> list[AddressEntry
         return entries
 
     try:
+        from app.services.dataset_query import get_active_filter
+
+        aux_filter = await get_active_filter(db, TbAuxBalance.__table__, pid, year)
         result = await db.execute(
             sa.select(
                 TbAuxBalance.account_code,
@@ -920,11 +923,7 @@ async def build_aux_entries(db, project_id: str, year: int) -> list[AddressEntry
                 TbAuxBalance.aux_code,
                 TbAuxBalance.aux_name,
             )
-            .where(
-                TbAuxBalance.project_id == pid,
-                TbAuxBalance.year == year,
-                TbAuxBalance.is_deleted == sa.false(),
-            )
+            .where(aux_filter)
             .group_by(
                 TbAuxBalance.account_code,
                 TbAuxBalance.account_name,

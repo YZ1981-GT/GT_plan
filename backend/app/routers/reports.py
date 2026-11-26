@@ -31,6 +31,7 @@ from app.models.report_schemas import (
     ReportProvenanceResponse,
     ReportRow,
 )
+from app.services.dataset_query import active_rows_predicate
 from app.services.event_bus import event_bus
 from app.services.formula_provenance import redact_final_provenance
 from app.services.report_engine import ReportEngine
@@ -606,7 +607,7 @@ async def get_line_composition(
         year_result = await db.execute(
             sa.select(sa.func.max(TbBalance.year)).where(
                 TbBalance.project_id == project_id,
-                TbBalance.is_deleted == sa.false(),
+                await active_rows_predicate(db, TbBalance.__table__, project_ids=[project_id], year=None),
             )
         )
         year = year_result.scalar_one_or_none()
