@@ -951,6 +951,8 @@ export interface DisclosureNoteDetail {
   text_content: string | null
   guidance_text?: string | null
   status: string
+  /** 服务端下发的编辑起点内容摘要（跨会话 CAS）；PUT 原样回传为 expected_digest */
+  content_digest?: string | null
 }
 
 export interface NoteValidationFinding {
@@ -985,8 +987,24 @@ export async function getDisclosureNoteDetail(projectId: string, year: number, n
   return data
 }
 
-export async function updateDisclosureNote(noteId: string, body: Record<string, any>) {
-  const { data } = await http.put(P_dn.update(noteId), body)
+export interface UpdateDisclosureNoteOptions {
+  /** 稳定幂等键：同一业务保存的网络重试沿用同一 id，服务端只执行一次 */
+  mutationId?: string
+  /** 调用方自行处理错误（含 409 冲突）时不弹全局 toast */
+  silent?: boolean
+}
+
+export async function updateDisclosureNote(
+  noteId: string,
+  body: Record<string, any>,
+  opts?: UpdateDisclosureNoteOptions,
+) {
+  const headers: Record<string, string> = {}
+  if (opts?.mutationId) headers['X-Mutation-Id'] = opts.mutationId
+  const { data } = await http.put(P_dn.update(noteId), body, {
+    headers,
+    ...(opts?.silent ? { _silent: true } : {}),
+  } as any)
   return data
 }
 

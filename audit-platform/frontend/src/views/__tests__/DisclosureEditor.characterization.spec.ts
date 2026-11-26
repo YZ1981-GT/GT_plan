@@ -199,7 +199,7 @@ describe('DisclosureEditor Characterization — Save', () => {
       clearAutoSaveDraft: vi.fn(),
     })
     await onSave()
-    expect(mockUpdateNote).toHaveBeenCalledWith('n1', expect.objectContaining({ table_data: { rows: [] } }))
+    expect(mockUpdateNote).toHaveBeenCalledWith('n1', expect.objectContaining({ table_data: { rows: [] } }), expect.objectContaining({ silent: true }))
   })
 })
 

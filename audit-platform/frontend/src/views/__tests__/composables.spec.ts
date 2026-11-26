@@ -293,7 +293,7 @@ describe('useNotePersist', () => {
       clearEditDirty: clearDirty, autoSaveClearDirty: vi.fn(), clearAutoSaveDraft: vi.fn(),
     })
     await onSave()
-    expect(mockUpdateNote).toHaveBeenCalledWith('n1', expect.objectContaining({ table_data: { rows: [{ values: [1, 2] }] } }))
+    expect(mockUpdateNote).toHaveBeenCalledWith('n1', expect.objectContaining({ table_data: { rows: [{ values: [1, 2] }] } }), expect.objectContaining({ mutationId: expect.any(String), silent: true }))
     expect(clearDirty).toHaveBeenCalled()
   })
 
@@ -313,7 +313,7 @@ describe('useNotePersist', () => {
     expect(mockUpdateNote).toHaveBeenCalledWith('n-table-clear', {
       text_content: '',
       table_data: { rows: [] },
-    })
+    }, expect.objectContaining({ silent: true }))
     expect(currentNote.value.text_content).toBe('')
   })
 
@@ -335,7 +335,7 @@ describe('useNotePersist', () => {
     expect(mockUpdateNote).toHaveBeenCalledWith('n-mixed', {
       text_content: '<p>说明</p>',
       table_data: preparedTable,
-    })
+    }, expect.objectContaining({ silent: true }))
     expect(currentNote.value.text_content).toBe('<p>说明</p>')
     expect(currentNote.value.table_data).toStrictEqual(preparedTable)
   })
@@ -394,11 +394,13 @@ describe('useNotePersist', () => {
 
     const pendingSave = onSave()
     currentNote.value = nextNote
-    resolveSave({})
+    resolveSave({ status: 'draft', content_digest: 'new-digest' })
     await pendingSave
 
     expect(savedNote.text_content).toBe('<p>已保存正文</p>')
-    expect(savedNote.status).toBe('confirmed')
+    // 2026-11-26 P1：采用服务端返回的状态，不再把「已保存」本地写成「已确认」。
+    expect(savedNote.status).toBe('draft')
+    expect(savedNote.content_digest).toBe('new-digest')
     expect(currentNote.value).toMatchObject(nextNote)
     expect(editMode.value).toBe(true)
     expect(clearEditDirty).not.toHaveBeenCalled()
@@ -417,7 +419,7 @@ describe('useNotePersist', () => {
       clearEditDirty: vi.fn(), autoSaveClearDirty: vi.fn(), clearAutoSaveDraft: vi.fn(),
     })
     await onSave()
-    expect(mockUpdateNote).toHaveBeenCalledWith('n2', expect.objectContaining({ text_content: '<p>hello</p>' }))
+    expect(mockUpdateNote).toHaveBeenCalledWith('n2', expect.objectContaining({ text_content: '<p>hello</p>' }), expect.objectContaining({ silent: true }))
   })
 
   it('onSave does nothing when currentNote is null', async () => {

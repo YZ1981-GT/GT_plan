@@ -2883,6 +2883,11 @@ const { saveLoading, justSaved, markEdited: markPersistEdited,
       throw error
     }
   },
+  // 409 NOTE_CONTENT_CONFLICT →「查看最新内容」：绕缓存重载当前章（带回新 content_digest）。
+  reloadCurrentNote: async () => {
+    const section = currentNote.value?.note_section
+    if (section) await fetchDetailFresh(section)
+  },
 })
 markNoteSaveEdited = markPersistEdited; discardNoteSaveEdits = () => discardPersistEdits()
 
