@@ -22,7 +22,9 @@ describe('F3-5 逾期未付票据公式与风险', () => {
     }, new Date('2025-10-15T00:00:00'))
 
     expect(row.termDays).toBe(181)
-    expect(row.overdueDays).toBe(105)
+    // 07-01 → 10-15 按日历是 106 天。原期望 105 是 UTC+8 下「到期日按 UTC 零点、基准日按本地零点」
+    // 直接相减少算的那一天，CI（UTC）上即得 106（2026-11-26 修为按日历日计算，见 utils/calendarDays）
+    expect(row.overdueDays).toBe(106)
     expect(row.unpaidAmount).toBe(400_000)
     expect(row.riskFlags).toContain('逾期超过90天')
     expect(row.riskFlags).toContain('期后尚未付清')

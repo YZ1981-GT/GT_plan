@@ -17,9 +17,18 @@ vi.mock('@/composables/usePermissionMatrix', () => ({
   usePermissionMatrix: () => ({ currentRole }),
 }))
 
-// defineAsyncComponent 的 ReviewPanel 在弹窗内，这里只关心标题与可见性，桩掉即可
+// defineAsyncComponent 的 ReviewPanel 在弹窗内，这里只关心标题与可见性，桩掉即可。
+// 🔴 不能只给 { default }：defineAsyncComponent 在包装层会读组件上的 `__isTeleport` / `__isKeepAlive`
+//    等内部标记，缺了它们就是 8 条 "No __isTeleport export is defined on the mock"（2026-11-26 CI 实测）。
 vi.mock('../AiReviewPanel.vue', () => ({
-  default: { name: 'AiReviewPanel', template: '<div class="review-panel-stub" />' },
+  __esModule: true,
+  default: {
+    name: 'AiReviewPanel',
+    __isTeleport: false,
+    __isKeepAlive: false,
+    __isSuspense: false,
+    template: '<div class="review-panel-stub" />',
+  },
 }))
 
 import GtWpAiReviewToolbar from '../GtWpAiReviewToolbar.vue'

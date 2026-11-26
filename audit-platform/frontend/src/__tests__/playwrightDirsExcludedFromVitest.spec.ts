@@ -90,4 +90,12 @@ describe('Playwright 用例目录排除在 vitest 之外', () => {
       .map(({ file, dir }) => `${file} → ${dir}/**`)
     expect(missing, 'vitest 会把这些 Playwright 用例当单测跑、整文件报错；请加进 vitest.config.ts 的 exclude').toEqual([])
   })
+
+  it('scripts/ 下的 Playwright 脚本（smoke-browser-mount.spec.mjs）不在 vitest 的搜索范围', () => {
+    // 它不在任何 playwright*.config.ts 的 testDir 里（由 scripts 直接调），但 vitest 的 include `**/*.spec.*`
+    // 会把它收进来 —— CI 上没装浏览器，3 条用例全红（2026-11-26 实测）。
+    const exclude = vitestExclude()
+    expect(exclude).not.toBeNull()
+    expect(coveredByExclude('scripts', exclude!)).toBe(true)
+  })
 })

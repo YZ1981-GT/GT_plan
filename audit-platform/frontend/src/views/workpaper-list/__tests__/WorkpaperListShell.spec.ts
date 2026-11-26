@@ -28,9 +28,21 @@ vi.mock('vue-router', () => ({
 }))
 
 // ─── Mock useAuditContext ────────────────────────────────────────────────────
-vi.mock('@/composables/useAuditContext', () => ({
-  useAuditContext: () => ({ onContextChange: vi.fn() }),
-}))
+// 横切组件（含 ConsolLockedBanner）从它取 projectId；缺了 projectId 会在 mounted 钩子里抛
+// `Cannot read properties of undefined (reading 'value')`（未处理异常，2026-11-26 CI 实测）。
+vi.mock('@/composables/useAuditContext', async () => {
+  const { computed } = await import('vue')
+  return {
+    useAuditContext: () => ({
+      onContextChange: vi.fn(),
+      projectId: computed(() => 'test-proj'),
+      year: computed(() => 2025),
+      applicableStandard: computed(() => 'soe'),
+      isArchived: computed(() => false),
+      canEdit: computed(() => true),
+    }),
+  }
+})
 
 // ─── Mock useProjectStore (P0-6.2) ──────────────────────────────────────────
 vi.mock('@/stores/project', () => ({

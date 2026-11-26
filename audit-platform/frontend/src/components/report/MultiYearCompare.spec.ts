@@ -109,10 +109,12 @@ describe('MultiYearCompare.vue', () => {
             props: ['data', 'maxHeight', 'border'],
           },
           'el-table-column': {
+            // 行形状必须与组件产出的行一致（values / yoy_changes 是对象）：桩成 `{}` 会让模板
+            // `row.values[String(yr)]` 读 `undefined[...]` 抛错（2026-11-26 CI 上 25 条未处理异常）
             template: '<div class="el-table-column-stub"><slot :row="row" /></div>',
             props: ['label', 'prop', 'fixed', 'align', 'width', 'minWidth'],
             setup() {
-              return { row: {} }
+              return { row: { item_name: '', values: {}, yoy_changes: {} } }
             },
           },
         },

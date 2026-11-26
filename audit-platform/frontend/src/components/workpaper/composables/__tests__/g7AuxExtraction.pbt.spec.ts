@@ -26,6 +26,11 @@ const arbCostRowPartial = fc.record({
   decreaseAmount: arbAmount,
 })
 
+/** 唯一的被投资方名：`mergeAuxRowsIntoDetail` 按名归并（同名即同一行），
+ *  生成器给出重名行时「按名找原行」的断言会指向另一行（2026-11-26 全量套件实测）。 */
+const arbUniqueCostRowPartial = fc
+  .uniqueArray(arbCostRowPartial, { minLength: 1, maxLength: 5, comparator: (a, b) => a.investeeName === b.investeeName })
+
 function buildState(rows: Array<{ name: string; opening: number; increase: number; decrease: number }>): G7DetailState {
   const state: G7DetailState = { costRows: [], equityRows: [], impairmentRows: [] }
   for (let i = 0; i < rows.length; i++) {
@@ -46,17 +51,18 @@ describe('Property 2: Persist_First 不改已填值', () => {
     fc.assert(
       fc.property(
         // Generate existing state with non-zero values
-        fc.array(
+        // 唯一名称：下面按名找原行做断言，同名多行会找到另一行（按名归并语义下同名即同一行）
+        fc.uniqueArray(
           fc.record({
             name: arbInvesteeName,
             opening: arbPositiveAmount,
             increase: arbPositiveAmount,
             decrease: arbPositiveAmount,
           }),
-          { minLength: 1, maxLength: 5 },
+          { minLength: 1, maxLength: 5, comparator: (a, b) => a.name === b.name },
         ),
         // Generate incoming rows (may overlap names)
-        fc.array(arbCostRowPartial, { minLength: 1, maxLength: 5 }),
+        arbUniqueCostRowPartial,
         (existingDefs, incoming) => {
           // Build state with non-zero values
           const state = buildState(existingDefs)
@@ -104,7 +110,7 @@ describe('Property 4: 按名归并幂等', () => {
   it('同一取数结果连续应用两次，state 行数与各字段值不变', () => {
     fc.assert(
       fc.property(
-        fc.array(arbCostRowPartial, { minLength: 1, maxLength: 8 }),
+        fc.uniqueArray(arbCostRowPartial, { minLength: 1, maxLength: 8, comparator: (x, y) => x.investeeName === y.investeeName }),
         (incoming) => {
           // Start with empty state
           const state: G7DetailState = { costRows: [], equityRows: [], impairmentRows: [] }

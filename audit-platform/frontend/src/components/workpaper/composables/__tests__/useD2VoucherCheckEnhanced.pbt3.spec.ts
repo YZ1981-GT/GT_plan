@@ -155,10 +155,16 @@ describe('Feature: d2-7-voucher-check-enhancement, Property 14: Merge deduplicat
         arbUniqueRows({ withChecks: true, min: 0, max: 8 }),
         arbUniqueRows({ withChecks: false, min: 0, max: 8 }),
         (existing, incoming) => {
-          const existingNos = new Set(existing.map((r) => r.voucherNo).filter(Boolean))
-          const newCount = incoming.filter(
-            (r) => !r.voucherNo || !existingNos.has(r.voucherNo),
-          ).length
+          // R5：去重键是「凭证号 + 日期」（同号不同日是不同凭证）；导入行之间同键只取第一行，无号的照加
+          const keyOf = (r: VoucherCheckRow) => `${r.voucherNo}|${r.voucherDate || ''}`
+          const seen = new Set(existing.filter((r) => r.voucherNo).map(keyOf))
+          let newCount = 0
+          for (const r of incoming) {
+            if (!r.voucherNo) { newCount += 1; continue }
+            if (seen.has(keyOf(r))) continue
+            seen.add(keyOf(r))
+            newCount += 1
+          }
 
           const result = mergeVoucherRows(existing, incoming)
           expect(result.length).toBe(existing.length + newCount)

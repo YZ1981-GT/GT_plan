@@ -114,7 +114,7 @@ describe('Feature: a3-8-goodwill-impairment, Property 4: 折现系数随年份�
 })
 
 describe('Feature: a3-8-goodwill-impairment, Property 5: 减值损失分摊总和守恒', () => {
-  const arbAllocRows = fc.array(
+  const arbAllocRowsBase = fc.array(
     fc.record({
       id: fc.string({ minLength: 1, maxLength: 8 }),
       asset_type: fc.constantFrom('流动资产', '固定资产', '无形资产', '商誉'),
@@ -123,7 +123,21 @@ describe('Feature: a3-8-goodwill-impairment, Property 5: 减值损失分摊总�
       recoverable: fc.constant(null),
     }),
     { minLength: 1, maxLength: 6 },
-  ).map((rows) => rows.map((r, i) => ({ ...r, id: `al-${i}` })) as A38AllocationRow[])
+  )
+  // 商誉至多一条：`allocateImpairment` 用 `find(asset_type === '商誉')` 取第一条，多条时其余商誉被当成
+  // 「其他资产」再分摊一次，守恒式不再成立；数据契约里商誉也只有一个（2026-11-26 全量套件实测）。
+  const arbAllocRows = arbAllocRowsBase
+    .map((rows) => {
+      let seen = false
+      const out = rows.filter((r) => {
+        if (r.asset_type !== '商誉') return true
+        if (seen) return false
+        seen = true
+        return true
+      })
+      return out.length ? out : [{ ...rows[0], asset_type: '流动资产' as const }]
+    })
+    .map((rows) => rows.map((r, i) => ({ ...r, id: `al-${i}` })) as A38AllocationRow[])
 
   it('Σ(alloc_first+alloc_second) === loss when other-asset carrying exists or goodwill covers', () => {
     fc.assert(

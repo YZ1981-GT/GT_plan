@@ -62,7 +62,14 @@ describe('批注提示不嵌在另一层提示里', () => {
   it('src 下全部 .vue 没有这种写法', () => {
     const files = walkSourceFiles(FRONTEND_SRC).filter((f) => f.endsWith('.vue'))
     expect(files.length).toBeGreaterThan(1000) // 防空转：扫描范围失效时不能恒绿
-    const hits = files.flatMap((f) => scanNested(toSrcRelative(f), readSource(f)))
+    // 命中的前提是模板里出现批注组件的标签名：没出现的文件不可能命中，先按文本预筛再做 SFC 解析。
+    // 原先对 1000+ 个 .vue 全量解析，CI 机器上超过 15s 超时（2026-11-26 实测）。
+    const needles = ['CommentTooltip', ...Object.keys(COMMENT_ROOTED)]
+    const candidates = files
+      .map((f) => ({ f, src: readSource(f) }))
+      .filter(({ src }) => needles.some((n) => src.includes(n)))
+    expect(candidates.length).toBeGreaterThan(0) // 防空转：预筛不能把全部文件都筛掉
+    const hits = candidates.flatMap(({ f, src }) => scanNested(toSrcRelative(f), src))
     expect(hits).toEqual([])
   })
 

@@ -31,12 +31,14 @@ const NUM_RUNS = 20
 /** Unicode 标签（含中文 / emoji / 拉丁 / 空串），验证标签在转置中被忠实保留。 */
 const labelArb = fc.string({ unit: 'grapheme', maxLength: 6 })
 
-/** 单元格值：显式覆盖空值（null / 空串）、数字、Unicode 文本。 */
+/** 单元格值：显式覆盖空值（null / 空串）、数字、Unicode 文本。
+ *  排除 ±Infinity：`JSON.stringify` 会把它变成 null，本用例用 JSON 快照判「入参未被改动」，
+ *  那种值会让快照与入参不可比（与业务无关，表格里也不会出现无穷大）。 */
 const valueArb = fc.oneof(
   fc.constant(null),
   fc.constant(''),
   fc.integer(),
-  fc.double({ noNaN: true }),
+  fc.double({ noNaN: true, noInfinity: true }),
   fc.string({ unit: 'grapheme', maxLength: 8 }),
 )
 

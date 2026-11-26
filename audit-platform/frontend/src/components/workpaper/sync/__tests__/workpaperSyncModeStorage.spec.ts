@@ -13,6 +13,7 @@
 import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import {
   WP_SYNC_MODE_KEY_PREFIX,
@@ -108,7 +109,9 @@ describe('统一键按 entry/wp/sheet', () => {
 
 /** 递归扫源码，收集 `const STORAGE_PREFIX = 'xxx-dual-mode:'` 的真实前缀。 */
 function discoverLegacyPrefixes(): string[] {
-  const srcRoot = resolve(dirname(new URL(import.meta.url).pathname.replace(/^\//, '')), '../../../..')
+  // fileURLToPath：Linux 上 pathname 本就是绝对路径，原先无条件去掉开头的「/」会变成相对路径
+  // （CI 实测拼成 frontend/home/runner/...），只在 Windows 盘符路径上碰巧可用。
+  const srcRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
   const found = new Set<string>()
   const re = /STORAGE_PREFIX\s*=\s*'([a-z0-9][a-z0-9-]*-dual-mode:)'/g
   const walk = (dir: string): void => {
