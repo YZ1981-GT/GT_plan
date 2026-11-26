@@ -4,7 +4,7 @@ import enum
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, func
+from sqlalchemy import DateTime, ForeignKey, false, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -90,7 +90,10 @@ class SoftDeleteMixin:
     设置 is_deleted=True 时会通过 @event.listens_for 自动填充 deleted_at。
     """
 
-    is_deleted: Mapped[bool] = mapped_column(default=False)
+    # server_default 与迁移里的 `is_deleted BOOLEAN NOT NULL DEFAULT false` 一致：只有 Python 侧
+    # default 时，create_all 建出的库（CI 空库引导）这列没有库级默认，裸 SQL 插入不写它就
+    # NOT NULL 失败，而迁移建出的库正常 —— 两套库同一张表行为不同。
+    is_deleted: Mapped[bool] = mapped_column(default=False, server_default=false())
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
