@@ -3,12 +3,12 @@
   "version": "2025-R1",
   "generated_by": "backend/scripts/seed/seed_formula_presets.py",
   "summary": {
-    "total_pages": 250,
-    "total_formulas": 4250,
+    "total_pages": 245,
+    "total_formulas": 4235,
     "by_scope": {
       "note": {
-        "pages": 131,
-        "formula_count": 2607
+        "pages": 126,
+        "formula_count": 2592
       },
       "report": {
         "pages": 7,
@@ -21,42 +21,6 @@
     }
   },
   "pages": [
-    {
-      "page_key": "note:三、在合营安排或联营",
-      "scope": "note",
-      "preset_status": "presetted",
-      "formula_count": 6,
-      "sources": [
-        "note_formula_derivation"
-      ]
-    },
-    {
-      "page_key": "note:三、在未纳入合并财务",
-      "scope": "note",
-      "preset_status": "presetted",
-      "formula_count": 1,
-      "sources": [
-        "note_formula_derivation"
-      ]
-    },
-    {
-      "page_key": "note:三、工程物资【不适用",
-      "scope": "note",
-      "preset_status": "presetted",
-      "formula_count": 2,
-      "sources": [
-        "note_formula_derivation"
-      ]
-    },
-    {
-      "page_key": "note:三、现金流量表项目注",
-      "scope": "note",
-      "preset_status": "presetted",
-      "formula_count": 2,
-      "sources": [
-        "note_formula_derivation"
-      ]
-    },
     {
       "page_key": "note:三、计入递延收益的政",
       "scope": "note",
@@ -71,15 +35,6 @@
       "scope": "note",
       "preset_status": "presetted",
       "formula_count": 6,
-      "sources": [
-        "note_formula_derivation"
-      ]
-    },
-    {
-      "page_key": "note:九、5",
-      "scope": "note",
-      "preset_status": "presetted",
-      "formula_count": 24,
       "sources": [
         "note_formula_derivation"
       ]
@@ -112,10 +67,10 @@
       ]
     },
     {
-      "page_key": "note:三、风险管理目标和政",
+      "page_key": "note:九、5",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 4,
+      "formula_count": 24,
       "sources": [
         "note_formula_derivation"
       ]

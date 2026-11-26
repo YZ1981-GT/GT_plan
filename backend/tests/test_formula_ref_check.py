@@ -234,7 +234,8 @@ def test_executor_tb_sums_by_prefix_and_tolerates_spaces():
     cross = _cross(tb={"1122.01": {"audited": 5.0}, "1122.02": {"audited": 7.0}, "1123": {"audited": 100.0}})
     assert _resolve_single_cross_ref("TB('1122','审定数')", cross) == 12.0   # 原先只认精确码 ⇒ 0
     assert _resolve_single_cross_ref("TB( '1122' , '审定数' )", cross) == 12.0
-    assert _resolve_single_cross_ref("TB('9999','审定数')", cross) == 0.0
+    # 科目及其下级都不存在 ⇒ 取不到（None），不冒充 0（S1 R4：缺数留空，由调用方给出原因）
+    assert _resolve_single_cross_ref("TB('9999','审定数')", cross) is None
 
 
 async def test_cross_table_data_keeps_live_note_tables_only(db):

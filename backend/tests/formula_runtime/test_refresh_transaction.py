@@ -17,6 +17,7 @@ import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Mapping
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -58,6 +59,32 @@ def _make_mutation(
         after_value=after,
         expected_version=version,
     )
+
+
+def _empty_result():
+    """空查询结果：幂等 / 链尾 / 后继判定都应按「没有」返回（MagicMock 会让它们以为「有」）。"""
+    result = MagicMock()
+    result.scalars.return_value.first.return_value = None
+    result.scalar_one_or_none.return_value = None
+    result.first.return_value = None
+    result.all.return_value = []
+    result.scalar.return_value = None
+    result.rowcount = 0
+    return result
+
+
+@pytest.fixture(autouse=True)
+def _stub_audit_chain(monkeypatch):
+    """审计链写入不属本文件考点：换空替身（否则 AsyncMock 会话让链尾判定以为「已有未登记后继」）。"""
+    import app.services.audit_log_helper as helper_mod
+    from unittest.mock import AsyncMock as _AsyncMock
+
+    monkeypatch.setattr(helper_mod, "append_audit_log", _AsyncMock(return_value=uuid.uuid4()))
+
+
+def _bind(dialect: str = "sqlite"):
+    """``AsyncSession.get_bind()`` 的替身（同步方法，返回带 dialect 的对象）。"""
+    return SimpleNamespace(dialect=SimpleNamespace(name=dialect))
 
 
 class MockAdapter:
@@ -213,11 +240,10 @@ class TestExecuteRefreshAllOrNothing:
         session = AsyncMock()
         session.add = MagicMock()
         session.flush = AsyncMock()
+        session.get_bind = MagicMock(return_value=_bind())
 
         # Mock execute to return None for idempotency check
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.first.return_value = None
-        session.execute = AsyncMock(return_value=mock_result)
+        session.execute = AsyncMock(return_value=_empty_result())
 
         result = await svc.execute_refresh(
             session,
@@ -242,10 +268,9 @@ class TestExecuteRefreshAllOrNothing:
         session = AsyncMock()
         session.add = MagicMock()
         session.flush = AsyncMock()
+        session.get_bind = MagicMock(return_value=_bind())
 
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.first.return_value = None
-        session.execute = AsyncMock(return_value=mock_result)
+        session.execute = AsyncMock(return_value=_empty_result())
 
         result = await svc.execute_refresh(
             session,
@@ -267,10 +292,9 @@ class TestExecuteRefreshAllOrNothing:
         session = AsyncMock()
         session.add = MagicMock()
         session.flush = AsyncMock()
+        session.get_bind = MagicMock(return_value=_bind())
 
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.first.return_value = None
-        session.execute = AsyncMock(return_value=mock_result)
+        session.execute = AsyncMock(return_value=_empty_result())
 
         result = await svc.execute_refresh(
             session,
@@ -303,10 +327,9 @@ class TestExecuteRefreshPartialSuccess:
         session = AsyncMock()
         session.add = MagicMock()
         session.flush = AsyncMock()
+        session.get_bind = MagicMock(return_value=_bind())
 
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.first.return_value = None
-        session.execute = AsyncMock(return_value=mock_result)
+        session.execute = AsyncMock(return_value=_empty_result())
 
         # Mock begin_nested for savepoint (context manager)
         class FakeNested:
@@ -354,6 +377,7 @@ class TestIdempotency:
         session = AsyncMock()
         session.add = MagicMock()
         session.flush = AsyncMock()
+        session.get_bind = MagicMock(return_value=_bind())
 
         # First execute returns None (advisory lock), second returns prior audit
         call_count = [0]
@@ -397,10 +421,9 @@ class TestSnapshotAuditOutbox:
         added_objects = []
         session.add = lambda obj: added_objects.append(obj)
         session.flush = AsyncMock()
+        session.get_bind = MagicMock(return_value=_bind())
 
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.first.return_value = None
-        session.execute = AsyncMock(return_value=mock_result)
+        session.execute = AsyncMock(return_value=_empty_result())
 
         result = await svc.execute_refresh(
             session,
@@ -453,10 +476,9 @@ class TestSnapshotAuditOutbox:
         session = AsyncMock()
         session.add = MagicMock()
         session.flush = AsyncMock()
+        session.get_bind = MagicMock(return_value=_bind())
 
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.first.return_value = None
-        session.execute = AsyncMock(return_value=mock_result)
+        session.execute = AsyncMock(return_value=_empty_result())
 
         result = await svc.execute_refresh(
             session,

@@ -152,7 +152,9 @@ async def test_production_strict_records_failed_attempt_before_original_raise(in
     "IF(1,7,ROW('BS001'))",
     "IF(0,ROW('BS001'),7)",
     "IF(1,7,SUM_ROW('BS001','BS002'))",
-    "IF(1,7,ADJ('1001'))",
+    # ADJ 必须两参（449b5be51 起解析期校验参数个数）：一参写法是定义错误，任何分支都应拒绝，
+    # 这里要验的是「未选中分支不读调整分录」，故用合法两参。
+    "IF(1,7,ADJ('1001','aje_net'))",
 ])
 async def test_unselected_reference_branch_never_reads_or_blocks(monkeypatch, formula):
     db = MemoryRead()
@@ -265,3 +267,17 @@ async def test_opening_compatibility_entry_never_loads_current_adjustments(monke
     assert result == Decimal("0")
     loader.assert_not_awaited()
     assert rc.current_report_evaluation() is None
+
+
+async def test_wrong_arity_in_unselected_branch_is_definition_error(monkeypatch):
+    """参数个数错误是公式定义错误：即使处在未选中分支也报损坏，且不读取任何数据。"""
+    db = MemoryRead()
+    parser = re.ReportFormulaParser(db, uuid4(), 2025)
+    adjustments = AsyncMock(side_effect=AssertionError("不应读取调整分录"))
+    monkeypatch.setattr(parser, "_get_adj_data", adjustments)
+    cfg = config("IF(1,7,ADJ('1001'))")
+    scope = rc.RowScope.of([cfg])
+    result = await rc.compute_row(parser, cfg, {}, mode="audited", scope=scope, strict=True)
+    assert not result.ok and result.value is None
+    assert any("参数个数" in e for e in result.errors)
+    adjustments.assert_not_awaited()

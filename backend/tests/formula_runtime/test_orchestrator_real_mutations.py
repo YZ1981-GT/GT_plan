@@ -19,6 +19,7 @@ import uuid
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -92,6 +93,9 @@ def _make_formula(
 def _mock_session():
     """Create a mock AsyncSession."""
     session = AsyncMock()
+    # get_bind 是同步方法（真 AsyncSession 也是）：AsyncMock 会把它变成协程，
+    # 年度门 / 适配器里的 db.get_bind().dialect 就会抛 AttributeError
+    session.get_bind = MagicMock(return_value=SimpleNamespace(dialect=SimpleNamespace(name="sqlite")))
     # Make execute return empty by default
     mock_result = MagicMock()
     mock_result.scalars.return_value.all.return_value = []
@@ -99,6 +103,31 @@ def _mock_session():
     session.flush = AsyncMock()
     session.commit = AsyncMock()
     return session
+
+
+def _patch_year(monkeypatch, year=2025):
+    """年度门：替身会话里的项目行是 MagicMock，五级年度解析会拿到协程 ⇒ 直接注入项目年度。"""
+    import app.services.wp_cell_reader as reader
+    import app.services.project_audit_year as pay
+
+    async def _fetch(db, project_id):
+        return year
+
+    monkeypatch.setattr(pay, "fetch_project_audit_year", _fetch)
+    monkeypatch.setattr(reader, "fetch_project_audit_year", _fetch)
+
+
+def _patch_effective(monkeypatch, formulas):
+    """把有效定义注入 coordinator 的读取点（ADR-FGR-08：不再直查 wp_formula）。"""
+    import app.services.formula_settings.wp_effective as eff
+
+    _patch_year(monkeypatch)
+
+    async def _effective(db, project_id, *args, **kwargs):
+        codes = {f.wp_id: f.sheet_name for f in formulas if getattr(f, "wp_id", None)}
+        return list(formulas), codes
+
+    monkeypatch.setattr(eff, "effective_project_formulas", _effective)
 
 
 class _PreparedAdapter:
@@ -123,7 +152,7 @@ class TestFormulaRuntimeCoordinator:
     """Test FormulaRuntimeCoordinator.generate_mutation_plan."""
 
     @pytest.mark.asyncio
-    async def test_report_scope_produces_mutations(self):
+    async def test_report_scope_produces_mutations(self, monkeypatch):
         """Report scope should produce FormulaMutations for report targets."""
         project_id = uuid.uuid4()
         year = 2025
@@ -138,9 +167,7 @@ class TestFormulaRuntimeCoordinator:
 
         session = _mock_session()
         # Mock formula loading
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = [formula]
-        session.execute = AsyncMock(return_value=mock_result)
+        _patch_effective(monkeypatch, [formula])
 
         # Patch value loader to return a value for the ref
         with patch.object(
@@ -163,7 +190,7 @@ class TestFormulaRuntimeCoordinator:
         assert isinstance(plan.scope_failures, list)
 
     @pytest.mark.asyncio
-    async def test_workpaper_scope_produces_real_mutations(self):
+    async def test_workpaper_scope_produces_real_mutations(self, monkeypatch):
         """Workpaper scope should produce real mutations, not just page_keys.
 
         表达式用可求值的算式：默认 ``=REF1+REF2`` 的两个标识符在 row_cache 里都没有，原先按 0 求值也出 mutation
@@ -184,9 +211,7 @@ class TestFormulaRuntimeCoordinator:
         )
 
         session = _mock_session()
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = [formula]
-        session.execute = AsyncMock(return_value=mock_result)
+        _patch_effective(monkeypatch, [formula])
 
         with (
             patch.object(
@@ -217,7 +242,7 @@ class TestFormulaRuntimeCoordinator:
             assert m.after_value == Decimal("50000")
 
     @pytest.mark.asyncio
-    async def test_adjudication_scope_produces_real_mutations(self):
+    async def test_adjudication_scope_produces_real_mutations(self, monkeypatch):
         """Adjudication scope should produce real mutations."""
         project_id = uuid.uuid4()
         wp_id = uuid.uuid4()
@@ -233,9 +258,7 @@ class TestFormulaRuntimeCoordinator:
         )
 
         session = _mock_session()
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = [formula]
-        session.execute = AsyncMock(return_value=mock_result)
+        _patch_effective(monkeypatch, [formula])
 
         with patch.object(
             FormulaValueLoader, "load_many",
@@ -259,7 +282,7 @@ class TestFormulaRuntimeCoordinator:
             assert m.target.domain == "adjudication"
 
     @pytest.mark.asyncio
-    async def test_note_scope_produces_real_mutations(self):
+    async def test_note_scope_produces_real_mutations(self, monkeypatch):
         """Note scope should produce real mutations."""
         project_id = uuid.uuid4()
         wp_id = uuid.uuid4()
@@ -275,9 +298,7 @@ class TestFormulaRuntimeCoordinator:
         )
 
         session = _mock_session()
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = [formula]
-        session.execute = AsyncMock(return_value=mock_result)
+        _patch_effective(monkeypatch, [formula])
 
         with patch.object(
             FormulaValueLoader, "load_many",
@@ -300,7 +321,7 @@ class TestFormulaRuntimeCoordinator:
             assert m.target.domain == "note"
 
     @pytest.mark.asyncio
-    async def test_missing_refs_result_in_scope_failures(self):
+    async def test_missing_refs_result_in_scope_failures(self, monkeypatch):
         """Missing/ambiguous refs should result in scope_failures, not crashes, not mutations.
 
         spec formula-hub-integrity-closure 需求 1.3 起引用从表达式解析、不读 ``refs`` 列（``FormulaValueLoader`` 不再参与
@@ -318,9 +339,7 @@ class TestFormulaRuntimeCoordinator:
         )
 
         session = _mock_session()
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = [formula]
-        session.execute = AsyncMock(return_value=mock_result)
+        _patch_effective(monkeypatch, [formula])
 
         from app.services.formula_runtime.value_loader import LoadIssue
 
@@ -349,7 +368,7 @@ class TestFormulaRuntimeCoordinator:
         assert "REF1" in plan.scope_failures[0]["detail"], plan.scope_failures
 
     @pytest.mark.asyncio
-    async def test_coordinator_does_not_commit(self):
+    async def test_coordinator_does_not_commit(self, monkeypatch):
         """Coordinator should NOT call session.commit()."""
         project_id = uuid.uuid4()
         year = 2025
@@ -371,7 +390,7 @@ class TestFormulaRuntimeCoordinator:
         session.commit.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_no_formulas_returns_empty_plan(self):
+    async def test_no_formulas_returns_empty_plan(self, monkeypatch):
         """无公式时返回空 plan，但**必须留下可见的 no_formulas 记录**。
 
         🔴 **本断言于 2026-08-07 按 R9.6 诚实改写**
@@ -420,7 +439,7 @@ class TestFormulaRuntimeCoordinator:
         assert "report" in entry["detail"]
 
     @pytest.mark.asyncio
-    async def test_logic_check_produces_issues_not_mutations(self):
+    async def test_logic_check_produces_issues_not_mutations(self, monkeypatch):
         """logic_check formulas should produce issues, not mutations."""
         project_id = uuid.uuid4()
         year = 2025
@@ -433,9 +452,7 @@ class TestFormulaRuntimeCoordinator:
         )
 
         session = _mock_session()
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = [formula]
-        session.execute = AsyncMock(return_value=mock_result)
+        _patch_effective(monkeypatch, [formula])
 
         with patch.object(
             FormulaValueLoader, "load_many",
@@ -469,7 +486,7 @@ class TestFormulaRuntimeCoordinator:
     n_formulas=st.integers(min_value=0, max_value=10),
     scope=st.sampled_from(["report", "workpaper", "adjudication", "note"]),
 )
-def test_pbt_plan_structure_invariants(n_formulas: int, scope: str):
+def test_pbt_plan_structure_invariants(n_formulas: int, scope: str, monkeypatch):
     """**Validates: Requirements 1, 7 | P2, P3**
 
     Property: generate_mutation_plan always returns a well-formed MutationPlanResult
@@ -492,9 +509,7 @@ def test_pbt_plan_structure_invariants(n_formulas: int, scope: str):
     ]
 
     session = _mock_session()
-    mock_result = MagicMock()
-    mock_result.scalars.return_value.all.return_value = formulas
-    session.execute = AsyncMock(return_value=mock_result)
+    _patch_effective(monkeypatch, formulas)
 
     # Patch value loader — return values for all refs
     values = {f"tb:{1000 + i}": Decimal(str(i * 100)) for i in range(n_formulas)}
@@ -544,7 +559,7 @@ def test_pbt_plan_structure_invariants(n_formulas: int, scope: str):
 @given(
     missing_count=st.integers(min_value=1, max_value=5),
 )
-def test_pbt_missing_refs_produce_failures(missing_count: int):
+def test_pbt_missing_refs_produce_failures(missing_count: int, monkeypatch):
     """**Validates: Requirements 8 | P8, P9**
 
     Property: when the expression references values that cannot be fetched, the formula appears in
@@ -567,9 +582,7 @@ def test_pbt_missing_refs_produce_failures(missing_count: int):
     )
 
     session = _mock_session()
-    mock_result = MagicMock()
-    mock_result.scalars.return_value.all.return_value = [formula]
-    session.execute = AsyncMock(return_value=mock_result)
+    _patch_effective(monkeypatch, [formula])
 
     from app.services.formula_runtime.value_loader import LoadIssue
 

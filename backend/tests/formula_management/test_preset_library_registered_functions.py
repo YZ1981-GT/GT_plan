@@ -40,7 +40,9 @@ MAPPING_PATH = pl.DATA_DIR / "prefill_formula_mapping.json"
 #: ``git show 00525717f:backend/data/prefill_formula_mapping.json`` 的 sha256（blob 本身是 LF）。仓库 core.autocrlf=true 且
 #: .gitattributes 没给本文件 ``eol=lf`` ⇒ Windows 检出的磁盘字节是 CRLF、CI 是 LF，故对 LF 归一后的字节比对。
 #: 本常量只证明预设库归一没有改写数据文件；映射文件有意改动（别的 spec）时同步更新。
-MAPPING_LF_SHA256 = "198e2846918023d6bfb9343852de611f69b28fe7bd6a66d7e9edd8439b365244"
+# 映射文件当前版本的 LF 口径摘要。映射文件被有意改动（如 11-22 / 11-25 补 H0 函证双族码）时须同步更新本值；
+# 本用例真正守的是下面「构建预设库不改写映射文件」那一条。
+MAPPING_LF_SHA256 = "2b4ac464773975c1fe971099b1a5e897bfee414f8d4534ad8790472ee8e14930"
 PREFILL = "prefill_formula_mapping"
 #: 全量预设里非 prefill 来源现存的未登记函数名（2026-10-28 现算冻结；待决）。
 FROZEN_UNREGISTERED: dict[str, frozenset[str]] = {"check_presets": frozenset({"SUM"})}

@@ -146,8 +146,11 @@ class TestExecuteEntryPoint:
         import inspect
 
         assert not inspect.iscoroutinefunction(execute)
-        params = set(inspect.signature(execute).parameters)
-        assert params == {"formula", "ctx"}
+        params = inspect.signature(execute).parameters
+        # strict 是后加的仅关键字开关（报表 / 审核路径缺数报错）；不得出现 db / session 一类依赖
+        assert set(params) == {"formula", "ctx", "strict"}
+        assert params["strict"].kind is inspect.Parameter.KEYWORD_ONLY
+        assert not ({"db", "session"} & set(params))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -44,7 +44,8 @@ WRITE_API = frozenset({"mark_changed", "mark_statement", "slot_row_codes", "CALC
 FRESHNESS_READERS: dict[str, str] = {
     "app/routers/reports.py::get_report": "报表视图：逐行 row_status（含生成时公式与生效公式比较）",
     "app/routers/reports.py::get_report_row_provenance": "S5 本期最终值来源：同一 row_status 判 stale / legacy",
-    "app/routers/reports.py::export_report_excel": "单表 Excel 导出：「说明」列 status_note(row_status)",
+    # 单表导出的取数与「说明」列已抽到 report_excel_export（路由 export_report_excel 只转调）
+    "app/services/report_excel_export.py::build_report_excel_response": "单表 Excel 导出：「说明」列 status_note(row_status)",
     "app/services/deliverable_readiness_sources.py::ReadinessSourceChecks._check_reports": "F38 交付就绪",
     "app/services/report_export_checks.py::_check_freshness": "F38 导出前检查（过期 / 计算失败 / 留空三条提示）",
     "app/services/stale_summary_aggregate.py::get_full_summary": "F38 过期汇总（签发清单 / 合伙人 / EQCR 复用）",
@@ -80,7 +81,6 @@ REQUIRED = (
     "app/services/stale_summary_aggregate.py::get_full_summary",
     "app/services/formula_health_service.py::_stale_stats",
     "app/routers/reports.py::get_report",
-    "app/routers/reports.py::export_report_excel",
 )
 
 _TABLE = re.compile(r"\bfinancial_report\b(?!_)", re.I)

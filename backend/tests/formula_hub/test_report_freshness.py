@@ -148,7 +148,12 @@ def _assert_view(rows: list[dict]) -> None:
 
 def _assert_export(content: bytes) -> None:
     ws = openpyxl.load_workbook(io.BytesIO(content)).active
-    header, *body = list(ws.iter_rows(values_only=True))
+    rows = list(ws.iter_rows(values_only=True))
+    # 导出表头之前带「金额单位：…」说明行（显示偏好接入导出后）；按表头行定位，不假定在第 1 行
+    start = next(i for i, r in enumerate(rows) if r and r[0] == "行次代码")
+    # 表头之上可以有「金额单位：…」说明行与空行；不得直接以数据行开头
+    assert any(str(r[0] or "").startswith("金额单位") for r in rows[:start]), rows[:start]
+    header, *body = rows[start:]
     assert list(header) == ["行次代码", "项目", "期末余额", "年初余额", "说明"]
     notes = {r[0]: (r[4] or "") for r in body}
     for code, shape in BY_CODE.items():

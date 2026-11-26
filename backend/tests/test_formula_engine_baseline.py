@@ -219,8 +219,9 @@ RE_BASELINE: dict[str, Decimal] = {
     "F05_ROW":            Decimal("1000000"),
     "F06_SUM_ROW":        Decimal("600"),
     "F07_REPORT":         Decimal("100"),
-    "F08_PREV":           Decimal("0"),          # 报表语境强制 0 → D2
-    "F09_AUX":            Decimal("0"),
+    # F08/F09：报表路径按 strict 求值（449b5be51 起），上年 / 辅助来源未预载 ⇒ 失败（None），不再冒充 0
+    "F08_PREV":           None,
+    "F09_AUX":            None,
     "F10_NESTED_PREV_TB": None,
     "F11_IF":             Decimal("100000"),
     "F12_ABS":            Decimal("30000"),
@@ -330,8 +331,12 @@ KNOWN_DIVERGENCES: dict[str, tuple[Decimal, Decimal, str]] = {
         "SUM_TB 区间匹配：formula_engine 前缀截断(含14999) vs report_engine 整串字典序(不含14999)",
     ),
     "F08_PREV": (
-        Decimal("80000"), Decimal("0"),
-        "PREV 取数：formula_engine 取上年 prior_tb_data vs report_engine 报表语境强制 0",
+        Decimal("80000"), None,
+        "PREV 取数：formula_engine 取上年 prior_tb_data vs report_engine 严格模式下上年来源未预载 ⇒ 失败",
+    ),
+    "F09_AUX": (
+        Decimal("0"), None,
+        "AUX 未预载：formula_engine 非严格模式按 0 继续；report_engine 严格模式报失败（缺数不冒充 0）",
     ),
     "F10_NESTED_PREV_TB": (
         Decimal("80000"), None,
@@ -363,15 +368,18 @@ class TestSemanticDivergencesExplicit:
         )
 
     def test_divergence_count_frozen(self):
-        """已知语义分歧总数冻结为 3（新增/消失分歧都会失败，强制人工确认）。
+        """已知语义分歧总数冻结为 4（新增/消失分歧都会失败，强制人工确认）。
+
+        3 → 4：报表路径改为 strict 求值后，未预载的 AUX 在报表侧失败（None），formula_engine
+        非严格模式仍按 0 继续（F09）。
 
         基线 2（F04_SUM_TB 区间匹配 + F08_PREV 取数）→ 3：P0 技术债修复将 _PARSE_MODE
         默认由 parallel 切到 ast 后，嵌套 PREV(TB(...))（F10）由 AST 正确取上年值，
         暴露出与 report_engine（报表语境强制 PREV→0）的真实分歧（D2 的嵌套形态）。
         旧 parallel 模式下该公式两引擎都因 regex 不识别嵌套而返 0（伪收敛）。
         """
-        assert len(KNOWN_DIVERGENCES) == 3, (
-            f"已知语义分歧数变化（现 {len(KNOWN_DIVERGENCES)}，基线 3）。"
+        assert len(KNOWN_DIVERGENCES) == 4, (
+            f"已知语义分歧数变化（现 {len(KNOWN_DIVERGENCES)}，基线 4）。"
             f"新增分歧须在 KNOWN_DIVERGENCES 登记并人工确认目标语义。"
         )
 

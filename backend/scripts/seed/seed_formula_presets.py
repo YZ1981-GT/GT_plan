@@ -107,6 +107,16 @@ def main() -> None:
     print(f"  By scope: {result['by_scope']}")
     print(f"  inventory.json written: {result['written']}")
 
+    if args.check:
+        # --check 原先只打印统计、恒 exit 0 ⇒ 磁盘 inventory 与现算漂移（250 vs 245）长期无人发现。
+        doc, _ = build_inventory_doc(include_sources=not args.seed_only)
+        expected = json.dumps(doc, ensure_ascii=False, indent=2) + "\n"
+        actual = INVENTORY_PATH.read_text(encoding="utf-8") if INVENTORY_PATH.exists() else ""
+        if actual.replace("\r\n", "\n") != expected:
+            print(f"[DRIFT] {INVENTORY_PATH} 与现算不一致，请运行本脚本（不带 --check）重新生成")
+            sys.exit(2)
+        print("  inventory.json 与现算一致")
+
 
 if __name__ == "__main__":
     main()

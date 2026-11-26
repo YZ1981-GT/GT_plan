@@ -1092,7 +1092,7 @@ def _resolve_single_cross_ref(token: str, cross_data: dict[str, Any]) -> Decimal
     - PRIOR('account_name','期末'|'期初')                   (Sprint 1.5 D4)
     - AGING('account_name','1年以内'|'1-2年'|...|'5年以上')  (Sprint 1.5 D4)
 
-    无法解析或科目/底稿/附注不存在时返回 None；TB 列存在但 account 不存在 → 0。
+    无法解析或科目/底稿/附注不存在时返回 None；TB 科目（含下级）不存在或该列全部缺数也返回 None（不冒充 0）。
     """
     import re
 
