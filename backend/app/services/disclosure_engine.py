@@ -679,6 +679,20 @@ class DisclosureEngine:
         # **同代码同年度 standalone 兄弟项目**而非合并项目自身。惰性构造，
         # 非合并项目 / 未命中母公司章时全程不查库（零回归支点）。
         self._parent_scope_cache: ParentScopeCache | None = None
+        # update_note 的跨会话 CAS / 无变化去噪（2026-11-26）：路由读这两个字段
+        # 决定是否发 NOTE_SECTION_SAVED、把新摘要写进响应。
+        self._last_update_changed: bool | None = None
+        self._last_update_digest: str | None = None
+
+    async def _load_note_by_id(self, note_id: UUID) -> DisclosureNote | None:
+        """按 id 读当前附注（活跃行）；CAS 与无变化判定共用。"""
+        result = await self.db.execute(
+            sa.select(DisclosureNote).where(
+                DisclosureNote.id == note_id,
+                DisclosureNote.is_deleted == sa.false(),
+            )
+        )
+        return result.scalar_one_or_none()
 
     # ------------------------------------------------------------------
     # 母公司章取数上下文（Task 12/13）
@@ -2730,6 +2744,7 @@ class DisclosureEngine:
         status: NoteStatus | None = None,
         *,
         user_id: UUID | None = None,
+        expected_digest: str | None = None,
     ) -> DisclosureNote | None:
         """更新附注章节内容；有字段要改就盖「最近一次编辑」（``note_edit_stamp``，第 24 组）。
 
@@ -2738,13 +2753,44 @@ class DisclosureEngine:
         按稳定 hash 判 changed，一处 flag_modified + 一次 UPDATE；外部签名、
         pushed_row_violations 409 语义、note_edit_stamp 戳章行为完全不变。
 
+        2026-11-26（穿透复盘 P0/P2）：
+        - ``expected_digest``：跨会话 CAS。携带时在锁内与当前内容摘要比对，不匹配抛
+          409 ``NOTE_CONTENT_CONFLICT``（带当前摘要与当前内容）；缺省保持旧语义，
+          自动写入 / AI 写回不受影响。摘要函数 ``note_content_digest``。
+        - 无变化去噪：四个业务字段与库中逐项相等时**不**盖编辑时间（updated_at/by 不动），
+          返回对象上带 ``content_changed=False``，路由据此跳过 NOTE_SECTION_SAVED 事件。
+
         Validates: Requirements 4.10
         """
         from app.services.disclosure.note_section_write_kernel import mutate_note_by_id
+        from app.services.note_content_digest import note_content_digest, note_content_conflict
         from app.services.note_edit_stamp import stamp_note_edit
         from app.services.note_pushed_row_guard import PUSHED_ROW_PROTECTED, pushed_row_violations
 
         captured: dict[str, DisclosureNote | None] = {"note": None}
+        # 先取当前值做 CAS 与无变化判定：在锁内、与写入同一事务，避免 TOCTOU。
+        current = await self._load_note_by_id(note_id)
+        if current is None:
+            return None
+        if expected_digest is not None:
+            current_digest = note_content_digest(
+                current.text_content, current.table_data,
+            )
+            if expected_digest != current_digest:
+                raise note_content_conflict(current)
+
+        def _field_changed() -> bool:
+            if table_data is not None and table_data != current.table_data:
+                return True
+            if text_content is not None and text_content != current.text_content:
+                return True
+            if guidance_text is not None and guidance_text != current.guidance_text:
+                return True
+            if status is not None and status != current.status:
+                return True
+            return False
+
+        changed = _field_changed()
 
         def _mutator(note: DisclosureNote, workspace: dict[str, Any]) -> None:
             captured["note"] = note
@@ -2758,7 +2804,7 @@ class DisclosureEngine:
                         "message": "集团下推的固定行不能删除、改名或去掉下推标记：" + "、".join(
                             f"「{v['table']}」{v['row']}（{v['problem']}）" for v in bad[:5]) + (" 等" if len(bad) > 5 else "")})
 
-            if any(v is not None for v in (table_data, text_content, guidance_text, status)):
+            if changed and any(v is not None for v in (table_data, text_content, guidance_text, status)):
                 stamp_note_edit(note, user_id)
 
             if table_data is not None:
@@ -2775,7 +2821,11 @@ class DisclosureEngine:
         result = await mutate_note_by_id(self.db, note_id=note_id, mutator=_mutator)
         if result is None:
             return None
-        return captured["note"]
+        note = captured["note"]
+        # 供路由判断是否发事件（dataclass 不可加属性 → 存到本实例字段）。
+        self._last_update_changed = changed
+        self._last_update_digest = note_content_digest(note.text_content, note.table_data)
+        return note
 
     # ------------------------------------------------------------------
     # 事件处理器

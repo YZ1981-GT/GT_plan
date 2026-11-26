@@ -209,6 +209,10 @@ class DisclosureMutationCoordinator:
             # 支持单个 EventPayload 或列表
             if not isinstance(payloads, list):
                 payloads = [payloads]
+            # 无实际变化（如附注重复保存同一内容）：调用方声明本轮没有业务事件可发，
+            # event_delivery 如实置 skipped，不假装 published（2026-11-26 去噪）。
+            if not payloads:
+                event_delivery = "skipped"
             for payload in payloads:
                 payload.extra = {
                     **(payload.extra or {}),

@@ -290,6 +290,9 @@ class DisclosureNoteDetail(BaseModel):
     last_sync_wp_id: UUID | None = None
     last_sync_at: datetime | None = None
     last_sync_user_id: UUID | None = None
+    # 内容摘要（text_content + table_data 的稳定哈希前缀）：详情下发、保存回传，
+    # 供调用方做跨会话乐观锁（expected_digest）。
+    content_digest: str | None = None
 
 
 class DisclosureNoteUpdate(BaseModel):
@@ -298,6 +301,9 @@ class DisclosureNoteUpdate(BaseModel):
     text_content: str | None = None
     guidance_text: str | None = None
     status: NoteStatus | None = None
+    # 跨会话 CAS（2026-11-26 穿透复盘 P0）：调用方编辑起点的内容摘要。
+    # 缺省 = 不校验（既有自动写入 / AI 写回兼容）；携带时不匹配 → 409 NOTE_CONTENT_CONFLICT。
+    expected_digest: str | None = None
 
 
 class DisclosureNoteGenerateRequest(BaseModel):

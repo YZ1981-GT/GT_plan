@@ -844,6 +844,12 @@ async def get_note_detail(
     if note is None:
         raise HTTPException(status_code=404, detail="附注章节不存在")
     detail = DisclosureNoteDetail.model_validate(note)
+    # 跨会话 CAS（2026-11-26 穿透复盘 P0）：摘要按**库中原始值**（投影/表头派生/读时增强
+    # 之前）计算 —— 它是服务端发给前端的不透明编辑起点 token，前端 GET 后原样随 PUT 回传，
+    # 服务端锁内按同一口径（原始值）重算比对。投影后的 table_data 形态差异不参与比对。
+    from app.services.note_content_digest import note_content_digest
+
+    detail.content_digest = note_content_digest(note.text_content, note.table_data)
     # 读时投影（不写库）：workpaper 来源记录把 sub_table_data + _sub_table_columns 投影为
     # 可渲染 _tables，供附注模块/Word 忠实呈现源模板表样（spec disclosure-table-sync-convergence
     # Req6.1，Property7）。非 workpaper 来源返回 None → 不投影，沿用既有 _tables/rows（Req6.2）。
@@ -933,13 +939,24 @@ async def update_note(
             guidance_text=data.guidance_text,
             status=data.status,
             user_id=current_user.id,
+            expected_digest=data.expected_digest,
         )
         if note is None:
             raise HTTPException(status_code=404, detail="附注章节不存在")
         holder["note"] = note
-        return DisclosureNoteDetail.model_validate(note).model_dump()
+        holder["engine"] = engine
+        response = DisclosureNoteDetail.model_validate(note).model_dump()
+        # 跨会话 CAS（P0）+ 无变化去噪（P2）：回传新摘要供下一次保存做编辑起点；
+        # 内容没有实际变化时 no_change=true 且不发布 NOTE_SECTION_SAVED（见 _event）。
+        response["content_digest"] = engine._last_update_digest
+        response["no_change"] = not engine._last_update_changed
+        return response
 
-    def _event(_response: dict[str, Any]) -> EventPayload:
+    def _event(_response: dict[str, Any]) -> EventPayload | list[EventPayload]:
+        # 无实际变化：不发业务保存事件（否则下游 stale 引擎 / 交付件 / 合并附注
+        # 每次重复保存都白刷新一轮）；审计与幂等键照常生效。
+        if _response.get("no_change"):
+            return []
         note = holder["note"]
         return EventPayload(
             event_type=EventType.NOTE_SECTION_SAVED,

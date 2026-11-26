@@ -17,6 +17,7 @@ from app.models.core import User, UserRole
 from app.models.report_schemas import DisclosureNoteGenerateRequest, DisclosureNoteUpdate
 from app.models.report_models import NoteStatus
 from app.routers import disclosure_notes as notes_router
+from app.services.disclosure_engine import DisclosureEngine
 from app.services.disclosure_mutation_coordinator import (
     DisclosureMutationCoordinator,
     _LOCAL_LOCKS,
@@ -529,11 +530,17 @@ class TestUpdateEndpointRegression:
 
         fake_note = _FakeNote()
 
+        # 2026-11-26 CAS / 去噪改造：路由从 engine 实例读 `_last_update_changed/_last_update_digest`。
+        # AsyncMock 直接替换类方法后拿不到真实 engine —— mock 必须附上生产形态的字段。
+        async def _update_note(self, *args, **kwargs):
+            self._last_update_changed = True
+            self._last_update_digest = "digest-after-save"
+            return fake_note
+
         with patch(
             "app.routers.disclosure_notes.assert_note_edit_access_for_object", new=AsyncMock(return_value=PROJECT_ID)
-        ), patch(
-            "app.services.disclosure_engine.DisclosureEngine.update_note",
-            new=AsyncMock(return_value=fake_note),
+        ), patch.object(
+            DisclosureEngine, "update_note", new=_update_note
         ), patch(
             "app.services.event_bus.event_bus.publish", new=AsyncMock()
         ), patch(
@@ -546,6 +553,8 @@ class TestUpdateEndpointRegression:
         assert result["event_delivery"] == "published"
         assert result["mutation_id"] == "upd-001"
         assert result["warnings"] == []
+        assert result["content_digest"] == "digest-after-save"
+        assert result["no_change"] is False
         assert db.commit.await_count == 1
 
     def test_update_note_not_found_returns_404(self):
