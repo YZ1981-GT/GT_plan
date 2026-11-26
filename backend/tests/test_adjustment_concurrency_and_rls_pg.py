@@ -32,6 +32,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+pytestmark = pytest.mark.pg_only
+
 ACCEPT_URL_ENV = "GT_ADJ_ACCEPT_DB_URL"
 _PROBE_ROLE = "gt_rls_probe"
 _PROBE_PASSWORD = "gt_rls_probe_pw"

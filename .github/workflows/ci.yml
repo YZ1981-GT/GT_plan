@@ -118,11 +118,21 @@ jobs:
           psql -h localhost -U postgres -d test_audit -c "ALTER TABLE service_identities ALTER COLUMN id SET DEFAULT gen_random_uuid();"
           psql -h localhost -U postgres -d test_audit -c "DROP TABLE IF EXISTS ai_chat_action_receipts, ai_chat_tool_calls, ai_chat_attachments, ai_chat_runs CASCADE;"
           python -c "import asyncio,sys; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/test_audit').run_pending()); print('migrations executed:', len(r.executed), 'failed:', [f.version for f in r.failed]); sys.exit(1 if r.failed else 0)"
+      # 调整模块验收库（真双事务并发 / 非 superuser RLS / outbox 派发不自锁）：从刚建好的
+      # test_audit 克隆结构 + V235 + 探针角色。原先 CI 里不建它，GT_ADJ_ACCEPT_DB_URL 一族
+      # 4 个文件恒 skip —— 11-15 与 11-26 两次同形的 outbox 自锁死锁都是这样漏过去的。
+      - name: Build adjustment acceptance DB
+        working-directory: backend
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: python scripts/e2e/create_adjustment_accept_db.py --source-db test_audit --db gt_adj_accept
       - name: Run PG-only tests
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_audit
           # 一次性库声明，同上（backend-tests job）
           GT_PG_DISPOSABLE_DB: test_audit
+          GT_ADJ_ACCEPT_DB_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/gt_adj_accept
           # 🔴 排除「perf ∧ pg_only」写库性能用例：本 job 是 **功能**回归，不是压测。
           #    它们会往库里插 5000 行再清理，tests/_perf_gate.py 要求额外声明
           #    GT_PERF_DISPOSABLE_DB=YES 才放行（防静默写共享 PG）。这里既不声明也

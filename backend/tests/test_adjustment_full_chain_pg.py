@@ -42,6 +42,8 @@ from tests.test_adjustment_concurrency_and_rls_pg import (  # noqa: F401 - fixtu
     accept_db,
 )
 
+pytestmark = pytest.mark.pg_only
+
 
 @pytest.fixture(scope="module", autouse=True)
 def _models_loaded():
