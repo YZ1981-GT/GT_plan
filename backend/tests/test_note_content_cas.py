@@ -119,6 +119,8 @@ class TestContentCas:
         assert resp.status_code == 200, resp.text
         body = _unwrap(resp.json())
         assert body["no_change"] is False
+        assert isinstance(body["content_digest"], str) and len(body["content_digest"]) == 16, (
+            f"保存响应必须回传 16 位新摘要（下次保存的起点），得到 {body.get('content_digest')!r}")
         assert body["content_digest"] != digest, "保存后必须回传新摘要（下一次保存的起点）"
         assert body["event_delivery"] == "published"
 
