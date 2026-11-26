@@ -137,15 +137,23 @@ class ImportEventOutboxService:
                 extra=event_extra,
             )
         gated = DurableEventOutboxService.is_fanout_gated(item.event_type)
-        if gated and not await DurableEventOutboxService.begin_fanout(
-            db, event_id=item.id, project_id=item.project_id, year=item.year
-        ):
-            logger.info(
-                "[outbox] fan-out 已消费过，跳过重复派发 outbox_id=%s event_type=%s",
-                item.id,
-                item.event_type,
-            )
-            return False
+        if gated:
+            if not await DurableEventOutboxService.begin_fanout(
+                db, event_id=item.id, project_id=item.project_id, year=item.year
+            ):
+                logger.info(
+                    "[outbox] fan-out 已消费过，跳过重复派发 outbox_id=%s event_type=%s",
+                    item.id,
+                    item.event_type,
+                )
+                return False
+            # 🔴 2026-11-26：上面那次提交之后，begin_fanout 又在本会话插了一行
+            # import_event_consumptions（project_id 外键 ⇒ 对 projects 行加 KEY SHARE，且开了
+            # 新的未提交事务）。不再提交就派发，handler 的独立会话一 `SELECT ... FOR UPDATE`
+            # projects 就等本事务的 txid，而本事务在等 handler 返回 —— 与 11-15 同形的自锁死锁
+            # （formula-e2e 实测：pending/resolve 后 publish_pending 卡死，每个请求 60 秒超时）。
+            # 认领行提交后再派发；派发失败由 abort_fanout 删掉认领行，重放仍能重新抢到。
+            await ImportEventOutboxService._release_locks_before_deliver(db)
         try:
             # 🔴 2026-11-14：改为查**注册表**派发 —— 通用 outbox 不再 import 任何业务域
             # （原先内联 formula 分支造成 formula <-> import-export 双向依赖）。

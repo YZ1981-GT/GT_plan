@@ -58,6 +58,8 @@ from sqlalchemy.pool import NullPool
 
 ACCEPT_URL_ENV = "GT_ADJ_ACCEPT_DB_URL"
 
+pytestmark = pytest.mark.pg_only
+
 
 def _accept_url() -> str:
     url = (os.environ.get(ACCEPT_URL_ENV) or "").strip()
@@ -227,6 +229,69 @@ async def test_handler_runs_after_replay_releases_the_outbox_row_lock(
     assert not bad, (
         "handler 运行时 outbox 行仍被 replay 事务锁住 ⇒ replay 在开放事务里 await "
         f"handler 的独立会话（派发前必须先 commit 释放锁）：{bad}"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["replay_pending", "publish_one"])
+async def test_handler_runs_after_fanout_claim_is_committed(world, observer_engine, path):
+    """handler 被调用时，闸门认领行（及其对 projects 的外键锁）也必须已提交。
+
+    🔴 2026-11-26 formula-e2e 实测：上一条守卫只看 outbox 行锁，而 ``_deliver`` 提交之后
+    ``begin_fanout`` 又在本会话插 ``import_event_consumptions``（``project_id`` 外键 ⇒ 对
+    projects 行加 KEY SHARE，且开了新的未提交事务），随即 await handler。handler 的独立
+    会话一 ``SELECT projects ... FOR UPDATE`` 就等这个 txid ⇒ 同形自锁死锁，pending/resolve
+    之后每个请求都卡 60 秒。判据：探针对本项目行 ``FOR UPDATE NOWAIT`` 必须立刻成功。
+    """
+    from app.models.audit_platform_schemas import EventPayload, EventType
+    from app.services.event_bus import event_bus
+    from app.services.import_event_outbox_service import ImportEventOutboxService
+    from app.services.workpaper_sync.outbox import DurableEventOutboxService
+
+    project_id = world["project_id"]
+    factory = world["factory"]
+
+    async with factory() as db:
+        event = EventPayload(
+            event_type=EventType.ADJUSTMENT_APPROVED,
+            project_id=project_id, year=2025,
+            account_codes=["1122"], entry_group_id=uuid.uuid4(),
+            extra={"origin": "manual", "operator_id": str(world["actor_id"])},
+        )
+        publication = await DurableEventOutboxService.enqueue_event(db, event)
+        await db.commit()
+
+    observations: list[dict[str, object]] = []
+
+    async def probe(payload: EventPayload) -> None:
+        async with observer_engine() as probe_db:
+            try:
+                await probe_db.execute(sa.text(
+                    "select id from projects where id = :p for update nowait"
+                ), {"p": project_id})
+                observations.append({"lock_released": True})
+            except Exception as exc:  # noqa: BLE001
+                observations.append({"lock_released": False, "error": type(exc).__name__,
+                                     "detail": str(exc)[:200]})
+            finally:
+                await probe_db.rollback()
+
+    event_bus._handlers[EventType.ADJUSTMENT_APPROVED] = [probe]
+
+    async with factory() as db:
+        if path == "replay_pending":
+            await asyncio.wait_for(
+                ImportEventOutboxService.replay_pending(db, limit=10, max_attempts=3), timeout=30)
+        else:
+            await asyncio.wait_for(
+                ImportEventOutboxService.publish_one(db, publication.outbox_id), timeout=30)
+        await db.commit()
+
+    assert observations, "探针 handler 没有被调用"
+    bad = [o for o in observations if not o.get("lock_released")]
+    assert not bad, (
+        "handler 运行时本会话仍持有 projects 行的外键锁 ⇒ begin_fanout 的认领行未提交就派发："
+        f"{bad}"
     )
 
 
