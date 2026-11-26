@@ -322,8 +322,11 @@ async function fetchData() {
           row_code: r.row_code || '',
           indent_level: r.indent_level || 0,
           is_total_row: r.is_total_row || false,
-          values: sortedYears.value.map(() => null),
-          yoy: sortedYears.value.slice(1).map(() => null),
+          // 模板按 `values[String(yr)]` / `yoy_changes[String(yr)]` 取值：fallback 行必须给同形的空记录，
+          // 给数组（原先 `sortedYears.map(() => null)`）会让单元格渲染时读 `undefined[String(yr)]` 抛错、
+          // 变成整批未处理异常（2026-11-26 CI 上 25 条）
+          values: Object.fromEntries(sortedYears.value.map((yr) => [String(yr), null])),
+          yoy_changes: Object.fromEntries(sortedYears.value.slice(1).map((yr) => [String(yr), null])),
         }))
       } catch {
         tableData.value = []
