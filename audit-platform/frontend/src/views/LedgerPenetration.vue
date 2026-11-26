@@ -461,15 +461,19 @@
         <el-button size="small" plain @click="exportTabLedgerExcel">导出Excel</el-button>
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
+      <!-- 🔴 densityMetrics 是组合式函数返回的普通对象，其字段是 ComputedRef；
+           模板不会自动解包嵌套在普通对象里的 ref，必须显式 .value ——
+           漏写 .value 时 estimated-row-height 收到对象（isNumber=false）、
+           header-height 使 fixedTableHeight 变 NaN，虚拟列表渲染 0 行整表空白（实测复现） -->
       <el-table-v2
         v-if="tabLedgerDisplay.length > 1000"
         :columns="tabLedgerVirtualColumns"
         :data="tabLedgerDisplay"
         :width="tableWidth"
         :height="tableHeight || 600"
-        :estimated-row-height="densityMetrics.estimatedRowHeight"
-        :header-height="densityMetrics.headerHeight"
-        :key="densityMetrics.remountKey"
+        :estimated-row-height="densityMetrics.estimatedRowHeight.value"
+        :header-height="densityMetrics.headerHeight.value"
+        :key="densityMetrics.remountKey.value"
         :row-class="ledgerVirtualRowClass"
         :row-event-handlers="tabVirtualRowEventHandlers"
         fixed
@@ -596,9 +600,9 @@
         :data="tabAuxLedgerDisplay"
         :width="tableWidth"
         :height="tableHeight || 600"
-        :estimated-row-height="densityMetrics.estimatedRowHeight"
-        :header-height="densityMetrics.headerHeight"
-        :key="densityMetrics.remountKey"
+        :estimated-row-height="densityMetrics.estimatedRowHeight.value"
+        :header-height="densityMetrics.headerHeight.value"
+        :key="densityMetrics.remountKey.value"
         :row-class="ledgerVirtualRowClass"
         :row-event-handlers="tabVirtualRowEventHandlers"
         fixed
@@ -728,9 +732,9 @@
         :data="ledgerVirtualDisplay"
         :width="tableWidth"
         :height="tableHeight || 600"
-        :estimated-row-height="densityMetrics.estimatedRowHeight"
-        :header-height="densityMetrics.headerHeight"
-        :key="densityMetrics.remountKey"
+        :estimated-row-height="densityMetrics.estimatedRowHeight.value"
+        :header-height="densityMetrics.headerHeight.value"
+        :key="densityMetrics.remountKey.value"
         :row-class="ledgerVirtualRowClass"
         :row-event-handlers="virtualRowEventHandlers"
         fixed

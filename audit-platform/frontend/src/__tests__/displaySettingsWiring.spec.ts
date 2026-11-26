@@ -88,8 +88,13 @@ describe('显示设置接线（AC-07）', () => {
 
     const ledger = read('views/LedgerPenetration.vue')
     expect(ledger).toContain('useTableDensityMetrics')
-    expect(ledger).toContain(':estimated-row-height="densityMetrics.estimatedRowHeight"')
-    expect(ledger).toContain(':header-height="densityMetrics.headerHeight"')
+    // 🔴 densityMetrics 是普通对象包 ComputedRef，模板不自动解包，必须显式 .value
+    // （漏写 .value 时 el-table-v2 拿到对象，虚拟列表渲染 0 行整表空白，2026-11-26 实测）
+    expect(ledger).toContain(':estimated-row-height="densityMetrics.estimatedRowHeight.value"')
+    expect(ledger).toContain(':header-height="densityMetrics.headerHeight.value"')
+    // 反向：禁止回退到漏 .value 的缺陷写法（该写法曾让序时账 >1000 行时整表空白）
+    expect(ledger).not.toContain(':estimated-row-height="densityMetrics.estimatedRowHeight"')
+    expect(ledger).not.toContain(':header-height="densityMetrics.headerHeight"')
     expect(ledger).not.toContain(':estimated-row-height="50"')
   })
 
