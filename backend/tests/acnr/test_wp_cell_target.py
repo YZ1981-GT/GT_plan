@@ -2,7 +2,7 @@
 
 真实目录（``get_catalog()``，不 mock）+ SQLite 真 ORM：sheet 级 vs 父底稿绑定、借名 blocked、两 sheet 同 A1 各取各值、
 目录外按原文读、多义 / 禁止别名不读、``effective_catalog`` 锁定命中按锁定目录判名、数据库异常上抛。
-pg_only（真库只读回滚）：原因细化（表单录入 / 只有文件）与库内值逐值相等。
+pg_only（回滚事务 + 自建样本）：原因细化（表单录入 / 只有文件）与库内值逐值相等。
 """
 from __future__ import annotations
 
@@ -239,23 +239,31 @@ def test_module_does_not_touch_parsed_data_or_extract():
     assert "resolve_wp_cell" in names
 
 
-# ── 真 PG（只读回滚） ─────────────────────────────────────────────────────────
+# ── 真 PG（回滚事务，自带样本） ───────────────────────────────────────────────
+#
+# 🔴 2026-11-26：原先两条用例只读库里现成的底稿，判据随库内容漂移 —— 共享库只剩 7 个 A1 数值格
+#    时「至少 20 格」恒红，CI 一次性空库又只能 skip（两头都不是在测代码）。改为在回滚事务里自建
+#    【测试】项目与已知样本：判据只由本用例写入的数据决定，空库 / 共享库都真跑；库里已有的真实底稿
+#    照样逐值比对（不计入门槛，只要读到就必须相等），事务结束一律回滚，不留任何数据。
 
-async def _pg(fn):
+#: 值比对样本：每张表一个 A1 数值格（含小数、负数、零、大数），表名不在目录里 ⇒ 按原文读
+_PG_VALUE_SAMPLES = [(f"【测试】取值表{i:02d}", f"C{i + 5}", value) for i, value in enumerate([
+    "100.50", "-3", "0", "1234567.89", "0.125", "42", "-0.01", "7", "999999999.99", "3.5",
+    "12", "-12.75", "5000", "0.5", "88", "-1", "250.25", "60", "19.99", "1",
+    "-77.7", "300", "0.001", "64",
+])]
+#: 目录内命中样本（走 read_entry_cell 分支）：E1 的两张目录表，项目里没有 sheet 级底稿 ⇒ 绑到 E1 本身
+_PG_CATALOG_SAMPLES = [("货币资金审定表E1-1", "C10", "100.50"), ("货币资金分析表E1-14", "C10", "0.125")]
+
+
+async def _pg_rollback(fn):
+    """在 PG 上开一个事务跑 ``fn(session)``，结束一律回滚。"""
     from app.core.config import settings
 
     eng = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
     try:
         async with async_sessionmaker(eng, expire_on_commit=False)() as s:
-            await s.execute(text("SET TRANSACTION READ ONLY"))
             try:
-                n = (await s.execute(text(
-                    "SELECT count(*) FROM working_paper w "
-                    "WHERE COALESCE(w.is_deleted, false) = false"))).scalar()
-                if not n:
-                    # 🔴 2026-11-24：CI 一次性空库无任何底稿 —— 环境事实，显式 skip
-                    # （与 tests/four_table 连库守卫的空库 skip 同口径）。
-                    pytest.skip("bootstrap 空库：working_paper 无业务数据 —— 真库判据待有数据的环境")
                 return await fn(s)
             finally:
                 await s.rollback()
@@ -263,10 +271,30 @@ async def _pg(fn):
         await eng.dispose()
 
 
+async def _seed_pg_project(s) -> uuid.UUID:
+    pid = uuid.uuid4()
+    s.add(Project(id=pid, name=f"【测试】ACNR 取值接线 PG {pid.hex[:8]}", client_name="【测试】ACNR 取值接线",
+                  status=ProjectStatus.execution, template_type="listed", report_scope="standalone",
+                  audit_year=2025, scenario="normal"))
+    await s.flush()
+    return pid
+
+
+async def _seed_pg_paper(s, pid: uuid.UUID, wp_code: str, *, parsed=None, file_path: str = "") -> uuid.UUID:
+    idx = WpIndex(id=uuid.uuid4(), project_id=pid, wp_code=wp_code, wp_name=f"【测试】{wp_code}")
+    s.add(idx)
+    await s.flush()
+    wp = WorkingPaper(id=uuid.uuid4(), project_id=pid, wp_index_id=idx.id, file_path=file_path,
+                      source_type=WpSourceType.template, parsed_data=parsed)
+    s.add(wp)
+    await s.flush()
+    return wp.id
+
+
 _PG_SAMPLE = (
     "SELECT w.project_id, i.wp_code FROM working_paper w JOIN wp_index i ON i.id = w.wp_index_id "
     "WHERE COALESCE(w.is_deleted, false) = false AND COALESCE(i.is_deleted, false) = false AND {cond} "
-    "ORDER BY w.project_id, i.wp_code LIMIT 1"
+    "AND w.project_id = :pid ORDER BY i.wp_code LIMIT 1"
 )
 
 
@@ -278,29 +306,48 @@ _PG_SAMPLE = (
 ])
 async def test_pg_reason_refinement(cond, code):
     async def run(s):
-        row = (await s.execute(text(_PG_SAMPLE.format(cond=cond)))).first()
-        assert row is not None, f"真库没有 {code} 形态的底稿（防空转）"
-        pid, wp_code = row
+        pid = await _seed_pg_project(s)
+        # 表单录入：数据只在 checklist_responses；只有文件：既无 html_data 也无表单行，只有底稿文件
+        form_wp = await _seed_pg_paper(s, pid, "ZZFORM1", parsed={}, file_path="ZZFORM1.xlsx")
+        await s.execute(text(
+            "INSERT INTO checklist_responses (project_id, wp_id, item_id, remark) VALUES (:p, :w, 'ZZFORM1-r1', '1')"
+        ), {"p": pid, "w": form_wp})
+        await _seed_pg_paper(s, pid, "ZZFILE1", parsed={}, file_path="ZZFILE1.xlsx")
+
+        row = (await s.execute(text(_PG_SAMPLE.format(cond=cond)), {"pid": pid})).first()
+        assert row is not None, f"自建样本里没有 {code} 形态的底稿（样本构造与判据不符）"
+        _, wp_code = row
         got = await read_formula_cell(s, project_id=pid, year=None, wp_code=wp_code, sheet_text="不存在的表",
                                       cell="ZZ9999", index=get_catalog())
         assert (got.read.state, got.read.reason_code) == ("missing", code), (wp_code, got.read)
         assert got.read.reason in (wp_cell_target.FORM_STORAGE_REASON, wp_cell_target.FILE_ONLY_REASON)
         assert s.info[wp_cell_target._STORAGE_MEMO_KEY][got.read.wp_id] == code
 
-    await _pg(run)
+    await _pg_rollback(run)
 
 
 @pytest.mark.pg_only
 async def test_pg_values_equal_stored_cells():
-    """真库全部带 html_data 的底稿：每张表抽一个数值格，经 read_formula_cell 按原文表名读回的值与库内值相等。"""
+    """带 html_data 的底稿：每张表抽一个数值格，经 read_formula_cell 按原文表名读回的值与库内值相等。
+
+    自建样本覆盖两条取值分支：目录外按原文读（24 张）与目录内命中（E1 两张）；门槛只由它们决定，
+    库里已有的真实底稿同样逐值比对。
+    """
     from app.services.address_registry import extract_custom_cells
 
     async def run(s):
+        pid = await _seed_pg_project(s)
+        html = {sheet: {"cells": {cell: value}} for sheet, cell, value in _PG_VALUE_SAMPLES}
+        await _seed_pg_paper(s, pid, "ZZVAL1", parsed={"html_data": html}, file_path="ZZVAL1.xlsx")
+        e1 = {sheet: {"cells": {cell: value}} for sheet, cell, value in _PG_CATALOG_SAMPLES}
+        await _seed_pg_paper(s, pid, "E1", parsed={"html_data": e1}, file_path="E1.xlsx")
+
         rows = (await s.execute(text(
             "SELECT w.project_id, i.wp_code, w.parsed_data FROM working_paper w JOIN wp_index i ON i.id = w.wp_index_id "
             "WHERE COALESCE(w.is_deleted, false) = false AND (w.parsed_data -> 'html_data') IS NOT NULL"))).all()
-        checked = 0
-        for pid, wp_code, parsed in rows:
+        checked_seeded = 0
+        cat = get_catalog()
+        for row_pid, wp_code, parsed in rows:
             seen = set()
             for rec in extract_custom_cells(parsed):
                 if rec.sheet in seen or rec.value in (None, ""):
@@ -312,8 +359,7 @@ async def test_pg_values_equal_stored_cells():
                 if not expected.is_finite():
                     continue
                 seen.add(rec.sheet)
-                cat = get_catalog()
-                got = await read_formula_cell(s, project_id=pid, year=None, wp_code=wp_code, sheet_text=rec.sheet,
+                got = await read_formula_cell(s, project_id=row_pid, year=None, wp_code=wp_code, sheet_text=rec.sheet,
                                               cell=rec.cell, index=cat)
                 if got.read.reason_code in ("sheet_name_borrowed", "sheet_ambiguous"):
                     continue
@@ -322,7 +368,8 @@ async def test_pg_values_equal_stored_cells():
                 assert got.read.state in ("ok", "blocked"), (wp_code, rec.sheet, rec.cell, got.read)
                 if got.read.state == "ok":
                     assert got.read.value == expected, (wp_code, rec.sheet, rec.cell)
-                    checked += 1
-        return checked
+                    if row_pid == pid:
+                        checked_seeded += 1
+        return checked_seeded
 
-    assert await _pg(run) >= 20
+    assert await _pg_rollback(run) == len(_PG_VALUE_SAMPLES) + len(_PG_CATALOG_SAMPLES)

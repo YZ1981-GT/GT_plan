@@ -124,7 +124,15 @@ class TestProjectDataFlow:
         assert resp.status_code == 200
         data = resp.json()
         payload = data.get("data", data)
-        assert payload["version"] == "1.0.0"
+        # 版本来自构建版本单一来源（zero-downtime-deployment：BUILD_VERSION_JSON > _build_version.json > "dev"），
+        # 不再是 FastAPI 元数据里写死的 "1.0.0"
+        from app.core.build_version import get_build_version
+
+        expected = get_build_version()
+        assert payload["version"] == expected["semantic_version"]
+        assert payload["git_commit"] == expected["git_commit"]
+        assert payload["build_time"] == expected["build_time"]
+        assert payload["api_prefix"] == "/api"
 
 
 # ---------------------------------------------------------------------------

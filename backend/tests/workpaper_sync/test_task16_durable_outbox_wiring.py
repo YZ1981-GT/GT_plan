@@ -738,6 +738,8 @@ def test_the_gate_covers_the_two_workpaper_sync_event_types_only() -> None:
         EventType.ADJUSTMENT_APPROVED,
         EventType.ADJUSTMENT_REVIEW_REVOKED,
         EventType.ADJUSTMENT_CLIENT_BOOKING_CHANGED,
+        # adjustment_treatment_service 经耐久 outbox 发布，与其余调整事件同受 at-most-once 闸门
+        EventType.ADJUSTMENT_TREATMENT_CHANGED,
         EventType.TRIAL_BALANCE_UPDATED,
     }
     for gated in GATED_FANOUT_EVENT_TYPES:
