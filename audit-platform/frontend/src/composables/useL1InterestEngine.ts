@@ -16,6 +16,7 @@
  * - J11(L1-7): =IF(I11=0,0,$I$9-I11)  (逾期天数)
  * - L11(L1-7): =E11*G11*K11  (逾期利息=本金×逾期利率日×天数)
  */
+import { calendarDaysBetween } from '@/utils/calendarDays'
 
 // ─── 常量 ────────────────────────────────────────────────────
 
@@ -154,11 +155,8 @@ export function calcInterestDiff(calculated: number, booked: number): number {
  */
 export function calcOverdueDays(dueDate: Date | null, reportDate: Date): number {
   if (!dueDate) return 0
-
-  const dueMs = Date.UTC(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate())
-  const reportMs = Date.UTC(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate())
-
-  return Math.round((reportMs - dueMs) / (1000 * 60 * 60 * 24))
+  // 按日历日：dueDate 来自 new Date('YYYY-MM-DD')（UTC 零点），取本地年月日在负时区会前移一天
+  return calendarDaysBetween(dueDate, reportDate) ?? 0
 }
 
 // ─── 7. 逾期利息计算 ────────────────────────────────────────

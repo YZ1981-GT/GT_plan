@@ -8,6 +8,7 @@
  *
  * Spec: .kiro/specs/g2-interest-receivable/ Requirement 12
  */
+import { calendarDaysBetween } from '@/utils/calendarDays'
 
 export function parseNum(val: string | number | null | undefined): number {
   if (val === null || val === undefined || val === '') return 0
@@ -52,13 +53,11 @@ export function calcECL(ead: number, pd: number, lgd: number): number {
   return ead * pd * lgd
 }
 
-/** 逾期天数 = MAX(0, 当前日 - 约定日) */
+/** 逾期天数 = MAX(0, 当前日 - 约定日)，按日历日（见 utils/calendarDays） */
 export function calcOverdueDays(dueDateStr: string, asOf: Date = new Date()): number {
   if (!dueDateStr) return 0
-  const due = new Date(dueDateStr)
-  if (Number.isNaN(due.getTime())) return 0
-  const diff = asOf.getTime() - due.getTime()
-  return diff > 0 ? Math.floor(diff / 86400000) : 0
+  const days = calendarDaysBetween(dueDateStr, asOf)
+  return days !== null && days > 0 ? days : 0
 }
 
 /** 阶段判定：已减值→3, 显著增加→2, 否则→1 */

@@ -2,6 +2,8 @@
  * F3 应付票据 — 公式引擎（贷方科目 2201）
  * Spec: .kiro/specs/f3-notes-payable/ Requirement 11
  */
+import { calendarDaysBetween } from '@/utils/calendarDays'
+
 export function parseNum(val: string | number | null | undefined): number {
   if (val === null || val === undefined || val === '') return 0
   const n = typeof val === 'number' ? val : Number(val)
@@ -14,13 +16,12 @@ export function calcInterest(principal: number, ratePct: number, days: number): 
   return (principal * ratePct / 100 * days) / 360
 }
 
-/** 逾期天数 = MAX(0, 当前日 - 到期日) */
+/** 逾期天数 = MAX(0, 当前日 - 到期日)，按日历日（到期日字符串按 UTC 零点解析而 asOf 是本地时刻，
+ *  直接相减在北京时间 0~8 点会少一天，见 utils/calendarDays） */
 export function calcOverdueDays(dueDateStr: string, asOf: Date = new Date()): number {
   if (!dueDateStr) return 0
-  const due = new Date(dueDateStr)
-  if (Number.isNaN(due.getTime())) return 0
-  const diff = asOf.getTime() - due.getTime()
-  return diff > 0 ? Math.floor(diff / 86400000) : 0
+  const days = calendarDaysBetween(dueDateStr, asOf)
+  return days !== null && days > 0 ? days : 0
 }
 
 /** 贷方余额 = 期初 + 贷方(增加) - 借方(减少) */

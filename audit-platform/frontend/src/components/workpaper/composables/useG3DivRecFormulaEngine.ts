@@ -9,6 +9,7 @@
  *
  * Spec: .kiro/specs/g3-dividend-receivable/ Requirement 9
  */
+import { calendarDaysBetween } from '@/utils/calendarDays'
 
 export function parseNum(val: string | number | null | undefined): number {
   if (val === null || val === undefined || val === '') return 0
@@ -37,10 +38,11 @@ export function calcAdjustedAmount(unadjusted: number, aje: number, rje: number)
   return unadjusted + aje + rje
 }
 
-/** 逾期天数 = MAX(0, 当前日期 - 约定日) */
+/** 逾期天数 = MAX(0, 当前日期 - 约定日)，按日历日（调用方传 `new Date()` 对 `new Date('YYYY-MM-DD')`，
+ *  直接相减在北京时间 0~8 点会少一天，见 utils/calendarDays） */
 export function calcOverdueDays(currentDate: Date, dueDate: Date): number {
-  const diff = currentDate.getTime() - dueDate.getTime()
-  return diff > 0 ? Math.floor(diff / 86400000) : 0
+  const days = calendarDaysBetween(dueDate, currentDate)
+  return days !== null && days > 0 ? days : 0
 }
 
 /** 期末应收 = 应收股利 - 已收金额 */

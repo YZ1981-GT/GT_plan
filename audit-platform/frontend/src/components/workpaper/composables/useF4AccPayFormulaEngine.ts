@@ -4,6 +4,7 @@
  * Spec: .kiro/specs/f4-accounts-payable/ Task 2.1
  * 8个纯函数 + parseNum + 辅助函数
  */
+import { calendarDaysBetween } from '@/utils/calendarDays'
 
 /** 安全数值解析：null/undefined/NaN/空→0 */
 export function parseNum(val: string | number | null | undefined): number {
@@ -51,10 +52,11 @@ export function isDebitCreditBalanced(debits: number[], credits: number[]): bool
   return Math.abs(d - c) < 0.01
 }
 
-/** Property 7: 挂账天数 = MAX(0, (当前日期 - 起始日) / 86400000) 取整 */
+/** Property 7: 挂账天数 = MAX(0, 当前日期 - 起始日)，按日历日（调用方传 `new Date()` 对
+ *  `new Date('YYYY-MM-DD')`，直接相减在北京时间 0~8 点会少一天，见 utils/calendarDays） */
 export function calcOutstandingDays(currentDate: Date, startDate: Date): number {
-  const diff = currentDate.getTime() - startDate.getTime()
-  return Math.max(0, Math.floor(diff / 86400000))
+  const days = calendarDaysBetween(startDate, currentDate)
+  return days !== null && days > 0 ? days : 0
 }
 
 /** Property 8 辅助：小计求和 */

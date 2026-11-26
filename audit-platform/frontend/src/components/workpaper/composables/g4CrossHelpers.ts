@@ -2,6 +2,7 @@
  * G4 跨表辅助 — G4-2 ↔ G4-9 ↔ G4-10
  */
 import http from '@/utils/http'
+import { calendarDaysBetween } from '@/utils/calendarDays'
 import {
   fetchTrialBalanceByPrefix,
   pickTbAmount,
@@ -55,11 +56,9 @@ export async function fetchG42DetailRows(wpId: string): Promise<any[]> {
 /** 计算相对基准日已逾期天数（未逾期返回 0） */
 export function calcOverdueDays(maturityDate: string | undefined | null, asOfDate?: string | null): number {
   if (!maturityDate) return 0
-  const mat = new Date(maturityDate)
-  const asOf = asOfDate ? new Date(asOfDate) : new Date()
-  if (Number.isNaN(mat.getTime()) || Number.isNaN(asOf.getTime())) return 0
-  const days = Math.round((asOf.getTime() - mat.getTime()) / 86400000)
-  return days > 0 ? days : 0
+  // 按日历日：基准日缺省是本地当前时刻，与 UTC 零点解析的到期日直接相减会差一天（见 utils/calendarDays）
+  const days = calendarDaysBetween(maturityDate, asOfDate || new Date())
+  return days !== null && days > 0 ? days : 0
 }
 
 export const G4_9_ROWS_KEY = 'G4-9-rows'

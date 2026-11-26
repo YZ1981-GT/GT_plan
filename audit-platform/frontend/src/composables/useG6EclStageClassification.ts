@@ -5,6 +5,7 @@
 import { computed, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { determineStage } from '@/composables/useG6EclFormulaEngine'
+import { calendarDaysBetween } from '@/utils/calendarDays'
 
 export interface CheckItemDef {
   label: string
@@ -270,10 +271,9 @@ function calcOverdueDays(
   asOfDate?: string | null,
 ): number {
   if (!maturityDate) return 0
-  const maturity = new Date(String(maturityDate))
-  const asOf = asOfDate ? new Date(asOfDate) : new Date()
-  if (Number.isNaN(maturity.getTime()) || Number.isNaN(asOf.getTime())) return 0
-  return Math.max(0, Math.floor((asOf.getTime() - maturity.getTime()) / 86400000))
+  // 按日历日：基准日缺省是本地当前时刻，与 UTC 零点解析的到期日直接相减会差一天（见 utils/calendarDays）
+  const days = calendarDaysBetween(String(maturityDate), asOfDate || new Date())
+  return days !== null && days > 0 ? days : 0
 }
 
 export function getValidColumnIndices(
