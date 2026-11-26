@@ -8,13 +8,17 @@ R1a 冻结写入方事实；R1b（D1 2026-11-04 拍板后）在本登记表上�
 - ``manual``：手工入口，经附注编辑门禁放行，不受矩阵限制；
 - ``derived``：按表内其他格计算（附注公式、二次求值、读时修复），沿用现有只写 auto / kept_push 规则；
 - ``structural``：用户发起的整批结构操作（下发、导入、重对齐、准则切换、裁剪、公式物化、回滚等）；
-- ``stale``：过期状态机。
+- ``stale``：过期状态机；
+- ``kernel``：统一写入内核（``disclosure.note_section_write_kernel``）的 mutator 入口 —— 本层不判定归属，
+  由**调用方**的业务 mutator 决定写什么，因此既不是 ``automatic``（不能要求它自身经 ``WriteGate``），
+  也不是 ``manual``。登记在册是为了让「内核也是写入面」这件事对 AST 扫描可见（spec
+  ``platform-heavy-jobs-and-capacity-closure`` C2/C3 接入内核后，本表曾漏登记这三个入口）。
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-ROLES = frozenset({"automatic", "manual", "derived", "structural", "stale"})
+ROLES = frozenset({"automatic", "manual", "derived", "structural", "stale", "kernel"})
 
 _ROLE_OF: dict[str, str] = {
     **dict.fromkeys((
@@ -33,6 +37,9 @@ _ROLE_OF: dict[str, str] = {
         "formula_runtime_restore",
     ), "structural"),
     **dict.fromkeys(("stale_mark", "stale_clear"), "stale"),
+    **dict.fromkeys((
+        "write_kernel_section", "write_kernel_by_id", "write_kernel_engine_mutator",
+    ), "kernel"),
 }
 
 CANONICAL_FIELDS = frozenset({
@@ -125,6 +132,17 @@ NOTE_WRITERS: tuple[NoteWriterSpec, ...] = (
     _w("restore_auto", "app.services.note_wp_mapping_service:NoteWpMappingService.restore_auto_mode", "恢复自动模式", ("table.structure",), True),
     _w("stale_mark", "app.services.stale_state:mark_note_stale", "下游数据变化", ("stale_state",), True),
     _w("stale_clear", "app.services.stale_state:clear_note_stale", "完整重算成功", ("stale_state",), True),
+    # ─── 统一写入内核（spec platform-heavy-jobs-and-capacity-closure C2/C3）──────────────
+    # 🔴 这三个入口由内核负责 deepcopy + advisory lock + FOR UPDATE + stable-hash diff，
+    #    **字段写什么由调用方传进来的 mutator 决定**；内核自身不判归属（不含 WriteGate），
+    #    因此 role 是 ``kernel`` 而不是 ``automatic``。不登记 ⇒ 「内核是写入面」这件事
+    #    从 AST 扫描里消失，未登记写入方会静默增长。
+    _w("write_kernel_section", "app.services.disclosure.note_section_write_kernel:mutate_note_section",
+       "按(项目,年度,章节)走统一内核", _TABLE + _TEXT, True),
+    _w("write_kernel_by_id", "app.services.disclosure.note_section_write_kernel:mutate_note_by_id",
+       "按 note.id 走统一内核", _TABLE + _TEXT, True),
+    _w("write_kernel_engine_mutator", "app.services.disclosure_engine:DisclosureEngine.update_note._mutator",
+       "附注编辑器手工保存的 mutator（内核回调）", _TABLE + _TEXT, True),
 )
 
 # AST 会看到但不会持久化的对象；测试会验证这些入口仍保持只读/纯 DTO。
@@ -140,6 +158,27 @@ NOTE_WRITER_SCAN_BLIND_SPOTS: dict[str, str] = {
     "app.services.note_offline_import_tables:persist_applied_table_data": (
         "通过 values(**动态字典) 写 table_data，静态字段扫描看不到；入口与写入字段另由单测验证"
     ),
+}
+
+#: **间接门面**：登记在册（要出现在归属矩阵的 owner / 触发点文案里），但函数体自己不再直接赋值
+#: ``table_data`` / ``text_content``，真正的持久化落到某个**下层已登记写入方**。
+#: 每条都必须可伪证 —— ``delegates_to`` 指向本表内的另一个 ``entrypoint``，
+#: 守卫 ``test_note_writers_guard.py::test_indirect_facades_are_real_and_falsifiable`` 会
+#: ①断言它确实在本表登记、②断言 AST 已看不见它直接写字段、③断言函数体真的调用了
+#: ``delegates_to`` 的末段名字。任一条不成立即打红（删条目也让 stale_registry 打红）。
+NOTE_WRITER_INDIRECT_FACADES: dict[str, str] = {
+    # spec platform-heavy-jobs-and-capacity-closure C2：update_note 改经 mutate_note_by_id
+    # 统一内核写入，字段赋值全部搬进嵌套 mutator（已登记为 write_kernel_engine_mutator）。
+    "app.services.disclosure_engine:DisclosureEngine.update_note": (
+        "app.services.disclosure.note_section_write_kernel:mutate_note_by_id"
+    ),
+}
+
+#: 写的是 ``stale_state`` 列（走 SQLAlchemy ``update()``），不属于 ``table_data`` / ``text_content``
+#: 扫描面，因此 AST 不会看见 —— 与「漏登记」不同型，登记在此以免被当成缺项。
+NOTE_WRITER_SCAN_OUT_OF_SURFACE: dict[str, str] = {
+    "app.services.stale_state:mark_note_stale": "写 stale_state 列，不在 table_data / text_content 扫描面",
+    "app.services.stale_state:clear_note_stale": "写 stale_state 列，不在 table_data / text_content 扫描面",
 }
 
 FRONTEND_BUILDER_AUTHORITY = (
@@ -160,7 +199,9 @@ __all__ = [
     "FRONTEND_BUILDER_AUTHORITY",
     "NOTE_WRITERS",
     "NOTE_WRITER_EXCLUSIONS",
+    "NOTE_WRITER_INDIRECT_FACADES",
     "NOTE_WRITER_SCAN_BLIND_SPOTS",
+    "NOTE_WRITER_SCAN_OUT_OF_SURFACE",
     "NoteWriterSpec",
     "ROLES",
     "writer_by_id",

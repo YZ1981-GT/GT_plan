@@ -1132,6 +1132,25 @@ jobs:
       - name: Assert registry has no drift vs frontend source of truth
         run: python backend/scripts/gen_note_wp_sync_registry.py --check
 
+  note-writer-ownership:
+    # 附注「章节 × 字段」唯一自动写方守卫（formula-writer-ownership-and-stale R1b）。
+    # 双向 AST 对账：生产代码里出现的附注写入方必须登记，登记入口也不能凭空消失。
+    # 2026-11-26 实测：C2/C3 引入 disclosure.note_section_write_kernel 后，
+    # 登记表漏了 mutate_note_section / mutate_note_by_id / update_note._mutator 三个入口，
+    # 本目录守卫红灯但**没有任何 CI job 引用** ⇒ 红成常态无人看见。
+    # 独立成 job、不带 -x：一条红不能掩盖其余判据；pg_only 用例由 tests/conftest.py
+    # 在未设 DATABASE_URL 时自动跳过，CI 无需真实 PG。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run note writer ownership guards
+        run: python -m pytest backend/tests/formula_writer_ownership/ -q -p no:playwright
+
   note-report-row-code:
     # 平台级：附注 report_row_code 与 report_config 编号体系一致性守卫
     # （h-cycle-legacy-cleanup-and-platform-hygiene R6）

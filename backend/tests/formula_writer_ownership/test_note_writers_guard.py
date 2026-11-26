@@ -8,7 +8,9 @@ from app.services.note_writers import (
     CANONICAL_FIELDS,
     FRONTEND_BUILDER_AUTHORITY,
     NOTE_WRITER_EXCLUSIONS,
+    NOTE_WRITER_INDIRECT_FACADES,
     NOTE_WRITER_SCAN_BLIND_SPOTS,
+    NOTE_WRITER_SCAN_OUT_OF_SURFACE,
     NOTE_WRITERS,
 )
 
@@ -130,18 +132,66 @@ def test_all_observed_note_content_writers_are_registered_or_verified_excluded()
     observed = _observed()
     registered = {spec.entrypoint for spec in NOTE_WRITERS}
     uncovered = sorted(observed - registered - set(NOTE_WRITER_EXCLUSIONS))
-    stale_registry = sorted(registered - observed - {
-        # stale 状态走 SQLAlchemy update，但字段不属于 table_data/text_content 扫描面。
-        "app.services.stale_state:mark_note_stale",
-        "app.services.stale_state:clear_note_stale",
-        # 间接门面本身不直接改字段，由下层已登记 writer 持久化。
-        "app.routers.ai_content:_writeback_note",
-        "app.routers.disclosure_notes:update_note._mutate",
-        "app.routers.excel_html:save_edits",
-        *NOTE_WRITER_SCAN_BLIND_SPOTS,
-    })
+    # 「登记了但 AST 已看不见它直接写字段」= 写入已委托给下层（间接门面 / 扫描面外），
+    # 必须逐条在可伪证清单里声明；空白名单会让「登记表与事实分离」静默通过。
+    stale_registry = sorted(
+        registered - observed
+        - set(NOTE_WRITER_INDIRECT_FACADES)
+        - set(NOTE_WRITER_SCAN_OUT_OF_SURFACE)
+        - set(NOTE_WRITER_SCAN_BLIND_SPOTS)
+    )
     assert uncovered == [], f"未登记附注写入方：{uncovered}"
-    assert stale_registry == [], f"登记入口已不再写附注：{stale_registry}"
+    assert stale_registry == [], f"登记入口已不再写附注也未被声明为间接门面：{stale_registry}"
+
+
+def test_indirect_facades_are_real_and_falsifiable():
+    """间接门面清单必须可伪证：登记在册、AST 已看不见它直接写字段、且真的调用了委托目标。"""
+    observed = _observed()
+    registered = {spec.entrypoint for spec in NOTE_WRITERS}
+    problems: list[str] = []
+    for facade, delegates_to in NOTE_WRITER_INDIRECT_FACADES.items():
+        if facade not in registered:
+            problems.append(f"{facade}：不在 NOTE_WRITERS（间接门面必须先是登记写入方）")
+        if facade in observed:
+            problems.append(f"{facade}：AST 仍看见它直接写 table_data/text_content（不该登记为间接门面）")
+        if delegates_to not in registered:
+            problems.append(f"{facade}：委托目标 {delegates_to} 不在 NOTE_WRITERS")
+        tail = delegates_to.split(":", 1)[1].rsplit(".", 1)[-1]
+        module_name, qualname = facade.split(":", 1)
+        path = ROOT / "backend" / Path(*module_name.split(".")).with_suffix(".py")
+        if tail not in _body_calls(path, qualname):
+            problems.append(f"{facade}：函数体没有调用 {tail}，委托声明不成立")
+    assert problems == [], "间接门面清单不可伪证：\n" + "\n".join(problems)
+
+
+def _resolve_target(path: Path, qualname: str) -> ast.AST:
+    tree = ast.parse(path.read_text(encoding="utf-8-sig", errors="replace"))
+    scope: list[ast.stmt] = tree.body
+    node: ast.AST | None = None
+    for part in qualname.split("."):
+        node = next(
+            (n for n in scope
+             if isinstance(n, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == part),
+            None,
+        )
+        assert node is not None, f"{path.name}:{qualname} 未找到"
+        scope = getattr(node, "body", [])
+    return node
+
+
+def _body_calls(path: Path, qualname: str) -> set[str]:
+    """该函数体（含嵌套 def 的调用点）调用到的名字末段。"""
+    node = _resolve_target(path, qualname)
+    names: set[str] = set()
+    for stmt in getattr(node, "body", []):
+        for n in ast.walk(stmt):
+            if isinstance(n, ast.Call):
+                fn = n.func
+                if isinstance(fn, ast.Attribute):
+                    names.add(fn.attr)
+                elif isinstance(fn, ast.Name):
+                    names.add(fn.id)
+    return names
 
 
 def test_exclusions_are_real_and_still_non_persistent():
