@@ -21,7 +21,7 @@
  *
  * 审计底稿中大量字段可能为空或无效值，统一转为数字 0 以确保公式运算不出 NaN。
  */
-export function parseNum(val: string | number | null | undefined): number {
+export function parseNum(val: unknown): number {
   if (val === null || val === undefined || val === '') return 0
   const n = typeof val === 'number' ? val : Number(val)
   if (!isFinite(n)) return 0

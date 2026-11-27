@@ -1,3 +1,4 @@
+import type { Ref } from 'vue'
 import { computed, defineComponent, isRef, nextTick, ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -104,7 +105,7 @@ function makeConfig(overrides: Record<string, unknown> = {}) {
   }
 }
 describe('GtWpRenderer Runtime Boundary', () => {
-  let renderConfig: ReturnType<typeof ref<any>>
+  let renderConfig: Ref<any>
 
   beforeEach(() => {
     scaffoldSpy.mockReset()

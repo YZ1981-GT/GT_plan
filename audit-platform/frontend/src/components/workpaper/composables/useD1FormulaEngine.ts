@@ -22,9 +22,9 @@ import {
  * 非有限值也必须归零：`parseFloat('Infinity')` / `parseFloat('1e400')` 都能过 `isNaN`
  * 检查，一旦漏进公式，`Infinity - Infinity` / `Infinity / Infinity` 会让整表变 NaN。
  */
-export function parseNum(val: string | number | null | undefined): number {
+export function parseNum(val: unknown): number {
   if (val === null || val === undefined || val === '') return 0
-  const n = typeof val === 'number' ? val : parseFloat(val)
+  const n = typeof val === 'number' ? val : parseFloat(String(val))
   return Number.isFinite(n) ? n : 0
 }
 

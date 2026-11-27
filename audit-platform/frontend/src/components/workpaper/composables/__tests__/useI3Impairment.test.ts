@@ -14,6 +14,7 @@
  * Spec: .kiro/specs/i3-goodwill/
  * Task: 3.5
  */
+import type { Ref } from 'vue'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, computed, nextTick } from 'vue'
 import { useI3Impairment, type CguRow } from '../useI3Impairment'
@@ -35,7 +36,7 @@ function createAllResponses(data?: Record<string, any>) {
 }
 
 describe('useI3Impairment', () => {
-  let wpId: ReturnType<typeof ref<string>>
+  let wpId: Ref<string>
   let allResponses: ReturnType<typeof createAllResponses>
   let onSave: ReturnType<typeof vi.fn>
 

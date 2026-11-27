@@ -4,13 +4,14 @@
  * 通过 confirm_index 关联 D0-1 函证汇总表，提供跳转导航能力。
  * TODO: 接入真实路由 + EventBus 跨底稿跳转
  */
+import type { Ref } from 'vue'
 import { ref } from 'vue'
 
 export interface D01LinkageReturn {
   /** 跳转到 D0-1 对应索引行 */
   navigateToD01: (confirmIndex: string) => void
   /** 是否正在跳转 */
-  isNavigating: ReturnType<typeof ref<boolean>>
+  isNavigating: Ref<boolean>
 }
 
 export function useD01Linkage(): D01LinkageReturn {

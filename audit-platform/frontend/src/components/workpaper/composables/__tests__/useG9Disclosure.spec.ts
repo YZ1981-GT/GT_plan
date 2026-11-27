@@ -1,6 +1,7 @@
 /**
  * useG9Disclosure — 合计 / 勾稽 / 分项带入
  */
+import type { Ref } from 'vue'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
 import type { ChecklistResponse } from '../useF1FormData'
@@ -24,7 +25,7 @@ function makeMap(entries: Record<string, Partial<ChecklistResponse>> = {}) {
 }
 
 describe('useG9Disclosure', () => {
-  let allResponses: ReturnType<typeof ref<Map<string, ChecklistResponse>>>
+  let allResponses: Ref<Map<string, ChecklistResponse>>
   let saves: Array<{ id: string; data: Partial<ChecklistResponse> }>
 
   beforeEach(() => {

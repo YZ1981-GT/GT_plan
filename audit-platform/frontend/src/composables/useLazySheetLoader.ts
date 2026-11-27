@@ -11,6 +11,7 @@
  *   lazyLoader.markAllInitialLoaded(workbookData)  // 标记初次加载到的 sheet
  *   await lazyLoader.ensureSheetLoaded(sheetName, univerAPI)  // 切换时调用
  */
+import type { Ref } from 'vue'
 import { ref } from 'vue'
 import httpApi from '@/utils/http'
 
@@ -23,7 +24,7 @@ export interface LazyLoaderReturn {
   /** 已加载（含初始化 + 已 fetch）sheet 名集合，前端可用于显示 loading 状态 */
   loadedSheets: Set<string>
   /** 累计 fetch 次数（指标） */
-  fetchCount: ReturnType<typeof ref<number>>
+  fetchCount: Ref<number>
   /**
    * 标记初次加载结果中所有非 _lazy 的 sheet 为已加载。
    * @param workbookData /xlsx-to-json 返回的 IWorkbookData

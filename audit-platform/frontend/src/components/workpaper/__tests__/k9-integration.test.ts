@@ -14,6 +14,7 @@
  *
  * Mock: http调用（无后端依赖），eventBus验证
  */
+import type { Ref } from 'vue'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, nextTick } from 'vue'
 
@@ -59,7 +60,7 @@ import { useK9CrossSheet } from '../composables/useK9CrossSheet'
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('useK9Adjudication — 集成', () => {
-  let allResponses: ReturnType<typeof ref<Map<string, any>>>
+  let allResponses: Ref<Map<string, any>>
   let saveSpy: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
@@ -168,7 +169,7 @@ describe('useK9Adjudication — 集成', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('useK9Detail — 集成', () => {
-  let allResponses: ReturnType<typeof ref<Map<string, any>>>
+  let allResponses: Ref<Map<string, any>>
   let saveSpy: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
@@ -261,7 +262,7 @@ describe('useK9Detail — 集成', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('useK9Analysis — 集成', () => {
-  let allResponses: ReturnType<typeof ref<Map<string, any>>>
+  let allResponses: Ref<Map<string, any>>
   let saveSpy: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
@@ -358,7 +359,7 @@ describe('useK9Analysis — 集成', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('useK9Cutoff — 集成', () => {
-  let allResponses: ReturnType<typeof ref<Map<string, any>>>
+  let allResponses: Ref<Map<string, any>>
   let saveSpy: ReturnType<typeof vi.fn>
 
   beforeEach(() => {

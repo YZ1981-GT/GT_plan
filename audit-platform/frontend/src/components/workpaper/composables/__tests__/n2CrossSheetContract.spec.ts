@@ -13,6 +13,7 @@
  * P2 源码：禁止 crossSheet 再出现旧键/旧字段字面量（防下次重构又漂移）
  * P3 契约：crossSheet 读的 item_id 必须等于持久化方 saveField 拼出的 item_id
  */
+import type { Ref } from 'vue'
 import { describe, it, expect } from 'vitest'
 import { ref } from 'vue'
 import fs from 'node:fs'
@@ -62,7 +63,7 @@ function detailRow(
   }
 }
 
-function mkResponses(entries: Record<string, unknown>): ReturnType<typeof ref<Map<string, ChecklistResponse>>> {
+function mkResponses(entries: Record<string, unknown>): Ref<Map<string, ChecklistResponse>> {
   const map = new Map<string, ChecklistResponse>()
   for (const [itemId, value] of Object.entries(entries)) {
     map.set(itemId, {

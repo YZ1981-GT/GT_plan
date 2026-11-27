@@ -17,7 +17,7 @@ import { computed, type Ref } from 'vue'
 // ─── helpers ────────────────────────────────────────────────
 
 /** 安全数值解析：null/undefined/NaN/空→0 */
-export function parseNum(val: string | number | null | undefined): number {
+export function parseNum(val: unknown): number {
   if (val === null || val === undefined || val === '') return 0
   const n = typeof val === 'number' ? val : Number(val)
   return Number.isFinite(n) ? n : 0

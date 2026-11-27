@@ -2,6 +2,7 @@
  * useStaleStatus 重算年度（spec post-push-residual-defect-closure 6.5.3）：
  * 显式年度 > 项目 store；都没有 ⇒ 提示后不发（原先兜底去年 ⇒ 重算了别的年度）。
  */
+import type { Ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { defineComponent, h, ref } from 'vue'
@@ -18,7 +19,7 @@ import { useStaleStatus } from '../useStaleStatus'
 import { useProjectStore } from '@/stores/project'
 import { MISSING_AUDIT_YEAR_MESSAGE } from '@/composables/useProjectAuditYear'
 
-function setup(year?: ReturnType<typeof ref<number | null>>) {
+function setup(year?: Ref<number | null>) {
   let api!: ReturnType<typeof useStaleStatus>
   mount(defineComponent({ setup() { api = useStaleStatus(ref('p1'), year as any); return () => h('div') } }))
   return api

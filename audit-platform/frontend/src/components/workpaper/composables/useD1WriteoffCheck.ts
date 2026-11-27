@@ -94,7 +94,7 @@ export const YN_OPTIONS = ['是', '否'] as const
  * 用于从 allResponses remark 字符串或 input 控件值安全解析为数字。
  * 非有限数（Infinity / NaN）均降级为 0。
  */
-export function parseNum(val: string | number | null | undefined): number {
+export function parseNum(val: unknown): number {
   if (val == null || val === '') return 0
   const n = typeof val === 'number' ? val : Number(val)
   return Number.isFinite(n) ? n : 0

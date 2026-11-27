@@ -11,6 +11,7 @@
  *
  * 科目：2502 应付债券（贷方/负债类！）
  */
+import type { Ref } from 'vue'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref, nextTick } from 'vue'
 import {
@@ -182,7 +183,7 @@ describe('集成测试 — 后续计量2分支末期趋面值', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('集成测试 — L4→L2/L8 EventBus 联动', () => {
-  let allResponses: ReturnType<typeof ref<Map<string, ChecklistResponse>>>
+  let allResponses: Ref<Map<string, ChecklistResponse>>
 
   beforeEach(() => {
     allResponses = ref(new Map<string, ChecklistResponse>())
@@ -281,7 +282,7 @@ describe('集成测试 — L4→L2/L8 EventBus 联动', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('集成测试 — 账面核对差异计算', () => {
-  let allResponses: ReturnType<typeof ref<Map<string, ChecklistResponse>>>
+  let allResponses: Ref<Map<string, ChecklistResponse>>
 
   beforeEach(() => {
     allResponses = ref(new Map<string, ChecklistResponse>())

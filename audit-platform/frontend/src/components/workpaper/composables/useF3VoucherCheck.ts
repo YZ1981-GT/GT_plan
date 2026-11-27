@@ -9,6 +9,7 @@
  * 抽凭回填 / 挂凭导入 / 撤销 / 年审阶段预审行只读走共享回填函数 `useVoucherCheckFill`：一个对方科目一行
  * （后端配对），按分录指纹去重，行元数据 `_gt` 随行 JSON 落库（spec voucher-identity-writeback-and-audit-phase 任务 11）。
  */
+import type { Ref } from 'vue'
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
 import { registerPendingFlusher } from '@/components/workpaper/sync/pendingWrites'
 import { calcSubtotal, parseNum } from './useF3FormulaEngine'
@@ -290,7 +291,7 @@ export function useF3VoucherCheck(options: UseF3BaseOptions) {
   const readonly = isReadonly ?? ref(false)
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-  const stored: Record<F3VoucherSection, ReturnType<typeof ref<F3VoucherCheckRow[]>>> = {
+  const stored: Record<F3VoucherSection, Ref<F3VoucherCheckRow[]>> = {
     debit: ref<F3VoucherCheckRow[]>([]),
     credit: ref<F3VoucherCheckRow[]>([]),
     subsequent: ref<F3VoucherCheckRow[]>([]),

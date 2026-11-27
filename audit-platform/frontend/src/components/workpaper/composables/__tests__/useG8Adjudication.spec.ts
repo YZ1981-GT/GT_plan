@@ -1,6 +1,7 @@
 /**
  * useG8Adjudication — 勾稽 / 从明细带入 / 回写
  */
+import type { Ref } from 'vue'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, computed, nextTick } from 'vue'
 import type { ChecklistResponse } from '../useF1FormData'
@@ -25,7 +26,7 @@ function makeMap(entries: Record<string, Partial<ChecklistResponse>> = {}) {
 
 describe('useG8Adjudication', () => {
   let saves: Array<{ id: string; data: Partial<ChecklistResponse> }>
-  let allResponses: ReturnType<typeof ref<Map<string, ChecklistResponse>>>
+  let allResponses: Ref<Map<string, ChecklistResponse>>
 
   beforeEach(() => {
     saves = []

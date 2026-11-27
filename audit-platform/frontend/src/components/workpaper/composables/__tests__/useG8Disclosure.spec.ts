@@ -1,6 +1,7 @@
 /**
  * useG8Disclosure — 附注 AI section + 与 G8-1 勾稽（模板分表结构）
  */
+import type { Ref } from 'vue'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, computed, nextTick } from 'vue'
 import type { ChecklistResponse } from '../useF1FormData'
@@ -32,7 +33,7 @@ function makeMap(entries: Record<string, Partial<ChecklistResponse>> = {}) {
 }
 
 describe('useG8Disclosure', () => {
-  let allResponses: ReturnType<typeof ref<Map<string, ChecklistResponse>>>
+  let allResponses: Ref<Map<string, ChecklistResponse>>
   let saves: Array<{ id: string; data: Partial<ChecklistResponse> }>
 
   beforeEach(() => {

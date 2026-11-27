@@ -1,6 +1,7 @@
 /**
  * useI3Detail — 单元测试（原值/减值双表滚动）
  */
+import type { Ref } from 'vue'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
 import {
@@ -35,7 +36,7 @@ describe('calcRollEnding / calcAudited', () => {
 })
 
 describe('useI3Detail', () => {
-  let wpId: ReturnType<typeof ref<string>>
+  let wpId: Ref<string>
   let allResponses: ReturnType<typeof createAllResponses>
   let onSave: ReturnType<typeof vi.fn>
 

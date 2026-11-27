@@ -51,7 +51,7 @@ export const SAMPLE_BALANCE_TOLERANCE = 1e-6
  *
  * 样本单元可能为空或含无效值，统一转为数字 0 以确保勾稽求和不出 NaN。
  */
-export function parseNum(val: string | number | null | undefined): number {
+export function parseNum(val: unknown): number {
   if (val === null || val === undefined || (val as unknown) === '') return 0
   const n = typeof val === 'number' ? val : Number(val)
   if (!isFinite(n)) return 0

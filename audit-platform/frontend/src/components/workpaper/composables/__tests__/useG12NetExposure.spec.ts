@@ -1,3 +1,4 @@
+import type { Ref } from 'vue'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
 import { useG12NetExposure } from '../useG12NetExposure'
@@ -25,7 +26,7 @@ describe('g12NetExposureCalc', () => {
 })
 
 describe('useG12NetExposure', () => {
-  let allResponses: ReturnType<typeof ref<Map<string, ChecklistResponse>>>
+  let allResponses: Ref<Map<string, ChecklistResponse>>
   let saved: Array<{ id: string; data: Partial<ChecklistResponse> }>
   let ne: ReturnType<typeof useG12NetExposure>
 

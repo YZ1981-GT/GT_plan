@@ -13,6 +13,7 @@
  *
  * 科目：1811 递延所得税资产（**借方/资产类！期末=期初+借方-贷方**）
  */
+import type { Ref } from 'vue'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref, effectScope } from 'vue'
 import { useN1CrossSheet } from '../composables/useN1CrossSheet'
@@ -61,7 +62,7 @@ vi.mock('element-plus', () => ({
 
 function createResponses(
   entries: [string, string | null, string | null][],
-): ReturnType<typeof ref<Map<string, ChecklistResponse>>> {
+): Ref<Map<string, ChecklistResponse>> {
   const map = new Map<string, ChecklistResponse>()
   for (const [itemId, conclusion, remark] of entries) {
     map.set(itemId, { item_id: itemId, conclusion, remark })

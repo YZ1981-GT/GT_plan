@@ -13,6 +13,7 @@
  *
  * Mock: http调用（无后端依赖），eventBus验证
  */
+import type { Ref } from 'vue'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, nextTick } from 'vue'
 
@@ -141,7 +142,7 @@ describe('useK11FormData — 损益取数(发生额)', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('useK11Adjudication — 审定回写(发生额)', () => {
-  let allResponses: ReturnType<typeof ref<Map<string, any>>>
+  let allResponses: Ref<Map<string, any>>
   let saveSpy: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
@@ -322,7 +323,7 @@ describe('useK11Adjudication — adjustmentReconcile（K11-3→K11-1 联动）',
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('useK11Detail — 商誉不可转回', () => {
-  let allResponses: ReturnType<typeof ref<Map<string, any>>>
+  let allResponses: Ref<Map<string, any>>
   let saveSpy: ReturnType<typeof vi.fn>
 
   beforeEach(() => {

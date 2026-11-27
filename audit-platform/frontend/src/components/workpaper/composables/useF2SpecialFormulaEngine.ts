@@ -3,7 +3,7 @@
  */
 import { calcEndBalance, calcSubtotal } from './useF2InvMaiFormulaEngine'
 
-export function parseNum(val: string | number | null | undefined): number {
+export function parseNum(val: unknown): number {
   if (val === null || val === undefined || val === '') return 0
   const n = typeof val === 'number' ? val : Number(val)
   return Number.isFinite(n) ? n : 0
