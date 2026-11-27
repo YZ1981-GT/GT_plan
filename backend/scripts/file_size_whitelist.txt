@@ -2042,3 +2042,6 @@ backend/app/routers/confirmations.py 894
 # G7TabEquityMethodCalc.vue —— 2026-11-27 入册：HEAD 已 2478 行且未登记，改一行类型标注即被拒。
 #   拆分方向：净资产调整 / 逐行计算 / 汇总三个区块各抽子组件，update*/recalc* 计算函数抽 composable。
 audit-platform/frontend/src/components/workpaper/g7-long-term-equity-method/calculation/G7TabEquityMethodCalc.vue 2478
+# g7DisclosureCrossSheet.ts —— 2026-11-27 入册：HEAD 已 3011 行且未登记，补一个漏传的实参即被拒。
+#   拆分方向：按取数来源（G7-1~G7-7 各 sheet 解析器）与组装（bundle 构建）拆成两个模块。
+audit-platform/frontend/src/components/workpaper/composables/g7DisclosureCrossSheet.ts 3011

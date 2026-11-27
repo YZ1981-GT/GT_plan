@@ -4,16 +4,16 @@
     <el-alert type="info" :closable="false" class="audit-objective">
       <template #title>审计目标</template>
       <ol class="ao-list">
-        <li><strong>完整性</strong>：出口退税是否完整确认(免抵退税额逐月测算全覆盖)</li>
-        <li><strong>准确性</strong>：免抵退计算是否正确(征退税率差额产生进项转出联动N2-6)</li>
+        <li><strong>完整性</strong>：出口货物免抵退税申报汇总表 22 栏是否完整取数</li>
+        <li><strong>准确性</strong>：免抵退税额、当期应退税额、免抵税额计算是否正确（征退税率差额产生的不予免征和抵扣税额联动 N2-6 进项转出）</li>
       </ol>
     </el-alert>
 
     <!-- ═══ Section Header ═══ -->
     <div class="section-header">
       <div class="section-title">
-        <span>出口退税核对表 N2-7</span>
-        <el-tag type="info" size="small">12月×10列 · 4公式</el-tag>
+        <span>免抵退税申报汇总表 N2-7</span>
+        <el-tag type="info" size="small">22 栏 · 12 栏公式</el-tag>
         <GtIndexChip value="wp:N2-6" />
         <GtIndexChip value="wp:N2-1" />
       </div>
@@ -40,26 +40,24 @@
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>出口退税核对公式(源模板红字)：</strong>
-        ⑤免抵退税额 = ②出口销售额(FOB) × ④退税率；
-        ⑥不得免征和抵扣税额 = ②出口销售额 × (③征税率 - ④退税率) ← <em>这是进项转出的来源，联动N2-6!</em>
-        ⑧免抵税额 = ⑤免抵退税额 - ⑦应退税额(自动计算)；
-        ⑩差异 = ⑦应退税额 - ⑨已退税额。
-        征税率是出口货物的增值税税率(13%/9%/6%)，退税率≤征税率。两者差异产生不得免征和抵扣税额。
+        <strong>免抵退税公式（源模板）：</strong>
+        ⑬免抵退税额 = ②免抵退出口销售额 × 退税率；
+        ⑥不予免征和抵扣税额 = ①出口销售额 × (征税率 − 退税率) − ⑤ ← <em>进项转出的来源，联动 N2-6！</em>
+        ㉑当期应退税额 = min(⑯当期免抵退税额, ⑳可退留抵税额)；㉒当期免抵税额 = ⑯ − ㉑。
+        征税率是出口货物的增值税税率（13%/9%/6%），退税率 ≤ 征税率。
       </div>
     </div>
 
-    <!-- ═══ 配置提示栏：默认征税率/退税率快捷设置 ═══ -->
+    <!-- ═══ 参数区：征税率 / 退税率 / 免税原材料 ═══ -->
     <div class="calc-toolbar">
       <div class="toolbar-section">
-        <span class="toolbar-label">全年统一征税率：</span>
+        <span class="toolbar-label">征税率：</span>
         <el-select
-          v-model="batchVatRate"
+          :model-value="exportRefund.params.value.taxRateParam"
           size="small"
-          placeholder="选择"
           style="width: 90px"
           :disabled="isReadonly"
-          @change="applyBatchVatRate"
+          @change="(v: number) => handleParamChange('taxRateParam', v)"
         >
           <el-option :value="0.13" label="13%" />
           <el-option :value="0.09" label="9%" />
@@ -67,14 +65,13 @@
         </el-select>
       </div>
       <div class="toolbar-section">
-        <span class="toolbar-label">全年统一退税率：</span>
+        <span class="toolbar-label">退税率：</span>
         <el-select
-          v-model="batchRefundRate"
+          :model-value="exportRefund.params.value.refundRateParam"
           size="small"
-          placeholder="选择"
           style="width: 90px"
           :disabled="isReadonly"
-          @change="applyBatchRefundRate"
+          @change="(v: number) => handleParamChange('refundRateParam', v)"
         >
           <el-option :value="0.13" label="13%" />
           <el-option :value="0.10" label="10%" />
@@ -83,217 +80,75 @@
           <el-option :value="0.05" label="5%" />
         </el-select>
       </div>
+      <div class="toolbar-section">
+        <span class="toolbar-label">免税购进原材料成本：</span>
+        <el-input-number
+          :model-value="exportRefund.params.value.exemptMaterialCost"
+          :precision="2"
+          :controls="false"
+          size="small"
+          style="width: 160px"
+          :disabled="isReadonly"
+          @change="(v: number | undefined) => handleParamChange('exemptMaterialCost', v ?? 0)"
+        />
+      </div>
+      <el-tag v-if="refundRateAboveTaxRate" type="danger" size="small">退税率高于征税率，请核对</el-tag>
     </div>
 
-    <!-- ═══ Monthly Data Table (12 rows + annual total) ═══ -->
+    <!-- ═══ 22 栏台账 ═══ -->
     <el-table
-      :data="tableData"
+      :data="exportRefund.ledgerRows.value"
       border
       size="small"
       style="width: 100%"
       :row-class-name="getRowClassName"
       class="export-refund-table"
     >
-      <!-- ① 月份 -->
-      <el-table-column prop="label" label="月份" width="60" align="center" fixed="left">
+      <el-table-column prop="line" label="栏次" width="60" align="center" />
+      <el-table-column prop="label" label="项目" min-width="320" />
+      <el-table-column label="金额" width="170" align="right">
         <template #default="{ row }">
-          <strong v-if="row.isTotal">合计</strong>
-          <span v-else>{{ row.label }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- ② 出口销售额(FOB) -->
-      <el-table-column label="出口销售额(FOB)" width="140" align="right">
-        <template #default="{ row }">
-          <template v-if="row.isTotal">
-            <span class="total-cell">{{ fmtAmount(row.exportSalesFob) }}</span>
-          </template>
-          <template v-else>
-            <el-input-number
-              :model-value="row.exportSalesFob"
-              :disabled="isReadonly"
-              :controls="false"
-              :precision="2"
-              size="small"
-              style="width: 120px"
-              @change="(val: number | undefined) => handleCellChange(row.month, 'exportSalesFob', val ?? 0)"
-            />
-          </template>
-        </template>
-      </el-table-column>
-
-      <!-- ③ 征税率 -->
-      <el-table-column label="征税率" width="90" align="center">
-        <template #header>
-          <el-tooltip content="出口货物适用增值税税率: 13%/9%/6%" placement="top">
-            <span class="formula-col-header">征税率③</span>
+          <el-tooltip v-if="row.auto" :content="`公式：${row.formula}`" placement="top">
+            <span class="auto-calc-cell">{{ fmtAmount(row.amount) }}</span>
           </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <template v-if="row.isTotal">—</template>
-          <template v-else>
-            <el-select
-              :model-value="row.vatRate"
-              size="small"
-              :disabled="isReadonly"
-              style="width: 70px"
-              @change="(val: number) => handleCellChange(row.month, 'vatRate', val)"
-            >
-              <el-option :value="0.13" label="13%" />
-              <el-option :value="0.09" label="9%" />
-              <el-option :value="0.06" label="6%" />
-            </el-select>
-          </template>
+          <el-input-number
+            v-else-if="!isReadonly"
+            :model-value="row.amount"
+            :precision="2"
+            :controls="false"
+            size="small"
+            style="width: 100%"
+            @change="(v: number | undefined) => handleAmountChange(row.line, v ?? 0)"
+          />
+          <span v-else>{{ fmtAmount(row.amount) }}</span>
         </template>
       </el-table-column>
-
-      <!-- ④ 退税率 -->
-      <el-table-column label="退税率" width="90" align="center">
-        <template #header>
-          <el-tooltip content="出口退税率，≤征税率" placement="top">
-            <span class="formula-col-header">退税率④</span>
-          </el-tooltip>
-        </template>
+      <el-table-column label="备注 / 文号" min-width="160">
         <template #default="{ row }">
-          <template v-if="row.isTotal">—</template>
-          <template v-else>
-            <el-select
-              :model-value="row.refundRate"
-              size="small"
-              :disabled="isReadonly"
-              style="width: 70px"
-              @change="(val: number) => handleCellChange(row.month, 'refundRate', val)"
-            >
-              <el-option :value="0.13" label="13%" />
-              <el-option :value="0.10" label="10%" />
-              <el-option :value="0.09" label="9%" />
-              <el-option :value="0.06" label="6%" />
-              <el-option :value="0.05" label="5%" />
-            </el-select>
-          </template>
-        </template>
-      </el-table-column>
-
-      <!-- ⑤ 免抵退税额 (auto) -->
-      <el-table-column label="免抵退税额⑤" width="130" align="right">
-        <template #header>
-          <el-tooltip content="公式: ② × ④ (出口销售额 × 退税率)" placement="top">
-            <span class="formula-col-header">免抵退税额⑤</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <span class="auto-calc-cell">{{ fmtAmount(row.exemptCreditRefundAmt) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- ⑥ 不得免征和抵扣税额 (auto) -->
-      <el-table-column label="不得免征抵扣⑥" width="140" align="right">
-        <template #header>
-          <el-tooltip content="公式: ② × (③ - ④) → 进项转出来源!" placement="top">
-            <span class="formula-col-header">不得免征抵扣⑥</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <span class="auto-calc-cell">{{ fmtAmount(row.nonDeductible) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- ⑦ 应退税额(批复) -->
-      <el-table-column label="应退税额⑦" width="130" align="right">
-        <template #header>
-          <el-tooltip content="税务机关批复通知书金额(手工录入)" placement="top">
-            <span>应退税额⑦</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <template v-if="row.isTotal">
-            <span class="total-cell">{{ fmtAmount(row.refundApproved) }}</span>
-          </template>
-          <template v-else>
-            <el-input-number
-              :model-value="row.refundApproved"
-              :disabled="isReadonly"
-              :controls="false"
-              :precision="2"
-              size="small"
-              style="width: 110px"
-              @change="(val: number | undefined) => handleCellChange(row.month, 'refundApproved', val ?? 0)"
-            />
-          </template>
-        </template>
-      </el-table-column>
-
-      <!-- ⑧ 免抵税额 (auto) -->
-      <el-table-column label="免抵税额⑧" width="120" align="right">
-        <template #header>
-          <el-tooltip content="公式: ⑤ - ⑦ (免抵退税额 - 应退税额)" placement="top">
-            <span class="formula-col-header">免抵税额⑧</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <span class="auto-calc-cell">{{ fmtAmount(row.exemptCreditAmt) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- ⑨ 已退税额 -->
-      <el-table-column label="已退税额⑨" width="130" align="right">
-        <template #default="{ row }">
-          <template v-if="row.isTotal">
-            <span class="total-cell">{{ fmtAmount(row.actualRefunded) }}</span>
-          </template>
-          <template v-else>
-            <el-input-number
-              :model-value="row.actualRefunded"
-              :disabled="isReadonly"
-              :controls="false"
-              :precision="2"
-              size="small"
-              style="width: 110px"
-              @change="(val: number | undefined) => handleCellChange(row.month, 'actualRefunded', val ?? 0)"
-            />
-          </template>
-        </template>
-      </el-table-column>
-
-      <!-- ⑩ 差异 (auto) -->
-      <el-table-column label="差异⑩" width="110" align="right">
-        <template #header>
-          <el-tooltip content="公式: ⑦ - ⑨ (应退税额 - 已退税额)" placement="top">
-            <span class="formula-col-header">差异⑩</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <span
-            class="auto-calc-cell"
-            :class="{ 'diff-highlight': row.hasDiff }"
-          >
-            {{ fmtAmount(row.difference) }}
-          </span>
-        </template>
-      </el-table-column>
-
-      <!-- ⑪ 批复文号/备注 -->
-      <el-table-column label="批复文号/备注" min-width="150">
-        <template #default="{ row }">
-          <template v-if="row.isTotal">—</template>
-          <template v-else>
-            <el-input
-              :model-value="row.approvalRef"
-              size="small"
-              :disabled="isReadonly"
-              placeholder="批复文号"
-              @change="(val: string) => handleCellChange(row.month, 'approvalRef', val)"
-            />
-          </template>
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.remark"
+            size="small"
+            @change="(v: string) => handleRemarkChange(row.line, v)"
+          />
+          <span v-else>{{ row.remark || '—' }}</span>
         </template>
       </el-table-column>
     </el-table>
 
-    <!-- ═══ 联动卡片 ═══ -->
+    <!-- ═══ 核心结论 + 联动 ═══ -->
     <el-card shadow="never" class="linkage-card">
       <div class="linkage-content">
         <div class="linkage-value">
-          <span class="linkage-label">不得免征和抵扣税额合计</span>
+          <span class="linkage-label">㉑当期应退税额</span>
+          <span class="linkage-amount">{{ fmtAmount(exportRefund.totalRefundDue.value) }}</span>
+          <span class="linkage-label">㉒当期免抵税额</span>
+          <span class="linkage-amount">{{ fmtAmount(exportRefund.currentExemptCredit.value) }}</span>
+        </div>
+      </div>
+      <div class="linkage-content linkage-row">
+        <div class="linkage-value">
+          <span class="linkage-label">⑥不予免征和抵扣税额（→N2-6 进项转出）</span>
           <span class="linkage-amount">{{ fmtAmount(exportRefund.totalNonDeductible.value) }}</span>
         </div>
         <el-button
@@ -304,10 +159,6 @@
         >
           同步至N2-6(进项转出)
         </el-button>
-      </div>
-      <div v-if="exportRefund.diffMonths.value.length > 0" class="linkage-warning">
-        <el-icon><WarningFilled /></el-icon>
-        <span>{{ exportRefund.diffMonths.value.map(m => m + '月').join('、') }}存在差异，需取得管理层解释</span>
       </div>
     </el-card>
 
@@ -335,11 +186,10 @@
     <details class="n2-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>免抵退税额 = 出口销售额(FOB) × 退税率（自动计算）</li>
-        <li>不得免征和抵扣税额 = 出口销售额 × (征税率 - 退税率) → 联动N2-6进项转出</li>
-        <li>免抵税额 = 免抵退税额 - 应退税额（自动计算，非手工录入）</li>
-        <li>差异 = 应退税额(批复) - 已退税额(实际到账)</li>
-        <li>应退税额来自税务机关退税批复通知书(手工录入)，与免抵退测算结果交叉验证</li>
+        <li>⑬免抵退税额 = ②免抵退出口货物销售额 × 退税率（自动计算）</li>
+        <li>⑥不予免征和抵扣税额 = ①出口销售额 × (征税率 − 退税率) − ⑤ → 联动N2-6进项转出</li>
+        <li>㉑当期应退税额 = min(⑯当期免抵退税额, ⑳可退留抵税额)；㉒免抵税额 = ⑯ − ㉑（自动计算）</li>
+        <li>录入栏取自企业《免抵退税申报汇总表》与增值税纳税申报表，与税务机关退税批复交叉核对</li>
         <li>征税率是出口货物的增值税税率(13%/9%/6%)，退税率≤征税率</li>
         <li>差异≠0需取得合理解释：申报时间差/汇率/退税率调整/审批延迟</li>
         <li>核对结果联动N2-6增值税测算(不得免征和抵扣税额 = 进项转出)</li>
@@ -350,18 +200,20 @@
 
 <script setup lang="ts">
 /**
- * N2TabExportRefund — N2-7 出口退税核对表 (REWRITE)
+ * N2TabExportRefund — N2-7 免抵退税申报汇总表（22 栏）
  *
- * 对齐源xlsx模板：12个月行 + 年度合计，10列含4公式列
- * 核心联动：不得免征和抵扣税额合计 → N2-6进项转出
+ * 🔴 composable 早在 5ae6cd97d 改成 22 栏台账（REFUND_TEMPLATE），本页仍按旧「12 个月 × 10 列」读
+ *    monthlyRows / annualSummary / diffMonths 等已删除的字段 ⇒ 渲染即报错、台账也从未 loadLedger。
+ *    本页改按 22 栏台账渲染：参数区（征税率 / 退税率 / 免税原材料）+ 录入栏 + 公式栏只读。
+ * 核心联动：⑥不予免征和抵扣税额 → N2-6 进项转出
  */
 import { ref, computed, inject, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick, ChatDotSquare, WarningFilled } from '@element-plus/icons-vue'
+import { MagicStick, ChatDotSquare } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useN2FormData } from '../../composables/useN2FormData'
-import { useN2ExportRefund } from '../../composables/useN2ExportRefund'
-import type { MonthlyExportRow } from '../../composables/useN2ExportRefund'
+import { LINE_EXEMPT_CREDIT, LINE_REFUND_DUE, useN2ExportRefund } from '../../composables/useN2ExportRefund'
+import type { RefundLedgerRow, RefundParams } from '../../composables/useN2ExportRefund'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -397,80 +249,46 @@ const exportRefund = useN2ExportRefund({
 
 const isReadonly = computed(() => props.isReadonly ?? false)
 const auditNote = ref('')
-const batchVatRate = ref<number | undefined>(undefined)
-const batchRefundRate = ref<number | undefined>(undefined)
 
-// ─── Table data (12 monthly + 1 annual total row) ────────────────────────────
-
-interface TableRow extends MonthlyExportRow {
-  isTotal?: boolean
-}
-
-const tableData = computed<TableRow[]>(() => {
-  const rows: TableRow[] = exportRefund.monthlyRows.value.map(r => ({ ...r, isTotal: false }))
-  const s = exportRefund.annualSummary.value
-  rows.push({
-    month: 0,
-    label: '合计',
-    exportSalesFob: s.exportSalesFob,
-    vatRate: 0,
-    refundRate: 0,
-    exemptCreditRefundAmt: s.exemptCreditRefundAmt,
-    nonDeductible: s.nonDeductible,
-    refundApproved: s.refundApproved,
-    exemptCreditAmt: s.exemptCreditAmt,
-    actualRefunded: s.actualRefunded,
-    difference: s.difference,
-    approvalRef: '',
-    hasDiff: !s.allMatch,
-    isTotal: true,
-  })
-  return rows
-})
+/** 退税率不应高于征税率（源模板口径）；高于时只提示，不拦截 */
+const refundRateAboveTaxRate = computed(
+  () => exportRefund.params.value.refundRateParam > exportRefund.params.value.taxRateParam,
+)
 
 // ─── Format ──────────────────────────────────────────────────────────────────
 
 function fmtAmount(val: number): string {
-  if (val === 0) return '—'
+  if (!val) return '—'
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-function getRowClassName({ row }: { row: TableRow }) {
+function getRowClassName({ row }: { row: RefundLedgerRow }) {
   if (!row) return ''
-  if (row.isTotal) return 'row--annual-total'
-  if (row.hasDiff) return 'row--diff'
-  return ''
+  if (row.line === LINE_REFUND_DUE || row.line === LINE_EXEMPT_CREDIT) return 'row--annual-total'
+  return row.auto ? 'row--auto' : ''
 }
 
-async function handleCellChange(month: number, field: string, value: any) {
-  await exportRefund.setMonthlyData(
-    month,
-    field as any,
-    value,
-  )
+async function handleParamChange(key: keyof RefundParams, value: number) {
+  await exportRefund.setParam(key, value)
   scheduleAutoSnapshot?.()
 }
 
-async function applyBatchVatRate(val: number) {
-  if (!val) return
-  await exportRefund.setBatchVatRate(val)
-  ElMessage.success(`已设置全年征税率 ${(val * 100).toFixed(0)}%`)
+async function handleAmountChange(line: number, value: number) {
+  await exportRefund.setRowAmount(line, value)
   scheduleAutoSnapshot?.()
 }
 
-async function applyBatchRefundRate(val: number) {
-  if (!val) return
-  await exportRefund.setBatchRefundRate(val)
-  ElMessage.success(`已设置全年退税率 ${(val * 100).toFixed(0)}%`)
+async function handleRemarkChange(line: number, value: string) {
+  await exportRefund.setRowRemark(line, value)
   scheduleAutoSnapshot?.()
 }
 
 async function handleSyncToN26() {
   await exportRefund.syncToN26()
   scheduleAutoSnapshot?.()
-  ElMessage.success('已同步不得免征和抵扣税额至N2-6(进项转出)')
+  ElMessage.success('已同步不予免征和抵扣税额至N2-6(进项转出)')
 }
 
 function handleNoteChange() {
@@ -481,12 +299,12 @@ function handleAiAssist() {
   import('@/utils/http').then(({ default: h }) => {
     h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       section: 'n2-export-refund',
-      prompt: '请基于出口退税核对表数据，分析免抵退税额与批复差异原因，给出审计说明',
+      prompt: '请基于免抵退税申报汇总表数据，分析免抵退税额、当期应退税额与免抵税额，给出审计说明',
       context: {
-        totalExportSales: String(exportRefund.annualSummary.value.exportSalesFob),
+        exportSalesFob: String(exportRefund.ledgerRows.value.find((r) => r.line === 1)?.amount ?? 0),
+        totalRefundDue: String(exportRefund.totalRefundDue.value),
+        currentExemptCredit: String(exportRefund.currentExemptCredit.value),
         totalNonDeductible: String(exportRefund.totalNonDeductible.value),
-        totalDifference: String(exportRefund.annualSummary.value.difference),
-        diffMonths: exportRefund.diffMonths.value.join(','),
       },
     }).then((res: any) => {
       if (res?.data?.content) {
@@ -524,6 +342,7 @@ function restoreData(): void {
 
 onMounted(async () => {
   await formData.loadData()
+  exportRefund.loadLedger()
   restoreData()
 })
 </script>
@@ -656,6 +475,12 @@ onMounted(async () => {
   font-size: 18px;
   font-weight: 700;
   color: #409eff;
+}
+.linkage-row {
+  margin-top: 10px;
+}
+:deep(.row--auto) {
+  background: #fafafa;
 }
 .linkage-warning {
   margin-top: 10px;

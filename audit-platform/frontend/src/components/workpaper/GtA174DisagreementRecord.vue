@@ -297,7 +297,7 @@ async function aiGenerate(section: number) {
     }, { _silent: true } as any)
     const content = res?.content || ''
     if (!content) { ElMessage.info('AI 未生成有效内容'); return }
-    updateSection(section, 'content', content)
+    updateSection(section, content)
     ElMessage.success('AI 已生成')
   } catch { ElMessage.warning('AI 生成失败') }
   finally { aiLoading.value = null }

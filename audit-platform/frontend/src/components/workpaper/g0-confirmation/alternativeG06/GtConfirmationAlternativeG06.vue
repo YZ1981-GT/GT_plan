@@ -973,7 +973,7 @@ function markDirty() {
  * 只有真在界面上改一次才发现）。九个替代程序组件里只有 D0-5 接了，其余属平台级遗留。
  */
 function handleMasterUpdateField(companyId: string, field: string, value: unknown) {
-  data.updateCompany(companyId, { [field]: value } as Partial<AlternativeCompany>)
+  data.updateCompany(companyId, field, value)
 }
 
 // ─── 源模板两组点选项（源 B7 测试范围 / C15 本期发生额抽样标准）───────────────

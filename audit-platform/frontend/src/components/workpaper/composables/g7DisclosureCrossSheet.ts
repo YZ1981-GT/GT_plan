@@ -2924,7 +2924,7 @@ export async function loadG7DisclosureSources(options: {
   }
   if (!bundle.controlJudgmentNarrative) {
     const fromHtml = parseG77ControlJudgmentNarrative(
-      html.controlJudgment ?? html.control_judgment ?? html.g77 ?? null,
+      html.controlJudgment ?? html.control_judgment ?? html.g77 ?? null, null, // 旧版 html 无单独结论字段
     )
     if (fromHtml) {
       bundle.controlJudgmentNarrative = fromHtml

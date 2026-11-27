@@ -110,6 +110,15 @@ export interface BalanceSummary {
   receipt_check_ratio?: number | null
   /** 本期出库检查比例（自动：block4合计/sales_amount） */
   shipment_check_ratio?: number | null
+  /** 以下为 G0-6（交易性金融资产等投资类替代程序）使用：所属科目 / 投资产品 */
+  account_subject?: string
+  investment_product?: string
+  /** 本期增加 / 本期减少金额 */
+  increase_amount?: number
+  decrease_amount?: number
+  /** 本期投资收益 / 公允价值变动 */
+  investment_income?: number
+  fv_change?: number
 }
 
 // ─── 审计结论 ───────────────────────────────────────────────────────────────
