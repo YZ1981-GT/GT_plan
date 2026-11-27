@@ -522,6 +522,12 @@ def test_h5_import_data_requires_wp_edit(monkeypatch):
     wp = uuid.uuid4()
     files = {"file": ("h5.xlsx", buf.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
 
+    # 本用例只验「编辑权限」；内容冻结 / 编辑锁门禁另有用例，这里不连库
+    async def _no_lock_gate(db, user, request, wp_uuid):
+        return None
+
+    monkeypatch.setattr("app.routers._wp_gate.enforce_edit_lock_for_content_write", _no_lock_gate)
+
     client, calls = _h5_client(monkeypatch, edit=HTTPException(status_code=403, detail="无底稿编辑权限"))
     resp = client.post("/api/h5/import-data", data={"wp_id": str(wp), "sheet": "H5-2"}, files=files)
     assert resp.status_code == 403

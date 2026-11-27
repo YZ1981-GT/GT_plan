@@ -14,6 +14,8 @@ Reqs:    Sprint A.3 验收 — PRIOR 跨年动态行匹配（与 2-arg 兼容）
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -100,7 +102,8 @@ def test_2arg_still_works_with_3arg_data_present():
     """同 section_dict 既有 closing/opening 又有 label dict → 2-arg 仍取合计."""
     cross = _make_cross_with_dynamic()
     val = _resolve_single_cross_ref("PRIOR('八、3','期末')", cross)
-    assert val == 1234.56
+    # 附注执行器 Decimal 化（formula-grammar-resolver-unification R4）：按定点值比较，不与二进制浮点比
+    assert val == Decimal("1234.56")
 
 
 def test_2arg_label_named_closing_does_not_corrupt():
@@ -158,8 +161,9 @@ def test_index_dynamic_rows_handles_none_values():
         {"row_type": "dynamic_data", "label": "Y", "values": [10.0, None]},
     ]
     _index_prior_dynamic_rows(prior, keys=["S"], rows=rows)
-    assert prior["S"]["X"] == {"closing": 0.0, "opening": 50.0}
-    assert prior["S"]["Y"] == {"closing": 10.0, "opening": 0.0}
+    # 空值保持空（缺数不冒充 0，R4）；有值的那一边照常记
+    assert prior["S"]["X"] == {"closing": None, "opening": 50.0}
+    assert prior["S"]["Y"] == {"closing": 10.0, "opening": None}
 
 
 def test_index_dynamic_rows_skips_empty_label():

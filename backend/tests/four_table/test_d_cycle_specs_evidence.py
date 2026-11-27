@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import inspect
 import re
+from pathlib import Path
 
 import pytest
 
@@ -63,6 +64,9 @@ from app.services.four_table.d_cycle_specs import (
     D_PL_CYCLES,
     D_PL_POSITIVE_SIDE,
 )
+
+#: 后端 app 目录（与工作目录无关；原写 os.path.join("backend", "app") 只在仓库根跑才对）
+_APP_ROOT = str(Path(__file__).resolve().parents[2] / "app")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 冻结证据：D 类 row_code → report_config 行名
@@ -158,7 +162,7 @@ class TestConsumedSpecsRowCodes:
 
     def test_evidence_agrees_with_platform_table(self):
         """与平台证据表的 D 类条目逐字比对（防两处各自漂移成双真源）。"""
-        from backend.tests.four_table import test_cycle_specs_row_code_evidence as plat  # noqa: E501
+        from tests.four_table import test_cycle_specs_row_code_evidence as plat  # 与工作目录无关
 
         table = getattr(plat, "_ROW_CODE_EVIDENCE", None)
         assert isinstance(table, dict) and len(table) >= 50, (
@@ -180,7 +184,7 @@ class TestConsumedSpecsRowCodes:
         平台 `_all_specs()` 只导入 `D_CYCLE_SPECS`。哪天它把 `D_ACCOUNT_SPECS`
         也纳入了，本断言打红 —— 那时应删掉本文件的 row_code 组，避免双真源。
         """
-        from backend.tests.four_table import test_cycle_specs_row_code_evidence as plat  # noqa: E501
+        from tests.four_table import test_cycle_specs_row_code_evidence as plat  # 与工作目录无关
 
         src = _src(plat)
         assert "D_ACCOUNT_SPECS" not in src, (
@@ -291,7 +295,7 @@ class TestSpecNotWiredAndScopeRegistered:
         """
         import os
 
-        root = os.path.join("backend", "app")
+        root = _APP_ROOT
         hits: list[str] = []
         for dirpath, _dirs, files in os.walk(root):
             for fn in files:
@@ -320,7 +324,7 @@ class TestSpecNotWiredAndScopeRegistered:
 
         n = sum(
             1
-            for dp, _d, fs in os.walk(os.path.join("backend", "app"))
+            for dp, _d, fs in os.walk(_APP_ROOT)
             for f in fs
             if f.endswith(".py")
         )

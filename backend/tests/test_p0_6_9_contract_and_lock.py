@@ -265,9 +265,8 @@ class TestPermissionMatrix:
         from app.services.event_handlers_cycle_linkage import _publisher_can_publish
 
         session = AsyncMock()
-        result = asyncio.get_event_loop().run_until_complete(
-            _publisher_can_publish(session, None)
-        )
+        # 3.12 起同步用例里没有当前事件循环，get_event_loop() 会抛 RuntimeError（与测试顺序有关）
+        result = asyncio.run(_publisher_can_publish(session, None))
         assert result is False
 
 

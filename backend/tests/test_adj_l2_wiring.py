@@ -125,12 +125,24 @@ def test_evaluate_formula_accepts_adj_data():
 
 
 def test_evaluate_formula_forwards_adj_data_to_context():
+    """行为判据：传入的 adj_data 真的进入求值。
+
+    原先比对源码文本 ``adj_data=adj_data or {}``；evaluate_formula 改为委托 evaluate_formula_result 后
+    写法变了、语义未变 ⇒ 改按求值结果判。"""
+    import asyncio
+    from decimal import Decimal
+    from types import SimpleNamespace
+
     from app.services.report_engine import evaluate_formula
 
-    src = inspect.getsource(evaluate_formula)
-    assert "adj_data=adj_data or {}" in src, (
-        "evaluate_formula 未把 adj_data 传给 FormulaContext"
-    )
+    resolver = SimpleNamespace(project_id=None)
+    adj = {"1001": {"aje_net": Decimal("5")}}
+    value = asyncio.run(evaluate_formula("ADJ('1001','aje_net')", resolver=resolver, adj_data=adj))
+    assert value == Decimal("5"), "evaluate_formula 未把 adj_data 传给 FormulaContext"
+    # 键名原样使用、不做转换：换一个键就取不到
+    other = asyncio.run(evaluate_formula("ADJ('1001','aje_net')", resolver=resolver,
+                                         adj_data={"1001": {"aje": Decimal("5")}}))
+    assert other != Decimal("5")
 
 
 def test_report_parser_caches_adj_data():
@@ -169,14 +181,28 @@ def test_report_parser_queries_real_account_codes():
     _assert_caliber(src, "report_engine._get_adj_data")
 
 
-def test_report_parser_only_loads_adj_when_formula_uses_it():
-    """公式不含 ADJ 时不应触发调整额取数（绝大多数报表公式不用）。"""
+def test_report_parser_only_loads_adj_when_formula_uses_it(monkeypatch):
+    """公式不含 ADJ 时不应触发调整额取数（绝大多数报表公式不用）。
+
+    现实现比原「公式文本含 ``ADJ(``」更严：只在求值真正访问到 ADJ 节点时才取（IF 未选中分支里的 ADJ 也不取）。
+    原判据比对 execute 源码文本，按行为改写。"""
+    import asyncio
+    import uuid
+    from decimal import Decimal
+    from unittest.mock import AsyncMock
+
     from app.services.report_engine import ReportFormulaParser
 
-    src = inspect.getsource(ReportFormulaParser.execute)
-    assert '"ADJ(" in formula' in src, (
-        "execute 未做 ADJ 存在性预判 ⇒ 每条公式都会触发一次调整额取数"
-    )
+    parser = ReportFormulaParser(None, uuid.uuid4(), 2025)
+    load = AsyncMock(return_value={"1001": {"aje_net": Decimal("3")}})
+    monkeypatch.setattr(parser, "_get_adj_data", load)
+
+    assert asyncio.run(parser.execute("1+2", {})) == Decimal("3")
+    assert asyncio.run(parser.execute("IF(1,7,ADJ('1001','aje_net'))", {})) == Decimal("7")
+    load.assert_not_awaited()  # 不含 ADJ / ADJ 在未选中分支 ⇒ 不取数
+
+    assert asyncio.run(parser.execute("ADJ('1001','aje_net')", {})) == Decimal("3")
+    assert load.await_count == 1
 
 
 # ─── L2 #3：adjudication_writeback ──────────────────────────────────────────

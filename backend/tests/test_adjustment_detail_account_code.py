@@ -96,7 +96,9 @@ def test_p7_recalc_does_not_read_detail_account_code():
     """P7：recalc 调整聚合按 adjustments 头表 account_code，且全文不引用 detail_account_code。"""
     src = _read("app/services/trial_balance_service.py")
     assert "detail_account_code" not in src, "recalc 不应引用 detail_account_code（零影响红线）"
-    assert "group_by(adj.c.account_code" in src, "调整聚合应按 adjustments.account_code（一级）"
+    # ADR-ADJ-001 起调整聚合按明细行的一级标准码 adjustment_entries.standard_account_code（不再取头表
+    # adjustments.account_code）；P7 的要点不变 —— 按一级码聚合、不读 detail_account_code
+    assert "group_by(ae.c.standard_account_code" in src, "调整聚合应按一级标准科目码"
 
 
 def test_p5_validate_only_standard_code():
@@ -118,7 +120,8 @@ def test_p2_import_keeps_level1_normalization_and_persists_detail():
 def test_create_update_persist_detail_code():
     """create_entry / update_entry 均持久化 detail_account_code。"""
     src = _read("app/services/adjustment_service.py")
-    assert src.count("detail_account_code=li.detail_account_code") == 2
+    # create / update 两处（循环变量名为 line）
+    assert src.count("detail_account_code=line.detail_account_code") == 2
 
 
 def test_orm_has_detail_account_code_nullable():

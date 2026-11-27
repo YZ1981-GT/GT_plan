@@ -158,26 +158,28 @@ class TestHsP6Bp6SeedIdentityFix:
 class TestHsP8Bp7DisclosureColumnKeyFix:
     """修后全 H 背离 H7 动态列范式 == 0 处。"""
 
-    def test_h8_disclosure_columns_use_stable_key_not_label(self) -> None:
-        """🔴 列定义的 `key` 必须取自 `c.key`（稳定槽键），**不是** `c.label`（可变中文）。"""
+    def test_h8_disclosure_columns_key_aligned_to_template_headers(self) -> None:
+        """列定义的 `key` 取类别名（`c.label`），与模板 seed 的 `headers` 同键。
+
+        BP-7 初版改成 `c.key`（稳定槽键）后，附注侧按表头认列时整列取不到值，
+        现行契约（`h8NoteSubtableContract.spec.ts` / `test_note_h8_right_of_use_structure`）
+        钉的是「payload 列键 == seed 表头」，因此列键与行数据键都取 `c.label`，
+        取值仍按内部英文 key 读 state。
+        """
         text = (_CO / "h8DisclosureSyncPayload.ts").read_text(encoding="utf-8", errors="replace")
-        # cats.map 的映射函数体内：应取 c.key（列数据键），c.label 只用于展示
         cats_map_body = re.search(r"cats\.map\(\(c\)\s*=>\s*\(\{(.*?)\}\)", text, re.S)
         assert cats_map_body, "buildH8ListedColumns 的 cats.map 映射体消失了"
         body = cats_map_body.group(1)
-        assert "key: c.key" in body, f"列 key 应取 c.key，实得：{body}"
-        assert "key: c.label" not in body, "列 key 不得取 c.label"
+        assert "key: c.label" in body, f"列 key 应与模板表头同键（c.label），实得：{body}"
 
-    def test_h8_subtable_rows_use_stable_key_not_label(self) -> None:
-        """🔴 行数据的列键也必须是 `c.key`（与列定义**必须同时改**）。"""
+    def test_h8_subtable_rows_key_matches_column_key(self) -> None:
+        """行数据的列键必须与列定义同一个键（`c.label`），取值按内部 key 读 state。"""
         text = (_CO / "h8DisclosureSyncPayload.ts").read_text(encoding="utf-8", errors="replace")
-        # 文件里 buildH8ListedSubTableData 出现多次（函数声明 + export）——
-        # 取第三段（函数体之后）才能找到 `for (const c of cats)` 循环
         parts = text.split("buildH8ListedSubTableData")
         assert len(parts) >= 3, f"buildH8ListedSubTableData 出现 {len(parts)-1} 次"
-        fn_body = parts[2]  # 函数体在第三段
-        assert "row[c.key]" in fn_body, "行数据列键应为 c.key"
-        assert "row[c.label]" not in fn_body, "行数据列键不得为 c.label"
+        fn_body = parts[2]
+        assert "row[c.label] = h8ListedCellValue(state.movement, def, c.key)" in fn_body, \
+            "行键应为 c.label、取值应按 c.key 读 state"
 
     def test_total_column_uses_reserved_key_not_chinese_literal(self) -> None:
         """🔴 合计列的 key 不能用中文 `'合计'` —— 用户可能自定义同名类别导致撞键。"""
@@ -194,9 +196,9 @@ class TestHsP8Bp7DisclosureColumnKeyFix:
         # label 是独立字段
         assert "label:" in text
 
-    def test_no_other_h_cycle_site_violates_sk1_after_fix(self) -> None:
-        """🔴 修完后全 H 背离 H7 范式的地方从 1 处 → **0 处**。"""
+    def test_label_keyed_columns_stay_in_sync_between_header_and_rows(self) -> None:
+        """列定义与行数据用同一把键：两处 `c.label` 要么都在、要么都不在（避免只改一边）。"""
         text = (_CO / "h8DisclosureSyncPayload.ts").read_text(encoding="utf-8", errors="replace")
-        # 列定义里不应再有 `key: c.label`
-        violations = re.findall(r"key:\s*c\.label", text)
-        assert violations == [], violations
+        col_keys = re.findall(r"key:\s*c\.label", text)
+        row_keys = re.findall(r"row\[c\.label\]", text)
+        assert len(col_keys) == 1 and len(row_keys) == 1, (col_keys, row_keys)

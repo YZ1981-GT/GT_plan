@@ -110,6 +110,7 @@ class TestEventBusDebounce:
                 EventPayload(
                     event_type=EventType.ADJUSTMENT_CREATED,
                     project_id=project_id,
+                    year=2025,
                     account_codes=[f"100{i}"],
                 )
             )
@@ -158,12 +159,14 @@ class TestEventBusDebounce:
             EventPayload(
                 event_type=EventType.ADJUSTMENT_CREATED,
                 project_id=uuid.uuid4(),
+                year=2025,
             )
         )
         await bus.publish(
             EventPayload(
                 event_type=EventType.ADJUSTMENT_CREATED,
                 project_id=uuid.uuid4(),
+                year=2025,
             )
         )
 
@@ -431,8 +434,8 @@ class TestReportEngineCache:
         db = AsyncMock()
         engine = ReportEngine(db, redis=None)
         pid = uuid.uuid4()
-        key = engine._cache_key(pid, "balance_sheet")
-        assert key == f"report:{pid}:balance_sheet"
+        key = engine._cache_key(pid, 2025, "balance_sheet")
+        assert key == f"report:{pid}:2025:balance_sheet"
 
     @pytest.mark.asyncio
     async def test_cache_set_and_get(self):
@@ -449,10 +452,10 @@ class TestReportEngineCache:
 
         # Set cache
         data = [{"row_code": "BS-001", "row_name": "货币资金", "current_period_amount": "100"}]
-        await engine._set_cached_report(pid, "balance_sheet", data)
+        await engine._set_cached_report(pid, 2025, "balance_sheet", data)
         redis.setex.assert_called_once()
         call_args = redis.setex.call_args
-        assert call_args[0][0] == f"report:{pid}:balance_sheet"
+        assert call_args[0][0] == f"report:{pid}:2025:balance_sheet"
         assert call_args[0][1] == 600  # TTL = 10 min
 
     @pytest.mark.asyncio
@@ -462,19 +465,17 @@ class TestReportEngineCache:
 
         db = AsyncMock()
         redis = AsyncMock()
-        redis.delete = AsyncMock(return_value=1)
+        redis.scan = AsyncMock(return_value=(0, [b"k1", b"k2"]))
+        redis.delete = AsyncMock(return_value=2)
 
         engine = ReportEngine(db, redis=redis)
         pid = uuid.uuid4()
 
-        # Invalidate single type
+        # 失效按 report:{pid}:* 通配 SCAN 后批量 DELETE（含所有年度）
         count = await engine._invalidate_report_cache(pid, "balance_sheet")
-        assert count == 1
-
-        # Invalidate all types
-        redis.delete = AsyncMock(return_value=1)
-        count = await engine._invalidate_report_cache(pid)
-        assert count == 4  # 4 report types
+        assert count == 2
+        assert redis.scan.call_args.kwargs["match"] == f"report:{pid}:*"
+        redis.delete.assert_awaited_once_with(b"k1", b"k2")
 
     @pytest.mark.asyncio
     async def test_cache_miss_returns_none(self):
@@ -486,7 +487,7 @@ class TestReportEngineCache:
         redis.get = AsyncMock(return_value=None)
 
         engine = ReportEngine(db, redis=redis)
-        result = await engine._get_cached_report(uuid.uuid4(), "balance_sheet")
+        result = await engine._get_cached_report(uuid.uuid4(), 2025, "balance_sheet")
         assert result is None
 
     @pytest.mark.asyncio
@@ -499,10 +500,10 @@ class TestReportEngineCache:
         pid = uuid.uuid4()
 
         # All cache operations should be no-ops
-        result = await engine._get_cached_report(pid, "balance_sheet")
+        result = await engine._get_cached_report(pid, 2025, "balance_sheet")
         assert result is None
 
-        await engine._set_cached_report(pid, "balance_sheet", [])
+        await engine._set_cached_report(pid, 2025, "balance_sheet", [])
         count = await engine._invalidate_report_cache(pid)
         assert count == 0
 

@@ -547,7 +547,7 @@ def _bulk_app():
     """
     from fastapi import FastAPI, HTTPException
     from app.core.database import get_db
-    from app.deps import get_current_user
+    from app.deps import get_current_user, get_current_user_stream
     from app.middleware.error_handler import http_exception_handler
     from app.models.base import UserRole
     from app.models.core import ProjectStatus
@@ -571,6 +571,8 @@ def _bulk_app():
 
     app.dependency_overrides[get_db] = _db
     app.dependency_overrides[get_current_user] = lambda: user
+    # 导出端点走流式门禁 require_project_access_stream，内层鉴权依赖是 get_current_user_stream
+    app.dependency_overrides[get_current_user_stream] = lambda: user
     return app
 
 

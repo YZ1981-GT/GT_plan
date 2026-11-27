@@ -261,11 +261,10 @@ def test_exec_mixed_tb_wp():
     assert val == 90.0  # 50 + 40
 
 
-def test_exec_unknown_account_returns_zero():
-    """不存在的科目 → audited 默认 0（不崩溃）"""
+def test_exec_unknown_account_returns_none():
+    """不存在的科目（含下级）→ 取不到，返回 None（不崩溃、不冒充 0；R4 缺数留空）"""
     val = _exec_cross_table("TB('9999','期末')", _sample_cross_data())
-    # _resolve_single_cross_ref 对存在的 column 但不存在的 account 返回 0（audited=0）
-    assert val == 0.0
+    assert val is None
 
 
 def test_exec_unknown_wp_returns_none():

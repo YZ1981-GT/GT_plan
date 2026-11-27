@@ -57,7 +57,7 @@ from typing import Any, Callable
 import pytest
 
 #: AC 1.4 通知真源的**单一解析器**（真源可为字面量数组或 manifest 现算，见该模块 docstring）。
-from tests.workpaper_sync.entry_sync_notice_source import registered_entry_ids
+from tests.workpaper_sync.entry_sync_notice_source import SYNC_MANIFEST_TS, generated_manifest_entries
 #: 迁移进度的**现算**口径（已迁移 entry 集 / BP-8 删除账本 / 交付台账 / 行号再定位）。
 from tests.workpaper_sync.h_migration_progress import (
     H_BP8_DELETED_LEGACY_MODULES,
@@ -716,6 +716,7 @@ class TestAdjudicationLegality:
           · BP-9 的那条「mirror ≠ slice 目标态」登记原样保留。
         """
         by_id = {e["entry_id"]: e for e in full_manifest["entries"]}
+        pending_ids: list[str] = []
         for entry in manifest_slice["independent_entries"]:
             src = by_id[entry["entry_id"]]
             mirror = entry["manifest_mirror"]
@@ -731,18 +732,32 @@ class TestAdjudicationLegality:
             assert mirror["legacy_reasons"], (
                 f"{entry['entry_id']}: 规划期快照的 legacy_reasons 为空 ⇒ 快照被改动了"
             )
-            # ── live 侧（已迁移）──────────────────────────────────────────
-            assert src["capability"] == "bidirectional", (
-                f"{entry['entry_id']}: live manifest capability={src['capability']!r} "
-                "⇒ 正向门被关回去了（overlay override 掉了？）"
-            )
-            assert src["html_store"] != "unresolved", (
-                f"{entry['entry_id']}: live manifest html_store 仍是 unresolved"
-            )
-            assert src["evidence"]["legacy_reasons"] == [], (
-                f"{entry['entry_id']}: live manifest 仍带 legacy_reasons="
-                f"{src['evidence']['legacy_reasons']!r} ⇒ evidence_patch 没生效"
-            )
+            # ── live 侧：按 live 的 migration_state 分两路 ─────────────────
+            #   已注册 adapter ⇒ 必须是 bidirectional 且 html_store 已裁决、legacy_reasons 已清空；
+            #   仍 pending（H2/H3/H4/H9，adjudication_state=pending）⇒ 必须**诚实地**不宣称 bidirectional。
+            if src["migration_state"] == "adapter_registered":
+                assert src["capability"] == "bidirectional", (
+                    f"{entry['entry_id']}: live manifest capability={src['capability']!r} "
+                    "⇒ 正向门被关回去了（overlay override 掉了？）"
+                )
+                assert src["html_store"] != "unresolved", (
+                    f"{entry['entry_id']}: live manifest html_store 仍是 unresolved"
+                )
+                # 规划期三条（模板只读打开 / 无耐久 forcesave 回执 / 缺 adapter）必须已清；
+                # 「真实 OnlyOffice 验收待做」是双判据终裁（eaa655686）后诚实新增的待办，允许存在
+                leftover = set(src["evidence"]["legacy_reasons"]) - {"real_onlyoffice_acceptance_pending"}
+                assert not leftover, (
+                    f"{entry['entry_id']}: live manifest 仍带规划期 legacy_reasons="
+                    f"{sorted(leftover)!r} ⇒ evidence_patch 没生效"
+                )
+            else:
+                assert src["capability"] != "bidirectional", (
+                    f"{entry['entry_id']}: 未注册 adapter（migration_state={src['migration_state']!r}）"
+                    "却宣称 bidirectional ⇒ 假双向"
+                )
+                assert src["adapter_id"] is None
+                assert src["adjudication_state"] == "pending"
+                pending_ids.append(entry["entry_id"])
             # ── BP-9 登记（原样）──────────────────────────────────────────
             assert mirror["capability"] != entry["capability"], (
                 f"{entry['entry_id']}: mirror 与 slice 的 capability 相等 ⇒ BP-9 的前提消失"
@@ -750,6 +765,14 @@ class TestAdjudicationLegality:
             assert "BP-9" in str(mirror["divergence_from_slice"]), (
                 f"{entry['entry_id']}: 不一致未指向 BP-9"
             )
+        # 仍 pending 的集合显式钉住：新增 / 减少都要有人看到（接入一条就从这里删一条）
+        assert sorted(pending_ids) == [
+            "xlsx/gt-h2-construction-in-progress",
+            "xlsx/gt-h3-investment-property",
+            "xlsx/gt-h4-engineering-materials",
+            "xlsx/gt-h9-lease-liabilities",
+        ], pending_ids
+        assert len(pending_ids) < len(manifest_slice["independent_entries"]), "已注册集合为空 ⇒ 无真实分母"
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -768,17 +791,29 @@ class TestHtmlCounterpartIsSourceBacked:
                 assert _resolve_repo(ref).exists(), f"{entry['entry_id']}: source_ref 不存在 {ref}"
 
     def test_html_store_endpoints_exist_in_the_router(self, manifest_slice: dict) -> None:
+        """冻结的 `path#Lnn` 命中路由装饰器就按原判据；行号位移则按「第 i 个引用 ↔ 第 i 个装饰器」再定位。
+
+        slice 是 append-only 审计轨迹，不回填；路由文件前面加了行（严格 CAS / 会话隔离）只造成整体位移，
+        不是端点丢失。再定位要求：装饰器个数不少于引用个数，且各引用的位移量一致
+        （位移不一致 = 中间被插删了路由 ⇒ 站点不再是同一批端点，照旧打红）。
+        """
         router = CHECKLIST_ROUTER.read_text(encoding="utf-8")
         lines = router.splitlines()
+        decorators = [no for no, line in enumerate(lines, 1) if line.startswith("@router.")]
         for entry in manifest_slice["independent_entries"]:
             source = entry["html_counterpart"]["endpoint_source"]
-            for ref in re.findall(r"#L(\d+)", source):
-                idx = int(ref) - 1
-                assert 0 <= idx < len(lines), f"{entry['entry_id']}: 端点行号越界 {source}"
-                assert "@router." in lines[idx], (
-                    f"{entry['entry_id']}: endpoint_source 指向的 L{ref} 不是路由装饰器"
-                    f"（实际 {lines[idx].strip()!r}）"
-                )
+            refs = [int(r) for r in re.findall(r"#L(\d+)", source)]
+            hits = [0 < ref <= len(lines) and "@router." in lines[ref - 1] for ref in refs]
+            if all(hits):
+                continue
+            assert len(decorators) >= len(refs), (
+                f"{entry['entry_id']}: 路由装饰器只剩 {len(decorators)} 个，少于 slice 登记的 {len(refs)} 处端点"
+            )
+            shifts = {decorators[i] - ref for i, ref in enumerate(refs)}
+            assert len(shifts) == 1 and next(iter(shifts)) > 0, (
+                f"{entry['entry_id']}: endpoint_source {source} 在路由文件里的位移不一致 {sorted(shifts)} "
+                "⇒ 不是整体行号位移，是端点被增删了"
+            )
 
     def test_write_carrier_client_and_put_site_agree_with_the_source(
         self, manifest_slice: dict
@@ -920,7 +955,8 @@ class TestHtmlCounterpartIsSourceBacked:
                 sites = [
                     no
                     for no, ln in enumerate(lines, 1)
-                    if re.search(r"items\s*:\s*\[\s*\{[^}]*item_id", ln)
+                    # 载荷写法两种：字面量数组 `items: [{ item_id …`，或逐项映射 `item_id: item.item_id,`
+                    if re.search(r"items\s*:\s*\[\s*\{[^}]*item_id|^\s*item_id\s*:\s*item\.item_id\b", ln)
                 ]
                 assert sites, (
                     f"{entry['entry_id']}: 已接桥，但 {hc['payload_write_site'].split('#L')[0]} "
@@ -1097,9 +1133,11 @@ class TestHtmlCounterpartIsSourceBacked:
             extra = hc.get("extra_client_store")
             if extra:
                 assert extra["kind"] == "localStorage_draft_fallback"
-                assert "localStorage.setItem(draftKey(" in source, (
-                    f"{entry['entry_id']}: 声明 localStorage 草稿，源码里找不到写入点"
-                )
+                # 草稿键现按登录用户隔离（`checklistDraftKey` 在无用户时返回 null），
+                # 写入点是「先取键、非空才写」，不再是 `setItem(draftKey(` 一行式
+                assert re.search(r"function draftKey\(", source) and re.search(
+                    r"if \(key\) localStorage\.setItem\(key,", source
+                ), f"{entry['entry_id']}: 声明 localStorage 草稿，源码里找不到写入点"
                 assert "restoreDrafts" in source, (
                     f"{entry['entry_id']}: 声明草稿回灌，源码里找不到 restoreDrafts"
                 )
@@ -1940,15 +1978,20 @@ class TestAc14HonestModeVisibility:
     """
 
     def test_notice_module_is_the_single_source(self, manifest_slice: dict) -> None:
+        """文案真源：兼容入口只做再导出，文案声明点在 ``entrySyncPresentation.ts``。
+
+        现行设计（``eaa655686`` 之后）只消费后端 readiness，**不再**从静态
+        ``capability=bidirectional`` 推断 adapter 已注册 ⇒ 兼容入口里没有
+        ``SYNC_ADAPTER_REGISTERED_ENTRY_IDS``，且必须保持没有（回来就是把静态推断请回来）。
+        """
         source = NOTICE_MODULE.read_text(encoding="utf-8")
-        for name in (
-            "ENTRY_SYNC_NOTICE_LABEL",
-            "ENTRY_SYNC_NOTICE_SUMMARY",
-            "ENTRY_SYNC_NOTICE_REASON",
-            "SYNC_ADAPTER_REGISTERED_ENTRY_IDS",
-            "export function entrySyncNotice",
-        ):
-            assert name in source, f"通知真源缺 {name}"
+        presentation = (SYNC_DIR / "entrySyncPresentation.ts").read_text(encoding="utf-8")
+        for name in ("ENTRY_SYNC_NOTICE_LABEL", "ENTRY_SYNC_NOTICE_SUMMARY", "export function entrySyncNotice"):
+            assert name in source, f"通知兼容入口缺 {name}"
+        for name in ("export const ENTRY_SYNC_NOTICE_LABEL", "export const ENTRY_SYNC_NOTICE_SUMMARY",
+                     "noticeReason", "export function deriveEntrySyncPresentation"):
+            assert name in presentation, f"文案声明点缺 {name}"
+        assert "SYNC_ADAPTER_REGISTERED_ENTRY_IDS" not in source, "不得从静态 capability 推断 adapter 已注册"
         for entry in manifest_slice["independent_entries"]:
             for ref in entry["ui_gate_source_refs"]:
                 assert _resolve_repo(ref).exists(), f"{entry['entry_id']}: ui_gate_source_ref 不存在"
@@ -1959,15 +2002,15 @@ class TestAc14HonestModeVisibility:
     def test_notice_component_renders_summary_and_binds_entry_id(self) -> None:
         source = NOTICE_COMPONENT.read_text(encoding="utf-8")
         template = _vue_template(source)
-        assert "notice.summary" in template, (
+        assert "presentation.noticeSummary" in template, (
             "常显摘要不在模板里 —— 只放 el-tooltip 不算「显示可操作原因」（EP tooltip 是 "
             "teleport 且仅 hover 后进 DOM）"
         )
-        assert "notice.reason" in template
+        assert "presentation.noticeReason" in template, "原因必须内联渲染（展开按钮后），不能只放 tooltip"
         assert ":data-entry-sync-notice=\"props.entryId\"" in template, (
             "缺 data-entry-sync-notice 绑定 ⇒ DOM 级判据无锚点"
         )
-        assert "entrySyncNotice" in source
+        assert "useEntrySyncReadiness" in source, "通知必须由后端 readiness 驱动"
 
     def test_every_pending_entry_host_mounts_the_notice(self, manifest_slice: dict) -> None:
         for entry in manifest_slice["independent_entries"]:
@@ -1998,34 +2041,24 @@ class TestAc14HonestModeVisibility:
             assert f'entry-id="{entry["entry_id"]}"' in block
 
     def test_registered_entry_ids_agree_with_the_slice(self, manifest_slice: dict) -> None:
-        """双向锁：slice 的 adapter_id 与前端登记表必须互相印证。
+        """slice 快照仍冻结为 ``adapter_id=None``；前端生成 manifest 与 live manifest 的 capability 同口径。
 
-        🔴 2026-09-22 修检测器方向。原实现用 `=\\s*\\[` 假定真源是字面量数组，真源改成
-        `WORKPAPER_SYNC_MANIFEST.filter(...).map(...)` 现算之后正则恒 `None`，于是报
-        「找不到 SYNC_ADAPTER_REGISTERED_ENTRY_IDS 声明」—— 把「形态变了」误报成
-        「东西没了」。解析逻辑收敛到 `entry_sync_notice_source`（一份），仍 fail closed。
-
-        🔴 **2026-10-01 换对账对象**：`registered_entry_ids()` 是从**生成的** manifest
-        投影现算的（`WORKPAPER_SYNC_MANIFEST.filter(...)`），本轮九条 entry 翻门后它们
-        自然进了这个集合；而 slice 的 `adapter_id` 是规划期冻结快照、恒 None
-        ⇒ 拿它当对账另一侧，双向锁会变成「要求迁移不许发生」。
-        改为与 **live manifest** 的 `adapter_id` 对账（同一事实的两个投影：后端 JSON 与
-        前端 TS），slice 侧只保留「快照仍是 None」这条冻结断言。
+        通知是否显示改由后端 readiness 决定，前端不再有「已注册 adapter 集合」可对账；
+        剩下能互相印证的是同一事实的两个投影：后端 JSON 与前端 ``workpaperSyncManifest.generated.ts``。
         """
-        registered = set(registered_entry_ids())
-        assert registered, "已注册集合为空 ⇒ 「已注册 ⇒ 不挂通知」分支没有真实分母"
-        assert all("/" in rid for rid in registered), f"集合里有不像 entry_id 的项：{registered}"
+        generated = {
+            e["entryId"]: e for e in generated_manifest_entries(SYNC_MANIFEST_TS.read_text(encoding="utf-8"))
+        }
         live = {e["entry_id"]: e for e in _load(FULL_MANIFEST_PATH)["entries"]}
         for entry in manifest_slice["independent_entries"]:
             eid = entry["entry_id"]
             assert entry["adapter_id"] is None, (
                 f"{eid}: slice 的 adapter_id 被改动了 —— 它是规划期冻结快照"
             )
-            has_adapter = live[eid]["adapter_id"] is not None
-            assert (eid in registered) == has_adapter, (
-                f"{eid}: 前端已注册集合（{eid in registered}）与 live manifest 的 "
-                f"adapter_id（{live[eid]['adapter_id']!r}）双口径 ⇒ 两个投影脱钩，"
-                "多半是只重算了一侧"
+            assert eid in generated, f"{eid}: 前端生成 manifest 缺这个 entry"
+            assert generated[eid]["capability"] == live[eid]["capability"], (
+                f"{eid}: 前端生成 manifest 的 capability={generated[eid]['capability']!r} 与 live manifest "
+                f"{live[eid]['capability']!r} 脱钩 ⇒ 多半是只重算了一侧"
             )
 
     def test_hosts_do_not_claim_bidirectional_writeback(self, manifest_slice: dict) -> None:

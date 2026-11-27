@@ -146,12 +146,13 @@ class TestP1_4_ConsolPushOrchestration:
         import asyncio
         from app.services.consol_push_service import push_targets
 
+        pid = uuid.uuid4()
         db = AsyncMock()
         result = MagicMock()
-        result.scalar_one_or_none.return_value = None
+        # 递归 CTE 一条查询返回 [本项目 + 上层合并项目]；无父链时只有自身
+        result.scalars.return_value.all.return_value = [pid]
         db.execute = AsyncMock(return_value=result)
 
-        pid = uuid.uuid4()
         loop = asyncio.new_event_loop()
         try:
             targets = loop.run_until_complete(push_targets(db, pid))
