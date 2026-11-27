@@ -66,6 +66,22 @@ export interface M2DetailListedRow {
   beginAmount: number
   /** 期末金额 */
   endAmount: number
+  // ═══ 以下为 M2-2 上市版模板的增 / 减明细与 AJE/RJE 键（页面早已在用，接口漏声明） ═══
+  /** 本期增加明细：新发行 / 送股 / 公积金转增 / 其他 */
+  incNewIssue?: number
+  incBonus?: number
+  incReserveConvert?: number
+  incOther?: number
+  /** 期初 AJE / RJE、本期增减 AJE / RJE */
+  beginAje?: number
+  beginRje?: number
+  ajeIncrease?: number
+  ajeDecrease?: number
+  rjeIncrease?: number
+  rjeDecrease?: number
+  /** 函证核验（是否已核对 / 报告索引） */
+  isVerified?: boolean
+  verifyReportRef?: string
   /** 备注 */
   remark: string
 }

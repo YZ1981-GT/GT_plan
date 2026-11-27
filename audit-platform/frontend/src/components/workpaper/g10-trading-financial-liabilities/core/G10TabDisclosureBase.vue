@@ -136,8 +136,8 @@
         :row-class-name="rowClass"
         data-testid="g10-disclosure-movement-table"
       >
-        <el-table-column :label="dis.colLabels.value.movement.item" prop="label" min-width="220" fixed />
-        <el-table-column :label="dis.colLabels.value.movement.opening" width="120" align="right">
+        <el-table-column :label="dis.colLabels.value.movement!.item" prop="label" min-width="220" fixed />
+        <el-table-column :label="dis.colLabels.value.movement!.opening" width="120" align="right">
           <template #default="{ row }">
             <WpAmountInput
               v-if="!row.isTotal && !row.isParent && !isReadonly"
@@ -148,7 +148,7 @@
             <span v-else :class="{ 'formula-cell': row.isTotal || row.isParent }">{{ fmt(row.openingAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="dis.colLabels.value.movement.increase" width="120" align="right">
+        <el-table-column :label="dis.colLabels.value.movement!.increase" width="120" align="right">
           <template #default="{ row }">
             <WpAmountInput
               v-if="!row.isTotal && !row.isParent && !isReadonly"
@@ -159,7 +159,7 @@
             <span v-else :class="{ 'formula-cell': row.isTotal || row.isParent }">{{ fmt(row.increaseAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="dis.colLabels.value.movement.decrease" width="120" align="right">
+        <el-table-column :label="dis.colLabels.value.movement!.decrease" width="120" align="right">
           <template #default="{ row }">
             <WpAmountInput
               v-if="!row.isTotal && !row.isParent && !isReadonly"
@@ -170,7 +170,7 @@
             <span v-else :class="{ 'formula-cell': row.isTotal || row.isParent }">{{ fmt(row.decreaseAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="dis.colLabels.value.movement.closing" width="120" align="right">
+        <el-table-column :label="dis.colLabels.value.movement!.closing" width="120" align="right">
           <template #default="{ row }">
             <WpAmountInput
               v-if="!row.isTotal && !row.isParent && !isReadonly"
@@ -198,7 +198,7 @@
         style="font-size:13px;margin-top:8px"
         data-testid="g10-disclosure-designated-table"
       >
-        <el-table-column :label="dis.colLabels.value.designated.item" prop="label" min-width="160">
+        <el-table-column :label="dis.colLabels.value.designated!.item" prop="label" min-width="160">
           <template #default="{ row }">
             <el-input
               v-if="!isReadonly"
@@ -209,7 +209,7 @@
             <span v-else>{{ row.label }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="dis.colLabels.value.designated.opening" width="120" align="right">
+        <el-table-column :label="dis.colLabels.value.designated!.opening" width="120" align="right">
           <template #default="{ row }">
             <WpAmountInput
               v-if="!isReadonly"
@@ -220,7 +220,7 @@
             <span v-else>{{ fmt(row.openingAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="dis.colLabels.value.designated.closing" width="120" align="right">
+        <el-table-column :label="dis.colLabels.value.designated!.closing" width="120" align="right">
           <template #default="{ row }">
             <WpAmountInput
               v-if="!isReadonly"
@@ -231,7 +231,7 @@
             <span v-else>{{ fmt(row.closingAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="dis.colLabels.value.designated.reason" min-width="200">
+        <el-table-column :label="dis.colLabels.value.designated!.reason" min-width="200">
           <template #default="{ row }">
             <el-input
               v-if="!isReadonly"
