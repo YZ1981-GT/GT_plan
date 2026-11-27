@@ -79,28 +79,28 @@
       <el-table-column prop="taxBase" label="计税依据" min-width="120" align="right">
         <template #default="{ row }">
           <el-input-number v-if="!isReadonly && row.kind === 'manual'" :model-value="row.taxBase" :controls="false" :precision="2" size="small"
-            @change="(v: number) => handleManualUpdate(row, 'taxBase', v ?? 0)" />
+            @change="(v: number | undefined) => handleManualUpdate(row, 'taxBase', v ?? 0)" />
           <span v-else>{{ fmtAmount(row.taxBase) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="rate" label="税率" width="100" align="right">
         <template #default="{ row }">
           <el-input-number v-if="!isReadonly && row.kind === 'manual'" :model-value="row.rate * 100" :controls="false" :precision="2" size="small"
-            @change="(v: number) => handleManualUpdate(row, 'rate', (v ?? 0) / 100)" />
+            @change="(v: number | undefined) => handleManualUpdate(row, 'rate', (v ?? 0) / 100)" />
           <span v-else>{{ fmtPercent(row.rate) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="computed" label="测算额" min-width="120" align="right">
         <template #default="{ row }">
           <el-input-number v-if="!isReadonly && row.kind === 'manual'" :model-value="row.computed" :controls="false" :precision="2" size="small"
-            @change="(v: number) => handleManualUpdate(row, 'amountManual', v ?? 0)" />
+            @change="(v: number | undefined) => handleManualUpdate(row, 'amountManual', v ?? 0)" />
           <span v-else class="auto-calc-cell">{{ fmtAmount(row.computed) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="bookAccrued" label="账面计提数" min-width="120" align="right">
         <template #default="{ row }">
           <el-input-number v-if="!isReadonly" :model-value="row.bookAccrued" :controls="false" :precision="2" size="small"
-            @change="(v: number) => handleBookAccrual(row, v ?? 0)" />
+            @change="(v: number | undefined) => handleBookAccrual(row, v ?? 0)" />
           <span v-else>{{ fmtAmount(row.bookAccrued) }}</span>
         </template>
       </el-table-column>

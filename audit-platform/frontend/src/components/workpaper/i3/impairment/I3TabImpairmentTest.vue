@@ -151,7 +151,7 @@
                       :controls="false"
                       size="small"
                       class="amt-input"
-                      @change="handleUpdateOtherAsset($index, assetIdx - 1, 'bookValue', $event)"
+                      @change="handleUpdateOtherAsset($index, assetIdx - 1, 'bookValue', $event ?? null)"
                     />
                     <span v-else class="amt-cell">{{ fmtAmt(asset.bookValue) }}</span>
                   </template>
@@ -166,7 +166,7 @@
                       size="small"
                       class="amt-input"
                       placeholder="可选"
-                      @change="handleUpdateOtherAsset($index, assetIdx - 1, 'recoverableAmount', $event)"
+                      @change="handleUpdateOtherAsset($index, assetIdx - 1, 'recoverableAmount', $event ?? null)"
                     />
                     <span v-else class="amt-cell">{{ fmtAmt(asset.recoverableAmount) }}</span>
                   </template>
@@ -244,7 +244,7 @@
                 :controls="false"
                 size="small"
                 class="amt-input"
-                @change="handleUpdateAssetGroup($index, $event)"
+                @change="handleUpdateAssetGroup($index, $event ?? null)"
               />
               <span v-else class="amt-cell">{{ fmtAmt(row.assetGroupCarrying) }}</span>
             </template>
@@ -260,7 +260,7 @@
                 :controls="false"
                 size="small"
                 class="amt-input"
-                @change="handleUpdateGoodwillB1($index, $event)"
+                @change="handleUpdateGoodwillB1($index, $event ?? null)"
               />
               <span v-else class="amt-cell">{{ fmtAmt(row.goodwillB1) }}</span>
             </template>
@@ -276,7 +276,7 @@
                 :controls="false"
                 size="small"
                 class="amt-input"
-                @change="handleUpdateMinorityB2($index, $event)"
+                @change="handleUpdateMinorityB2($index, $event ?? null)"
               />
               <span v-else class="amt-cell">{{ fmtAmt(row.minorityB2) }}</span>
             </template>
@@ -302,7 +302,7 @@
                 size="small"
                 class="amt-input"
                 placeholder="可选"
-                @change="handleUpdateFv($index, $event)"
+                @change="handleUpdateFv($index, $event ?? null)"
               />
               <span v-else class="amt-cell">{{ fmtAmt(row.fairValueLessCost) }}</span>
             </template>
@@ -320,7 +320,7 @@
                   size="small"
                   class="amt-input"
                   placeholder="I3-7"
-                  @change="handleUpdateViu($index, $event)"
+                  @change="handleUpdateViu($index, $event ?? null)"
                 />
                 <span v-else class="amt-cell">{{ fmtAmt(row.valueInUse) }}</span>
                 <GtIndexChip value="I3-7" label="DCF" @click="navigateToSheet('I3-7')" />

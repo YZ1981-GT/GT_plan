@@ -116,7 +116,7 @@
               :precision="2"
               size="small"
               style="width: 120px"
-              @change="(val: number) => handleCellChange(row.month, 'exportSalesFob', val ?? 0)"
+              @change="(val: number | undefined) => handleCellChange(row.month, 'exportSalesFob', val ?? 0)"
             />
           </template>
         </template>
@@ -217,7 +217,7 @@
               :precision="2"
               size="small"
               style="width: 110px"
-              @change="(val: number) => handleCellChange(row.month, 'refundApproved', val ?? 0)"
+              @change="(val: number | undefined) => handleCellChange(row.month, 'refundApproved', val ?? 0)"
             />
           </template>
         </template>
@@ -249,7 +249,7 @@
               :precision="2"
               size="small"
               style="width: 110px"
-              @change="(val: number) => handleCellChange(row.month, 'actualRefunded', val ?? 0)"
+              @change="(val: number | undefined) => handleCellChange(row.month, 'actualRefunded', val ?? 0)"
             />
           </template>
         </template>

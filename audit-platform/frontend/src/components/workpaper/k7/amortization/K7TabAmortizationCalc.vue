@@ -83,7 +83,7 @@
             size="small"
             :precision="2"
             style="width:100px"
-            @change="(v:number) => calc.updateCell(row.rowId, 'grantTotal', v)"
+            @change="(v: number | undefined) => calc.updateCell(row.rowId, 'grantTotal', v)"
           />
           <span v-else class="amount-cell">{{ fmtNum(row.grantTotal) }}</span>
         </template>
@@ -126,7 +126,7 @@
             size="small"
             :min="0"
             style="width:72px"
-            @change="(v:number) => calc.updateCell(row.rowId, 'totalPeriods', v)"
+            @change="(v: number | undefined) => calc.updateCell(row.rowId, 'totalPeriods', v)"
           />
           <span v-else>{{ row.totalPeriods }}</span>
         </template>
@@ -141,7 +141,7 @@
             size="small"
             :min="0"
             style="width:65px"
-            @change="(v:number) => calc.updateCell(row.rowId, 'currentPeriods', v)"
+            @change="(v: number | undefined) => calc.updateCell(row.rowId, 'currentPeriods', v)"
           />
           <span v-else>{{ row.currentPeriods }}</span>
         </template>
@@ -170,7 +170,7 @@
             size="small"
             :precision="2"
             style="width:95px"
-            @change="(v:number) => calc.updateCell(row.rowId, 'accumulatedAmort', v)"
+            @change="(v: number | undefined) => calc.updateCell(row.rowId, 'accumulatedAmort', v)"
           />
           <span v-else class="amount-cell">{{ fmtNum(row.accumulatedAmort) }}</span>
         </template>
@@ -199,7 +199,7 @@
             size="small"
             :precision="2"
             style="width:95px"
-            @change="(v:number) => calc.updateCell(row.rowId, 'enterpriseAmort', v)"
+            @change="(v: number | undefined) => calc.updateCell(row.rowId, 'enterpriseAmort', v)"
           />
           <span v-else class="amount-cell">{{ fmtNum(row.enterpriseAmort) }}</span>
         </template>

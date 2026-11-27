@@ -130,17 +130,17 @@
       </el-table-column>
       <el-table-column label="期初" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.beginBalance" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v:number) => handleUpdate(row.rowId, 'beginBalance', v)" />
+          <el-input-number v-model="row.beginBalance" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v: number | undefined) => handleUpdate(row.rowId, 'beginBalance', v)" />
         </template>
       </el-table-column>
       <el-table-column label="计提" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.provision" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v:number) => handleUpdate(row.rowId, 'provision', v)" />
+          <el-input-number v-model="row.provision" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v: number | undefined) => handleUpdate(row.rowId, 'provision', v)" />
         </template>
       </el-table-column>
       <el-table-column label="转销" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.release" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v:number) => handleUpdate(row.rowId, 'release', v)" />
+          <el-input-number v-model="row.release" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v: number | undefined) => handleUpdate(row.rowId, 'release', v)" />
         </template>
       </el-table-column>
       <el-table-column label="期末" width="110" align="right">
@@ -222,7 +222,7 @@
       <el-table-column label="最佳估计数" width="120" align="right">
         <template #default="{ row }">
           <template v-if="row.measurementMethod === 'single'">
-            <el-input-number v-model="row.bestEstimate" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:100px" @change="(v:number) => handleUpdate(row.rowId, 'bestEstimate', v)" />
+            <el-input-number v-model="row.bestEstimate" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:100px" @change="(v: number | undefined) => handleUpdate(row.rowId, 'bestEstimate', v)" />
           </template>
           <template v-else>
             <el-tooltip :content="row.measurementMethod === 'range' ? '(上限+下限)/2' : 'Σ(金额×概率)'" placement="top">
@@ -233,13 +233,13 @@
       </el-table-column>
       <el-table-column label="区间上限" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="row.measurementMethod === 'range'" v-model="row.rangeUpper" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v:number) => handleUpdate(row.rowId, 'rangeUpper', v)" />
+          <el-input-number v-if="row.measurementMethod === 'range'" v-model="row.rangeUpper" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v: number | undefined) => handleUpdate(row.rowId, 'rangeUpper', v)" />
           <span v-else class="text-muted">—</span>
         </template>
       </el-table-column>
       <el-table-column label="区间下限" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="row.measurementMethod === 'range'" v-model="row.rangeLower" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v:number) => handleUpdate(row.rowId, 'rangeLower', v)" />
+          <el-input-number v-if="row.measurementMethod === 'range'" v-model="row.rangeLower" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v: number | undefined) => handleUpdate(row.rowId, 'rangeLower', v)" />
           <span v-else class="text-muted">—</span>
         </template>
       </el-table-column>
@@ -273,27 +273,27 @@
       </el-table-column>
       <el-table-column label="期初调整" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.openingAdjust" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v:number) => handleUpdate(row.rowId, 'openingAdjust', v)" />
+          <el-input-number v-model="row.openingAdjust" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v: number | undefined) => handleUpdate(row.rowId, 'openingAdjust', v)" />
         </template>
       </el-table-column>
       <el-table-column label="账项调整-增" width="105" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.ajeIncrease" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:88px" @change="(v:number) => handleUpdate(row.rowId, 'ajeIncrease', v)" />
+          <el-input-number v-model="row.ajeIncrease" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:88px" @change="(v: number | undefined) => handleUpdate(row.rowId, 'ajeIncrease', v)" />
         </template>
       </el-table-column>
       <el-table-column label="账项调整-减" width="105" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.ajeDecrease" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:88px" @change="(v:number) => handleUpdate(row.rowId, 'ajeDecrease', v)" />
+          <el-input-number v-model="row.ajeDecrease" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:88px" @change="(v: number | undefined) => handleUpdate(row.rowId, 'ajeDecrease', v)" />
         </template>
       </el-table-column>
       <el-table-column label="重分类-增" width="105" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.rjeIncrease" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:88px" @change="(v:number) => handleUpdate(row.rowId, 'rjeIncrease', v)" />
+          <el-input-number v-model="row.rjeIncrease" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:88px" @change="(v: number | undefined) => handleUpdate(row.rowId, 'rjeIncrease', v)" />
         </template>
       </el-table-column>
       <el-table-column label="重分类-减" width="105" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.rjeDecrease" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:88px" @change="(v:number) => handleUpdate(row.rowId, 'rjeDecrease', v)" />
+          <el-input-number v-model="row.rjeDecrease" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:88px" @change="(v: number | undefined) => handleUpdate(row.rowId, 'rjeDecrease', v)" />
         </template>
       </el-table-column>
       <el-table-column label="审定期初" width="105" align="right">

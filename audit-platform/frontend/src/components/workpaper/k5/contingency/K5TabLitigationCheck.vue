@@ -63,7 +63,7 @@
       </el-table-column>
       <el-table-column label="涉案金额" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.amount" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v:number) => save(row.rowId, 'amount', v)" />
+          <el-input-number v-model="row.amount" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v: number | undefined) => save(row.rowId, 'amount', v)" />
         </template>
       </el-table-column>
       <el-table-column label="我方角色" width="85">
@@ -105,12 +105,12 @@
       </el-table-column>
       <el-table-column label="应赔/预计损失" width="115" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.estimatedLoss" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v:number) => save(row.rowId, 'estimatedLoss', v)" />
+          <el-input-number v-model="row.estimatedLoss" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v: number | undefined) => save(row.rowId, 'estimatedLoss', v)" />
         </template>
       </el-table-column>
       <el-table-column label="已计提预计负债" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.bookProvision" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v:number) => save(row.rowId, 'bookProvision', v)" />
+          <el-input-number v-model="row.bookProvision" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v: number | undefined) => save(row.rowId, 'bookProvision', v)" />
         </template>
       </el-table-column>
       <el-table-column label="差异金额" width="105" align="right">

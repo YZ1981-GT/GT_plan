@@ -155,7 +155,7 @@ const props = withDefaults(defineProps<{
   isRowLocked?: (row: CutoffRow) => boolean
   /** 来源列「多科目」看整张凭证用；不传则不显示来源列 */
   projectId?: string
-  year?: number
+  year?: number | null
 }>(), {
   showExtended: false,
 })

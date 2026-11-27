@@ -256,12 +256,12 @@ async function handleUpdate(rowKey: string, field: string, value: any) {
   await reconcile.updateRow(rowKey, field as any, value)
 }
 
-async function handleSetN1(val: number) {
-  await reconcile.setN1AssetChange(val)
+async function handleSetN1(val: number | undefined) {
+  await reconcile.setN1AssetChange(val ?? 0)
 }
 
-async function handleSetN3(val: number) {
-  await reconcile.setN3LiabilityChange(val)
+async function handleSetN3(val: number | undefined) {
+  await reconcile.setN3LiabilityChange(val ?? 0)
 }
 
 async function handleAddRow() {

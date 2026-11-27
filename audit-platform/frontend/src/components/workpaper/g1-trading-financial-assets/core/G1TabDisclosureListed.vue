@@ -325,63 +325,63 @@
           <el-table-column label="期初" width="90" align="right">
             <template #default="{ row }">
               <el-input-number v-if="row.kind==='leaf'&&!isReadonly" :model-value="row.opening" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v:number)=>updateL3Field(row.rowKey,'opening',v??0)" />
+                @update:model-value="(v: number | undefined)=>updateL3Field(row.rowKey,'opening',v??0)" />
               <span v-else>{{ fmt(row.opening) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="转入" width="80" align="right">
             <template #default="{ row }">
               <el-input-number v-if="row.kind==='leaf'&&!isReadonly" :model-value="row.transferIn" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v:number)=>updateL3Field(row.rowKey,'transferIn',v??0)" />
+                @update:model-value="(v: number | undefined)=>updateL3Field(row.rowKey,'transferIn',v??0)" />
               <span v-else>{{ fmt(row.transferIn) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="转出" width="80" align="right">
             <template #default="{ row }">
               <el-input-number v-if="row.kind==='leaf'&&!isReadonly" :model-value="row.transferOut" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v:number)=>updateL3Field(row.rowKey,'transferOut',v??0)" />
+                @update:model-value="(v: number | undefined)=>updateL3Field(row.rowKey,'transferOut',v??0)" />
               <span v-else>{{ fmt(row.transferOut) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="计入损益" width="90" align="right">
             <template #default="{ row }">
               <el-input-number v-if="row.kind==='leaf'&&!isReadonly" :model-value="row.gainPl" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v:number)=>updateL3Field(row.rowKey,'gainPl',v??0)" />
+                @update:model-value="(v: number | undefined)=>updateL3Field(row.rowKey,'gainPl',v??0)" />
               <span v-else>{{ fmt(row.gainPl) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="计入OCI" width="90" align="right">
             <template #default="{ row }">
               <el-input-number v-if="row.kind==='leaf'&&!isReadonly" :model-value="row.gainOci" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v:number)=>updateL3Field(row.rowKey,'gainOci',v??0)" />
+                @update:model-value="(v: number | undefined)=>updateL3Field(row.rowKey,'gainOci',v??0)" />
               <span v-else>{{ fmt(row.gainOci) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="购买" width="80" align="right">
             <template #default="{ row }">
               <el-input-number v-if="row.kind==='leaf'&&!isReadonly" :model-value="row.purchase" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v:number)=>updateL3Field(row.rowKey,'purchase',v??0)" />
+                @update:model-value="(v: number | undefined)=>updateL3Field(row.rowKey,'purchase',v??0)" />
               <span v-else>{{ fmt(row.purchase) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="发行" width="80" align="right">
             <template #default="{ row }">
               <el-input-number v-if="row.kind==='leaf'&&!isReadonly" :model-value="row.issue" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v:number)=>updateL3Field(row.rowKey,'issue',v??0)" />
+                @update:model-value="(v: number | undefined)=>updateL3Field(row.rowKey,'issue',v??0)" />
               <span v-else>{{ fmt(row.issue) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="出售" width="80" align="right">
             <template #default="{ row }">
               <el-input-number v-if="row.kind==='leaf'&&!isReadonly" :model-value="row.sale" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v:number)=>updateL3Field(row.rowKey,'sale',v??0)" />
+                @update:model-value="(v: number | undefined)=>updateL3Field(row.rowKey,'sale',v??0)" />
               <span v-else>{{ fmt(row.sale) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="结算" width="80" align="right">
             <template #default="{ row }">
               <el-input-number v-if="row.kind==='leaf'&&!isReadonly" :model-value="row.settlement" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v:number)=>updateL3Field(row.rowKey,'settlement',v??0)" />
+                @update:model-value="(v: number | undefined)=>updateL3Field(row.rowKey,'settlement',v??0)" />
               <span v-else>{{ fmt(row.settlement) }}</span>
             </template>
           </el-table-column>
@@ -391,7 +391,7 @@
           <el-table-column label="仍持有未实现" width="110" align="right">
             <template #default="{ row }">
               <el-input-number v-if="row.kind==='leaf'&&!isReadonly" :model-value="row.unrealizedHeld" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v:number)=>updateL3Field(row.rowKey,'unrealizedHeld',v??0)" />
+                @update:model-value="(v: number | undefined)=>updateL3Field(row.rowKey,'unrealizedHeld',v??0)" />
               <span v-else>{{ fmt(row.unrealizedHeld) }}</span>
             </template>
           </el-table-column>
@@ -413,21 +413,21 @@
           <el-table-column label="L1" width="100" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.l1" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v:number)=>updateAmortField(row.rowKey,'l1',v??0)" />
+                @update:model-value="(v: number | undefined)=>updateAmortField(row.rowKey,'l1',v??0)" />
               <span v-else>{{ fmt(row.l1) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="L2" width="100" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.l2" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v:number)=>updateAmortField(row.rowKey,'l2',v??0)" />
+                @update:model-value="(v: number | undefined)=>updateAmortField(row.rowKey,'l2',v??0)" />
               <span v-else>{{ fmt(row.l2) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="L3" width="100" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.l3" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v:number)=>updateAmortField(row.rowKey,'l3',v??0)" />
+                @update:model-value="(v: number | undefined)=>updateAmortField(row.rowKey,'l3',v??0)" />
               <span v-else>{{ fmt(row.l3) }}</span>
             </template>
           </el-table-column>

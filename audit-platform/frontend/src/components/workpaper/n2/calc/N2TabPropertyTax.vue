@@ -107,7 +107,7 @@
             :precision="2"
             size="small"
             style="width: 120px"
-            @change="(val: number) => propertyTax.updateRow(row.id, 'originalValue', val ?? 0)"
+            @change="(val: number | undefined) => propertyTax.updateRow(row.id, 'originalValue', val ?? 0)"
           />
           <span v-else class="cell-na">—</span>
         </template>
@@ -127,7 +127,7 @@
             :precision="2"
             size="small"
             style="width: 110px"
-            @change="(val: number) => propertyTax.updateRow(row.id, 'deductibleOriginalValue', val ?? 0)"
+            @change="(val: number | undefined) => propertyTax.updateRow(row.id, 'deductibleOriginalValue', val ?? 0)"
           />
           <span v-else class="cell-na">—</span>
         </template>
@@ -147,7 +147,7 @@
             :precision="2"
             size="small"
             style="width: 120px"
-            @change="(val: number) => propertyTax.updateRow(row.id, 'rentIncome', val ?? 0)"
+            @change="(val: number | undefined) => propertyTax.updateRow(row.id, 'rentIncome', val ?? 0)"
           />
           <span v-else class="cell-na">—</span>
         </template>
@@ -188,7 +188,7 @@
             :precision="0"
             size="small"
             style="width: 72px"
-            @change="(val: number) => propertyTax.updateRow(row.id, 'months', val ?? 12)"
+            @change="(val: number | undefined) => propertyTax.updateRow(row.id, 'months', val ?? 12)"
           />
         </template>
       </el-table-column>

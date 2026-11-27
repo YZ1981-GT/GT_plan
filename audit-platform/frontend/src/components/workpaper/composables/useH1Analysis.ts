@@ -733,17 +733,17 @@ export function useH1Analysis(
     })
   }
 
-  function setTaxAccumDep(v: number | null): void {
+  function setTaxAccumDep(v: number | null | undefined): void {
     taxAccumDep.value = v == null || (v as unknown as string) === '' ? null : Number(v)
     _persistTaxDiff()
   }
 
-  function setTaxPeriodDep(v: number | null): void {
+  function setTaxPeriodDep(v: number | null | undefined): void {
     taxPeriodDep.value = v == null || (v as unknown as string) === '' ? null : Number(v)
     _persistTaxDiff()
   }
 
-  function setTaxRate(v: number | null): void {
+  function setTaxRate(v: number | null | undefined): void {
     taxRate.value = v == null || (v as unknown as string) === '' ? null : Number(v)
     _persistTaxDiff()
   }

@@ -83,56 +83,56 @@
         <div class="input-grid">
           <label>资产总额（本期）
             <el-input-number v-model="localInputs.totalAssetsCurrent" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('totalAssetsCurrent', $event)" />
+              :disabled="isReadonly" @change="onInput('totalAssetsCurrent', $event ?? null)" />
           </label>
           <label>资产总额（上期）
             <el-input-number v-model="localInputs.totalAssetsPrior" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('totalAssetsPrior', $event)" />
+              :disabled="isReadonly" @change="onInput('totalAssetsPrior', $event ?? null)" />
           </label>
           <label>在建工程期末（上期）
             <el-input-number v-model="localInputs.cipEndPrior" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('cipEndPrior', $event)" />
+              :disabled="isReadonly" @change="onInput('cipEndPrior', $event ?? null)" />
           </label>
           <label>减值准备（本期）
             <el-input-number v-model="localInputs.impairmentCurrent" :controls="false" size="small"
               :placeholder="aggImpairmentHint" :disabled="isReadonly"
-              @change="onInput('impairmentCurrent', $event)" />
+              @change="onInput('impairmentCurrent', $event ?? null)" />
           </label>
           <label>减值准备（上期）
             <el-input-number v-model="localInputs.impairmentPrior" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('impairmentPrior', $event)" />
+              :disabled="isReadonly" @change="onInput('impairmentPrior', $event ?? null)" />
           </label>
           <label>在建原值（本期，可选）
             <el-input-number v-model="localInputs.cipGrossCurrent" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('cipGrossCurrent', $event)" />
+              :disabled="isReadonly" @change="onInput('cipGrossCurrent', $event ?? null)" />
           </label>
           <label>在建原值（上期，可选）
             <el-input-number v-model="localInputs.cipGrossPrior" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('cipGrossPrior', $event)" />
+              :disabled="isReadonly" @change="onInput('cipGrossPrior', $event ?? null)" />
           </label>
           <label>利息资本化率%（本期）
             <el-input-number v-model="localInputs.interestCapRateCurrent" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('interestCapRateCurrent', $event)" />
+              :disabled="isReadonly" @change="onInput('interestCapRateCurrent', $event ?? null)" />
           </label>
           <label>利息资本化率%（上期）
             <el-input-number v-model="localInputs.interestCapRatePrior" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('interestCapRatePrior', $event)" />
+              :disabled="isReadonly" @change="onInput('interestCapRatePrior', $event ?? null)" />
           </label>
           <label>实际产出（本期）
             <el-input-number v-model="localInputs.capacityOutputCurrent" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('capacityOutputCurrent', $event)" />
+              :disabled="isReadonly" @change="onInput('capacityOutputCurrent', $event ?? null)" />
           </label>
           <label>设计产能（本期）
             <el-input-number v-model="localInputs.designCapacityCurrent" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('designCapacityCurrent', $event)" />
+              :disabled="isReadonly" @change="onInput('designCapacityCurrent', $event ?? null)" />
           </label>
           <label>实际产出（上期）
             <el-input-number v-model="localInputs.capacityOutputPrior" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('capacityOutputPrior', $event)" />
+              :disabled="isReadonly" @change="onInput('capacityOutputPrior', $event ?? null)" />
           </label>
           <label>设计产能（上期）
             <el-input-number v-model="localInputs.designCapacityPrior" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('designCapacityPrior', $event)" />
+              :disabled="isReadonly" @change="onInput('designCapacityPrior', $event ?? null)" />
           </label>
         </div>
         <div class="fa-summary">

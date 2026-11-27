@@ -48,48 +48,48 @@
         <div class="input-grid">
           <label>资产总额（本期）
             <el-input-number v-model="localInputs.totalAssetsCurrent" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('totalAssetsCurrent', $event)" />
+              :disabled="isReadonly" @change="onInput('totalAssetsCurrent', $event ?? null)" />
           </label>
           <label>资产总额（上期）
             <el-input-number v-model="localInputs.totalAssetsPrior" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('totalAssetsPrior', $event)" />
+              :disabled="isReadonly" @change="onInput('totalAssetsPrior', $event ?? null)" />
           </label>
           <label>本期产品产量
             <el-input-number v-model="localInputs.productionVolumeCurrent" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('productionVolumeCurrent', $event)" />
+              :disabled="isReadonly" @change="onInput('productionVolumeCurrent', $event ?? null)" />
           </label>
           <label>上期产品产量
             <el-input-number v-model="localInputs.productionVolumePrior" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('productionVolumePrior', $event)" />
+              :disabled="isReadonly" @change="onInput('productionVolumePrior', $event ?? null)" />
           </label>
           <label>租入资产原值（本期）
             <el-input-number v-model="localInputs.leasedInCostCurrent" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('leasedInCostCurrent', $event)" />
+              :disabled="isReadonly" @change="onInput('leasedInCostCurrent', $event ?? null)" />
           </label>
           <label>租入资产原值（上期）
             <el-input-number v-model="localInputs.leasedInCostPrior" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('leasedInCostPrior', $event)" />
+              :disabled="isReadonly" @change="onInput('leasedInCostPrior', $event ?? null)" />
           </label>
           <label>租金收入（本期{{ leaseRentAuto > 0 ? '·已取H1-19' : '' }}）
             <el-input-number v-model="localInputs.rentalIncomeCurrent" :controls="false" size="small"
               :placeholder="leaseRentAuto > 0 ? String(leaseRentAuto) : ''"
-              :disabled="isReadonly" @change="onInput('rentalIncomeCurrent', $event)" />
+              :disabled="isReadonly" @change="onInput('rentalIncomeCurrent', $event ?? null)" />
           </label>
           <label>租金收入（上期）
             <el-input-number v-model="localInputs.rentalIncomePrior" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('rentalIncomePrior', $event)" />
+              :disabled="isReadonly" @change="onInput('rentalIncomePrior', $event ?? null)" />
           </label>
           <label>维修费用（本期）
             <el-input-number v-model="localInputs.maintenanceExpenseCurrent" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('maintenanceExpenseCurrent', $event)" />
+              :disabled="isReadonly" @change="onInput('maintenanceExpenseCurrent', $event ?? null)" />
           </label>
           <label>维修费用（上期）
             <el-input-number v-model="localInputs.maintenanceExpensePrior" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('maintenanceExpensePrior', $event)" />
+              :disabled="isReadonly" @change="onInput('maintenanceExpensePrior', $event ?? null)" />
           </label>
           <label>上期计提折旧
             <el-input-number v-model="localInputs.periodDepPrior" :controls="false" size="small"
-              :disabled="isReadonly" @change="onInput('periodDepPrior', $event)" />
+              :disabled="isReadonly" @change="onInput('periodDepPrior', $event ?? null)" />
           </label>
         </div>
         <div class="fa-summary">

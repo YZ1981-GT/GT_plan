@@ -69,7 +69,7 @@
             :precision="2"
             size="small"
             style="width: 120px"
-            @change="(val: number) => lvt.updateRow(row.id, 'transferIncome', val ?? 0)"
+            @change="(val: number | undefined) => lvt.updateRow(row.id, 'transferIncome', val ?? 0)"
           />
         </template>
       </el-table-column>
@@ -87,7 +87,7 @@
             :precision="2"
             size="small"
             style="width: 120px"
-            @change="(val: number) => lvt.updateRow(row.id, 'deductItems', val ?? 0)"
+            @change="(val: number | undefined) => lvt.updateRow(row.id, 'deductItems', val ?? 0)"
           />
         </template>
       </el-table-column>
@@ -243,7 +243,7 @@
               :precision="2"
               size="small"
               style="width: 130px"
-              @change="(val: number) => lvt.updateAreaRow(row.key, 'sellable', val ?? 0)"
+              @change="(val: number | undefined) => lvt.updateAreaRow(row.key, 'sellable', val ?? 0)"
             />
           </template>
         </el-table-column>
@@ -256,7 +256,7 @@
               :precision="2"
               size="small"
               style="width: 130px"
-              @change="(val: number) => lvt.updateAreaRow(row.key, 'sold', val ?? 0)"
+              @change="(val: number | undefined) => lvt.updateAreaRow(row.key, 'sold', val ?? 0)"
             />
           </template>
         </el-table-column>

@@ -89,7 +89,7 @@
             <span class="formula-cell">{{ fmtNum(row.begin) }}</span>
           </template>
           <template v-else>
-            <el-input-number v-model="row.begin" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:90px" @change="(v:number) => handleCellChange(row.rowKey, 'begin', v)" />
+            <el-input-number v-model="row.begin" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:90px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'begin', v)" />
           </template>
         </template>
       </el-table-column>
@@ -99,7 +99,7 @@
             <span class="formula-cell">{{ fmtNum(row.provision) }}</span>
           </template>
           <template v-else>
-            <el-input-number v-model="row.provision" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:90px" @change="(v:number) => handleCellChange(row.rowKey, 'provision', v)" />
+            <el-input-number v-model="row.provision" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:90px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'provision', v)" />
           </template>
         </template>
       </el-table-column>
@@ -109,7 +109,7 @@
             <span class="formula-cell">{{ fmtNum(row.release) }}</span>
           </template>
           <template v-else>
-            <el-input-number v-model="row.release" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:90px" @change="(v:number) => handleCellChange(row.rowKey, 'release', v)" />
+            <el-input-number v-model="row.release" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:90px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'release', v)" />
           </template>
         </template>
       </el-table-column>
@@ -126,7 +126,7 @@
             <span class="formula-cell">{{ fmtNum(row.unadjusted) }}</span>
           </template>
           <template v-else>
-            <el-input-number v-model="row.unadjusted" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:90px" @change="(v:number) => handleCellChange(row.rowKey, 'unadj', v)" />
+            <el-input-number v-model="row.unadjusted" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:90px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'unadj', v)" />
           </template>
         </template>
       </el-table-column>
@@ -136,7 +136,7 @@
             <span class="formula-cell">{{ fmtNum(row.aje) }}</span>
           </template>
           <template v-else>
-            <el-input-number v-model="row.aje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:80px" @change="(v:number) => handleCellChange(row.rowKey, 'aje', v)" />
+            <el-input-number v-model="row.aje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:80px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'aje', v)" />
           </template>
         </template>
       </el-table-column>
@@ -146,7 +146,7 @@
             <span class="formula-cell">{{ fmtNum(row.rje) }}</span>
           </template>
           <template v-else>
-            <el-input-number v-model="row.rje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:80px" @change="(v:number) => handleCellChange(row.rowKey, 'rje', v)" />
+            <el-input-number v-model="row.rje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:80px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'rje', v)" />
           </template>
         </template>
       </el-table-column>

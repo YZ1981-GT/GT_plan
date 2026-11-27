@@ -27,7 +27,7 @@ const props = defineProps<{
   /** 年审阶段的预审行只读（父组件的共享回填函数判定）：来源列加「只读」、行置灰点不进 */
   isRowLocked?: (row: F3VoucherCheckRow) => boolean
   /** 审计年度（来源列「多科目」看整张凭证用） */
-  year?: number
+  year?: number | null
 }>()
 
 const emit = defineEmits<{

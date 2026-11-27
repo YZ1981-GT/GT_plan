@@ -67,7 +67,7 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal"><span class="formula-cell">{{ fmtNum(row.beginBalance) }}</span></template>
             <template v-else>
-              <el-input-number v-model="row.beginBalance" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v:number) => handleCellChange(row.rowKey, 'beginBalance', v)" />
+              <el-input-number v-model="row.beginBalance" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'beginBalance', v)" />
             </template>
           </template>
         </el-table-column>
@@ -75,7 +75,7 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal"><span class="formula-cell">{{ fmtNum(row.received) }}</span></template>
             <template v-else>
-              <el-input-number v-model="row.received" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v:number) => handleCellChange(row.rowKey, 'received', v)" />
+              <el-input-number v-model="row.received" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'received', v)" />
             </template>
           </template>
         </el-table-column>
@@ -83,7 +83,7 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal"><span class="formula-cell">{{ fmtNum(row.amortized) }}</span></template>
             <template v-else>
-              <el-input-number v-model="row.amortized" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v:number) => handleCellChange(row.rowKey, 'amortized', v)" />
+              <el-input-number v-model="row.amortized" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'amortized', v)" />
             </template>
           </template>
         </el-table-column>
@@ -98,7 +98,7 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal"><span class="formula-cell">{{ fmtNum(row.unadj) }}</span></template>
             <template v-else>
-              <el-input-number v-model="row.unadj" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v:number) => handleCellChange(row.rowKey, 'unadj', v)" />
+              <el-input-number v-model="row.unadj" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'unadj', v)" />
             </template>
           </template>
         </el-table-column>
@@ -106,7 +106,7 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal"><span class="formula-cell">{{ fmtNum(row.aje) }}</span></template>
             <template v-else>
-              <el-input-number v-model="row.aje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:75px" @change="(v:number) => handleCellChange(row.rowKey, 'aje', v)" />
+              <el-input-number v-model="row.aje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:75px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'aje', v)" />
             </template>
           </template>
         </el-table-column>
@@ -114,7 +114,7 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal"><span class="formula-cell">{{ fmtNum(row.rje) }}</span></template>
             <template v-else>
-              <el-input-number v-model="row.rje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:75px" @change="(v:number) => handleCellChange(row.rowKey, 'rje', v)" />
+              <el-input-number v-model="row.rje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:75px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'rje', v)" />
             </template>
           </template>
         </el-table-column>
@@ -129,7 +129,7 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal"><span class="formula-cell">{{ fmtNum(row.priorAudited) }}</span></template>
             <template v-else>
-              <el-input-number v-model="row.priorAudited" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v:number) => handleCellChange(row.rowKey, 'priorAudited', v)" />
+              <el-input-number v-model="row.priorAudited" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'priorAudited', v)" />
             </template>
           </template>
         </el-table-column>
@@ -176,7 +176,7 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal"><span class="formula-cell">{{ fmtNum(row.beginBalance) }}</span></template>
             <template v-else>
-              <el-input-number v-model="row.beginBalance" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v:number) => handleCellChange(row.rowKey, 'beginBalance', v)" />
+              <el-input-number v-model="row.beginBalance" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'beginBalance', v)" />
             </template>
           </template>
         </el-table-column>
@@ -184,7 +184,7 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal"><span class="formula-cell">{{ fmtNum(row.received) }}</span></template>
             <template v-else>
-              <el-input-number v-model="row.received" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v:number) => handleCellChange(row.rowKey, 'received', v)" />
+              <el-input-number v-model="row.received" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'received', v)" />
             </template>
           </template>
         </el-table-column>
@@ -192,7 +192,7 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal"><span class="formula-cell">{{ fmtNum(row.amortized) }}</span></template>
             <template v-else>
-              <el-input-number v-model="row.amortized" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v:number) => handleCellChange(row.rowKey, 'amortized', v)" />
+              <el-input-number v-model="row.amortized" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'amortized', v)" />
             </template>
           </template>
         </el-table-column>
@@ -207,7 +207,7 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal"><span class="formula-cell">{{ fmtNum(row.unadj) }}</span></template>
             <template v-else>
-              <el-input-number v-model="row.unadj" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v:number) => handleCellChange(row.rowKey, 'unadj', v)" />
+              <el-input-number v-model="row.unadj" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'unadj', v)" />
             </template>
           </template>
         </el-table-column>
@@ -215,7 +215,7 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal"><span class="formula-cell">{{ fmtNum(row.aje) }}</span></template>
             <template v-else>
-              <el-input-number v-model="row.aje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:75px" @change="(v:number) => handleCellChange(row.rowKey, 'aje', v)" />
+              <el-input-number v-model="row.aje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:75px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'aje', v)" />
             </template>
           </template>
         </el-table-column>
@@ -223,7 +223,7 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal"><span class="formula-cell">{{ fmtNum(row.rje) }}</span></template>
             <template v-else>
-              <el-input-number v-model="row.rje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:75px" @change="(v:number) => handleCellChange(row.rowKey, 'rje', v)" />
+              <el-input-number v-model="row.rje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:75px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'rje', v)" />
             </template>
           </template>
         </el-table-column>
@@ -238,7 +238,7 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal"><span class="formula-cell">{{ fmtNum(row.priorAudited) }}</span></template>
             <template v-else>
-              <el-input-number v-model="row.priorAudited" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v:number) => handleCellChange(row.rowKey, 'priorAudited', v)" />
+              <el-input-number v-model="row.priorAudited" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'priorAudited', v)" />
             </template>
           </template>
         </el-table-column>

@@ -564,13 +564,13 @@ watch(allScopeDetermined, (val) => { if (val) publishScopeDetermined() })
           </el-table-column>
           <el-table-column prop="shareholding" label="持股%" width="80">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.shareholding" size="small" :min="0" :max="100" :controls="false" @change="(v: number|null) => { updateComponent(row.id, 'shareholding', v); emit('save') }" />
+              <el-input-number v-if="!isReadonly" :model-value="row.shareholding" size="small" :min="0" :max="100" :controls="false" @change="(v: number | null | undefined) => { updateComponent(row.id, 'shareholding', v); emit('save') }" />
               <span v-else>{{ row.shareholding != null ? row.shareholding + '%' : '-' }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="totalAssets" label="总资产" width="120">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.totalAssets" size="small" :controls="false" @change="(v: number|null) => { updateComponent(row.id, 'totalAssets', v); emit('save') }" />
+              <el-input-number v-if="!isReadonly" :model-value="row.totalAssets" size="small" :controls="false" @change="(v: number | null | undefined) => { updateComponent(row.id, 'totalAssets', v); emit('save') }" />
               <span v-else>{{ formatAmount(row.totalAssets) }}</span>
             </template>
           </el-table-column>
@@ -582,7 +582,7 @@ watch(allScopeDetermined, (val) => { if (val) publishScopeDetermined() })
           </el-table-column>
           <el-table-column prop="profit" label="利润" width="120">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.profit" size="small" :controls="false" @change="(v: number|null) => { updateComponent(row.id, 'profit', v); emit('save') }" />
+              <el-input-number v-if="!isReadonly" :model-value="row.profit" size="small" :controls="false" @change="(v: number | null | undefined) => { updateComponent(row.id, 'profit', v); emit('save') }" />
               <span v-else>{{ formatAmount(row.profit) }}</span>
             </template>
           </el-table-column>
@@ -631,7 +631,7 @@ watch(allScopeDetermined, (val) => { if (val) publishScopeDetermined() })
               size="small"
               :controls="false"
               placeholder="分配重要性"
-              @change="(v: number|null) => handleMaterialityInput(comp, v)"
+              @change="(v: number | null | undefined) => handleMaterialityInput(comp, v ?? null)"
             />
             <span v-else-if="comp.allocatedMateriality != null">{{ formatAmount(comp.allocatedMateriality) }} 元</span>
             <span v-else class="suggestion-hint">建议：{{ comp.suggestedMateriality ? formatAmount(comp.suggestedMateriality) + ' 元' : '-' }}</span>

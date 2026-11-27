@@ -158,17 +158,17 @@
       </el-table-column>
       <el-table-column label="预计弃置支出" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.futureExpense" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:100px" @change="(v:number) => save(row.rowId, 'futureExpense', v)" />
+          <el-input-number v-model="row.futureExpense" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:100px" @change="(v: number | undefined) => save(row.rowId, 'futureExpense', v)" />
         </template>
       </el-table-column>
       <el-table-column label="年数" width="70" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.expectedYears" :disabled="isReadonly" size="small" :controls="false" :precision="0" :min="0" style="width:55px" @change="(v:number) => save(row.rowId, 'expectedYears', v)" />
+          <el-input-number v-model="row.expectedYears" :disabled="isReadonly" size="small" :controls="false" :precision="0" :min="0" style="width:55px" @change="(v: number | undefined) => save(row.rowId, 'expectedYears', v)" />
         </template>
       </el-table-column>
       <el-table-column label="折现率" width="90" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.discountRate" :disabled="isReadonly" size="small" :controls="false" :precision="4" :step="0.001" style="width:75px" @change="(v:number) => save(row.rowId, 'discountRate', v)" />
+          <el-input-number v-model="row.discountRate" :disabled="isReadonly" size="small" :controls="false" :precision="4" :step="0.001" style="width:75px" @change="(v: number | undefined) => save(row.rowId, 'discountRate', v)" />
           <el-icon v-if="row.discountRate <= 0 && row.futureExpense > 0" color="#f56c6c" style="margin-left:2px"><WarningFilled /></el-icon>
         </template>
       </el-table-column>
@@ -181,12 +181,12 @@
       </el-table-column>
       <el-table-column label="期初" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.beginBalance" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v:number) => save(row.rowId, 'beginBalance', v)" />
+          <el-input-number v-model="row.beginBalance" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v: number | undefined) => save(row.rowId, 'beginBalance', v)" />
         </template>
       </el-table-column>
       <el-table-column label="增加" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.periodIncrease" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v:number) => save(row.rowId, 'periodIncrease', v)" />
+          <el-input-number v-model="row.periodIncrease" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v: number | undefined) => save(row.rowId, 'periodIncrease', v)" />
         </template>
       </el-table-column>
       <el-table-column label="利息调整" width="110" align="right">

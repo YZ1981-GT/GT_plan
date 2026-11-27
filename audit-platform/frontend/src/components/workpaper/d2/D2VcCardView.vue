@@ -27,7 +27,7 @@ const props = defineProps<{
   wpId: string
   projectId: string
   /** 审计年度（「来源」列里「多科目」看整张凭证用） */
-  year?: number
+  year?: number | null
   /** 年审阶段的预审行只读（共享回填函数 isRowLocked）：不出编辑控件、不能删 */
   isRowLocked?: (row: VoucherCheckRow) => boolean
 }>()

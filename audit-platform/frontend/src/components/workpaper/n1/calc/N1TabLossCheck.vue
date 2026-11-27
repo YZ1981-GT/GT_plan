@@ -83,7 +83,7 @@
               :precision="2"
               size="small"
               class="cell-input"
-              @change="(v: number|null) => lossCheck.updateRow($index, 'priorUnrecognized', v ?? 0)"
+              @change="(v: number | null | undefined) => lossCheck.updateRow($index, 'priorUnrecognized', v ?? 0)"
             />
             <span v-else>{{ fmtAmt(row.priorUnrecognized) }}</span>
           </template>
@@ -99,7 +99,7 @@
               :precision="2"
               size="small"
               class="cell-input"
-              @change="(v: number|null) => lossCheck.updateRow($index, 'bookAmount', v ?? 0)"
+              @change="(v: number | null | undefined) => lossCheck.updateRow($index, 'bookAmount', v ?? 0)"
             />
             <span v-else>{{ fmtAmt(row.bookAmount) }}</span>
           </template>
@@ -115,7 +115,7 @@
               :precision="2"
               size="small"
               class="cell-input"
-              @change="(v: number|null) => lossCheck.updateRow($index, 'auditAdjustment', v ?? 0)"
+              @change="(v: number | null | undefined) => lossCheck.updateRow($index, 'auditAdjustment', v ?? 0)"
             />
             <span v-else>{{ fmtAmt(row.auditAdjustment) }}</span>
           </template>
@@ -145,7 +145,7 @@
               :precision="2"
               size="small"
               class="cell-input"
-              @change="(v: number|null) => lossCheck.updateRow($index, 'recognizedAmount', v ?? 0)"
+              @change="(v: number | null | undefined) => lossCheck.updateRow($index, 'recognizedAmount', v ?? 0)"
             />
             <span v-else :class="{ 'text-muted': row.isExpired }">{{ row.isExpired ? '0（已届满）' : fmtAmt(row.recognizedAmount) }}</span>
           </template>
@@ -322,7 +322,7 @@
               :precision="2"
               size="small"
               class="cell-input"
-              @change="(v: number|null) => updateLead(row.key, 'priorUnrecognized', v ?? 0)"
+              @change="(v: number | null | undefined) => updateLead(row.key, 'priorUnrecognized', v ?? 0)"
             />
             <span v-else>{{ fmtAmt(row.priorUnrecognized) }}</span>
           </template>
@@ -336,7 +336,7 @@
               :precision="2"
               size="small"
               class="cell-input"
-              @change="(v: number|null) => updateLead(row.key, 'bookAmount', v ?? 0)"
+              @change="(v: number | null | undefined) => updateLead(row.key, 'bookAmount', v ?? 0)"
             />
             <span v-else>{{ fmtAmt(row.bookAmount) }}</span>
           </template>
@@ -350,7 +350,7 @@
               :precision="2"
               size="small"
               class="cell-input"
-              @change="(v: number|null) => updateLead(row.key, 'auditAdjustment', v ?? 0)"
+              @change="(v: number | null | undefined) => updateLead(row.key, 'auditAdjustment', v ?? 0)"
             />
             <span v-else>{{ fmtAmt(row.auditAdjustment) }}</span>
           </template>

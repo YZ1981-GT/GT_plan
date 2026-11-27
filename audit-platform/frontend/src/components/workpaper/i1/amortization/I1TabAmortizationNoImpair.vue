@@ -198,7 +198,7 @@
               size="small"
               :precision="2"
               class="cell-input"
-              @change="handleUsefulLifeChange($index, $event)"
+              @change="handleUsefulLifeChange($index, $event ?? null)"
             />
             <span v-else>{{ row.usefulLifeYears }}</span>
           </template>
