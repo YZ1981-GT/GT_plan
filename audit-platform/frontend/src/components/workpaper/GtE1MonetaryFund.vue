@@ -527,7 +527,8 @@ async function saveImmediate(items: any[]) {
     console.warn('[GtE1MonetaryFund] saveImmediate failed:', e)
   }
 }
-function debouncedSave(items: any[]) { void saveImmediate(items) }
+// 子 Tab 的 prop 契约是返回 Promise（有的会 await 以确认已落库）；原先返回 void，await 立即结束
+function debouncedSave(items: any[]): Promise<void> { return saveImmediate(items) }
 
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)

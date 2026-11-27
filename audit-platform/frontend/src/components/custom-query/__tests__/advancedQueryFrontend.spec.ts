@@ -188,7 +188,7 @@ describe('CustomQueryFieldPicker — 复用 useAcnr 构建选字段树 (R2.3)', 
     const groups = await driveLoad(load, { level: 0 })
     await flushPromises()
     expect(groups).toEqual([])
-    expect(wrapper.vm.loadState).toBe('empty')
+    expect((wrapper.vm as any).loadState).toBe('empty')
   })
 })
 
@@ -284,13 +284,13 @@ describe('CustomQueryTab — 高级构建器禁用态 (R11.6)', () => {
   it('接口判无权 → canUseBuilder=false，onOpenBuilder 不打开构建器，原因取接口文案（含合伙人）', async () => {
     roleHolder.value = 'admin' // 前端角色是 admin 也不放行：判据只在接口
     const wrapper = await mountTab({ allowed: false, basis: null, reason: BUILDER_FORBIDDEN, all_projects: false, accessible_project_count: 0 })
-    expect(wrapper.vm.canUseBuilder).toBe(false)
+    expect((wrapper.vm as any).canUseBuilder).toBe(false)
     // 双保险：即便被绕过点击也不打开
-    wrapper.vm.onOpenBuilder()
-    expect(wrapper.vm.builderDialogVisible).toBe(false)
+    ;(wrapper.vm as any).onOpenBuilder()
+    expect((wrapper.vm as any).builderDialogVisible).toBe(false)
     // 有原因提示文案
-    expect(wrapper.vm.builderDisabledReason).toContain('管理员')
-    expect(wrapper.vm.builderDisabledReason).toContain('合伙人')
+    expect((wrapper.vm as any).builderDisabledReason).toContain('管理员')
+    expect((wrapper.vm as any).builderDisabledReason).toContain('合伙人')
   })
 
   it('接口判可用（系统角色，或系统角色为 auditor 的项目经理）→ canUseBuilder=true 且可打开构建器', async () => {
@@ -300,9 +300,9 @@ describe('CustomQueryTab — 高级构建器禁用态 (R11.6)', () => {
       { allowed: true, basis: 'project_manager', reason: null, all_projects: false, accessible_project_count: 1 },
     ]) {
       const wrapper = await mountTab(access)
-      expect(wrapper.vm.canUseBuilder).toBe(true)
-      wrapper.vm.onOpenBuilder()
-      expect(wrapper.vm.builderDialogVisible).toBe(true)
+      expect((wrapper.vm as any).canUseBuilder).toBe(true)
+      ;(wrapper.vm as any).onOpenBuilder()
+      expect((wrapper.vm as any).builderDialogVisible).toBe(true)
     }
   })
 })
@@ -345,11 +345,11 @@ describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
   // （猜错即静默查别的年度），旧断言固化的是被修掉的行为。现在没选项目 / 项目没有审计年度时年度留空、执行不可用。
   it('初始年度为空（不按日历年推算），执行查询不可用并提示选择年度', async () => {
     const wrapper = await mountTabWithProjects([])
-    expect(wrapper.vm.formCtx.year).toBeNull()
-    wrapper.vm.formCtx.project_id = 'p-any'
-    wrapper.vm.formCtx.source = 'tb_detail'
+    expect((wrapper.vm as any).formCtx.year).toBeNull()
+    ;(wrapper.vm as any).formCtx.project_id = 'p-any'
+    ;(wrapper.vm as any).formCtx.source = 'tb_detail'
     await flushPromises()
-    expect(wrapper.vm.executeBlockedReason).toBe('请选择审计年度')
+    expect((wrapper.vm as any).executeBlockedReason).toBe('请选择审计年度')
   })
 
   it('选中项目后年度跟随该项目的 audit_year', async () => {
@@ -357,11 +357,11 @@ describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
       { id: 'p-2025', name: '临港店_2025', audit_year: 2025, can_edit: true },
       { id: 'p-2023', name: '旧项目_2023', audit_year: 2023, can_edit: true },
     ])
-    wrapper.vm.onProjectChange('p-2025')
-    expect(wrapper.vm.formCtx.year).toBe(2025)
+    ;(wrapper.vm as any).onProjectChange('p-2025')
+    expect((wrapper.vm as any).formCtx.year).toBe(2025)
     // 切到另一个年度不同的项目要跟着变，不能粘住上一个项目的年度
-    wrapper.vm.onProjectChange('p-2023')
-    expect(wrapper.vm.formCtx.year).toBe(2023)
+    ;(wrapper.vm as any).onProjectChange('p-2023')
+    expect((wrapper.vm as any).formCtx.year).toBe(2023)
   })
 
   it('项目没有 audit_year 时年度留空（不退回「今年 − 1」，也不粘住上一个项目的年度），且不发查询', async () => {
@@ -369,14 +369,14 @@ describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
       { id: 'p-2025', name: '临港店_2025', audit_year: 2025 },
       { id: 'p-null', name: '无年度项目', audit_year: null },
     ])
-    wrapper.vm.onProjectChange('p-2025')
-    expect(wrapper.vm.formCtx.year).toBe(2025)
-    wrapper.vm.formCtx.project_id = 'p-null'
-    wrapper.vm.onProjectChange('p-null')
-    expect(wrapper.vm.formCtx.year).toBeNull()
-    wrapper.vm.formCtx.source = 'tb_detail'
+    ;(wrapper.vm as any).onProjectChange('p-2025')
+    expect((wrapper.vm as any).formCtx.year).toBe(2025)
+    ;(wrapper.vm as any).formCtx.project_id = 'p-null'
+    ;(wrapper.vm as any).onProjectChange('p-null')
+    expect((wrapper.vm as any).formCtx.year).toBeNull()
+    ;(wrapper.vm as any).formCtx.source = 'tb_detail'
     apiMocks.post.mockClear()
-    await wrapper.vm.onExecute()
+    await (wrapper.vm as any).onExecute()
     expect(apiMocks.post.mock.calls.filter(([url]: any[]) => String(url).includes('execute'))).toHaveLength(0)
   })
 
@@ -385,44 +385,44 @@ describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
       { id: 'p-2024', name: '项目_2024', audit_year: 2024, can_edit: true },
     ])
     // 模拟「先由模板设好 project_id，再重新拉列表」
-    wrapper.vm.formCtx.project_id = 'p-2024'
-    await wrapper.vm.loadProjects()
+    ;(wrapper.vm as any).formCtx.project_id = 'p-2024'
+    await (wrapper.vm as any).loadProjects()
     await flushPromises()
-    expect(wrapper.vm.formCtx.year).toBe(2024)
+    expect((wrapper.vm as any).formCtx.year).toBe(2024)
   })
 
   it('0 行结果给出含年度的可诊断提示（不再静默空表）', async () => {
     const wrapper = await mountTabWithProjects([
       { id: 'p-2025', name: '临港店_2025', audit_year: 2025, can_edit: true },
     ])
-    wrapper.vm.formCtx.project_id = 'p-2025'
-    wrapper.vm.formCtx.source = 'tb_detail'
-    wrapper.vm.onProjectChange('p-2025')
+    ;(wrapper.vm as any).formCtx.project_id = 'p-2025'
+    ;(wrapper.vm as any).formCtx.source = 'tb_detail'
+    ;(wrapper.vm as any).onProjectChange('p-2025')
     apiMocks.post.mockResolvedValue({ rows: [], columns: [], total: 0 })
 
-    await wrapper.vm.onExecute()
+    await (wrapper.vm as any).onExecute()
     await flushPromises()
 
-    expect(wrapper.vm.emptyHint).toContain('2025')
-    expect(wrapper.vm.emptyHint).toContain('没有匹配数据')
+    expect((wrapper.vm as any).emptyHint).toContain('2025')
+    expect((wrapper.vm as any).emptyHint).toContain('没有匹配数据')
   })
 
   it('有结果时清空空态提示（不能把上一次的 0 行提示粘住）', async () => {
     const wrapper = await mountTabWithProjects([
       { id: 'p-2025', name: '临港店_2025', audit_year: 2025, can_edit: true },
     ])
-    wrapper.vm.formCtx.project_id = 'p-2025'
-    wrapper.vm.onProjectChange('p-2025') // 年度只取项目审计年度（任务 29 起不再有「今年 − 1」兜底）
-    wrapper.vm.formCtx.source = 'tb_detail'
+    ;(wrapper.vm as any).formCtx.project_id = 'p-2025'
+    ;(wrapper.vm as any).onProjectChange('p-2025') // 年度只取项目审计年度（任务 29 起不再有「今年 − 1」兜底）
+    ;(wrapper.vm as any).formCtx.source = 'tb_detail'
     apiMocks.post.mockResolvedValue({ rows: [], columns: [], total: 0 })
-    await wrapper.vm.onExecute()
+    await (wrapper.vm as any).onExecute()
     await flushPromises()
-    expect(wrapper.vm.emptyHint).not.toBe('')
+    expect((wrapper.vm as any).emptyHint).not.toBe('')
 
     apiMocks.post.mockResolvedValue({ rows: [{ a: 1 }], columns: ['a'], total: 1 })
-    await wrapper.vm.onExecute()
+    await (wrapper.vm as any).onExecute()
     await flushPromises()
-    expect(wrapper.vm.emptyHint).toBe('')
+    expect((wrapper.vm as any).emptyHint).toBe('')
   })
 
   it('报表行次配置不带 report_type，报表叶子才带（advanced-query-linkage-closure 任务 17）', async () => {
@@ -430,13 +430,13 @@ describe('CustomQueryTab — 年度默认值跟随项目审计年度', () => {
     const wrapper = await mountTabWithProjects([
       { id: 'p-2025', name: '临港店_2025', audit_year: 2025, can_edit: true },
     ])
-    wrapper.vm.formCtx.project_id = 'p-2025'
-    wrapper.vm.onProjectChange('p-2025') // 年度只取项目审计年度（任务 29 起不再有「今年 − 1」兜底）
+    ;(wrapper.vm as any).formCtx.project_id = 'p-2025'
+    ;(wrapper.vm as any).onProjectChange('p-2025') // 年度只取项目审计年度（任务 29 起不再有「今年 − 1」兜底）
     apiMocks.post.mockClear()
     apiMocks.post.mockResolvedValue({ rows: [], columns: [], total: 0 })
     for (const source of ['report_lines', 'report_income_statement']) {
-      wrapper.vm.formCtx.source = source
-      await wrapper.vm.onExecute()
+      ;(wrapper.vm as any).formCtx.source = source
+      await (wrapper.vm as any).onExecute()
       await flushPromises()
     }
     const bodies = apiMocks.post.mock.calls
@@ -484,9 +484,9 @@ describe('CustomQueryTab — 项目下拉的 change 接线', () => {
     expect(selects.length, '反向自检：没找到任何 el-select 探针，判据不可靠').toBeGreaterThan(0)
 
     // 项目下拉是第一个 el-select（与模板顺序一致）
-    wrapper.vm.formCtx.year = 1999
+    ;(wrapper.vm as any).formCtx.year = 1999
     selects[0].vm.$emit('change', 'p-2025')
     await flushPromises()
-    expect(wrapper.vm.formCtx.year, '项目下拉的 change 未接到 onProjectChange').toBe(2025)
+    expect((wrapper.vm as any).formCtx.year, '项目下拉的 change 未接到 onProjectChange').toBe(2025)
   })
 })
