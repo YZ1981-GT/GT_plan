@@ -58,6 +58,22 @@ import {
   isPlanReadyForCheck,
   suggestCoverageByRisk,
 } from './h2StocktakePlanEnhance'
+import {
+  createEmptySummary,
+  draftSummaryConclusion,
+  evaluateSummaryCompleteness,
+  fillSummaryFromUpstream,
+  isTimeRangeValid,
+  mergeAbnormalFromCheckRows,
+  newAbnormalItem,
+  newAuditorRow,
+  newClientPersonnelRow,
+  newObservationRow,
+  normalizeSummary,
+  summaryLogicWarnings,
+  type H2StocktakeSummary,
+  type StocktakeAbnormalItem,
+} from './h2StocktakeSummaryModel'
 
 export type {
   H2StocktakeCheckMeta,
@@ -66,27 +82,13 @@ export type {
   H2StocktakePlanForm,
   StocktakeProjectSelection,
   H2LegacyStocktakePlan,
+  H2StocktakeSummary,
+  StocktakeAbnormalItem,
 }
 export { isStoppedCheckRow }
 
 /** @deprecated 兼容旧五字段；新逻辑请用 planForm */
 export type H2StocktakePlan = H2LegacyStocktakePlan
-
-export interface H2StocktakeSummary {
-  overallSituation: string
-  abnormalProjects: StocktakeAbnormalItem[]
-  conclusion: string
-  preparedBy: string
-  preparedDate: string
-}
-
-export interface StocktakeAbnormalItem {
-  rowId: string
-  name: string
-  abnormalType: string
-  description: string
-  suggestion: string
-}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -114,13 +116,7 @@ export function useH2Stocktake(options: {
   const checkRows = ref<H2StocktakeCheckRow[]>([])
   const checkMeta = ref<H2StocktakeCheckMeta>(createEmptyCheckMeta())
 
-  const summary = ref<H2StocktakeSummary>({
-    overallSituation: '',
-    abnormalProjects: [],
-    conclusion: '',
-    preparedBy: '',
-    preparedDate: '',
-  })
+  const summary = ref<H2StocktakeSummary>(createEmptySummary())
 
   const auditNote = ref('')
 
@@ -159,24 +155,8 @@ export function useH2Stocktake(options: {
     const metaData = _getJson(CHECK_META_KEY)
     checkMeta.value = normalizeCheckMeta(metaData)
 
-    const summaryData = _getJson(SUMMARY_KEY)
-    if (summaryData && typeof summaryData === 'object') {
-      summary.value = {
-        overallSituation: summaryData.overallSituation ?? '',
-        abnormalProjects: Array.isArray(summaryData.abnormalProjects)
-          ? summaryData.abnormalProjects.map((a: any) => ({
-              rowId: a.rowId ?? `row-${Math.random().toString(36).slice(2, 10)}`,
-              name: a.name ?? '',
-              abnormalType: a.abnormalType ?? '',
-              description: a.description ?? '',
-              suggestion: a.suggestion ?? '',
-            }))
-          : [],
-        conclusion: summaryData.conclusion ?? '',
-        preparedBy: summaryData.preparedBy ?? '',
-        preparedDate: summaryData.preparedDate ?? '',
-      }
-    }
+    // 全部字段读回（原先只保留 5 个，其余填写保存后再打开即丢）
+    summary.value = normalizeSummary(_getJson(SUMMARY_KEY))
 
     auditNote.value = _getString(NOTE_KEY)
   }
@@ -627,17 +607,88 @@ export function useH2Stocktake(options: {
     options.onSave?.(SUMMARY_KEY, summary.value)
   }
 
-  function addAbnormalProject(name: string): void {
+  function persistSummary(): void {
     if (options.isReadonly.value) return
-    summary.value.abnormalProjects.push({
-      rowId: `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      name,
-      abnormalType: '',
-      description: '',
-      suggestion: '',
-    })
     options.onSave?.(SUMMARY_KEY, summary.value)
   }
+
+  function addAbnormalProject(name: string): void {
+    if (options.isReadonly.value) return
+    summary.value.abnormalProjects.push(newAbnormalItem({ name }))
+    persistSummary()
+  }
+
+  function _removeByRowId<T extends { rowId: string }>(list: T[], rowId: string): void {
+    const idx = list.findIndex((r) => r.rowId === rowId)
+    if (idx !== -1) {
+      list.splice(idx, 1)
+      persistSummary()
+    }
+  }
+
+  function removeAbnormalProject(rowId: string): void {
+    if (!options.isReadonly.value) _removeByRowId(summary.value.abnormalProjects, rowId)
+  }
+
+  function addClientPersonnel(): void {
+    if (options.isReadonly.value) return
+    summary.value.clientPersonnel.push(newClientPersonnelRow())
+    persistSummary()
+  }
+
+  function removeClientPersonnel(rowId: string): void {
+    if (!options.isReadonly.value) _removeByRowId(summary.value.clientPersonnel, rowId)
+  }
+
+  function addAuditorPersonnel(): void {
+    if (options.isReadonly.value) return
+    summary.value.auditorPersonnel.push(newAuditorRow())
+    persistSummary()
+  }
+
+  function removeAuditorPersonnel(rowId: string): void {
+    if (!options.isReadonly.value) _removeByRowId(summary.value.auditorPersonnel, rowId)
+  }
+
+  function addProjectObservation(): void {
+    if (options.isReadonly.value) return
+    summary.value.projectObservations.push(newObservationRow())
+    persistSummary()
+  }
+
+  function removeProjectObservation(rowId: string): void {
+    if (!options.isReadonly.value) _removeByRowId(summary.value.projectObservations, rowId)
+  }
+
+  /** 从 H2-12 计划 / H2-13 检查表回填空字段（不覆盖已填） */
+  function syncFromUpstream(): number {
+    if (options.isReadonly.value) return 0
+    const n = fillSummaryFromUpstream(summary.value, planForm.value, checkRows.value)
+    summary.value.lastAutoSyncAt = new Date().toISOString()
+    persistSummary()
+    return n
+  }
+
+  function mergeAbnormalFromCheck(): number {
+    if (options.isReadonly.value) return 0
+    const n = mergeAbnormalFromCheckRows(summary.value, checkRows.value, isStoppedCheckRow)
+    if (n) persistSummary()
+    return n
+  }
+
+  /** 规则起草结论：结论为空才写，避免覆盖人工结论 */
+  function applyRuleConclusion(opts?: { overwrite?: boolean }): void {
+    if (options.isReadonly.value) return
+    if (summary.value.conclusion.trim() && !opts?.overwrite) return
+    summary.value.conclusion = draftSummaryConclusion(summary.value, checkStats.value)
+    persistSummary()
+  }
+
+  const completeness = computed(() => evaluateSummaryCompleteness(summary.value))
+  const completenessOk = computed(() => completeness.value.every((c) => c.ok))
+  const incompleteCount = computed(() => completeness.value.filter((c) => !c.ok).length)
+  const logicWarnings = computed(() => summaryLogicWarnings(summary.value, checkRows.value, isStoppedCheckRow))
+  const timeRangeOk = computed(() => isTimeRangeValid(summary.value.startTime, summary.value.endTime))
 
   function saveNote(note: string): void {
     auditNote.value = note
@@ -691,7 +742,23 @@ export function useH2Stocktake(options: {
     draftCheckNoteLocal,
     draftCheckConclusionLocal,
     updateSummary,
+    persistSummary,
     addAbnormalProject,
+    removeAbnormalProject,
+    addClientPersonnel,
+    removeClientPersonnel,
+    addAuditorPersonnel,
+    removeAuditorPersonnel,
+    addProjectObservation,
+    removeProjectObservation,
+    syncFromUpstream,
+    mergeAbnormalFromCheck,
+    applyRuleConclusion,
+    completeness,
+    completenessOk,
+    incompleteCount,
+    logicWarnings,
+    timeRangeOk,
     saveNote,
     initFromAllResponses,
   }

@@ -1,12 +1,27 @@
 /**
- * H2-14 监盘小结 — 数据结构与默认值
- * 对齐致同模板「在建工程监盘小结」：了解→盘前→人员/时间→逐项踏勘→总体核对→异常→收尾→结论
- * 参照 H1-11（固定资产监盘小结）处理范式，保留 CIP 专用字段（形象进度/停工/转固时点）
+ * H2-14 在建工程监盘小结 — 数据结构、读入归一、完工程度闸门、逻辑提示、回填与规则起草
+ *
+ * 结构逐段对齐致同模板「监盘小结H2-14」（backend/wp_templates/H/H2 在建工程.xlsx）：
+ * 一、资产负债表日 → 二、察看前检查程序 → 三、人员及时间 → 四(一) 逐个工程形象进度 /
+ * 四(二) 察看总体情况六问 → 五、异常 → 六、结束工作（评价 / 差异说明盖章 / 签字确认）→ 结论
+ *
+ * 🔴 原先 H2-14 页面绑定的这些字段与操作在 useH2Stocktake 里都不存在：页面渲染即读
+ *    `state.completenessOk.value` 报错，且读入只保留 5 个字段 ⇒ 其余填写保存后再打开就丢。
+ *    参照 H1-11（h1StocktakeSummaryModel）补齐。
  */
+import type { H2StocktakeCheckRow } from './h2StocktakeCheckModel'
+import type { H2StocktakePlanForm } from './h2StocktakePlanModel'
+
+export interface StocktakeAbnormalItem {
+  rowId: string
+  name: string
+  abnormalType: string
+  description: string
+  suggestion: string
+}
 
 export interface H2SummaryPersonnelRow {
   rowId: string
-  seq: number
   department: string
   headcount: number
   names: string
@@ -15,122 +30,80 @@ export interface H2SummaryPersonnelRow {
 
 export interface H2SummaryAuditorRow {
   rowId: string
-  seq: number
   names: string
   responsibleArea: string
 }
 
-/** 逐个工程项目形象进度等情况描述 */
-export interface H2ProjectObservationRow {
+export interface H2SummaryObservationRow {
   rowId: string
-  seq: number
   projectName: string
   diagramIndex: string
   location: string
+  constructionStatus: string
   progressDescription: string
   photoIndex: string
-  /** 来自 H2-13 的施工状态（展示用，可手改） */
-  constructionStatus: string
-  visibleProgress: number | null
 }
 
-export interface H2ObservationCheckItem {
+export interface H2SummaryCheckItem {
   id: string
   label: string
   answer: string
   indexRef: string
 }
 
-export interface H2AbnormalItem {
-  rowId: string
-  name: string
-  abnormalType: string
-  description: string
-  suggestion: string
-}
+export type YesNo = '' | 'Y' | 'N'
 
-export interface H2StocktakeSummaryForm {
-  /** 一、资产负债表日说明 */
+export interface H2StocktakeSummary {
   bsDateNote: string
-  /** 二、盘前：工程管理部门 */
   engDept: string
-  /** 二、盘前：管理人员 */
   engStaff: string
-  /** 管理制度设计是否合理 */
   policyDesignOk: string
-  /** 是否有效执行 */
   policyExecutedOk: string
-  /** 管理制度索引 */
   policyIndex: string
-  /** 三、参与人员 */
   clientPersonnel: H2SummaryPersonnelRow[]
   auditorPersonnel: H2SummaryAuditorRow[]
-  /** 实际现场察看日/时段 */
   actualDate: string
   startTime: string
   endTime: string
-  /** 四(一)、逐项工程观察 */
-  projectObservations: H2ProjectObservationRow[]
-  /** 四(二)、察看总体情况描述（6 项核对） */
-  observationChecks: H2ObservationCheckItem[]
-  /** 总体情况补充叙述（兼容旧版 overallSituation） */
+  projectObservations: H2SummaryObservationRow[]
+  observationChecks: H2SummaryCheckItem[]
   overallSituation: string
-  /** 五、异常 */
-  abnormalProjects: H2AbnormalItem[]
+  abnormalProjects: StocktakeAbnormalItem[]
   abnormalNote: string
-  /** 六、结束工作 */
   postWorkNote: string
   evalFamiliarity: string
   evalAttitude: string
   evalCooperation: string
-  diffExplanationObtained: '' | 'Y' | 'N'
+  diffExplanationObtained: YesNo
   diffExplanationIndex: string
-  clientSigned: '' | 'Y' | 'N'
+  clientSigned: YesNo
   clientSignIndex: string
-  /** 结论与签署 */
   conclusion: string
   preparedBy: string
   preparedDate: string
   reviewedBy: string
   reviewedDate: string
-  /** 人工覆盖过的自动字段（不再被 H2-13 实时回填） */
-  manualOverrides: string[]
   lastAutoSyncAt: string
 }
 
-/** 四(二) 总体核对项 — 对齐致同模板 */
+/** 模板「四、（二）察看总体情况描述」六问（原文） */
 export const OBSERVATION_CHECK_DEFS: { id: string; label: string }[] = [
-  {
-    id: 'qtyMatch',
-    label: '实际观察到的在建工程是否与会计账簿记载数量一致',
-  },
-  {
-    id: 'offBook',
-    label: '是否存在会计账簿未记载的工程',
-  },
-  {
-    id: 'diagramMatch',
-    label: '获取的工程简图与现场是否一致',
-  },
-  {
-    id: 'progressMatch',
-    label: '现场察看的工程完工进度是否与账面记载一致，并与监理报告核对一致',
-  },
-  {
-    id: 'readyNotTransferred',
-    label: '有无已达到预计可使用状态但尚未办理竣工决算手续仍列于在建工程的情况',
-  },
-  {
-    id: 'longStoppage',
-    label: '有无长期停工的工程',
-  },
+  { id: 'qtyMatch', label: '实际观察到的在建工程是否与会计账簿记载数量一致' },
+  { id: 'offBook', label: '是否存在会计账簿未记载的工程' },
+  { id: 'diagramMatch', label: '获取的工程简图与现场是否一致' },
+  { id: 'progressMatch', label: '现场察看的工程完工进度是否与账面记载一致，并与监理报告核对一致' },
+  { id: 'readyNotTransferred', label: '有无已达到预计可使用状态但尚未办理竣工决算手续仍列于在建工程的情况' },
+  { id: 'longStopped', label: '有无长期停工的工程' },
 ]
 
-function _id(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+function _id(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-export function createEmptyH2SummaryForm(): H2StocktakeSummaryForm {
+const _s = (v: unknown): string => (v == null ? '' : String(v))
+const _yn = (v: unknown): YesNo => (v === 'Y' || v === 'N' ? v : '')
+
+export function createEmptySummary(): H2StocktakeSummary {
   return {
     bsDateNote: '',
     engDept: '',
@@ -144,11 +117,7 @@ export function createEmptyH2SummaryForm(): H2StocktakeSummaryForm {
     startTime: '',
     endTime: '',
     projectObservations: [],
-    observationChecks: OBSERVATION_CHECK_DEFS.map((d) => ({
-      ...d,
-      answer: '',
-      indexRef: '',
-    })),
+    observationChecks: OBSERVATION_CHECK_DEFS.map((d) => ({ ...d, answer: '', indexRef: '' })),
     overallSituation: '',
     abnormalProjects: [],
     abnormalNote: '',
@@ -165,344 +134,226 @@ export function createEmptyH2SummaryForm(): H2StocktakeSummaryForm {
     preparedDate: '',
     reviewedBy: '',
     reviewedDate: '',
-    manualOverrides: [],
     lastAutoSyncAt: '',
   }
 }
 
-/** 合并已存 JSON，兼容旧版仅 overallSituation/abnormalProjects/conclusion */
-export function normalizeH2SummaryForm(raw: any): H2StocktakeSummaryForm {
-  const base = createEmptyH2SummaryForm()
-  if (!raw || typeof raw !== 'object') return base
-
-  const out: H2StocktakeSummaryForm = { ...base, ...raw }
-
-  out.observationChecks = OBSERVATION_CHECK_DEFS.map((d) => {
-    const found = (Array.isArray(raw.observationChecks) ? raw.observationChecks : []).find(
-      (x: any) => x?.id === d.id,
-    )
-    return {
-      ...d,
-      answer: found?.answer ?? '',
-      indexRef: found?.indexRef ?? '',
-    }
-  })
-
-  out.clientPersonnel = Array.isArray(raw.clientPersonnel)
-    ? raw.clientPersonnel.map((r: any, i: number) => ({
-        rowId: r.rowId ?? `cp-${_id()}`,
-        seq: r.seq ?? i + 1,
-        department: r.department ?? '',
-        headcount: Number(r.headcount) || 0,
-        names: r.names ?? '',
-        responsibleArea: r.responsibleArea ?? '',
-      }))
-    : []
-
-  out.auditorPersonnel = Array.isArray(raw.auditorPersonnel)
-    ? raw.auditorPersonnel.map((r: any, i: number) => ({
-        rowId: r.rowId ?? `ap-${_id()}`,
-        seq: r.seq ?? i + 1,
-        names: r.names ?? '',
-        responsibleArea: r.responsibleArea ?? '',
-      }))
-    : []
-
-  out.projectObservations = Array.isArray(raw.projectObservations)
-    ? raw.projectObservations.map((r: any, i: number) => ({
-        rowId: r.rowId ?? `po-${_id()}`,
-        seq: r.seq ?? i + 1,
-        projectName: r.projectName ?? '',
-        diagramIndex: r.diagramIndex ?? '',
-        location: r.location ?? '',
-        progressDescription: r.progressDescription ?? '',
-        photoIndex: r.photoIndex ?? '',
-        constructionStatus: r.constructionStatus ?? '',
-        visibleProgress: r.visibleProgress != null ? Number(r.visibleProgress) : null,
-      }))
-    : []
-
-  out.abnormalProjects = Array.isArray(raw.abnormalProjects)
-    ? raw.abnormalProjects.map((a: any) => ({
-        rowId: a.rowId ?? `ab-${_id()}`,
-        name: a.name ?? '',
-        abnormalType: a.abnormalType ?? '',
-        description: a.description ?? '',
-        suggestion: a.suggestion ?? '',
-      }))
-    : []
-
-  if (!Array.isArray(out.manualOverrides)) out.manualOverrides = []
-  if (!out.lastAutoSyncAt) out.lastAutoSyncAt = ''
-
-  // 旧版字段兜底
-  if (!out.overallSituation && typeof raw.overallSituation === 'string') {
-    out.overallSituation = raw.overallSituation
-  }
-  if (!out.conclusion && typeof raw.conclusion === 'string') {
-    out.conclusion = raw.conclusion
-  }
-
-  return out
-}
-
-export function newClientPersonnelRow(
-  partial?: Partial<H2SummaryPersonnelRow>,
-): H2SummaryPersonnelRow {
-  return {
-    rowId: `cp-${_id()}`,
-    seq: 1,
-    department: '',
-    headcount: 1,
-    names: '',
-    responsibleArea: '',
-    ...partial,
-  }
+export function newClientPersonnelRow(partial?: Partial<H2SummaryPersonnelRow>): H2SummaryPersonnelRow {
+  return { rowId: _id('cp'), department: '', headcount: 1, names: '', responsibleArea: '', ...partial }
 }
 
 export function newAuditorRow(partial?: Partial<H2SummaryAuditorRow>): H2SummaryAuditorRow {
+  return { rowId: _id('ap'), names: '', responsibleArea: '', ...partial }
+}
+
+export function newObservationRow(partial?: Partial<H2SummaryObservationRow>): H2SummaryObservationRow {
   return {
-    rowId: `ap-${_id()}`,
-    seq: 1,
-    names: '',
-    responsibleArea: '',
-    ...partial,
+    rowId: _id('ob'), projectName: '', diagramIndex: '', location: '',
+    constructionStatus: '', progressDescription: '', photoIndex: '', ...partial,
   }
 }
 
-export function newProjectObservationRow(
-  partial?: Partial<H2ProjectObservationRow>,
-): H2ProjectObservationRow {
+export function newAbnormalItem(partial?: Partial<StocktakeAbnormalItem>): StocktakeAbnormalItem {
+  return { rowId: _id('row'), name: '', abnormalType: '', description: '', suggestion: '', ...partial }
+}
+
+/** 读入已存 JSON：全部字段按类型归一，缺省补齐（旧版只存了 5 个字段也能读） */
+export function normalizeSummary(raw: any): H2StocktakeSummary {
+  const base = createEmptySummary()
+  if (!raw || typeof raw !== 'object') return base
+  const rows = (v: unknown): any[] => (Array.isArray(v) ? v : [])
+  const checks = rows(raw.observationChecks)
   return {
-    rowId: `po-${_id()}`,
-    seq: 1,
-    projectName: '',
-    diagramIndex: '',
-    location: '',
-    progressDescription: '',
-    photoIndex: '',
-    constructionStatus: '',
-    visibleProgress: null,
-    ...partial,
+    ...base,
+    bsDateNote: _s(raw.bsDateNote),
+    engDept: _s(raw.engDept),
+    engStaff: _s(raw.engStaff),
+    policyDesignOk: _s(raw.policyDesignOk),
+    policyExecutedOk: _s(raw.policyExecutedOk),
+    policyIndex: _s(raw.policyIndex),
+    clientPersonnel: rows(raw.clientPersonnel).map((r) => newClientPersonnelRow({
+      rowId: r?.rowId || _id('cp'), department: _s(r?.department), headcount: Number(r?.headcount) || 0,
+      names: _s(r?.names), responsibleArea: _s(r?.responsibleArea),
+    })),
+    auditorPersonnel: rows(raw.auditorPersonnel).map((r) => newAuditorRow({
+      rowId: r?.rowId || _id('ap'), names: _s(r?.names), responsibleArea: _s(r?.responsibleArea),
+    })),
+    actualDate: _s(raw.actualDate),
+    startTime: _s(raw.startTime),
+    endTime: _s(raw.endTime),
+    projectObservations: rows(raw.projectObservations).map((r) => newObservationRow({
+      rowId: r?.rowId || _id('ob'), projectName: _s(r?.projectName), diagramIndex: _s(r?.diagramIndex),
+      location: _s(r?.location), constructionStatus: _s(r?.constructionStatus),
+      progressDescription: _s(r?.progressDescription), photoIndex: _s(r?.photoIndex),
+    })),
+    observationChecks: OBSERVATION_CHECK_DEFS.map((d) => {
+      const found = checks.find((c) => c?.id === d.id)
+      return { ...d, answer: _s(found?.answer), indexRef: _s(found?.indexRef) }
+    }),
+    overallSituation: _s(raw.overallSituation),
+    abnormalProjects: rows(raw.abnormalProjects).map((a) => newAbnormalItem({
+      rowId: a?.rowId || _id('row'), name: _s(a?.name), abnormalType: _s(a?.abnormalType),
+      description: _s(a?.description), suggestion: _s(a?.suggestion),
+    })),
+    abnormalNote: _s(raw.abnormalNote),
+    postWorkNote: _s(raw.postWorkNote),
+    evalFamiliarity: _s(raw.evalFamiliarity),
+    evalAttitude: _s(raw.evalAttitude),
+    evalCooperation: _s(raw.evalCooperation),
+    diffExplanationObtained: _yn(raw.diffExplanationObtained),
+    diffExplanationIndex: _s(raw.diffExplanationIndex),
+    clientSigned: _yn(raw.clientSigned),
+    clientSignIndex: _s(raw.clientSignIndex),
+    conclusion: _s(raw.conclusion),
+    preparedBy: _s(raw.preparedBy),
+    preparedDate: _s(raw.preparedDate),
+    reviewedBy: _s(raw.reviewedBy),
+    reviewedDate: _s(raw.reviewedDate),
+    lastAutoSyncAt: _s(raw.lastAutoSyncAt),
   }
 }
 
-export function newAbnormalItem(partial?: Partial<H2AbnormalItem>): H2AbnormalItem {
-  return {
-    rowId: `ab-${_id()}`,
-    name: '',
-    abnormalType: '',
-    description: '',
-    suggestion: '',
-    ...partial,
-  }
-}
-
-/** 结束时间须晚于开始时间（HH:mm） */
+/** 结束时间须晚于开始时间（HH:mm；任一为空不判） */
 export function isTimeRangeValid(start: string, end: string): boolean {
-  if (!start || !end) return true
   const toMin = (t: string) => {
-    const m = t.match(/^(\d{1,2}):(\d{2})$/)
-    if (!m) return null
-    return Number(m[1]) * 60 + Number(m[2])
+    const m = /^(\d{1,2}):(\d{2})$/.exec(t || '')
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null
   }
   const a = toMin(start)
   const b = toMin(end)
-  if (a == null || b == null) return true
-  return b > a
+  return a == null || b == null || b > a
 }
 
-/** 从 H2-13 检查行草稿逐项观察表（按工程名去重合并；兼容旧/新字段） */
-export function draftObservationsFromCheckRows(
-  rows: {
-    name: string
-    siteLocation?: string
-    location?: string
-    visibleProgress?: number | null
-    constructionStatus?: string
-    progressDifference?: string
-    progressDesc?: string
-    stopDuration?: string
-    stopReason?: string
-    readyForUse?: string
-    result?: string
-    photos?: string
-    photoUrl?: string
-    auditConclusion?: string
-    remark?: string
-  }[],
-): H2ProjectObservationRow[] {
-  return rows.map((r, i) => {
-    const progressDiff = r.progressDesc || r.progressDifference || ''
-    const parts = [
-      r.constructionStatus ? `施工状态：${r.constructionStatus}` : '',
-      r.visibleProgress != null ? `形象进度约 ${r.visibleProgress}%` : '',
-      progressDiff ? `进度状况：${progressDiff}` : '',
-      r.readyForUse ? `达可使用状态：${r.readyForUse}` : '',
-      r.stopDuration ? `已停工：${r.stopDuration}` : '',
-      r.stopReason ? `停工原因：${r.stopReason}` : '',
-      (r.result || r.auditConclusion) ? `检查结论：${r.result || r.auditConclusion}` : '',
-      r.remark || '',
-    ].filter(Boolean)
-    return newProjectObservationRow({
-      seq: i + 1,
-      projectName: r.name || '',
-      location: r.location || r.siteLocation || '',
-      progressDescription: parts.join('；'),
-      photoIndex: r.photoUrl || r.photos || '',
-      constructionStatus: r.constructionStatus || '',
-      visibleProgress: r.visibleProgress ?? null,
-    })
-  })
-}
-
-/** 从 H2-13 停工/进度异常/不存在等自动生成异常草稿（兼容旧/新字段） */
-export function draftAbnormalsFromCheckRows(
-  rows: {
-    name: string
-    constructionStatus?: string
-    progressDifference?: string
-    progressDesc?: string
-    stopDuration?: string
-    stopReason?: string
-    readyForUse?: string
-    result?: string
-    auditConclusion?: string
-    remark?: string
-  }[],
-): H2AbnormalItem[] {
-  const out: H2AbnormalItem[] = []
-  for (const r of rows) {
-    const stopped =
-      r.constructionStatus === '停工'
-      || !!String(r.stopDuration ?? '').trim()
-      || !!String(r.stopReason ?? '').trim()
-    if (stopped) {
-      out.push(
-        newAbnormalItem({
-          name: r.name,
-          abnormalType: '停工',
-          description: [
-            r.stopDuration,
-            r.stopReason,
-            r.progressDesc || r.progressDifference,
-            r.remark,
-            r.result || r.auditConclusion,
-          ].filter(Boolean).join('；'),
-          suggestion: '关注减值（→H2-15）',
-        }),
-      )
-      continue
-    }
-    if (r.readyForUse === '是') {
-      out.push(
-        newAbnormalItem({
-          name: r.name,
-          abnormalType: '达可使用未转固',
-          description: '现场判断已达预定可使用状态',
-          suggestion: '核对转固时点（→H2-5）',
-        }),
-      )
-    }
-    const diff = (r.progressDesc || r.progressDifference || '').trim()
-    if (diff && !/一致|无差异|相符/.test(diff)) {
-      out.push(
-        newAbnormalItem({
-          name: r.name,
-          abnormalType: '进度异常',
-          description: diff,
-          suggestion: '追加说明',
-        }),
-      )
-    }
-    const conclusion = r.result || r.auditConclusion || ''
-    if (/不存在|未见|无法核实|盘亏/.test(conclusion)) {
-      out.push(
-        newAbnormalItem({
-          name: r.name,
-          abnormalType: /盘亏/.test(conclusion) ? '盘亏' : '不存在',
-          description: conclusion,
-          suggestion: '建议调整',
-        }),
-      )
-    }
-  }
-  return out
-}
-
-/** 完工程度闸门 */
-export function calcH2SummaryCompleteness(form: H2StocktakeSummaryForm): {
+export interface CompletenessItem {
   id: string
   label: string
   ok: boolean
   hint: string
-}[] {
+}
+
+/** 完工程度闸门：签署前应补齐的项（不阻断签署，只提示） */
+export function evaluateSummaryCompleteness(s: H2StocktakeSummary): CompletenessItem[] {
+  const filled = (v: string) => v.trim().length > 0
   return [
+    { id: 'bsDate', label: '资产负债表日说明', ok: filled(s.bsDateNote), hint: '说明察看日与资产负债表日的关系' },
+    { id: 'pre', label: '察看前检查程序', ok: filled(s.engDept) && filled(s.policyDesignOk), hint: '填写工程管理部门与制度评价' },
     {
-      id: 'bs',
-      label: '资产负债表日说明',
-      ok: !!form.bsDateNote.trim(),
-      hint: '说明监盘日与资产负债表日关系',
+      id: 'people', label: '参与人员', ok: s.clientPersonnel.length > 0 && s.auditorPersonnel.length > 0,
+      hint: '被审计单位人员与审计人员各至少一行',
     },
     {
-      id: 'pre',
-      label: '盘前了解（部门/制度）',
-      ok: !!(form.engDept.trim() || form.engStaff.trim() || form.policyDesignOk.trim()),
-      hint: '填写工程管理部门或管理制度评价',
+      id: 'time', label: '实际察看日及时间',
+      ok: filled(s.actualDate) && filled(s.startTime) && filled(s.endTime) && isTimeRangeValid(s.startTime, s.endTime),
+      hint: '填写日期、开始与结束时间（结束须晚于开始）',
+    },
+    { id: 'obs', label: '逐个工程形象进度', ok: s.projectObservations.length > 0, hint: '可从 H2-13 回填' },
+    {
+      id: 'checks', label: '察看总体情况六问', ok: s.observationChecks.every((c) => filled(c.answer)),
+      hint: `尚有 ${s.observationChecks.filter((c) => !filled(c.answer)).length} 问未答`,
     },
     {
-      id: 'people',
-      label: '参与察看人员',
-      ok: form.clientPersonnel.length > 0 || form.auditorPersonnel.length > 0,
-      hint: '至少登记一方参与人员',
+      id: 'diff', label: '差异说明盖章与签字确认', ok: s.diffExplanationObtained === 'Y' && s.clientSigned === 'Y',
+      hint: '取得盖章《工程现场察看差异说明》并请被审计单位人员签字',
     },
-    {
-      id: 'time',
-      label: '实际察看时间',
-      ok: !!form.actualDate,
-      hint: '填写实际现场察看日',
-    },
-    {
-      id: 'obs',
-      label: '逐项工程观察',
-      ok: form.projectObservations.length > 0,
-      hint: '可从 H2-13 回填',
-    },
-    {
-      id: 'checks',
-      label: '总体核对（至少填 1 项）',
-      ok: form.observationChecks.some((c) => !!c.answer.trim()),
-      hint: '完成四(二)存在性/进度/停工等核对',
-    },
-    {
-      id: 'conclusion',
-      label: '监盘结论',
-      ok: !!form.conclusion.trim(),
-      hint: '明确是否达到审计目标',
-    },
+    { id: 'conclusion', label: '审计结论', ok: filled(s.conclusion), hint: '可点「规则起草」生成草稿' },
   ]
 }
 
-/** 规则起草结论草稿 */
-export function draftH2Conclusion(form: H2StocktakeSummaryForm, stats: {
-  total: number
-  inProgress: number
-  stopped: number
-  completed: number
-}): string {
-  const n = form.projectObservations.length || stats.total
-  const abn = form.abnormalProjects.length
-  const stop = form.abnormalProjects.filter((a) => a.abnormalType === '停工').length || stats.stopped
-  const ready = form.observationChecks.find((c) => c.id === 'readyNotTransferred')?.answer || ''
-  const lines = [
-    `本次现场察看覆盖在建工程项目 ${n} 个（施工中 ${stats.inProgress}、停工 ${stats.stopped}、完工 ${stats.completed}）。`,
-    abn > 0
-      ? `发现异常事项 ${abn} 项${stop > 0 ? `（其中停工 ${stop} 项，建议联动 H2-15 关注减值）` : ''}，详见异常清单。`
-      : '现场察看未发现重大异常。',
-    ready.trim()
-      ? `关于已达预计可使用状态仍挂在建：${ready.trim()}。`
-      : '',
-    '经实施上述程序，我们认为在建工程监盘程序已按计划执行，相关存在性、形象进度及停工/转固风险已得到适当关注（具体结论请结合抽样覆盖与证据充分性进一步判断）。',
-  ]
-  return lines.filter(Boolean).join('\n')
+/** 与 H2-13 交叉的逻辑提示 */
+export function summaryLogicWarnings(s: H2StocktakeSummary, checkRows: H2StocktakeCheckRow[],
+  isStopped: (r: H2StocktakeCheckRow) => boolean): string[] {
+  const out: string[] = []
+  if (!isTimeRangeValid(s.startTime, s.endTime)) out.push('察看结束时间早于或等于开始时间')
+  const stopped = checkRows.filter(isStopped).map((r) => r.name).filter(Boolean)
+  const abnormalNames = new Set(s.abnormalProjects.map((a) => a.name.trim()))
+  const missing = stopped.filter((n) => !abnormalNames.has(n.trim()))
+  if (missing.length) out.push(`H2-13 停工工程未列入异常：${missing.slice(0, 5).join('、')}${missing.length > 5 ? ' 等' : ''}`)
+  const ready = checkRows.filter((r) => r.readyForUse === '是').length
+  const q5 = s.observationChecks.find((c) => c.id === 'readyNotTransferred')
+  if (ready > 0 && q5 && !q5.answer.trim()) out.push(`H2-13 有 ${ready} 项已达预定可使用状态，第 5 问未作答（关注转固 H2-5）`)
+  if (s.diffExplanationObtained === 'Y' && !s.diffExplanationIndex.trim()) out.push('已取得差异说明但未填索引')
+  if (s.clientSigned === 'Y' && !s.clientSignIndex.trim()) out.push('被审计单位已签字但未填索引')
+  return out
+}
+
+/** 由 H2-13 行生成逐个工程观察行 */
+export function observationsFromCheckRows(rows: H2StocktakeCheckRow[]): H2SummaryObservationRow[] {
+  return rows
+    .filter((r) => r.name && r.name.trim())
+    .map((r) => newObservationRow({
+      projectName: r.name,
+      location: r.location || '',
+      constructionStatus: r.constructionStatus || '',
+      progressDescription: r.progressDesc || '',
+      photoIndex: r.photoUrl ? 'H2-13' : '',
+    }))
+}
+
+/** 从 H2-12 计划 / H2-13 检查表回填：只填空字段，已填的不覆盖 */
+export function fillSummaryFromUpstream(s: H2StocktakeSummary, plan: H2StocktakePlanForm,
+  checkRows: H2StocktakeCheckRow[]): number {
+  let n = 0
+  const setIfEmpty = (key: 'actualDate' | 'engDept' | 'policyIndex', v: string) => {
+    if (!s[key].trim() && v.trim()) { s[key] = v; n++ }
+  }
+  setIfEmpty('actualDate', plan.plannedDate || '')
+  setIfEmpty('engDept', plan.icResponsible || '')
+  setIfEmpty('policyIndex', plan.icSystemIndex || '')
+  if (!s.projectObservations.length) {
+    const obs = observationsFromCheckRows(checkRows)
+    if (obs.length) { s.projectObservations = obs; n++ }
+  }
+  if (!s.auditorPersonnel.length && plan.plannedLead.trim()) {
+    s.auditorPersonnel = [newAuditorRow({ names: plan.plannedLead, responsibleArea: '现场察看负责人' })]
+    n++
+  }
+  return n
+}
+
+/** 把 H2-13 的停工 / 差异行并入异常（按工程名去重） */
+export function mergeAbnormalFromCheckRows(s: H2StocktakeSummary, rows: H2StocktakeCheckRow[],
+  isStopped: (r: H2StocktakeCheckRow) => boolean): number {
+  const existing = new Set(s.abnormalProjects.map((a) => a.name.trim()))
+  let n = 0
+  for (const r of rows) {
+    const name = (r.name || '').trim()
+    if (!name || existing.has(name)) continue
+    if (isStopped(r)) {
+      s.abnormalProjects.push(newAbnormalItem({
+        name, abnormalType: '停工', description: [r.stopReason, r.stopDuration].filter(Boolean).join('；'),
+        suggestion: '关注减值',
+      }))
+    } else if (r.result === '盘盈' || r.result === '盘亏') {
+      s.abnormalProjects.push(newAbnormalItem({
+        name, abnormalType: '其他', description: `${r.result}${r.diffReason ? '：' + r.diffReason : ''}`,
+        suggestion: '追加说明',
+      }))
+    } else if (r.readyForUse === '是') {
+      s.abnormalProjects.push(newAbnormalItem({
+        name, abnormalType: '应转未转', description: '已达到预定可使用状态', suggestion: '关注转固(H2-5)',
+      }))
+    } else {
+      continue
+    }
+    existing.add(name)
+    n++
+  }
+  return n
+}
+
+/** 规则起草结论（只用已填事实，不编造） */
+export function draftSummaryConclusion(s: H2StocktakeSummary, stats: { total: number; stopped: number; completed: number }): string {
+  const parts: string[] = []
+  const when = s.actualDate ? `${s.actualDate}` : '实际察看日'
+  parts.push(`我们于${when}对在建工程实施了现场察看，共察看 ${stats.total || s.projectObservations.length} 个工程项目。`)
+  const stoppedCount = s.abnormalProjects.filter((a) => a.abnormalType === '停工').length || stats.stopped
+  if (stoppedCount > 0) parts.push(`其中 ${stoppedCount} 项处于停工状态，已联动 H2-15 关注减值。`)
+  const notTransferred = s.abnormalProjects.filter((a) => a.abnormalType === '应转未转').length
+  if (notTransferred > 0) parts.push(`${notTransferred} 项已达到预定可使用状态尚未转固，已联动 H2-5 检查转固时点。`)
+  const others = s.abnormalProjects.length - stoppedCount - notTransferred
+  if (others > 0) parts.push(`另发现 ${others} 项其他异常，详见第五部分。`)
+  if (s.abnormalProjects.length === 0) parts.push('未发现异常情况。')
+  if (s.diffExplanationObtained === 'Y') parts.push('已取得盖章的《工程现场察看差异说明》。')
+  parts.push('（以上为按已填写内容生成的草稿，请复核后据实修改。）')
+  return parts.join('')
 }
