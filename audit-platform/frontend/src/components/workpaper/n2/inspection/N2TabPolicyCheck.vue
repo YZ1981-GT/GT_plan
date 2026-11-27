@@ -76,7 +76,7 @@
           <el-radio-group
             :model-value="item.status"
             :disabled="isReadonly"
-            @change="(val: string) => handleStatusChange('incentive', idx, val)"
+            @change="(val: string | number | boolean | undefined) => handleStatusChange('incentive', idx, (val as string))"
           >
             <el-radio value="合规">合规</el-radio>
             <el-radio value="不合规">不合规</el-radio>
@@ -120,7 +120,7 @@
           <el-radio-group
             :model-value="item.status"
             :disabled="isReadonly"
-            @change="(val: string) => handleStatusChange('rate', idx, val)"
+            @change="(val: string | number | boolean | undefined) => handleStatusChange('rate', idx, (val as string))"
           >
             <el-radio value="合规">合规</el-radio>
             <el-radio value="不合规">不合规</el-radio>
@@ -164,7 +164,7 @@
           <el-radio-group
             :model-value="item.status"
             :disabled="isReadonly"
-            @change="(val: string) => handleStatusChange('obligation', idx, val)"
+            @change="(val: string | number | boolean | undefined) => handleStatusChange('obligation', idx, (val as string))"
           >
             <el-radio value="合规">合规</el-radio>
             <el-radio value="不合规">不合规</el-radio>

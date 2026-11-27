@@ -234,7 +234,7 @@
           <h4 class="gt-a121__section-title">诉讼确认</h4>
           <el-radio-group
             :model-value="replySection.litigation_status"
-            @change="(v: string) => updateField('reply', 'status', v)"
+            @change="(v: string | number | boolean | undefined) => updateField('reply', 'status', (v as string))"
           >
             <el-radio value="no_litigation">确认无诉讼</el-radio>
             <el-radio value="has_litigation">确认有诉讼</el-radio>
@@ -255,7 +255,7 @@
           <h4 class="gt-a121__section-title">律师费结算</h4>
           <el-radio-group
             :model-value="replySection.fee_status"
-            @change="(v: string) => updateField('reply', 'fee-status', v)"
+            @change="(v: string | number | boolean | undefined) => updateField('reply', 'fee-status', (v as string))"
           >
             <el-radio value="no_outstanding">未积欠</el-radio>
             <el-radio value="has_outstanding">尚有未付</el-radio>

@@ -461,7 +461,7 @@ async function generateAuditConclusion(): Promise<void> {
                 v-else-if="col.type === 'boolean'"
                 :model-value="!!row[col.key]"
                 :disabled="isReadonly || isVoucherRowLocked(row)"
-                @change="(val: boolean) => updateCell(row.id, col.key, val)"
+                @change="(val: string | number | boolean) => updateCell(row.id, col.key, val === true)"
               />
               <!-- Date -->
               <el-date-picker

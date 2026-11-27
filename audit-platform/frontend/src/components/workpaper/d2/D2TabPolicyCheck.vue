@@ -172,7 +172,7 @@ function fmtPct(v: number): string {
             <el-radio-group
               :model-value="p.conclusion"
               :disabled="isReadonly"
-              @change="(v: string) => updateParagraph(p.paragraphId, 'conclusion', v)"
+              @change="(v: string | number | boolean | undefined) => updateParagraph(p.paragraphId, 'conclusion', (v as string))"
             >
               <el-radio-button value="Y">Y</el-radio-button>
               <el-radio-button value="N">N</el-radio-button>

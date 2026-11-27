@@ -207,7 +207,7 @@
                 </div>
                 <el-radio-group
                   :model-value="(chapters[String(n)] as any).answer"
-                  @change="(v: string) => handleYnChange(n, v as 'Y' | 'N' | null)"
+                  @change="(v: string | number | boolean | undefined) => handleYnChange(n, (v as string) as 'Y' | 'N' | null)"
                 >
                   <el-radio value="Y">是</el-radio>
                   <el-radio value="N">否</el-radio>

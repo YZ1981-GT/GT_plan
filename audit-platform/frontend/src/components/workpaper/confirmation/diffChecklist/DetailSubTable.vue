@@ -123,7 +123,7 @@
             v-if="!readonly"
             :model-value="row.need_adjust"
             size="small"
-            @change="(val: boolean) => $emit('update-row', row._row_id, 'need_adjust', val)"
+            @change="(val: string | number | boolean) => $emit('update-row', row._row_id, 'need_adjust', val === true)"
           />
           <el-tag v-else :type="row.need_adjust ? 'danger' : 'info'" size="small">
             {{ row.need_adjust ? '是' : '否' }}

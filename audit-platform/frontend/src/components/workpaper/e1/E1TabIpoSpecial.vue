@@ -262,7 +262,7 @@ async function generateAuditConclusion(): Promise<void> {
           :disabled="isReadonly"
           active-text="已启用IPO/舞弊应对程序"
           inactive-text="未启用"
-          @change="toggleApplicability"
+          @change="(v) => toggleApplicability(v === true)"
         />
         <el-button v-if="isApplicable" size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
       </div>
@@ -316,7 +316,7 @@ async function generateAuditConclusion(): Promise<void> {
                 v-else-if="col.type === 'boolean'"
                 :model-value="!!row[col.key]"
                 :disabled="isReadonly"
-                @change="(val: boolean) => updateCell(row.id, col.key, val)"
+                @change="(val: string | number | boolean) => updateCell(row.id, col.key, val === true)"
               />
               <!-- Date -->
               <el-date-picker

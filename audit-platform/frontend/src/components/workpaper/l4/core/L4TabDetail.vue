@@ -285,7 +285,7 @@
         </el-table-column>
         <el-table-column label="已兑付" width="80" align="center">
           <template #default="{ row, $index }">
-            <el-checkbox :model-value="row.isRedeemed" :disabled="isReadonly" @change="(val: boolean) => handleUpdate($index, 'isRedeemed', val)" />
+            <el-checkbox :model-value="row.isRedeemed" :disabled="isReadonly" @change="(val: string | number | boolean) => handleUpdate($index, 'isRedeemed', val === true)" />
           </template>
         </el-table-column>
         <el-table-column label="备注" min-width="200">

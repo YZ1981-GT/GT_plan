@@ -333,7 +333,7 @@ const b22CEntrySync = useEntrySyncReadiness({
             :model-value="indicatorChecks[i]"
             :disabled="readonly"
             class="judgment-check"
-            @update:model-value="(v: boolean) => onIndicatorChange(i, v)"
+            @update:model-value="(v: string | number | boolean) => onIndicatorChange(i, v === true)"
           >
             {{ txt }}
           </el-checkbox>
@@ -352,7 +352,7 @@ const b22CEntrySync = useEntrySyncReadiness({
             :model-value="factorChecks[i]"
             :disabled="readonly"
             class="judgment-check"
-            @update:model-value="(v: boolean) => onFactorChange(i, v)"
+            @update:model-value="(v: string | number | boolean) => onFactorChange(i, v === true)"
           >
             {{ txt }}
           </el-checkbox>
@@ -423,7 +423,7 @@ const b22CEntrySync = useEntrySyncReadiness({
             <el-checkbox
               :model-value="row.isControlDeficiency"
               :disabled="readonly"
-              @update:model-value="(v: boolean) => onDeficiencyFieldChange(block.key, $index, 'isControlDeficiency', v)"
+              @update:model-value="(v: string | number | boolean) => onDeficiencyFieldChange(block.key, $index, 'isControlDeficiency', v === true)"
             />
           </template>
         </el-table-column>
@@ -485,7 +485,7 @@ const b22CEntrySync = useEntrySyncReadiness({
           <el-radio-group
             :model-value="block.sectionSignificant"
             :disabled="readonly"
-            @change="(v: boolean) => onSectionSignificantChange(block.key, v)"
+            @change="(v: string | number | boolean | undefined) => onSectionSignificantChange(block.key, v === true)"
           >
             <el-radio :value="true">是</el-radio>
             <el-radio :value="false">否</el-radio>

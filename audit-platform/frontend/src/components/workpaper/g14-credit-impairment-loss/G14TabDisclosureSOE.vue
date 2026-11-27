@@ -42,7 +42,7 @@
         inline-prompt
         active-text="显示空行"
         inactive-text="隐藏空行"
-        @update:model-value="dis.setShowEmptyRows"
+        @update:model-value="(v) => dis.setShowEmptyRows(v === true)"
       />
       <span v-if="dis.hiddenEmptyCount.value > 0" class="toolbar-hint">
         已隐藏 {{ dis.hiddenEmptyCount.value }} 个无发生额项目

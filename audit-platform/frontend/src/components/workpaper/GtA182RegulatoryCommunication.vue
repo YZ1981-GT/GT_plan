@@ -100,7 +100,7 @@
                 :model-value="matter.applicability"
                 :disabled="props.readonly"
                 size="small"
-                @change="(v: string) => updateMatter(matter.id, 'applicability', v)"
+                @change="(v: string | number | boolean | undefined) => updateMatter(matter.id, 'applicability', (v as string))"
               >
                 <el-radio value="Y">适用</el-radio>
                 <el-radio value="N">不适用</el-radio>

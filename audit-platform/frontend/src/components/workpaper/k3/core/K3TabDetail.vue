@@ -269,7 +269,7 @@
             <el-checkbox
               :model-value="row.suspectedUnrecorded"
               :disabled="isReadonly"
-              @change="(v: boolean) => detail.updateCell(row.rowId, 'suspectedUnrecorded', v)"
+              @change="(v: string | number | boolean) => detail.updateCell(row.rowId, 'suspectedUnrecorded', v === true)"
             />
           </template>
         </el-table-column>

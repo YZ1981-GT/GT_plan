@@ -220,21 +220,21 @@
                 :disabled="isReadonly"
                 size="small"
                 label="经营"
-                @change="(v: boolean) => lossCheck.updateRow($index, 'sourceOperating', !!v)"
+                @change="(v: string | number | boolean) => lossCheck.updateRow($index, 'sourceOperating', !!v === true)"
               />
               <el-checkbox
                 :model-value="row.sourceTemporaryDiff"
                 :disabled="isReadonly"
                 size="small"
                 label="暂时性差异"
-                @change="(v: boolean) => lossCheck.updateRow($index, 'sourceTemporaryDiff', !!v)"
+                @change="(v: string | number | boolean) => lossCheck.updateRow($index, 'sourceTemporaryDiff', !!v === true)"
               />
               <el-checkbox
                 :model-value="row.sourceOther"
                 :disabled="isReadonly"
                 size="small"
                 label="其他"
-                @change="(v: boolean) => lossCheck.updateRow($index, 'sourceOther', !!v)"
+                @change="(v: string | number | boolean) => lossCheck.updateRow($index, 'sourceOther', !!v === true)"
               />
             </div>
           </template>

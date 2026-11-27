@@ -37,7 +37,7 @@
               <el-radio-group
                 :model-value="effectiveHeader.business_class || ''"
                 :disabled="props.readonly"
-                @change="(val: string) => onHeaderFieldChange('business_class', val as 'A' | 'B' | 'C')"
+                @change="(val: string | number | boolean | undefined) => onHeaderFieldChange('business_class', (val as string) as 'A' | 'B' | 'C')"
               >
                 <el-radio value="A">A</el-radio>
                 <el-radio value="B">B</el-radio>
@@ -48,7 +48,7 @@
               <el-radio-group
                 :model-value="effectiveHeader.is_first_engagement == null ? '' : String(effectiveHeader.is_first_engagement)"
                 :disabled="props.readonly"
-                @change="(val: string) => onHeaderFieldChange('is_first_engagement', val === 'true')"
+                @change="(val: string | number | boolean | undefined) => onHeaderFieldChange('is_first_engagement', (val as string) === 'true')"
               >
                 <el-radio value="true">是</el-radio>
                 <el-radio value="false">否</el-radio>
@@ -118,7 +118,7 @@
                     :model-value="getItemResponse(item.id).applicable"
                     :disabled="props.readonly"
                     size="small"
-                    @change="(val: string) => onApplicableChange(item.id, val as 'yes' | 'no')"
+                    @change="(val: string | number | boolean | undefined) => onApplicableChange(item.id, (val as string) as 'yes' | 'no')"
                   >
                     <el-radio value="yes">适用</el-radio>
                     <el-radio value="no">不适用</el-radio>
@@ -185,7 +185,7 @@
                       :model-value="ci.applicable"
                       :disabled="props.readonly"
                       size="small"
-                      @change="(val: string) => onCustomItemApplicableChange(ci.id, val as 'yes' | 'no')"
+                      @change="(val: string | number | boolean | undefined) => onCustomItemApplicableChange(ci.id, (val as string) as 'yes' | 'no')"
                     >
                       <el-radio value="yes">适用</el-radio>
                       <el-radio value="no">不适用</el-radio>

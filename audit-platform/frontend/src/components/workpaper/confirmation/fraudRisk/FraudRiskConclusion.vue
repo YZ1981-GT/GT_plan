@@ -20,7 +20,7 @@
       <el-radio-group
         v-if="!readonly"
         :model-value="conclusion.conclusion_type"
-        @change="(val: string) => $emit('update', 'conclusion_type', val)"
+        @change="(val: string | number | boolean | undefined) => $emit('update', 'conclusion_type', (val as string))"
       >
         <el-radio
           v-for="opt in FRAUD_RISK_CONCLUSION_OPTIONS"

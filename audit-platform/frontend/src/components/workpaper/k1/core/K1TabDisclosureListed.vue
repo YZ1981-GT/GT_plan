@@ -307,7 +307,7 @@
             :disabled="isReadonly"
             size="small"
             active-text="本期不存在第二阶段"
-            @change="(v: boolean) => disc.toggleStage2None('end', v)"
+            @change="(v: string | number | boolean) => disc.toggleStage2None('end', v === true)"
           />
         </div>
         <el-alert
@@ -372,7 +372,7 @@
                 :disabled="isReadonly"
                 size="small"
                 active-text="上年年末不存在第二阶段"
-                @change="(v: boolean) => disc.toggleStage2None('prior', v)"
+                @change="(v: string | number | boolean) => disc.toggleStage2None('prior', v === true)"
               />
             </div>
             <el-alert

@@ -377,7 +377,7 @@
               :model-value="row.result"
               :disabled="readonly"
               size="small"
-              @change="(v: string) => onSampleResultChange($index, v)"
+              @change="(v: string | number | boolean | undefined) => onSampleResultChange($index, (v as string))"
             >
               <el-radio-button value="有效">
                 <span class="result-btn result-effective">有效</span>

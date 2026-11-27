@@ -439,7 +439,7 @@
             </div>
             <div style="display: flex; gap: 6px; align-items: center;">
               <el-tooltip content="保存后自动跳到下一未编制章节" placement="top">
-                <el-switch v-model="autoAdvance" size="small" @change="toggleAutoAdvance" style="margin-right:4px;" />
+                <el-switch v-model="autoAdvance" size="small" @change="(v) => toggleAutoAdvance(v === true)" style="margin-right:4px;" />
               </el-tooltip>
               <template v-if="noteEdit.showNonEqcrEntries.value && (currentNote.content_type === 'text' || currentNote.content_type === 'mixed')">
                 <el-tooltip content="参照知识库文档由 AI 起草本章节正文草稿" placement="bottom" :show-after="400">

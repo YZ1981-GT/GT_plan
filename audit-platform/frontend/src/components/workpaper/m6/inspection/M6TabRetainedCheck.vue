@@ -153,7 +153,7 @@
           <el-radio-group
             :model-value="item.status"
             size="small"
-            @change="(val: string) => updateCheckStatus(item.id, val as any)"
+            @change="(val: string | number | boolean | undefined) => updateCheckStatus(item.id, (val as string) as any)"
           >
             <el-radio-button value="pass">通过</el-radio-button>
             <el-radio-button value="fail">不通过</el-radio-button>
@@ -206,7 +206,7 @@
             :model-value="conclusion.conclusionType"
             :disabled="isReadonly"
             size="small"
-            @change="(val: string) => updateConclusion('conclusionType', val)"
+            @change="(val: string | number | boolean | undefined) => updateConclusion('conclusionType', (val as string))"
           >
             <el-radio-button value="no-exception">无异常</el-radio-button>
             <el-radio-button value="exception-found">发现异常</el-radio-button>

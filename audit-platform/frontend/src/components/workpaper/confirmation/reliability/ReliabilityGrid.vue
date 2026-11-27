@@ -202,7 +202,7 @@
             <el-checkbox
               v-if="!readonly"
               :model-value="row.identity_verified"
-              @change="(val: boolean) => $emit('update', row._row_id, 'identity_verified', val)"
+              @change="(val: string | number | boolean) => $emit('update', row._row_id, 'identity_verified', val === true)"
             />
             <el-icon v-else-if="row.identity_verified" color="var(--el-color-success)"><Select /></el-icon>
             <span v-else class="reliability-grid__empty">—</span>
@@ -267,7 +267,7 @@
             <el-checkbox
               v-if="!readonly"
               :model-value="row.email_verified"
-              @change="(val: boolean) => $emit('update', row._row_id, 'email_verified', val)"
+              @change="(val: string | number | boolean) => $emit('update', row._row_id, 'email_verified', val === true)"
             />
             <el-icon v-else-if="row.email_verified" color="var(--el-color-success)"><Select /></el-icon>
             <span v-else class="reliability-grid__empty">—</span>
@@ -309,7 +309,7 @@
             <el-checkbox
               v-if="!readonly"
               :model-value="row.phone_called"
-              @change="(val: boolean) => $emit('update', row._row_id, 'phone_called', val)"
+              @change="(val: string | number | boolean) => $emit('update', row._row_id, 'phone_called', val === true)"
             />
             <el-icon v-else-if="row.phone_called" color="var(--el-color-success)"><Select /></el-icon>
             <span v-else class="reliability-grid__empty">—</span>

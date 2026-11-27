@@ -55,7 +55,7 @@
           <el-radio-group
             :model-value="plan.existenceRiskLevel"
             :disabled="isReadonly"
-            @update:model-value="(v: string) => updatePlan('existenceRiskLevel', v as any)"
+            @update:model-value="(v: string | number | boolean | undefined) => updatePlan('existenceRiskLevel', (v as string) as any)"
           >
             <el-radio value="低">低</el-radio>
             <el-radio value="中">中</el-radio>

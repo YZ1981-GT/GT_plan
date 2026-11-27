@@ -616,7 +616,7 @@
             <el-switch
               :model-value="row.relatedParty"
               :disabled="isReadonly"
-              @change="(v: boolean) => dis.patchWriteoff(row.id, { relatedParty: v })"
+              @change="(v: string | number | boolean) => dis.patchWriteoff(row.id, { relatedParty: v === true })"
             />
           </template>
         </el-table-column>
@@ -687,7 +687,7 @@
             <el-switch
               :model-value="row.relatedParty"
               :disabled="isReadonly"
-              @change="(v: boolean) => dis.patchLeaseMlp(row.id, { relatedParty: v })"
+              @change="(v: string | number | boolean) => dis.patchLeaseMlp(row.id, { relatedParty: v === true })"
             />
           </template>
         </el-table-column>

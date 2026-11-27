@@ -459,7 +459,7 @@ onBeforeUnmount(() => {
             :model-value="responses[item.item_id]?.conclusion"
             size="small"
             :disabled="isReadonly"
-            @update:model-value="(v: string) => setItemConclusion(item.item_id, v as 'Y'|'N'|'NA')"
+            @update:model-value="(v: string | number | boolean | undefined) => setItemConclusion(item.item_id, (v as string) as 'Y'|'N'|'NA')"
           >
             <el-radio-button value="Y">是</el-radio-button>
             <el-radio-button value="N">否</el-radio-button>

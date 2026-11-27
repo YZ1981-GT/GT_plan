@@ -192,7 +192,7 @@ onBeforeUnmount(() => {
           :model-value="isFirstEngagement"
           active-text="是"
           inactive-text="否"
-          @change="(val: boolean) => updateFirstEngagement(val)"
+          @change="(val: string | number | boolean) => updateFirstEngagement(val === true)"
         />
       </div>
     </div>

@@ -275,14 +275,14 @@
               <el-checkbox
                 :model-value="row.isRelated"
                 :disabled="isReadonly"
-                @change="(v: boolean) => updateCell(row.id, 'isRelated', v)"
+                @change="(v: string | number | boolean) => updateCell(row.id, 'isRelated', v === true)"
               />
             </el-tooltip>
             <el-checkbox
               v-else-if="!isMetaRow(row)"
               :model-value="row.isRelated"
               :disabled="isReadonly"
-              @change="(v: boolean) => updateCell(row.id, 'isRelated', v)"
+              @change="(v: string | number | boolean) => updateCell(row.id, 'isRelated', v === true)"
             />
             <span v-else-if="summary.relatedCount">标记 {{ summary.relatedCount }} 户</span>
           </template>

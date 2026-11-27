@@ -138,7 +138,7 @@
         </el-table-column>
         <el-table-column prop="nonRecurring" label="非经常性" width="85" align="center">
           <template #default="{ row }">
-            <el-checkbox v-if="!isReadonly && row.isEditable" :model-value="row.nonRecurring" @change="(v: boolean) => updateCell(row.rowKey, 'nonRecurring', v)" />
+            <el-checkbox v-if="!isReadonly && row.isEditable" :model-value="row.nonRecurring" @change="(v: string | number | boolean) => updateCell(row.rowKey, 'nonRecurring', v === true)" />
             <span v-else>{{ row.nonRecurring ? '✓' : '' }}</span>
           </template>
         </el-table-column>

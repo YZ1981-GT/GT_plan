@@ -529,7 +529,7 @@
         <el-table-column label="强制异常" width="88" align="center">
           <template #default="{ row }">
             <el-checkbox v-if="!isReadonly" :model-value="row.forceAbnormal"
-              @update:model-value="(v: boolean) => vc.updateRow(row.rowId, { forceAbnormal: !!v })" />
+              @update:model-value="(v: string | number | boolean) => vc.updateRow(row.rowId, { forceAbnormal: !!v === true })" />
             <span v-else>{{ row.forceAbnormal ? '是' : '否' }}</span>
           </template>
         </el-table-column>
@@ -561,7 +561,7 @@
             <el-checkbox
               v-if="!isReadonly"
               :model-value="!!row.isHighValue"
-              @update:model-value="(v: boolean) => vc.updateRow(row.rowId, { isHighValue: !!v })"
+              @update:model-value="(v: string | number | boolean) => vc.updateRow(row.rowId, { isHighValue: !!v === true })"
             />
             <span v-else>{{ row.isHighValue ? '是' : '—' }}</span>
           </template>

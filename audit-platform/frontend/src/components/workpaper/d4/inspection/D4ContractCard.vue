@@ -222,7 +222,7 @@ const filledCount = computed(() => {
             :model-value="(item as any)[field.key]"
             :disabled="isReadonly"
             size="small"
-            @update:model-value="(v: string) => onFieldUpdate(field.key, v)"
+            @update:model-value="(v: string | number | boolean | undefined) => onFieldUpdate(field.key, (v as string))"
           >
             <el-radio-button value="Y">是</el-radio-button>
             <el-radio-button value="N">否</el-radio-button>
@@ -234,7 +234,7 @@ const filledCount = computed(() => {
             :model-value="(item as any)[field.key]"
             :disabled="isReadonly"
             size="small"
-            @update:model-value="(v: string) => onFieldUpdate(field.key, v)"
+            @update:model-value="(v: string | number | boolean | undefined) => onFieldUpdate(field.key, (v as string))"
           >
             <el-radio-button value="时点法">时点法</el-radio-button>
             <el-radio-button value="时段法">时段法</el-radio-button>
@@ -253,7 +253,7 @@ const filledCount = computed(() => {
             :model-value="item.conclusion"
             :disabled="isReadonly"
             size="small"
-            @update:model-value="(v: string) => onFieldUpdate('conclusion', v)"
+            @update:model-value="(v: string | number | boolean | undefined) => onFieldUpdate('conclusion', (v as string))"
           >
             <el-radio-button value="Y">合规</el-radio-button>
             <el-radio-button value="N">存在问题</el-radio-button>

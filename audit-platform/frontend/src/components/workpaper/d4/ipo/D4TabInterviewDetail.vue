@@ -286,31 +286,31 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
           <div class="question-card">
             <div class="q-label">2. 客户与发行人的结算方式</div>
             <div class="sub-question"><span class="sub-label">(1) 客户向发行人的采购</span>
-              <el-radio-group :model-value="formData.q2a_payment" :disabled="isReadonly" @change="(v:string)=>update('q2a_payment',v)"><el-radio v-for="opt in PAYMENT_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group>
+              <el-radio-group :model-value="formData.q2a_payment" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q2a_payment',(v as string))"><el-radio v-for="opt in PAYMENT_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group>
             </div>
             <div class="sub-question"><span class="sub-label">(2) 客户向发行人的销售</span>
-              <el-radio-group :model-value="formData.q2b_collection" :disabled="isReadonly" @change="(v:string)=>update('q2b_collection',v)"><el-radio v-for="opt in COLLECTION_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group>
+              <el-radio-group :model-value="formData.q2b_collection" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q2b_collection',(v as string))"><el-radio v-for="opt in COLLECTION_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group>
             </div>
           </div>
           <!-- Q3 交易情况 -->
           <div class="question-card">
             <div class="q-label">3. 20XX年度至今客户与发行人交易情况</div>
-            <div class="sub-question"><span class="sub-label">(1) 所有交易行为是否签订合同</span><el-radio-group :model-value="formData.q3a_hasContract" :disabled="isReadonly" @change="(v:string)=>update('q3a_hasContract',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
-            <div class="sub-question"><span class="sub-label">(2) 产品质量情况（适用客户）</span><el-radio-group :model-value="formData.q3b_quality" :disabled="isReadonly" @change="(v:string)=>update('q3b_quality',v)"><el-radio v-for="opt in QUALITY_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
-            <div class="sub-question"><span class="sub-label">(3) 是否约定退换货条款</span><el-radio-group :model-value="formData.q3c_returnClause" :disabled="isReadonly" @change="(v:string)=>update('q3c_returnClause',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
-            <div v-if="formData.q3c_returnClause==='是'" class="sub-question condition-expand"><span class="sub-label">(4) 退换货金额</span><el-radio-group :model-value="formData.q3d_returnAmount" :disabled="isReadonly" @change="(v:string)=>update('q3d_returnAmount',v)"><el-radio v-for="opt in RETURN_AMOUNT_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
-            <div class="sub-question"><span class="sub-label">(5) 产品验收入库情况</span><el-radio-group :model-value="formData.q3e_acceptance" :disabled="isReadonly" @change="(v:string)=>update('q3e_acceptance',v)"><el-radio v-for="opt in ACCEPTANCE_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
-            <div class="sub-question"><span class="sub-label">(6) 是否存在返利约定</span><el-radio-group :model-value="formData.q3f_hasRebate" :disabled="isReadonly" @change="(v:string)=>update('q3f_hasRebate',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
+            <div class="sub-question"><span class="sub-label">(1) 所有交易行为是否签订合同</span><el-radio-group :model-value="formData.q3a_hasContract" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q3a_hasContract',(v as string))"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
+            <div class="sub-question"><span class="sub-label">(2) 产品质量情况（适用客户）</span><el-radio-group :model-value="formData.q3b_quality" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q3b_quality',(v as string))"><el-radio v-for="opt in QUALITY_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
+            <div class="sub-question"><span class="sub-label">(3) 是否约定退换货条款</span><el-radio-group :model-value="formData.q3c_returnClause" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q3c_returnClause',(v as string))"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
+            <div v-if="formData.q3c_returnClause==='是'" class="sub-question condition-expand"><span class="sub-label">(4) 退换货金额</span><el-radio-group :model-value="formData.q3d_returnAmount" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q3d_returnAmount',(v as string))"><el-radio v-for="opt in RETURN_AMOUNT_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
+            <div class="sub-question"><span class="sub-label">(5) 产品验收入库情况</span><el-radio-group :model-value="formData.q3e_acceptance" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q3e_acceptance',(v as string))"><el-radio v-for="opt in ACCEPTANCE_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
+            <div class="sub-question"><span class="sub-label">(6) 是否存在返利约定</span><el-radio-group :model-value="formData.q3f_hasRebate" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q3f_hasRebate',(v as string))"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
             <template v-if="formData.q3f_hasRebate==='是'">
-              <div class="sub-question condition-expand"><span class="sub-label">A. 返利支付方式</span><el-radio-group :model-value="formData.q3f_rebateMethod" :disabled="isReadonly" @change="(v:string)=>update('q3f_rebateMethod',v)"><el-radio v-for="opt in REBATE_METHOD_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
-              <div class="sub-question condition-expand"><span class="sub-label">B. 返利金额</span><el-radio-group :model-value="formData.q3f_rebateAmount" :disabled="isReadonly" @change="(v:string)=>update('q3f_rebateAmount',v)"><el-radio v-for="opt in REBATE_AMOUNT_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
+              <div class="sub-question condition-expand"><span class="sub-label">A. 返利支付方式</span><el-radio-group :model-value="formData.q3f_rebateMethod" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q3f_rebateMethod',(v as string))"><el-radio v-for="opt in REBATE_METHOD_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
+              <div class="sub-question condition-expand"><span class="sub-label">B. 返利金额</span><el-radio-group :model-value="formData.q3f_rebateAmount" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q3f_rebateAmount',(v as string))"><el-radio v-for="opt in REBATE_AMOUNT_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
             </template>
-            <div class="sub-question"><span class="sub-label">(7) 经销商购买的货物是否已最终销售</span><el-radio-group :model-value="formData.q3g_finalSold" :disabled="isReadonly" @change="(v:string)=>update('q3g_finalSold',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio><el-radio value="不适用">不适用</el-radio></el-radio-group></div>
+            <div class="sub-question"><span class="sub-label">(7) 经销商购买的货物是否已最终销售</span><el-radio-group :model-value="formData.q3g_finalSold" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q3g_finalSold',(v as string))"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio><el-radio value="不适用">不适用</el-radio></el-radio-group></div>
           </div>
           <!-- Q4 其他资金 -->
           <div class="question-card">
             <div class="q-label">4. 除采购外是否还存在其他资金往来？</div>
-            <el-radio-group :model-value="formData.q4_otherFunds" :disabled="isReadonly" @change="(v:string)=>update('q4_otherFunds',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group>
+            <el-radio-group :model-value="formData.q4_otherFunds" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q4_otherFunds',(v as string))"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group>
           </div>
           <!-- Q5 其他 -->
           <div class="question-card">
@@ -323,9 +323,9 @@ defineExpose({ handleExportTemplate, handleExportData, handleImportClick })
         <div v-show="activeSection==='ch4'" class="form-section">
           <h4>四、关联关系情况</h4>
           <p class="field-hint">发行人的实际控制人、自然人股东、董事、监事或高管人员及主要关联方是否在客户持有股份</p>
-          <div class="question-card"><div class="q-label">是否持有股份</div><el-radio-group :model-value="formData.q6_hasShares" :disabled="isReadonly" @change="(v:string)=>update('q6_hasShares',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
-          <div class="question-card"><div class="q-label">是否担任职务</div><el-radio-group :model-value="formData.q6_hasPosition" :disabled="isReadonly" @change="(v:string)=>update('q6_hasPosition',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
-          <div class="question-card"><div class="q-label">是否和客户有交易</div><el-radio-group :model-value="formData.q6_hasTransaction" :disabled="isReadonly" @change="(v:string)=>update('q6_hasTransaction',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
+          <div class="question-card"><div class="q-label">是否持有股份</div><el-radio-group :model-value="formData.q6_hasShares" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q6_hasShares',(v as string))"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
+          <div class="question-card"><div class="q-label">是否担任职务</div><el-radio-group :model-value="formData.q6_hasPosition" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q6_hasPosition',(v as string))"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
+          <div class="question-card"><div class="q-label">是否和客户有交易</div><el-radio-group :model-value="formData.q6_hasTransaction" :disabled="isReadonly" @change="(v: string | number | boolean | undefined) =>update('q6_hasTransaction',(v as string))"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
         </div>
 
         <!-- 签字与承诺 -->

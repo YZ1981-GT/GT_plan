@@ -1225,7 +1225,7 @@ const b50REntrySync = useEntrySyncReadiness({
                 <el-checkbox
                   :model-value="allResponses.get(`B50-T1-factor-${idx}-transferred`)?.conclusion === 'Y'"
                   :disabled="isReadonly"
-                  @update:model-value="(v: boolean) => updateFactorField(idx, 'transferred', v ? 'Y' : '', true)"
+                  @update:model-value="(v: string | number | boolean) => updateFactorField(idx, 'transferred', v === true ? 'Y' : '', true)"
                 />
               </template>
             </el-table-column>

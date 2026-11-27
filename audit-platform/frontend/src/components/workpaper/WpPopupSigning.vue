@@ -189,7 +189,7 @@ onBeforeUnmount(() => {
         <template #default="{ row }">
           <el-checkbox
             :model-value="signStates[row.id]?.signed || false"
-            @change="(val: boolean) => updateSigned(row.id, val)"
+            @change="(val: string | number | boolean) => updateSigned(row.id, val === true)"
           >
             已签字
           </el-checkbox>

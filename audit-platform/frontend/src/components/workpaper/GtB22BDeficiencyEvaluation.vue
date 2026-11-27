@@ -662,7 +662,7 @@ const b22BEntrySync = useEntrySyncReadiness({
         <el-radio-group
           :model-value="item.hasCompensatingControl"
           :disabled="isReadonly"
-          @change="(val: boolean) => handleCompensatingChange(index, val)"
+          @change="(val: string | number | boolean | undefined) => handleCompensatingChange(index, val === true)"
         >
           <el-radio :value="true">是</el-radio>
           <el-radio :value="false">否</el-radio>
@@ -684,7 +684,7 @@ const b22BEntrySync = useEntrySyncReadiness({
         <el-radio-group
           :model-value="item.hasCorrectiveAction"
           :disabled="isReadonly"
-          @change="(val: boolean) => handleCorrectiveChange(index, val)"
+          @change="(val: string | number | boolean | undefined) => handleCorrectiveChange(index, val === true)"
         >
           <el-radio :value="true">是</el-radio>
           <el-radio :value="false">否</el-radio>

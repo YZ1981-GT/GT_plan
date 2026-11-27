@@ -31,7 +31,7 @@
     <el-table-column label="核对内容" align="center">
       <el-table-column v-for="i in 5" :key="i" :label="String(i)" width="42" align="center">
         <template #default="{ row }">
-          <el-checkbox :model-value="!!row.checkItems?.[i - 1]" :disabled="rowReadonly(row)" @change="(v: boolean) => emit('toggle', row.rowId, i - 1, v)" />
+          <el-checkbox :model-value="!!row.checkItems?.[i - 1]" :disabled="rowReadonly(row)" @change="(v: string | number | boolean) => emit('toggle', row.rowId, i - 1, v === true)" />
         </template>
       </el-table-column>
     </el-table-column>
@@ -43,7 +43,7 @@
     </el-table-column>
     <el-table-column label="是否异常" width="70" align="center">
       <template #default="{ row }">
-        <el-checkbox :model-value="row.isAbnormal" :disabled="rowReadonly(row)" @change="(v: boolean) => emit('update', row.rowId, 'isAbnormal', v)" />
+        <el-checkbox :model-value="row.isAbnormal" :disabled="rowReadonly(row)" @change="(v: string | number | boolean) => emit('update', row.rowId, 'isAbnormal', v === true)" />
       </template>
     </el-table-column>
     <el-table-column label="备注说明" min-width="120">

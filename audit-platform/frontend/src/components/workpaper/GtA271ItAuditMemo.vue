@@ -162,7 +162,7 @@
           <span class="gt-a271__radio-label">结论：</span>
           <el-radio-group
             :model-value="chapters[2].conclusion"
-            @change="(v: string) => updateChapter(3, 'conclusion', v)"
+            @change="(v: string | number | boolean | undefined) => updateChapter(3, 'conclusion', (v as string))"
           >
             <el-radio value="部分有效">部分有效</el-radio>
             <el-radio value="没有有效">没有有效</el-radio>
@@ -221,7 +221,7 @@
           <span class="gt-a271__radio-label">结论：</span>
           <el-radio-group
             :model-value="chapters[5].conclusion"
-            @change="(v: string) => updateChapter(6, 'conclusion', v)"
+            @change="(v: string | number | boolean | undefined) => updateChapter(6, 'conclusion', (v as string))"
           >
             <el-radio value="部分有效">部分有效</el-radio>
             <el-radio value="没有有效">没有有效</el-radio>

@@ -94,7 +94,7 @@
                 <span class="gt-a91__sub-label">（一）审计项目组成员保持独立性</span>
                 <el-radio-group
                   :model-value="sectionData.independence.team_independent"
-                  @change="(v: string) => updateField('independence', 'team_independent', v)"
+                  @change="(v: string | number | boolean | undefined) => updateField('independence', 'team_independent', (v as string))"
                 >
                   <el-radio value="Y">是</el-radio>
                   <el-radio value="N">否</el-radio>
@@ -105,7 +105,7 @@
                 <span class="gt-a91__sub-label">（二）不存在影响独立性的关系和事项</span>
                 <el-radio-group
                   :model-value="sectionData.independence.no_relationships"
-                  @change="(v: string) => updateField('independence', 'no_relationships', v)"
+                  @change="(v: string | number | boolean | undefined) => updateField('independence', 'no_relationships', (v as string))"
                 >
                   <el-radio value="Y">是</el-radio>
                   <el-radio value="N">否</el-radio>
@@ -126,7 +126,7 @@
                 <span class="gt-a91__sub-label">（三）已采取必要防护措施</span>
                 <el-radio-group
                   :model-value="sectionData.independence.safeguards_taken"
-                  @change="(v: string) => updateField('independence', 'safeguards_taken', v)"
+                  @change="(v: string | number | boolean | undefined) => updateField('independence', 'safeguards_taken', (v as string))"
                 >
                   <el-radio value="Y">是</el-radio>
                   <el-radio value="N">否</el-radio>
@@ -138,7 +138,7 @@
                 <span class="gt-a91__sub-label">是否提供非审计服务</span>
                 <el-radio-group
                   :model-value="sectionData.independence.non_audit_services"
-                  @change="(v: string) => updateField('independence', 'non_audit_services', v)"
+                  @change="(v: string | number | boolean | undefined) => updateField('independence', 'non_audit_services', (v as string))"
                 >
                   <el-radio value="Y">是</el-radio>
                   <el-radio value="N">否</el-radio>
@@ -271,7 +271,7 @@
                 <span class="gt-a91__sub-label">适用性：</span>
                 <el-radio-group
                   :model-value="sectionData.committee.applicability"
-                  @change="(v: string) => updateField('committee', 'applicability', v)"
+                  @change="(v: string | number | boolean | undefined) => updateField('committee', 'applicability', (v as string))"
                 >
                   <el-radio value="Y">适用</el-radio>
                   <el-radio value="N">不适用</el-radio>

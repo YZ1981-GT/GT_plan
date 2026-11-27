@@ -66,7 +66,7 @@
             @update:model-value="(v: string) => updateClientText(r.id, v)" />
           <div v-else class="gt-b1eval__risk-select">
             <el-radio-group :model-value="getVal('client-' + r.id)"
-              @update:model-value="(v: string) => updateClientRisk(r.id, v)">
+              @update:model-value="(v: string | number | boolean | undefined) => updateClientRisk(r.id, (v as string))">
               <el-radio-button v-for="o in riskOptions" :key="o.value" :value="o.value">{{ o.label }}</el-radio-button>
             </el-radio-group>
             <el-tag v-if="getVal('client-' + r.id)" :type="riskTagType(getVal('client-' + r.id))" effect="dark" size="small">
@@ -180,7 +180,7 @@
         </div>
         <div class="gt-b1eval__elem-label">（二）承接承做意见</div>
         <div class="gt-b1eval__opinion-row">
-          <el-radio-group :model-value="opinion" @update:model-value="updateOpinion">
+          <el-radio-group :model-value="opinion" @update:model-value="(v) => updateOpinion(v as string)">
             <el-radio-button v-for="o in opinionOptions" :key="o.value" :value="o.value">{{ o.label }}</el-radio-button>
           </el-radio-group>
           <el-tag v-if="currentOpinion" :type="currentOpinion.class as any" effect="dark" size="small">

@@ -165,7 +165,7 @@ function yesnoOptions(type?: string): string[] {
               v-else
               :model-value="fieldVal(section.id, f.key)"
               :disabled="readonly"
-              @update:model-value="(v: string) => setField(section.id, f.key, v as string)"
+              @update:model-value="(v: string | number | boolean | undefined) => setField(section.id, f.key, v as string)"
             >
               <el-radio v-for="o in yesnoOptions(f.type)" :key="o" :value="o">{{ o }}</el-radio>
             </el-radio-group>
@@ -189,7 +189,7 @@ function yesnoOptions(type?: string): string[] {
               <el-radio-group
                 :model-value="qAnswer(section.id, q.key)"
                 :disabled="readonly"
-                @update:model-value="(v: string) => setQAnswer(section.id, q.key, v as string)"
+                @update:model-value="(v: string | number | boolean | undefined) => setQAnswer(section.id, q.key, v as string)"
               >
                 <el-radio v-for="o in yesnoOptions(q.type)" :key="o" :value="o">{{ o }}</el-radio>
               </el-radio-group>
@@ -232,7 +232,7 @@ function yesnoOptions(type?: string): string[] {
                 :model-value="row[col.key]"
                 :disabled="readonly"
                 size="small"
-                @update:model-value="(v: string) => setCell(section.id, $index, col.key, v as string)"
+                @update:model-value="(v: string | number | boolean | undefined) => setCell(section.id, $index, col.key, v as string)"
               >
                 <el-radio v-for="o in yesnoOptions(col.type)" :key="o" :value="o">{{ o }}</el-radio>
               </el-radio-group>

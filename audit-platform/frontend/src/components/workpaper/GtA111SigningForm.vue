@@ -293,7 +293,7 @@ const BIZ_CATEGORIES = [
           <el-radio-group
             :model-value="getField('A1-11-first-engagement').conclusion || ''"
             :disabled="isReadonly"
-            @change="(val: string) => updateField('A1-11-first-engagement', 'conclusion', val)"
+            @change="(val: string | number | boolean | undefined) => updateField('A1-11-first-engagement', 'conclusion', (val as string))"
           >
             <el-radio value="Y">是</el-radio>
             <el-radio value="N">否</el-radio>

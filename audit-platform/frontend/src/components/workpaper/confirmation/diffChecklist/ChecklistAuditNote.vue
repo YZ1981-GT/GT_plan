@@ -31,7 +31,7 @@
         <el-radio-group
           :model-value="conclusion?.conclusion_type"
           :disabled="readonly"
-          @change="(val: string) => $emit('update-conclusion', 'conclusion_type', val)"
+          @change="(val: string | number | boolean | undefined) => $emit('update-conclusion', 'conclusion_type', (val as string))"
         >
           <div class="checklist-audit-note__option" :class="{ 'is-active': conclusion?.conclusion_type === 'A' }">
             <el-radio label="A">

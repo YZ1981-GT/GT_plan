@@ -398,7 +398,7 @@
               v-if="!isReadonly"
               :model-value="row.forceAbnormal"
               size="small"
-              @update:model-value="(v: boolean) => vc.updateRow(row.rowId, { forceAbnormal: !!v })"
+              @update:model-value="(v: string | number | boolean) => vc.updateRow(row.rowId, { forceAbnormal: !!v === true })"
             />
             <span v-else>{{ row.forceAbnormal ? '是' : '否' }}</span>
           </template>

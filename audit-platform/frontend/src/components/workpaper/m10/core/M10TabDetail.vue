@@ -105,13 +105,13 @@
             </el-table-column>
             <el-table-column label="可赎回" width="70" align="center">
               <template #default="{ row }">
-                <el-checkbox v-if="!isReadonly" :model-value="row.isRedeemable" @change="(val: boolean) => updateRowByKey(row.key, 'isRedeemable', val)" />
+                <el-checkbox v-if="!isReadonly" :model-value="row.isRedeemable" @change="(val: string | number | boolean) => updateRowByKey(row.key, 'isRedeemable', val === true)" />
                 <span v-else>{{ row.isRedeemable ? '是' : '否' }}</span>
               </template>
             </el-table-column>
             <el-table-column label="可转股" width="70" align="center">
               <template #default="{ row }">
-                <el-checkbox v-if="!isReadonly" :model-value="row.isConvertible" @change="(val: boolean) => updateRowByKey(row.key, 'isConvertible', val)" />
+                <el-checkbox v-if="!isReadonly" :model-value="row.isConvertible" @change="(val: string | number | boolean) => updateRowByKey(row.key, 'isConvertible', val === true)" />
                 <span v-else>{{ row.isConvertible ? '是' : '否' }}</span>
               </template>
             </el-table-column>
@@ -170,13 +170,13 @@
             </el-table-column>
             <el-table-column label="可赎回" width="70" align="center">
               <template #default="{ row }">
-                <el-checkbox v-if="!isReadonly" :model-value="row.isRedeemable" @change="(val: boolean) => updateRowByKey(row.key, 'isRedeemable', val)" />
+                <el-checkbox v-if="!isReadonly" :model-value="row.isRedeemable" @change="(val: string | number | boolean) => updateRowByKey(row.key, 'isRedeemable', val === true)" />
                 <span v-else>{{ row.isRedeemable ? '是' : '否' }}</span>
               </template>
             </el-table-column>
             <el-table-column label="可转股" width="70" align="center">
               <template #default="{ row }">
-                <el-checkbox v-if="!isReadonly" :model-value="row.isConvertible" @change="(val: boolean) => updateRowByKey(row.key, 'isConvertible', val)" />
+                <el-checkbox v-if="!isReadonly" :model-value="row.isConvertible" @change="(val: string | number | boolean) => updateRowByKey(row.key, 'isConvertible', val === true)" />
                 <span v-else>{{ row.isConvertible ? '是' : '否' }}</span>
               </template>
             </el-table-column>
@@ -235,13 +235,13 @@
             </el-table-column>
             <el-table-column label="可赎回" width="70" align="center">
               <template #default="{ row }">
-                <el-checkbox v-if="!isReadonly" :model-value="row.isRedeemable" @change="(val: boolean) => updateRowByKey(row.key, 'isRedeemable', val)" />
+                <el-checkbox v-if="!isReadonly" :model-value="row.isRedeemable" @change="(val: string | number | boolean) => updateRowByKey(row.key, 'isRedeemable', val === true)" />
                 <span v-else>{{ row.isRedeemable ? '是' : '否' }}</span>
               </template>
             </el-table-column>
             <el-table-column label="可转股" width="70" align="center">
               <template #default="{ row }">
-                <el-checkbox v-if="!isReadonly" :model-value="row.isConvertible" @change="(val: boolean) => updateRowByKey(row.key, 'isConvertible', val)" />
+                <el-checkbox v-if="!isReadonly" :model-value="row.isConvertible" @change="(val: string | number | boolean) => updateRowByKey(row.key, 'isConvertible', val === true)" />
                 <span v-else>{{ row.isConvertible ? '是' : '否' }}</span>
               </template>
             </el-table-column>
@@ -480,13 +480,13 @@
             </el-table-column>
             <el-table-column label="递延" width="65" align="center">
               <template #default="{ row }">
-                <el-checkbox v-if="!isReadonly" :model-value="row.isDeferrable" @change="(val: boolean) => updateRowByKey(row.key, 'isDeferrable', val)" />
+                <el-checkbox v-if="!isReadonly" :model-value="row.isDeferrable" @change="(val: string | number | boolean) => updateRowByKey(row.key, 'isDeferrable', val === true)" />
                 <span v-else>{{ row.isDeferrable ? '是' : '否' }}</span>
               </template>
             </el-table-column>
             <el-table-column label="已递延" width="65" align="center">
               <template #default="{ row }">
-                <el-checkbox v-if="!isReadonly" :model-value="row.isDeferred" @change="(val: boolean) => updateRowByKey(row.key, 'isDeferred', val)" />
+                <el-checkbox v-if="!isReadonly" :model-value="row.isDeferred" @change="(val: string | number | boolean) => updateRowByKey(row.key, 'isDeferred', val === true)" />
                 <span v-else>{{ row.isDeferred ? '是' : '否' }}</span>
               </template>
             </el-table-column>
@@ -550,13 +550,13 @@
             </el-table-column>
             <el-table-column label="递延" width="65" align="center">
               <template #default="{ row }">
-                <el-checkbox v-if="!isReadonly" :model-value="row.isDeferrable" @change="(val: boolean) => updateRowByKey(row.key, 'isDeferrable', val)" />
+                <el-checkbox v-if="!isReadonly" :model-value="row.isDeferrable" @change="(val: string | number | boolean) => updateRowByKey(row.key, 'isDeferrable', val === true)" />
                 <span v-else>{{ row.isDeferrable ? '是' : '否' }}</span>
               </template>
             </el-table-column>
             <el-table-column label="已递延" width="65" align="center">
               <template #default="{ row }">
-                <el-checkbox v-if="!isReadonly" :model-value="row.isDeferred" @change="(val: boolean) => updateRowByKey(row.key, 'isDeferred', val)" />
+                <el-checkbox v-if="!isReadonly" :model-value="row.isDeferred" @change="(val: string | number | boolean) => updateRowByKey(row.key, 'isDeferred', val === true)" />
                 <span v-else>{{ row.isDeferred ? '是' : '否' }}</span>
               </template>
             </el-table-column>
@@ -620,13 +620,13 @@
             </el-table-column>
             <el-table-column label="递延" width="65" align="center">
               <template #default="{ row }">
-                <el-checkbox v-if="!isReadonly" :model-value="row.isDeferrable" @change="(val: boolean) => updateRowByKey(row.key, 'isDeferrable', val)" />
+                <el-checkbox v-if="!isReadonly" :model-value="row.isDeferrable" @change="(val: string | number | boolean) => updateRowByKey(row.key, 'isDeferrable', val === true)" />
                 <span v-else>{{ row.isDeferrable ? '是' : '否' }}</span>
               </template>
             </el-table-column>
             <el-table-column label="已递延" width="65" align="center">
               <template #default="{ row }">
-                <el-checkbox v-if="!isReadonly" :model-value="row.isDeferred" @change="(val: boolean) => updateRowByKey(row.key, 'isDeferred', val)" />
+                <el-checkbox v-if="!isReadonly" :model-value="row.isDeferred" @change="(val: string | number | boolean) => updateRowByKey(row.key, 'isDeferred', val === true)" />
                 <span v-else>{{ row.isDeferred ? '是' : '否' }}</span>
               </template>
             </el-table-column>

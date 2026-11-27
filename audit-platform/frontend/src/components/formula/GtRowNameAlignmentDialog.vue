@@ -71,7 +71,7 @@
           >
             <el-checkbox
               :model-value="isSelected(activeRow.row_key, c.target_identity.dimension_key)"
-              @change="(v: boolean) => toggleSelection(activeRow!.row_key, c, v)"
+              @change="(v: string | number | boolean) => toggleSelection(activeRow!.row_key, c, v === true)"
             />
             <span class="gt-rna-canditem__name">{{ c.display_name }}</span>
             <span class="gt-rna-canditem__amt">{{ fmtAmount(c.amount) }}</span>

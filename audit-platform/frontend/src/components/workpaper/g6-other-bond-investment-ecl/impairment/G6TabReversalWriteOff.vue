@@ -334,7 +334,7 @@
           <el-switch
             v-else-if="!isReadonly"
             :model-value="row.isRelatedParty"
-            @change="(v: boolean) => { row.isRelatedParty = v; persist() }"
+            @change="(v: string | number | boolean) => { row.isRelatedParty = v === true; persist() }"
           />
           <el-tag v-else :type="row.isRelatedParty ? 'warning' : 'info'" size="small">
             {{ row.isRelatedParty ? '是' : '否' }}

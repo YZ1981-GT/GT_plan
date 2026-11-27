@@ -326,7 +326,7 @@
               :model-value="row.status"
               :disabled="isReadonly"
               size="small"
-              @change="(v: string) => updateCell(row.rowId, 'status', v)"
+              @change="(v: string | number | boolean | undefined) => updateCell(row.rowId, 'status', (v as string))"
             >
               <el-radio-button value="compliant">合规</el-radio-button>
               <el-radio-button value="non_compliant">不合规</el-radio-button>

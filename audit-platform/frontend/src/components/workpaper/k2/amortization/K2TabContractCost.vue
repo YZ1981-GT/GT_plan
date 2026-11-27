@@ -88,7 +88,7 @@
             :disabled="isReadonly"
             active-text="是"
             inactive-text="否"
-            @change="(v: boolean) => handleConditionChange('isIncremental', v)"
+            @change="(v: string | number | boolean) => handleConditionChange('isIncremental', v === true)"
           />
         </div>
         <div class="condition-item">
@@ -98,7 +98,7 @@
             :disabled="isReadonly"
             active-text="是"
             inactive-text="否"
-            @change="(v: boolean) => handleConditionChange('isRecoverable', v)"
+            @change="(v: string | number | boolean) => handleConditionChange('isRecoverable', v === true)"
           />
         </div>
         <div class="condition-item">
@@ -108,7 +108,7 @@
             :disabled="isReadonly"
             active-text="是"
             inactive-text="否"
-            @change="(v: boolean) => handleConditionChange('isDirectlyRelated', v)"
+            @change="(v: string | number | boolean) => handleConditionChange('isDirectlyRelated', v === true)"
           />
         </div>
       </div>
@@ -206,7 +206,7 @@
               v-if="!isReadonly"
               :model-value="row.isIncremental"
               size="small"
-              @change="(v: boolean) => { updateCell(row.rowId, 'isIncremental', v); autoUpdateCapitalized(row.rowId) }"
+              @change="(v: string | number | boolean) => { updateCell(row.rowId, 'isIncremental', v === true); autoUpdateCapitalized(row.rowId) }"
             />
             <el-icon v-else :color="row.isIncremental ? '#67c23a' : '#909399'">
               <component :is="row.isIncremental ? 'CircleCheckFilled' : 'CircleCloseFilled'" />
@@ -219,7 +219,7 @@
               v-if="!isReadonly"
               :model-value="row.isRecoverable"
               size="small"
-              @change="(v: boolean) => { updateCell(row.rowId, 'isRecoverable', v); autoUpdateCapitalized(row.rowId) }"
+              @change="(v: string | number | boolean) => { updateCell(row.rowId, 'isRecoverable', v === true); autoUpdateCapitalized(row.rowId) }"
             />
             <el-icon v-else :color="row.isRecoverable ? '#67c23a' : '#909399'">
               <component :is="row.isRecoverable ? 'CircleCheckFilled' : 'CircleCloseFilled'" />
@@ -232,7 +232,7 @@
               v-if="!isReadonly"
               :model-value="row.isDirectlyRelated"
               size="small"
-              @change="(v: boolean) => { updateCell(row.rowId, 'isDirectlyRelated', v); autoUpdateCapitalized(row.rowId) }"
+              @change="(v: string | number | boolean) => { updateCell(row.rowId, 'isDirectlyRelated', v === true); autoUpdateCapitalized(row.rowId) }"
             />
             <el-icon v-else :color="row.isDirectlyRelated ? '#67c23a' : '#909399'">
               <component :is="row.isDirectlyRelated ? 'CircleCheckFilled' : 'CircleCloseFilled'" />

@@ -208,24 +208,24 @@
           <div class="gt-a1731__sub-section">
             <div class="gt-a1731__sub-header">
               <span class="gt-a1731__sub-label">(一) 项目组是否与咨询意见达成一致意见</span>
-              <el-radio-group :model-value="s3Agree" size="small" :disabled="props.readonly" @change="(v: string) => { s3Agree = v; saveS3() }">
+              <el-radio-group :model-value="s3Agree" size="small" :disabled="props.readonly" @change="(v: string | number | boolean | undefined) => { s3Agree = (v as string); saveS3() }">
                 <el-radio-button value="Y">是</el-radio-button>
                 <el-radio-button value="N">否</el-radio-button>
               </el-radio-group>
             </div>
-            <el-input v-if="s3Agree === 'N'" :model-value="s3AgreeReason" type="textarea" :autosize="{minRows:2}" :disabled="props.readonly" placeholder="如否，最终解决情况说明（虽观点少出现，但需说明）" @change="(v: string) => { s3AgreeReason = v; saveS3() }" />
+            <el-input v-if="s3Agree === 'N'" :model-value="s3AgreeReason" type="textarea" :autosize="{minRows:2}" :disabled="props.readonly" placeholder="如否，最终解决情况说明（虽观点少出现，但需说明）" @change="(v: string | number | boolean | undefined) => { s3AgreeReason = (v as string); saveS3() }" />
           </div>
 
           <!-- (二) 是否得到执行 -->
           <div class="gt-a1731__sub-section">
             <div class="gt-a1731__sub-header">
               <span class="gt-a1731__sub-label">(二) 咨询结果（结论）是否得到执行</span>
-              <el-radio-group :model-value="s3Executed" size="small" :disabled="props.readonly" @change="(v: string) => { s3Executed = v; saveS3() }">
+              <el-radio-group :model-value="s3Executed" size="small" :disabled="props.readonly" @change="(v: string | number | boolean | undefined) => { s3Executed = (v as string); saveS3() }">
                 <el-radio-button value="Y">是</el-radio-button>
                 <el-radio-button value="N">否</el-radio-button>
               </el-radio-group>
             </div>
-            <el-input v-if="s3Executed === 'N'" :model-value="s3ExecutedReason" type="textarea" :autosize="{minRows:2}" :disabled="props.readonly" placeholder="如未得到执行，说明相关原因（如未执行、部分执行、暂缓执行）" @change="(v: string) => { s3ExecutedReason = v; saveS3() }" />
+            <el-input v-if="s3Executed === 'N'" :model-value="s3ExecutedReason" type="textarea" :autosize="{minRows:2}" :disabled="props.readonly" placeholder="如未得到执行，说明相关原因（如未执行、部分执行、暂缓执行）" @change="(v: string | number | boolean | undefined) => { s3ExecutedReason = (v as string); saveS3() }" />
           </div>
 
           <!-- (三) 具体执行情况 -->

@@ -97,7 +97,7 @@
           <el-radio-group
             :model-value="devState.step1"
             :disabled="readonly"
-            @update:model-value="(v: string) => onStepChange('step1', v)"
+            @update:model-value="(v: string | number | boolean | undefined) => onStepChange('step1', (v as string))"
           >
             <el-radio
               v-for="opt in getOptions(1)"
@@ -144,7 +144,7 @@
           <el-radio-group
             :model-value="devState.step2"
             :disabled="readonly"
-            @update:model-value="(v: string) => onStepChange('step2', v)"
+            @update:model-value="(v: string | number | boolean | undefined) => onStepChange('step2', (v as string))"
           >
             <el-radio
               v-for="opt in getOptions(2)"
@@ -191,7 +191,7 @@
           <el-radio-group
             :model-value="devState.step3"
             :disabled="readonly"
-            @update:model-value="(v: string) => onStepChange('step3', v)"
+            @update:model-value="(v: string | number | boolean | undefined) => onStepChange('step3', (v as string))"
           >
             <el-radio
               v-for="opt in getOptions(3)"
@@ -238,7 +238,7 @@
           <el-radio-group
             :model-value="devState.step4"
             :disabled="readonly"
-            @update:model-value="(v: string) => onStepChange('step4', v)"
+            @update:model-value="(v: string | number | boolean | undefined) => onStepChange('step4', (v as string))"
           >
             <el-radio
               v-for="opt in getOptions(4)"
@@ -313,7 +313,7 @@
           <el-radio-group
             :model-value="devState.step6"
             :disabled="readonly"
-            @update:model-value="(v: string) => onStepChange('step6', v)"
+            @update:model-value="(v: string | number | boolean | undefined) => onStepChange('step6', (v as string))"
           >
             <el-radio
               v-for="opt in getOptions(6)"

@@ -1134,7 +1134,7 @@ async function handleResample() {
             :model-value="row.abnormal"
             size="small"
             :disabled="!canEditRow(row)"
-            @change="(val: boolean) => handleAbnormalChange(row, val)"
+            @change="(val: string | number | boolean) => handleAbnormalChange(row, val === true)"
           />
         </template>
       </el-table-column>

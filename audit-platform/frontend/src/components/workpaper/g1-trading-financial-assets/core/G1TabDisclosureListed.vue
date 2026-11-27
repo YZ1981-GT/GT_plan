@@ -87,7 +87,7 @@
                 v-if="row.kind === 'leaf'"
                 :model-value="row.applicable !== false"
                 :disabled="isReadonly"
-                @change="(v: boolean) => updateClassField(row.rowKey, 'applicable', v)"
+                @change="(v: string | number | boolean) => updateClassField(row.rowKey, 'applicable', v === true)"
               />
             </template>
           </el-table-column>

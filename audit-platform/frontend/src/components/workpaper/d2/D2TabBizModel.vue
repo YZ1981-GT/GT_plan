@@ -155,7 +155,7 @@ const GUIDANCE_TEXTS = [
           <el-radio-group
             :model-value="j.answer"
             :disabled="isReadonly"
-            @change="(v: string) => updateJudgment(j.questionId, 'answer', v)"
+            @change="(v: string | number | boolean | undefined) => updateJudgment(j.questionId, 'answer', (v as string))"
           >
             <el-radio-button value="Y">是</el-radio-button>
             <el-radio-button value="N">否</el-radio-button>

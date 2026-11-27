@@ -150,7 +150,7 @@
         :model-value="bm.hasSubPortfolios.value"
         :disabled="props.isReadonly"
         size="small"
-        @update:model-value="(val: boolean) => bm.setHasSubPortfolios(val)"
+        @update:model-value="(val: string | number | boolean | undefined) => bm.setHasSubPortfolios(val === true)"
       >
         <el-radio :value="true">是，需分拆为次级组合</el-radio>
         <el-radio :value="false">否，单一业务模式适用</el-radio>

@@ -317,7 +317,7 @@
         <el-table-column v-for="(label, idx) in checkLabels" :key="idx" :label="label" width="72" align="center">
           <template #default="{ row }">
             <el-checkbox v-if="!isReadonly" :model-value="checkValue(row, idx)"
-              @change="(v: boolean) => setCheck(row, idx, v)" />
+              @change="(v: string | number | boolean) => setCheck(row, idx, v === true)" />
             <span v-else>{{ checkValue(row, idx) ? '✓' : '✗' }}</span>
           </template>
         </el-table-column>

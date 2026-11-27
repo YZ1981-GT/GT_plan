@@ -179,7 +179,7 @@ const methodOptions = [
             <el-checkbox
               :model-value="row.confirmed"
               :disabled="isReadonly"
-              @update:model-value="(val: boolean) => handleConfirmSample($index, val)"
+              @update:model-value="(val: string | number | boolean) => handleConfirmSample($index, val === true)"
             />
           </template>
         </el-table-column>

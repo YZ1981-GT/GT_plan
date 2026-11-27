@@ -21,7 +21,7 @@
       <!-- 左侧：预设方案 -->
       <div class="aging-presets">
         <div class="aging-presets-label">预设方案</div>
-        <el-radio-group v-model="preset" @change="onPresetChange">
+        <el-radio-group v-model="preset" @change="(v) => onPresetChange(v as string)">
           <el-radio value="THREE_YEAR">三年段</el-radio>
           <el-radio value="FIVE_YEAR">五年段</el-radio>
           <el-radio value="CUSTOM">自定义</el-radio>

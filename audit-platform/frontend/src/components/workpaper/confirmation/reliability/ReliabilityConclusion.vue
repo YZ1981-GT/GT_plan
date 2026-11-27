@@ -59,7 +59,7 @@
           <el-radio-group
             :model-value="conclusion.conclusion_type"
             :disabled="readonly"
-            @change="(val: string) => $emit('update-conclusion', 'conclusion_type', val)"
+            @change="(val: string | number | boolean | undefined) => $emit('update-conclusion', 'conclusion_type', (val as string))"
           >
             <el-radio value="可靠">可靠——电子回函经验证均可靠，可作为审计证据</el-radio>
             <el-radio value="部分可靠需补充">部分可靠需补充——部分回函需补充程序确认可靠性</el-radio>

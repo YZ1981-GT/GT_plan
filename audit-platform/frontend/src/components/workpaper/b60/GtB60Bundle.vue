@@ -486,7 +486,7 @@ onMounted(async () => {
               <el-checkbox
                 :model-value="row.applicable"
                 :disabled="props.readonly"
-                @change="(val: boolean) => toggleApplicability(row.code, val)"
+                @change="(val: string | number | boolean) => toggleApplicability(row.code, val === true)"
               />
             </template>
           </el-table-column>

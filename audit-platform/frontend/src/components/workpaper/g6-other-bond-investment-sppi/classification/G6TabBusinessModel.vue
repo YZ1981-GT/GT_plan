@@ -97,7 +97,7 @@
                   v-if="!isReadonly"
                   :model-value="Boolean(row.critical)"
                   size="small"
-                  @change="(value: boolean) => changeCritical(section.key, row.id, value)"
+                  @change="(value: string | number | boolean) => changeCritical(section.key, row.id, value === true)"
                 >
                   关键项
                 </el-checkbox>

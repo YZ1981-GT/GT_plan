@@ -237,7 +237,7 @@ function handleReview(sid: string) { openReviewDialog(sid) }
                 <el-radio-group
                   v-else-if="f.type === 'yesno' || f.type === 'yesnona'"
                   :model-value="fieldVal(s.id, f.key)" :disabled="readonly"
-                  @update:model-value="(v: string) => setField(s.id, f.key, v as string)"
+                  @update:model-value="(v: string | number | boolean | undefined) => setField(s.id, f.key, v as string)"
                 >
                   <el-radio v-for="o in yesnoOptions(f.type)" :key="o" :value="o">{{ o }}</el-radio>
                 </el-radio-group>
@@ -258,7 +258,7 @@ function handleReview(sid: string) { openReviewDialog(sid) }
                 <div class="q-label">{{ q.label }}</div>
                 <div class="q-controls">
                   <el-radio-group :model-value="qAnswer(s.id, q.key)" :disabled="readonly"
-                    @update:model-value="(v: string) => setQAnswer(s.id, q.key, v as string)">
+                    @update:model-value="(v: string | number | boolean | undefined) => setQAnswer(s.id, q.key, v as string)">
                     <el-radio v-for="o in yesnoOptions(q.type)" :key="o" :value="o">{{ o }}</el-radio>
                   </el-radio-group>
                   <el-input :model-value="qNote(s.id, q.key)" :disabled="readonly" size="small"
@@ -409,7 +409,7 @@ function handleReview(sid: string) { openReviewDialog(sid) }
                     <el-option v-for="o in col.options" :key="o" :label="o" :value="o" />
                   </el-select>
                   <el-radio-group v-else-if="col.type === 'yesno' || col.type === 'yesnona'" :model-value="row[col.key]" :disabled="readonly" size="small"
-                    @update:model-value="(v: string) => setCell(s.id, $index, col.key, v as string)">
+                    @update:model-value="(v: string | number | boolean | undefined) => setCell(s.id, $index, col.key, v as string)">
                     <el-radio v-for="o in yesnoOptions(col.type)" :key="o" :value="o">{{ o }}</el-radio>
                   </el-radio-group>
                   <el-date-picker v-else-if="col.type === 'date'" :model-value="row[col.key]" type="date" value-format="YYYY-MM-DD" :disabled="readonly" size="small"

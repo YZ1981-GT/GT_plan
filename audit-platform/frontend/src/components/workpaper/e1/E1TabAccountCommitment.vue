@@ -497,7 +497,7 @@ onBeforeUnmount(() => {
             <el-radio-group
               :model-value="signConfirm"
               :disabled="isReadonly"
-              @change="onSignChange"
+              @change="(v) => onSignChange(v as string)"
             >
               <el-radio value="Y">已签字盖章确认</el-radio>
               <el-radio value="N">未签署</el-radio>

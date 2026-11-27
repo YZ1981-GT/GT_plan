@@ -33,7 +33,7 @@
           <el-switch
             :model-value="applicability.noKam"
             active-text="不存在/不沟通关键审计事项"
-            @change="(v: boolean) => toggleApplicability(v)"
+            @change="(v: string | number | boolean) => toggleApplicability(v === true)"
           />
         </div>
         <el-alert

@@ -56,7 +56,7 @@
       <el-radio-group
         :model-value="activeInstrumentId || undefined"
         size="small"
-        @update:model-value="(id: string) => setActiveInstrument(id)"
+        @update:model-value="(id: string | number | boolean | undefined) => setActiveInstrument(id as string)"
       >
         <el-radio-button
           v-for="inst in instruments"

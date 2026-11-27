@@ -118,7 +118,7 @@
             <el-radio-group
               :model-value="statements[3].consistency"
               :disabled="props.readonly"
-              @change="(v: string) => updateStatement(3, 'consistency', v)"
+              @change="(v: string | number | boolean | undefined) => updateStatement(3, 'consistency', (v as string))"
             >
               <el-radio value="Y">一致</el-radio>
               <el-radio value="N">不一致</el-radio>

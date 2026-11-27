@@ -35,7 +35,7 @@
       <el-radio-group
         :model-value="activeSegment"
         size="small"
-        @change="(val: string) => activeSegment = val"
+        @change="(val: string | number | boolean | undefined) => activeSegment = (val as string)"
       >
         <el-radio-button
           v-for="seg in CONTRACT_SEGMENTS"

@@ -3,7 +3,7 @@
     <!-- 适用性开关 -->
     <div class="applicability-bar">
       <span class="applicability-label">本项目是否存在弃置义务？</span>
-      <el-switch v-model="isApplicable" :disabled="isReadonly" active-text="适用" inactive-text="不适用" @change="handleApplicabilityChange" />
+      <el-switch v-model="isApplicable" :disabled="isReadonly" active-text="适用" inactive-text="不适用" @change="(v) => handleApplicabilityChange(v === true)" />
       <el-tooltip v-if="!isApplicable" content="适用资产：矿井、核电站、油气设施等有法定弃置义务的长期资产" placement="right">
         <el-icon style="margin-left:4px;color:#909399"><InfoFilled /></el-icon>
       </el-tooltip>

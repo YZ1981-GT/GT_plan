@@ -340,13 +340,13 @@ const GUIDANCE_TEXTS = [
         </el-table-column>
         <el-table-column label="风险已转移" width="100" align="center">
           <template #default="{ row }">
-            <el-switch v-if="!isReadonly" :model-value="row.riskTransferred" size="small" @change="(v: boolean) => updateCell(row.rowId, 'riskTransferred', v)" />
+            <el-switch v-if="!isReadonly" :model-value="row.riskTransferred" size="small" @change="(v: string | number | boolean) => updateCell(row.rowId, 'riskTransferred', v === true)" />
             <el-tag v-else :type="row.riskTransferred ? 'success' : 'info'" size="small">{{ row.riskTransferred ? '是' : '否' }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="保留控制" width="90" align="center">
           <template #default="{ row }">
-            <el-switch v-if="!isReadonly" :model-value="row.controlRetained" size="small" @change="(v: boolean) => updateCell(row.rowId, 'controlRetained', v)" />
+            <el-switch v-if="!isReadonly" :model-value="row.controlRetained" size="small" @change="(v: string | number | boolean) => updateCell(row.rowId, 'controlRetained', v === true)" />
             <el-tag v-else :type="row.controlRetained ? 'warning' : 'info'" size="small">{{ row.controlRetained ? '是' : '否' }}</el-tag>
           </template>
         </el-table-column>
