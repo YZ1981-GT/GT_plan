@@ -244,3 +244,39 @@ async def test_bulk_insert_ledger_with_voucher_fields(db_session):
         project_id=PID, year=YEAR, dataset_id=DID,
     )
     assert count == 1
+
+
+@pytest.mark.asyncio
+async def test_bulk_insert_mixed_keys_in_one_batch(db_session):
+    """回归：同一批内只有部分行带 sign_anomaly_flags 时不能报错。
+
+    线上事故：converter 只给方向异常行写 sign_anomaly_flags，
+    多行 INSERT 按首行键集合生成 VALUES，后续缺该键的行导致
+    "explicitly rendered as a boundparameter" 报错。
+    正常行在前（首行无该键）时，异常行的标记也不能被静默丢弃。
+    """
+    rows = [
+        {"account_code": "2202", "account_name": "应付账款",
+         "closing_balance": Decimal("8000")},
+        {"account_code": "1001", "account_name": "现金",
+         "closing_balance": Decimal("-100"),
+         "sign_anomaly_flags": {"conflicts": ["debit_on_liability"]}},
+        {"account_code": "1002", "account_name": "银行存款",
+         "closing_balance": Decimal("200")},
+    ]
+    count = await bulk_insert_staged(
+        lambda: _session_ctx(db_session), TbBalance, rows,
+        project_id=PID, year=YEAR, dataset_id=DID,
+    )
+    assert count == 3
+
+    # SQLite 下 JSON 列写 None 存的是 JSON null（非 SQL NULL），用 json_type 区分真值
+    flagged = (await db_session.execute(
+        sa.text(
+            "SELECT account_code, sign_anomaly_flags FROM tb_balance "
+            "WHERE json_type(sign_anomaly_flags) = 'object'"
+        )
+    )).all()
+    assert len(flagged) == 1
+    assert flagged[0][0] == "1001"
+    assert "debit_on_liability" in str(flagged[0][1])

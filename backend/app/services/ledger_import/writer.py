@@ -552,6 +552,15 @@ async def bulk_insert_staged(
                 records.append(rec)
 
             if records:
+                # 多行 VALUES 以首行键集合为准：同批内各行键必须一致，
+                # 否则缺键的行会报错、或其它行独有的键（如 sign_anomaly_flags）被丢弃。
+                # 缺失的键统一补 None（与列默认值语义一致）。
+                all_keys: dict[str, None] = {}
+                for rec in records:
+                    all_keys.update(dict.fromkeys(rec))
+                records = [
+                    {k: rec.get(k) for k in all_keys} for rec in records
+                ]
                 await db.execute(insert(table_model).values(records))
                 inserted += len(records)
         await db.commit()
