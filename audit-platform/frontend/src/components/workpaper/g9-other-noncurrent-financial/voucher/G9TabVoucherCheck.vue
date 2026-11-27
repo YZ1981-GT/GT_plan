@@ -848,6 +848,7 @@ function triggerPostFillReview(samples: Array<{
   debitAmount?: number | string
   creditAmount?: number | string
   counterpartAccount?: string
+  counterpartAccountName?: string | null
   abnormal?: boolean
   amount?: number
 }>) {

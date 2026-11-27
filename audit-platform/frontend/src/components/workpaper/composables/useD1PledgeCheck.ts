@@ -27,7 +27,7 @@
  */
 import { newUuid } from '@/utils/uuid'
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import { sumColumn, computePledgeRatio, type PledgeRow } from './d1InspectionFormulas'
 import { readD1AdjudicationTotals } from './d1AdjudicationModel'
@@ -532,7 +532,6 @@ export function useD1PledgeCheck(options: UseD1PledgeCheckOptions) {
 
       // 确认弹窗
       const msgHtml = mappedFields.map(f => `<li><b>${f.label}</b>：${f.value}</li>`).join('')
-      const { default: ElMessageBox } = await import('element-plus')
       await ElMessageBox.confirm(
         `<p>OCR 识别结果（仅填入空字段）：</p><ul>${msgHtml}</ul>`,
         'OCR 识别确认',

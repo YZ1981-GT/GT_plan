@@ -626,7 +626,8 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
   const detailCrossValidation = computed((): string | null => {
     const rows = detailRows.value
     if (!rows.length) return null
-    const d2_2_total = rows.reduce((s, r) => s + parseNum(r.currentAudited), 0)
+    // detailRows 不带 currentAudited（原先读它恒为 0，交叉校验恒报差异）；按 D2-2 行公式现算：期末审定 = 未审 + AJE + RJE
+    const d2_2_total = rows.reduce((s, r) => s + r.currentUnadjusted + r.currentAje + r.currentRje, 0)
     const grossRows = adjudicationRows.value.filter(r => r.rowKey !== 'total')
     const d2_1_total = grossRows.reduce((s, r) => s + r.currentAudited, 0)
     const diff = d2_1_total - d2_2_total

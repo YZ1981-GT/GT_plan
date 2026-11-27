@@ -380,6 +380,7 @@ export function mapSampledToI2TargetedRow(s: {
   debitAmount?: string | number | null
   creditAmount?: string | number | null
   counterpartAccount?: string | null
+  counterpartAccountName?: string | null
   accountName?: string | null
   isHighValue?: boolean
   selectionReason?: string

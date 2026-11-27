@@ -54,6 +54,8 @@ export interface ExtractedVoucher {
   accountCode: string
   accountName: string | null
   counterpartAccount: string | null
+  /** 对方科目名称（后端 counterpart_account_name） */
+  counterpartAccountName?: string | null
   voucherType: string | null
   cutoffStatus: CutoffStatus
   remark: string
@@ -344,6 +346,7 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
           accountCode: item.account_code ?? item.accountCode ?? '',
           accountName: item.account_name ?? item.accountName ?? null,
           counterpartAccount: item.counterpart_account ?? item.counterpartAccount ?? null,
+          counterpartAccountName: item.counterpart_account_name ?? item.counterpartAccountName ?? null,
           voucherType: item.voucher_type ?? item.voucherType ?? null,
           cutoffStatus: status,
           remark: '',
@@ -465,6 +468,7 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
           accountName: item.account_name ?? item.accountName ?? null,
           counterpartAccount:
             item.counterpart_account ?? item.counterpartAccount ?? null,
+          counterpartAccountName: item.counterpart_account_name ?? item.counterpartAccountName ?? null,
           voucherType: item.voucher_type ?? item.voucherType ?? null,
           cutoffStatus: crossPeriod ? ('可能跨期' as CutoffStatus) : ('正常' as CutoffStatus),
           remark: crossPeriod ? '跨期疑点' : '',

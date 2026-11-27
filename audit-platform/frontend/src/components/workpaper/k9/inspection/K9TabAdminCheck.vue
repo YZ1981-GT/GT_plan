@@ -474,8 +474,8 @@ async function handleAiGenerate() {
       section: 'K9-8-audit-note',
       context: {
         科目: '6602 管理费用（借方/损益类/发生额）',
-        抽样方法: criteria.samplingMethod || '未填',
-        样本量: criteria.sampleSize ?? 0,
+        抽样方法: criteria.value.samplingMethod || '未填',
+        样本量: criteria.value.sampleSize ?? 0,
         检查比例: ratio && ratio.ratio != null ? `${(ratio.ratio * 100).toFixed(1)}%` : '未计算',
         异常笔数: abnormalRows.value.length,
       },
@@ -497,8 +497,8 @@ function pullBookAmount(): void {
   const item = props.allResponses.get('K9-1-audited-total')
   const v = Number(item?.remark ?? item?.conclusion ?? 0)
   if (v > 0) {
-    criteria.bookDebitOccurrence = v
-    if (!criteria.populationDebitAmount) criteria.populationDebitAmount = v
+    criteria.value.bookDebitOccurrence = v
+    if (!criteria.value.populationDebitAmount) criteria.value.populationDebitAmount = v
     persist()
     ElMessage.success(`已带入本期发生额 ${fmtAmt(v)}（来自 K9-1 审定合计）`)
   } else {

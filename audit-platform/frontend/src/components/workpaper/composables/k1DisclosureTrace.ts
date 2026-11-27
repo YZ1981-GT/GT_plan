@@ -45,7 +45,7 @@ function buildRows(variant: K1DisclosureVariant, map: Map<string, any>): K1Discl
   const storageKey = variant === 'listed' ? 'K1-note-listed-rows' : 'K1-note-soe-rows'
 
   return guides.map((g) => {
-    let adjudicationLabel = g.adjudicationLabel ?? '—'
+    let adjudicationLabel = '—' // 章节指引没有 adjudicationLabel 字段（恒走默认值）
     let adjudicationValue: number | null = null
     let status: K1TraceStatus = 'info'
     let detail = '待核对'

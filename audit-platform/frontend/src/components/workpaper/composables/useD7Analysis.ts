@@ -14,8 +14,15 @@ import {
   topNByField,
 } from './useD7FormulaEngine'
 import { eventBus } from '@/utils/eventBus'
+import { PRESET_SEGMENTS } from '@/composables/useAgingConfig'
+import { migrateD7FlatToNested } from '@/composables/useAgingMigration'
 import type { ChecklistResponse } from './useD7FormData'
 import type { DetailRow } from './useD7Detail'
+
+/** 账龄段 key → 显示名（预置三年 / 五年两套段，自定义段回退显示 key） */
+const AGING_SEGMENT_LABELS: Record<string, string> = Object.fromEntries(
+  Object.values(PRESET_SEGMENTS).flat().map((s) => [s.key, s.label]),
+)
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -144,12 +151,13 @@ export function useD7Analysis(options: UseD7AnalysisOptions) {
     return sorted.map(r => {
       const endBalance = parseNum(r.endAudited)
       const priorBalance = parseNum(r.priorAudited)
-      // Aging description from aging fields
+      // 账龄说明：现行明细行存嵌套 agingAudited（按段 key），历史数据是扁平 endAging1~4。
+      // 原先只读扁平字段 ⇒ 现行数据的账龄说明恒为空；这里两种都经 migrateD7FlatToNested 归一后读
       const agingParts: string[] = []
-      if (parseNum(r.endAging1) > 0) agingParts.push('1年以内')
-      if (parseNum(r.endAging2) > 0) agingParts.push('1~2年')
-      if (parseNum(r.endAging3) > 0) agingParts.push('2~3年')
-      if (parseNum(r.endAging4) > 0) agingParts.push('3年以上')
+      const audited = (migrateD7FlatToNested(r) as { agingAudited?: Record<string, number> }).agingAudited ?? {}
+      for (const [key, amount] of Object.entries(audited)) {
+        if (parseNum(amount) > 0) agingParts.push(AGING_SEGMENT_LABELS[key] ?? key)
+      }
 
       return {
         customerName: r.companyName || r.contractName || '',
