@@ -480,6 +480,7 @@ const FALLBACK_NAV = [
   { key: 'formula-global', label: '全局公式', icon: Grid, path: '/settings/formula-global', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'qc'] },
   { key: 'permissions', label: '权限管理', icon: UserFilled, path: '/settings/permissions', maturity: 'production', roles: ['admin'] },
   { key: 'departments', label: '部门管理', icon: OfficeBuilding, path: '/settings/departments', maturity: 'production', roles: ['admin'] },
+  { key: 'operation-logs', label: '操作日志', icon: Document, path: '/settings/operation-logs', maturity: 'production', roles: ['admin'] },
   { key: 'knowledge', label: '知识库', icon: Reading, path: '/knowledge', maturity: 'production', roles: null },
   { key: 'agent-store', label: '智能体商店', icon: Box, path: '/extension/agent-store', maturity: 'developing', roles: null },
   { key: 'private-storage', label: '私人库', icon: Suitcase, path: '/private-storage', maturity: 'production', roles: null },

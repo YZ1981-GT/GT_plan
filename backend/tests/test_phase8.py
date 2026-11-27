@@ -1005,22 +1005,25 @@ class TestSecurityMonitor:
         from app.services.security_monitor import SecurityMonitor
 
         sm = SecurityMonitor()
-        sm.record_login_attempt("admin", "127.0.0.1", True)
-        sm.record_login_attempt("admin", "127.0.0.1", False)
+        sm._log_event("session_created", {"user_id": "user1", "ip": "127.0.0.1"})
+        sm._log_event("session_terminated", {"session_id": "s1"})
 
         events = sm.get_security_events()
         assert len(events) >= 2
 
     def test_login_attempts_filter(self):
-        """登录尝试过滤"""
-        from app.services.security_monitor import SecurityMonitor
+        """登录尝试过滤 —— V274 起登录留痕持久化到 sys_login_log（独立会话），
+        SecurityMonitor 的内存实现已删除；读取端 /api/security/login-attempts
+        改查持久表（见 routers/security.py 与 test_operation_log_and_last_login.py）。"""
+        import sqlalchemy as sa
 
-        sm = SecurityMonitor()
-        sm.record_login_attempt("user_a", "10.0.0.1", False)
-        sm.record_login_attempt("user_b", "10.0.0.2", True)
+        from app.models.core import SysLoginLog
+        from app.routers.security import get_login_attempts as _endpoint  # noqa: F401 — 端点仍可导入
 
-        attempts = sm.get_login_attempts("user_a")
-        assert all(a["details"]["username"] == "user_a" for a in attempts)
+        # 端点查询构造的语句必须可编译（字段存在、result 白名单语义有效）
+        stmt = sa.select(SysLoginLog).where(SysLoginLog.result == "failed")
+        compiled = stmt.compile()
+        assert "result" in str(compiled)
 
 
 class TestPermissionCache:

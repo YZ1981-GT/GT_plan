@@ -83,6 +83,9 @@ async def list_users(
             "is_active": bool(u.is_active),
             "parent_partner_id": str(u.parent_partner_id) if u.parent_partner_id else None,
             "dept_id": str(u.dept_id) if u.dept_id else None,
+            # V274（operation-log-and-last-login）：最后登录信息（权限管理页展示）
+            "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+            "last_login_ip": u.last_login_ip,
         }
         for u in users
     ]

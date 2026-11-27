@@ -61,6 +61,21 @@
             </el-tag>
           </template>
         </el-table-column>
+        <!-- V274（operation-log-and-last-login）：部门与最后登录 -->
+        <el-table-column label="部门" min-width="110">
+          <template #default="{ row }">
+            <span style="color: var(--el-text-color-secondary)">{{ deptName(row.dept_id) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="最后登录" width="160" sortable :sort-method="(a: any, b: any) => String(a.last_login_at || '').localeCompare(String(b.last_login_at || ''))">
+          <template #default="{ row }">
+            <el-tooltip v-if="row.last_login_ip" :content="`IP：${row.last_login_ip}`" placement="top" :show-after="200">
+              <span>{{ fmtLastLogin(row.last_login_at) }}</span>
+            </el-tooltip>
+            <span v-else-if="row.last_login_at">{{ fmtLastLogin(row.last_login_at) }}</span>
+            <span v-else style="color: var(--el-text-color-placeholder)">从未登录</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="140" align="center" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="editUser(row)" v-permission="'admin'">编辑</el-button>
@@ -163,6 +178,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { listUsers, createUser, updateUser, deleteUser, listDepartments } from '@/services/commonApi'
+import { fmtDateTime } from '@/utils/formatters'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import UserProjectRoleTree from '@/components/system/UserProjectRoleTree.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -342,6 +358,17 @@ async function loadDepartments() {
     departments.value = await listDepartments()
   } catch { departments.value = [] }
   finally { deptLoading.value = false }
+}
+
+// V274（operation-log-and-last-login）：部门 id → 名称映射与最后登录格式化
+function deptName(deptId: string | null | undefined): string {
+  if (!deptId) return '-'
+  return departments.value.find(d => d.id === deptId)?.name || '-'
+}
+
+function fmtLastLogin(iso: string | null | undefined): string {
+  if (!iso) return '从未登录'
+  return fmtDateTime(iso)
 }
 
 function editUser(row: any) {

@@ -24,6 +24,7 @@ from app.core.config import settings
 from app.core.database import async_session
 from app.core.security import decode_token
 from app.models.core import Log
+from app.services.client_ip import extract_client_ip as _extract_client_ip_shared
 
 logger = logging.getLogger("audit_platform.audit_log")
 
@@ -58,14 +59,8 @@ _UUID_PATTERN = re.compile(
 
 
 def _extract_client_ip(request: Request) -> str | None:
-    """提取客户端 IP：优先 X-Forwarded-For（第一个 IP），回退 request.client.host。"""
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        # X-Forwarded-For 格式: client, proxy1, proxy2
-        return forwarded_for.split(",")[0].strip()
-    if request.client:
-        return request.client.host
-    return None
+    """提取客户端 IP（V274 起委托 services/client_ip 单一实现）。"""
+    return _extract_client_ip_shared(request.headers, request.client)
 
 
 def _extract_user_id_from_token(request: Request) -> uuid.UUID | None:

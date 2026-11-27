@@ -822,6 +822,8 @@ _WORKER_BINDINGS: tuple[tuple[str, str], ...] = (
     ("oo_apply_redrive_worker", "app.workers.oo_apply_redrive_worker"),
     # V240：持久合并 operation，数据库 claim + lease 使重启后可恢复。
     ("consol_operation_worker", "app.workers.consol_operation_worker"),
+    # V274（operation-log-and-last-login）：登录/操作日志按保留期每日清理。
+    ("log_retention_worker", "app.workers.log_retention_worker"),
 )
 
 # Stable worker names (always-on workers plus the conditional ImportJobRunner) — pinned
@@ -845,6 +847,7 @@ WORKER_TASK_NAMES: tuple[str, ...] = (
     "platform_job_worker",
     "oo_apply_redrive_worker",
     "consol_operation_worker",
+    "log_retention_worker",
     "ImportJobRunner.run_forever",
 )
 

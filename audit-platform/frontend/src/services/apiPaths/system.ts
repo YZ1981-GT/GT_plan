@@ -154,6 +154,12 @@ export const auditLogs = {
   list: '/api/audit-logs',
 } as const
 
+// ─── 操作日志（V274，operation-log-and-last-login；仅 admin） ───────────────
+
+export const operationLogs = {
+  list: '/api/system/operation-logs',
+} as const
+
 // ─── AI ─────────────────────────────────────────────────────────────────────
 
 export const ai = {

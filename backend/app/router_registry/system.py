@@ -183,11 +183,13 @@ def register_system_routers(app: FastAPI) -> None:
     # 四者均自带完整 /api 前缀（/api/system/roles、/api/system/user-roles、
     # /api/system/user-project-role-tree、/api/departments），直接注册不加前缀。
     from app.routers.departments import router as departments_router
+    from app.routers.operation_logs import router as operation_logs_router
     from app.routers.sys_role import router as sys_role_router
     from app.routers.user_role import router as user_role_router
     from app.routers.project_role_tree import router as project_role_tree_router
 
-    for r in [departments_router, sys_role_router, user_role_router, project_role_tree_router]:
+    for r in [departments_router, sys_role_router, user_role_router, project_role_tree_router,
+              operation_logs_router]:
         app.include_router(r)
 
     # 地址坐标注册表

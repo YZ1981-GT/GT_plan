@@ -1,5 +1,6 @@
 """认证服务 — 登录/刷新/登出/用户管理"""
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -17,8 +18,9 @@ from app.core.security import (
     verify_password,
 )
 from app.models.base import UserRole
-from app.models.core import User
+from app.models.core import SysLoginLog, User
 from app.schemas.auth import TokenResponse, UserCreate, UserResponse, UserUpdate
+from app.services.client_ip import extract_client_ip
 
 
 # ---------------------------------------------------------------------------
@@ -53,6 +55,55 @@ async def blacklist_token(token: str, redis: Redis, ttl_seconds: int) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 登录留痕（V274，operation-log-and-last-login）
+# ---------------------------------------------------------------------------
+
+async def _record_login_log(
+    *,
+    username: str,
+    result: str,
+    user_id: UUID | None,
+    ip: str | None,
+    user_agent: str | None,
+) -> None:
+    """往 sys_login_log 写一行（**独立会话**，fail-open）。
+
+    🔴 失败登录（401/423）走异常路径：请求会话不会被提交，日志若写进请求
+    会话必随 401 一起回滚 —— 所以登录留痕一律开自己的会话并立即 commit。
+    写失败只记 CRITICAL，不影响登录主流程（与操作日志中间件同一 fail-open 策略）。
+    """
+    import logging
+
+    from app.core.database import async_session
+
+    logger = logging.getLogger("audit_platform.auth_service")
+    try:
+        async with async_session() as session:
+            entry = SysLoginLog(
+                user_id=user_id,
+                username=username[:150],
+                result=result,
+                ip=ip[:45] if ip else None,
+                user_agent=(user_agent or None),
+            )
+            session.add(entry)
+            await session.commit()
+    except Exception:
+        logger.critical(
+            "登录留痕写入失败（result=%s username=%s user=%s）",
+            result, username, user_id, exc_info=True,
+        )
+
+
+def _login_request_meta(request) -> tuple[str | None, str | None]:
+    """从 Request 提取 (ip, user_agent)；测试传 stub 时安全退化。"""
+    if request is None:
+        return None, None
+    ip = extract_client_ip(request.headers, getattr(request, "client", None))
+    return ip, request.headers.get("user-agent")
+
+
+# ---------------------------------------------------------------------------
 # login
 # ---------------------------------------------------------------------------
 
@@ -61,14 +112,19 @@ async def login(
     password: str,
     db: AsyncSession,
     redis: Redis,
+    request=None,
 ) -> TokenResponse:
-    """验证用户名密码，检查锁定状态，成功后生成 token 对。"""
+    """验证用户名密码，检查锁定状态，成功后生成 token 对并留痕。"""
 
     fail_key = _login_fail_key(username)
+    ip, user_agent = _login_request_meta(request)
 
     # 检查账号锁定
     fail_count = await redis.get(fail_key)
     if fail_count is not None and int(fail_count) >= settings.LOGIN_MAX_ATTEMPTS:
+        await _record_login_log(
+            username=username, result="locked", user_id=None, ip=ip, user_agent=user_agent,
+        )
         raise HTTPException(status_code=423, detail="账号已锁定，请30分钟后重试")
 
     # 查询用户
@@ -86,10 +142,23 @@ async def login(
         # 递增失败计数
         await redis.incr(fail_key)
         await redis.expire(fail_key, settings.LOGIN_LOCK_MINUTES * 60)
+        await _record_login_log(
+            username=username,
+            result="failed",
+            user_id=user.id if user is not None else None,
+            ip=ip,
+            user_agent=user_agent,
+        )
         raise HTTPException(status_code=401, detail="用户名或密码错误")
 
     # 登录成功 — 清除失败计数
     await redis.delete(fail_key)
+
+    # V274：更新最后登录时间与 IP（请求事务内；login 在返回前显式提交）。
+    # 🔴 用 Python 侧时间而非 sa_func.now()：SQL 表达式赋值会让属性过期，
+    # 返回前 model_validate(user) 读取时触发隐式刷新 ⇒ greenlet 上下文外直接炸。
+    user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_ip = ip[:45] if ip else None
 
     # 生成 token 对
     token_data = {"sub": str(user.id)}
@@ -100,6 +169,12 @@ async def login(
     rt_key = _refresh_token_key(refresh_token)
     rt_ttl = settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 86400
     await redis.set(rt_key, str(user.id), ex=rt_ttl)
+
+    # 提交登录事务（last_login 更新）；随后独立会话写成功留痕
+    await db.commit()
+    await _record_login_log(
+        username=username, result="success", user_id=user.id, ip=ip, user_agent=user_agent,
+    )
 
     return TokenResponse(
         access_token=access_token,
@@ -188,8 +263,8 @@ async def refresh(refresh_token: str, redis: Redis, db: AsyncSession) -> dict:
 # logout
 # ---------------------------------------------------------------------------
 
-async def logout(refresh_token: str, redis: Redis) -> None:
-    """将 refresh_token 加入黑名单并删除 Redis 中的存储。"""
+async def logout(refresh_token: str, redis: Redis, request=None) -> None:
+    """将 refresh_token 加入黑名单并删除 Redis 中的存储，同时写登出留痕。"""
 
     # 尝试获取 token 剩余有效期作为黑名单 TTL
     rt_key = _refresh_token_key(refresh_token)
@@ -203,6 +278,37 @@ async def logout(refresh_token: str, redis: Redis) -> None:
 
     # 删除 refresh_token 记录
     await redis.delete(rt_key)
+
+    # V274：登出留痕。token 解不出用户（已过期/已失效）记 user_id=NULL。
+    user_id: UUID | None = None
+    username = ""
+    try:
+        payload = decode_token(refresh_token)
+        sub = payload.get("sub")
+        if sub:
+            user_id = UUID(str(sub))
+    except (JWTError, ValueError, TypeError):
+        user_id = None
+    if user_id is not None:
+        try:
+            # 独立短会话取用户名（登出请求的 db 会话未提交，不借用）
+            from app.core.database import async_session
+
+            async with async_session() as session:
+                row = (await session.execute(
+                    select(User.username).where(User.id == user_id)
+                )).first()
+                username = row[0] if row else ""
+        except Exception:
+            username = ""
+    ip, user_agent = _login_request_meta(request)
+    await _record_login_log(
+        username=username or "unknown",
+        result="logout",
+        user_id=user_id,
+        ip=ip,
+        user_agent=user_agent,
+    )
 
 
 # ---------------------------------------------------------------------------

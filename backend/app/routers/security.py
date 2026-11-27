@@ -16,7 +16,6 @@ from app.models.core import User
 from app.schemas.auth import UserUpdate
 from app.services import auth_service
 from app.services.audit_logger_enhanced import audit_logger
-from app.services.security_monitor import security_monitor
 
 router = APIRouter(prefix="/api", tags=["security"])
 
@@ -25,10 +24,33 @@ router = APIRouter(prefix="/api", tags=["security"])
 async def get_login_attempts(
     username: str | None = None,
     limit: int = 50,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(["admin"])),
 ):
-    """获取登录尝试记录。"""
-    return {"attempts": security_monitor.get_login_attempts(username, limit)}
+    """获取登录尝试记录（V274 起读 sys_login_log 持久表；原内存实现从未被写入、恒空）。"""
+    import sqlalchemy as sa
+
+    from app.models.core import SysLoginLog
+
+    stmt = sa.select(SysLoginLog).order_by(SysLoginLog.ts.desc()).limit(max(1, min(limit, 200)))
+    if username:
+        stmt = stmt.where(SysLoginLog.username == username)
+    rows = (await db.execute(stmt)).scalars().all()
+    return {
+        "attempts": [
+            {
+                "username": r.username,
+                "ip": r.ip,
+                # 兼容旧响应形状：success 布尔 + timestamp 秒级浮点
+                "success": r.result == "success",
+                "result": r.result,
+                "user_id": str(r.user_id) if r.user_id else None,
+                "timestamp": r.ts.timestamp() if r.ts else None,
+                "ts": r.ts.isoformat() if r.ts else None,
+            }
+            for r in rows
+        ]
+    }
 
 
 @router.post("/security/lock-account")

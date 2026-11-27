@@ -83,6 +83,7 @@ CANDIDATE_MODE_POLICY: dict[str, tuple[Action, str]] = {
     "platform_job_worker": _SKIP_WORKER,
     "oo_apply_redrive_worker": _SKIP_WORKER,
     "consol_operation_worker": _SKIP_WORKER,
+    "log_retention_worker": _SKIP_WORKER,
     "ImportJobRunner.run_forever": _SKIP_WORKER,
     "warm_workpaper_sync_registry": ("skip", "optional_prewarm"),
     "verify_lazy_routes": ("run", "in_process_only"),

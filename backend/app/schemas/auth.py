@@ -102,6 +102,9 @@ class UserResponse(BaseModel):
     full_name: str | None = None
     parent_partner_id: UUID | None = None
     dept_id: UUID | None = None
+    # V274（operation-log-and-last-login）：最后登录信息（登录响应与用户列表共用）
+    last_login_at: datetime | None = None
+    last_login_ip: str | None = None
 
 
 class TokenResponse(BaseModel):
