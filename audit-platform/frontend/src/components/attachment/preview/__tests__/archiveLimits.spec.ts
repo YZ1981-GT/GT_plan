@@ -44,7 +44,7 @@ describe('ARCHIVE_LIMITS', () => {
       maxTotalUncompressedBytes: 20,
       maxCompressionRatio: 4,
       maxPathDepth: 3,
-    }
+    } as const
     expect(
       checkArchiveLimits(
         {

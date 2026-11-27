@@ -61,6 +61,10 @@ import { useReportCellActions } from '../useReportCellActions'
 
 function createMockRvCtx() {
   return {
+    // Excel 模式内核开关（useCellSelection 的 gridMode；mock 恒 false = 经典模式）
+    kernelActive: ref(false),
+    // 登记跟随的表格（Excel 模式内核用）；mock 无表
+    followTables: vi.fn(),
     selectedCells: ref<any[]>([]),
     contextMenu: {
       rowData: null as any,

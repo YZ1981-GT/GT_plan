@@ -9,7 +9,13 @@ export const ARCHIVE_LIMITS = Object.freeze({
   maxPathDepth: 8,
 })
 
-export type ArchiveLimits = typeof ARCHIVE_LIMITS
+export interface ArchiveLimits {
+  maxEntries: number
+  maxEntryUncompressedBytes: number
+  maxTotalUncompressedBytes: number
+  maxCompressionRatio: number
+  maxPathDepth: number
+}
 export type ArchiveLimitKey = keyof ArchiveLimits
 
 export type ContainerSupport =
@@ -35,7 +41,7 @@ export function classifyZipFlags(generalPurposeBitFlag: number, method: number):
 
 export function normalizeArchivePath(
   name: string,
-  maxPathDepth = ARCHIVE_LIMITS.maxPathDepth,
+  maxPathDepth: number = ARCHIVE_LIMITS.maxPathDepth,
 ): {
   normalized: string
   depth: number

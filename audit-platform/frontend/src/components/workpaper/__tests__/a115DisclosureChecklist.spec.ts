@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { ref, nextTick, computed } from 'vue'
+import type { A115Section } from '../composables/useA115Checklist'
 import { shallowMount } from '@vue/test-utils'
 
 import { HTML_RENDERER_REGISTRY } from '../htmlRendererRegistry'
@@ -59,6 +60,7 @@ vi.stubGlobal('IntersectionObserver', mockIntersectionObserver)
 // Mock Data
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// 模板形状由 useA115Checklist 的 A115Template 约束（children.standard_ref 必填，mock 里有省略）
 const MOCK_TEMPLATE = {
   wp_code: 'A1-15',
   title: '企业会计准则有关财务报表列报及披露核对表',
@@ -338,7 +340,7 @@ describe('A1-15 披露核对表 — useA115Checklist 行为 (8.2)', () => {
 describe('A1-15 披露核对表 — useA115Navigation 行为 (8.3)', () => {
   it('visibleSections: 初始为空 Set', async () => {
     const { useA115Navigation } = await import('../composables/useA115Navigation')
-    const sections = ref(MOCK_TEMPLATE.sections)
+    const sections = ref(MOCK_TEMPLATE.sections as A115Section[])
     const containerRef = ref(null)
     const { visibleSections } = useA115Navigation(sections, containerRef)
 
@@ -348,7 +350,7 @@ describe('A1-15 披露核对表 — useA115Navigation 行为 (8.3)', () => {
 
   it('scrollToSection: 添加目标章节 + 邻居到 visibleSections', async () => {
     const { useA115Navigation } = await import('../composables/useA115Navigation')
-    const sections = ref(MOCK_TEMPLATE.sections)
+    const sections = ref(MOCK_TEMPLATE.sections as A115Section[])
     const containerRef = ref(null) // null → scrollIntoView won't execute but addWithNeighbors will
     const { visibleSections, scrollToSection, activeSectionId } = useA115Navigation(sections, containerRef)
 
@@ -364,7 +366,7 @@ describe('A1-15 披露核对表 — useA115Navigation 行为 (8.3)', () => {
 
   it('scrollToSection: 第一个章节无前邻居', async () => {
     const { useA115Navigation } = await import('../composables/useA115Navigation')
-    const sections = ref(MOCK_TEMPLATE.sections)
+    const sections = ref(MOCK_TEMPLATE.sections as A115Section[])
     const containerRef = ref(null)
     const { visibleSections, scrollToSection } = useA115Navigation(sections, containerRef)
 
@@ -378,7 +380,7 @@ describe('A1-15 披露核对表 — useA115Navigation 行为 (8.3)', () => {
 
   it('scrollToSection: 最后一个章节无后邻居', async () => {
     const { useA115Navigation } = await import('../composables/useA115Navigation')
-    const sections = ref(MOCK_TEMPLATE.sections)
+    const sections = ref(MOCK_TEMPLATE.sections as A115Section[])
     const containerRef = ref(null)
     const { visibleSections, scrollToSection } = useA115Navigation(sections, containerRef)
 
@@ -392,7 +394,7 @@ describe('A1-15 披露核对表 — useA115Navigation 行为 (8.3)', () => {
 
   it('activeSectionId: 初始状态为 null', async () => {
     const { useA115Navigation } = await import('../composables/useA115Navigation')
-    const sections = ref(MOCK_TEMPLATE.sections)
+    const sections = ref(MOCK_TEMPLATE.sections as A115Section[])
     const containerRef = ref(null)
     const { activeSectionId } = useA115Navigation(sections, containerRef)
 
@@ -401,7 +403,7 @@ describe('A1-15 披露核对表 — useA115Navigation 行为 (8.3)', () => {
 
   it('activeSectionId: scrollToSection 后更新为目标 id', async () => {
     const { useA115Navigation } = await import('../composables/useA115Navigation')
-    const sections = ref(MOCK_TEMPLATE.sections)
+    const sections = ref(MOCK_TEMPLATE.sections as A115Section[])
     const containerRef = ref(null)
     const { activeSectionId, scrollToSection } = useA115Navigation(sections, containerRef)
 
@@ -414,7 +416,7 @@ describe('A1-15 披露核对表 — useA115Navigation 行为 (8.3)', () => {
 
   it('isSectionVisible: 未加入时返回 false，加入后返回 true', async () => {
     const { useA115Navigation } = await import('../composables/useA115Navigation')
-    const sections = ref(MOCK_TEMPLATE.sections)
+    const sections = ref(MOCK_TEMPLATE.sections as A115Section[])
     const containerRef = ref(null)
     const { isSectionVisible, scrollToSection } = useA115Navigation(sections, containerRef)
 
