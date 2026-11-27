@@ -250,7 +250,7 @@ function summaryMethod({ columns }: { columns: any[]; data: F3InterestCalcRow[] 
         <template #default="{ row }"><WpAmountInput v-if="!isReadonly" :model-value="row.faceValue" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'faceValue', v ?? 0)" /><span v-else>{{ fmt(row.faceValue) }}</span></template>
       </el-table-column>
       <el-table-column prop="interestRate" label="票面利率%" width="90" align="right">
-        <template #default="{ row }"><el-input-number v-if="!isReadonly" :model-value="row.interestRate" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'interestRate', v ?? 0)" /><span v-else>{{ row.interestRate }}</span></template>
+        <template #default="{ row }"><el-input-number v-if="!isReadonly" :model-value="row.interestRate" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'interestRate', v ?? 0)" /><span v-else>{{ row.interestRate }}</span></template>
       </el-table-column>
       <el-table-column prop="payableInterest" label="应计利息" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }"><span class="formula-cell" title="应计利息 = 票面金额 × 票面利率% × 期限 / 360">{{ fmt(row.payableInterest) }}</span></template>

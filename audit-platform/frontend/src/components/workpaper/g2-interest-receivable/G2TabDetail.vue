@@ -80,7 +80,7 @@
         <template #default="{ row }">
           <el-input-number :model-value="row.openingAdjustment" size="small" :controls="false" :disabled="isReadonly"
             style="width:100%"
-            @update:model-value="(v: number) => detail.updateCell(row.id, 'openingAdjustment', v ?? 0)" />
+            @update:model-value="(v: number | undefined) => detail.updateCell(row.id, 'openingAdjustment', v ?? 0)" />
         </template>
       </el-table-column>
       <el-table-column label="期初余额审定数" width="120" align="right" class-name="auto-calc-col">
@@ -104,7 +104,7 @@
               :controls="false"
               :disabled="isReadonly"
               style="width:100%"
-              @update:model-value="(v: number) => detail.updateCell(row.id, `agingPrior.${band.key}`, v ?? 0)"
+              @update:model-value="(v: number | undefined) => detail.updateCell(row.id, `agingPrior.${band.key}`, v ?? 0)"
             />
           </template>
         </el-table-column>
@@ -157,7 +157,7 @@
               :controls="false"
               :disabled="isReadonly"
               style="width:100%"
-              @update:model-value="(v: number) => detail.updateCell(row.id, `agingAudited.${band.key}`, v ?? 0)"
+              @update:model-value="(v: number | undefined) => detail.updateCell(row.id, `agingAudited.${band.key}`, v ?? 0)"
             />
           </template>
         </el-table-column>
@@ -250,14 +250,14 @@
           <template #default="{ row }">
             <el-input-number :model-value="row.faceValue" size="small" :controls="false" :disabled="isReadonly"
               style="width:100%"
-              @update:model-value="(v: number) => detail.updateCell(row.id, 'faceValue', v ?? 0)" />
+              @update:model-value="(v: number | undefined) => detail.updateCell(row.id, 'faceValue', v ?? 0)" />
           </template>
         </el-table-column>
         <el-table-column label="票面利率(%)" width="110" align="right">
           <template #default="{ row }">
             <el-input-number :model-value="row.couponRate" size="small" :controls="false" :disabled="isReadonly"
               style="width:100%" :precision="4"
-              @update:model-value="(v: number) => detail.updateCell(row.id, 'couponRate', v ?? 0)" />
+              @update:model-value="(v: number | undefined) => detail.updateCell(row.id, 'couponRate', v ?? 0)" />
           </template>
         </el-table-column>
         <el-table-column label="计息起始日" width="130">
@@ -288,7 +288,7 @@
           <template #default="{ row }">
             <el-input-number :model-value="row.receivedInterest" size="small" :controls="false" :disabled="isReadonly"
               style="width:100%"
-              @update:model-value="(v: number) => detail.updateCell(row.id, 'receivedInterest', v ?? 0)" />
+              @update:model-value="(v: number | undefined) => detail.updateCell(row.id, 'receivedInterest', v ?? 0)" />
           </template>
         </el-table-column>
         <el-table-column label="测算期末应收" width="120" align="right" class-name="auto-calc-col">

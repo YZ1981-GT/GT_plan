@@ -221,7 +221,7 @@
                 size="small"
                 :controls="false"
                 :class="['compact-num', { 'stage3-input': row.stageGroup === 'Stage3' }]"
-                @change="(v: number) => updateField(row.id, 'pvFutureCashFlow', v)"
+                @change="(v: number | undefined) => updateField(row.id, 'pvFutureCashFlow', v)"
               />
               <span v-else>{{ fmtNum(row.pvFutureCashFlow) }}</span>
             </template>
@@ -243,7 +243,7 @@
                 :precision="4"
                 :step="0.01"
                 class="compact-num"
-                @change="(v: number) => updateField(row.id, 'creditLossRate', v)"
+                @change="(v: number | undefined) => updateField(row.id, 'creditLossRate', v)"
               />
               <span v-else>{{ pct(row.creditLossRate) }}</span>
             </template>
@@ -307,7 +307,7 @@
                 size="small"
                 :controls="false"
                 class="compact-num stage3-input"
-                @change="(v: number) => updateField(row.id, 'adjustedPvFutureCashFlow', v)"
+                @change="(v: number | undefined) => updateField(row.id, 'adjustedPvFutureCashFlow', v)"
               />
               <span v-else>{{ fmtNum(displayAdjPv(row)) }}</span>
             </template>
@@ -320,7 +320,7 @@
                 :precision="4"
                 :step="0.01"
                 class="compact-num"
-                @change="(v: number) => updateField(row.id, 'adjustedCreditLossRate', v)"
+                @change="(v: number | undefined) => updateField(row.id, 'adjustedCreditLossRate', v)"
               />
               <span v-else>{{ pct(displayAdjRate(row)) }}</span>
             </template>

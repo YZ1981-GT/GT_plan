@@ -124,7 +124,7 @@
               size="small"
               :controls="false"
               style="width: 100%"
-              @update:model-value="(v: number) => updateField(row.rowKey, 'openingUnadjusted', v ?? 0)"
+              @update:model-value="(v: number | undefined) => updateField(row.rowKey, 'openingUnadjusted', v ?? 0)"
             />
             <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmt(row.openingUnadjusted) }}</span>
           </template>
@@ -157,7 +157,7 @@
               size="small"
               :controls="false"
               style="width: 100%"
-              @update:model-value="(v: number) => updateField(row.rowKey, 'closingUnadjusted', v ?? 0)"
+              @update:model-value="(v: number | undefined) => updateField(row.rowKey, 'closingUnadjusted', v ?? 0)"
             />
             <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmt(row.closingUnadjusted) }}</span>
           </template>
@@ -219,7 +219,7 @@
         :controls="false"
         :disabled="isReadonly"
         style="width: 140px"
-        @update:model-value="(v: number) => adj.setTrialBalance(v ?? 0)"
+        @update:model-value="(v: number | undefined) => adj.setTrialBalance(v ?? 0)"
       />
       <span :class="['diff-value', { 'diff-red': adj.hasVarianceHighlight.value }]">
         差异：{{ fmt(adj.variance.value) }}

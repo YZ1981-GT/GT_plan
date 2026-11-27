@@ -145,7 +145,7 @@
       </el-table-column>
       <el-table-column label="转回前累计准备" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.priorProvisionAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateReversalCell(row.rowId, 'priorProvisionAmount', v ?? 0)" />
+          <el-input-number v-if="!isReadonly" :model-value="row.priorProvisionAmount" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateReversalCell(row.rowId, 'priorProvisionAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.priorProvisionAmount) }}</span>
         </template>
       </el-table-column>

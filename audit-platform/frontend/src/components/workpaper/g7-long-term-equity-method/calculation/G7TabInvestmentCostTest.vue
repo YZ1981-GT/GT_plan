@@ -156,7 +156,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.consideration" size="small"
               :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateFieldWithRecalc(row.id, 'consideration', v)" />
+              @change="(v: number | undefined) => updateFieldWithRecalc(row.id, 'consideration', v)" />
             <span v-else>{{ fmtNum(row.consideration) }}</span>
           </template>
         </el-table-column>
@@ -235,7 +235,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.adjustedNetAssets" size="small"
               :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateFieldWithRecalc(row.id, 'adjustedNetAssets', v)" />
+              @change="(v: number | undefined) => updateFieldWithRecalc(row.id, 'adjustedNetAssets', v)" />
             <span v-else>{{ fmtNum(row.adjustedNetAssets) }}</span>
           </template>
         </el-table-column>

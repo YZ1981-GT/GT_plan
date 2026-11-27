@@ -452,7 +452,7 @@ function rowClass({ row }: { row: BankAnalysisRow }): string {
                   :controls="false"
                   size="small"
                   style="width: 100%"
-                  @change="(v: number) => updateYearCell(y.year, row.key, v ?? 0)"
+                  @change="(v: number | undefined) => updateYearCell(y.year, row.key, v ?? 0)"
                 />
               </template>
             </el-table-column>
@@ -464,7 +464,7 @@ function rowClass({ row }: { row: BankAnalysisRow }): string {
                 :model-value="pack.judgment.remoteNoBusinessCount"
                 :disabled="isReadonly"
                 :controls="false"
-                @change="(v: number) => updateJudgment('remoteNoBusinessCount', v ?? 0)"
+                @change="(v: number | undefined) => updateJudgment('remoteNoBusinessCount', v ?? 0)"
               />
             </el-form-item>
             <el-form-item label="是否与业务规模匹配">

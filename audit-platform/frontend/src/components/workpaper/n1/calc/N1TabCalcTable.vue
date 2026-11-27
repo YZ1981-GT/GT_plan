@@ -284,27 +284,27 @@
             </el-table-column>
             <el-table-column prop="bookValue" label="账面价值" min-width="120" align="right">
               <template #default="{ row, $index }">
-                <el-input-number :model-value="row.bookValue" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number) => calcTable.updateRow($index, 'bookValue', v ?? 0)" />
+                <el-input-number :model-value="row.bookValue" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number | undefined) => calcTable.updateRow($index, 'bookValue', v ?? 0)" />
               </template>
             </el-table-column>
             <el-table-column prop="taxBase" label="计税基础" min-width="120" align="right">
               <template #default="{ row, $index }">
-                <el-input-number :model-value="row.taxBase" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number) => calcTable.updateRow($index, 'taxBase', v ?? 0)" />
+                <el-input-number :model-value="row.taxBase" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number | undefined) => calcTable.updateRow($index, 'taxBase', v ?? 0)" />
               </template>
             </el-table-column>
             <el-table-column prop="taxRate" label="税率(%)" min-width="80" align="center">
               <template #default="{ row, $index }">
-                <el-input-number :model-value="row.taxRate * 100" size="small" :controls="false" :precision="0" :min="0" :max="100" class="cell-input" @change="(v: number) => calcTable.updateRow($index, 'taxRate', (v ?? 25) / 100)" />
+                <el-input-number :model-value="row.taxRate * 100" size="small" :controls="false" :precision="0" :min="0" :max="100" class="cell-input" @change="(v: number | undefined) => calcTable.updateRow($index, 'taxRate', (v ?? 25) / 100)" />
               </template>
             </el-table-column>
             <el-table-column prop="assetBookBalance" label="资产账面余额" min-width="120" align="right">
               <template #default="{ row, $index }">
-                <el-input-number :model-value="row.assetBookBalance" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number) => calcTable.updateRow($index, 'assetBookBalance', v ?? 0)" />
+                <el-input-number :model-value="row.assetBookBalance" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number | undefined) => calcTable.updateRow($index, 'assetBookBalance', v ?? 0)" />
               </template>
             </el-table-column>
             <el-table-column prop="liabilityBookBalance" label="负债账面余额" min-width="120" align="right">
               <template #default="{ row, $index }">
-                <el-input-number :model-value="row.liabilityBookBalance" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number) => calcTable.updateRow($index, 'liabilityBookBalance', v ?? 0)" />
+                <el-input-number :model-value="row.liabilityBookBalance" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number | undefined) => calcTable.updateRow($index, 'liabilityBookBalance', v ?? 0)" />
               </template>
             </el-table-column>
             <el-table-column label="" width="60" align="center" fixed="right">

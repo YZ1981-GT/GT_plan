@@ -86,13 +86,13 @@
         <el-table-column label="期初FV" width="100" align="right">
           <template #default="{ row }">
             <el-input-number v-model="row.instrumentOpeningFV" size="small" :controls="false" :disabled="isReadonly"
-              style="width:100%" @change="(v: number) => fv.updateCell(row.rowId, 'instrumentOpeningFV', v)" />
+              style="width:100%" @change="(v: number | undefined) => fv.updateCell(row.rowId, 'instrumentOpeningFV', v)" />
           </template>
         </el-table-column>
         <el-table-column label="期末FV" width="100" align="right">
           <template #default="{ row }">
             <el-input-number v-model="row.instrumentClosingFV" size="small" :controls="false" :disabled="isReadonly"
-              style="width:100%" @change="(v: number) => fv.updateCell(row.rowId, 'instrumentClosingFV', v)" />
+              style="width:100%" @change="(v: number | undefined) => fv.updateCell(row.rowId, 'instrumentClosingFV', v)" />
           </template>
         </el-table-column>
         <el-table-column label="FV变动" width="100" align="right">
@@ -138,13 +138,13 @@
         <el-table-column label="期初FV" width="100" align="right">
           <template #default="{ row }">
             <el-input-number v-model="row.itemOpeningFV" size="small" :controls="false" :disabled="isReadonly"
-              style="width:100%" @change="(v: number) => fv.updateCell(row.rowId, 'itemOpeningFV', v)" />
+              style="width:100%" @change="(v: number | undefined) => fv.updateCell(row.rowId, 'itemOpeningFV', v)" />
           </template>
         </el-table-column>
         <el-table-column label="期末FV" width="100" align="right">
           <template #default="{ row }">
             <el-input-number v-model="row.itemClosingFV" size="small" :controls="false" :disabled="isReadonly"
-              style="width:100%" @change="(v: number) => fv.updateCell(row.rowId, 'itemClosingFV', v)" />
+              style="width:100%" @change="(v: number | undefined) => fv.updateCell(row.rowId, 'itemClosingFV', v)" />
           </template>
         </el-table-column>
         <el-table-column label="FV变动" width="100" align="right">

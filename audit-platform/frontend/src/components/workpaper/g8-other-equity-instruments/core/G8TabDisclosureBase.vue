@@ -149,7 +149,7 @@
             size="small"
             :controls="false"
             style="width:100%"
-            @update:model-value="(v: number) => disc.updateBalance(row.rowKey, 'prior', v ?? 0)"
+            @update:model-value="(v: number | undefined) => disc.updateBalance(row.rowKey, 'prior', v ?? 0)"
           />
           <span v-else>{{ fmt(row.prior) }}</span>
         </template>
@@ -203,14 +203,14 @@
         <el-table-column label="本期计入其他综合收益的利得和损失" width="130" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.ociPeriod" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => disc.updateOci(row.rowKey, 'ociPeriod', v ?? 0)" />
+              @update:model-value="(v: number | undefined) => disc.updateOci(row.rowKey, 'ociPeriod', v ?? 0)" />
             <span v-else>{{ fmt(row.ociPeriod) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期末累计计入其他综合收益的利得和损失" width="140" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.ociCumulative" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => disc.updateOci(row.rowKey, 'ociCumulative', v ?? 0)" />
+              @update:model-value="(v: number | undefined) => disc.updateOci(row.rowKey, 'ociCumulative', v ?? 0)" />
             <span v-else>{{ fmt(row.ociCumulative) }}</span>
           </template>
         </el-table-column>
@@ -224,7 +224,7 @@
         <el-table-column label="因终止确认转入留存收益的累计利得和损失" width="140" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.transferToRE" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => disc.updateOci(row.rowKey, 'transferToRE', v ?? 0)" />
+              @update:model-value="(v: number | undefined) => disc.updateOci(row.rowKey, 'transferToRE', v ?? 0)" />
             <span v-else>{{ fmt(row.transferToRE) }}</span>
           </template>
         </el-table-column>
@@ -278,7 +278,7 @@
           <template #default="{ row }">
             <span v-if="row.isTotal" class="formula-cell">{{ fmt(row.ociPeriod) }}</span>
             <el-input-number v-else-if="!isReadonly" :model-value="row.ociPeriod" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => disc.updateDetail(row.rowKey, 'ociPeriod', v ?? 0)" />
+              @update:model-value="(v: number | undefined) => disc.updateDetail(row.rowKey, 'ociPeriod', v ?? 0)" />
             <span v-else>{{ fmt(row.ociPeriod) }}</span>
           </template>
         </el-table-column>
@@ -286,7 +286,7 @@
           <template #default="{ row }">
             <span v-if="row.isTotal" class="formula-cell">{{ fmt(row.ociCumulative) }}</span>
             <el-input-number v-else-if="!isReadonly" :model-value="row.ociCumulative" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => disc.updateDetail(row.rowKey, 'ociCumulative', v ?? 0)" />
+              @update:model-value="(v: number | undefined) => disc.updateDetail(row.rowKey, 'ociCumulative', v ?? 0)" />
             <span v-else>{{ fmt(row.ociCumulative) }}</span>
           </template>
         </el-table-column>

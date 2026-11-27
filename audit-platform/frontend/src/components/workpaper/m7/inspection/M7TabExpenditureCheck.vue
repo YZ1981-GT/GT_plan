@@ -102,7 +102,7 @@
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.amount" size="small" :controls="false"
               :precision="2" style="width: 100%"
-              @change="(v: number) => updateRow('capital', $index, 'amount', v ?? 0)" />
+              @change="(v: number | undefined) => updateRow('capital', $index, 'amount', v ?? 0)" />
             <span v-else>{{ fmtAmount(row.amount) }}</span>
           </template>
         </el-table-column>
@@ -205,7 +205,7 @@
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.amount" size="small" :controls="false"
               :precision="2" style="width: 100%"
-              @change="(v: number) => updateRow('expense', $index, 'amount', v ?? 0)" />
+              @change="(v: number | undefined) => updateRow('expense', $index, 'amount', v ?? 0)" />
             <span v-else>{{ fmtAmount(row.amount) }}</span>
           </template>
         </el-table-column>

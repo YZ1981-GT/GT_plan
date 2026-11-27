@@ -435,7 +435,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
                 :controls="false"
                 size="small"
                 style="width:100%"
-                @change="(val: number) => updateCell(row.rowKey, 'currentUnadjusted', val ?? 0)"
+                @change="(val: number | undefined) => updateCell(row.rowKey, 'currentUnadjusted', val ?? 0)"
               />
               <template v-else>
                 <span :class="getCellClass(row, 'currentUnadjusted')">{{ fmtAmount(row.currentUnadjusted) }}</span>
@@ -476,7 +476,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
                 :controls="false"
                 size="small"
                 style="width:100%"
-                @change="(val: number) => updateCell(row.rowKey, 'currentAje', val ?? 0)"
+                @change="(val: number | undefined) => updateCell(row.rowKey, 'currentAje', val ?? 0)"
               />
               <span v-else :class="getCellClass(row, 'currentAje')">{{ fmtAmount(row.currentAje) }}</span>
             </template>
@@ -489,7 +489,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
                 :controls="false"
                 size="small"
                 style="width:100%"
-                @change="(val: number) => updateCell(row.rowKey, 'currentRje', val ?? 0)"
+                @change="(val: number | undefined) => updateCell(row.rowKey, 'currentRje', val ?? 0)"
               />
               <span v-else :class="getCellClass(row, 'currentRje')">{{ fmtAmount(row.currentRje) }}</span>
             </template>
@@ -511,7 +511,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
                 :controls="false"
                 size="small"
                 style="width:100%"
-                @change="(val: number) => updateCell(row.rowKey, 'priorUnadjusted', val ?? 0)"
+                @change="(val: number | undefined) => updateCell(row.rowKey, 'priorUnadjusted', val ?? 0)"
               />
               <template v-else>
                 <span>{{ fmtAmount(row.priorUnadjusted) }}</span>
@@ -551,7 +551,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
                 :controls="false"
                 size="small"
                 style="width:100%"
-                @change="(val: number) => updateCell(row.rowKey, 'priorAje', val ?? 0)"
+                @change="(val: number | undefined) => updateCell(row.rowKey, 'priorAje', val ?? 0)"
               />
               <span v-else>{{ fmtAmount(row.priorAje) }}</span>
             </template>
@@ -564,7 +564,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
                 :controls="false"
                 size="small"
                 style="width:100%"
-                @change="(val: number) => updateCell(row.rowKey, 'priorRje', val ?? 0)"
+                @change="(val: number | undefined) => updateCell(row.rowKey, 'priorRje', val ?? 0)"
               />
               <span v-else>{{ fmtAmount(row.priorRje) }}</span>
             </template>

@@ -105,7 +105,7 @@
             :controls="false"
             :precision="2"
             style="width: 100px"
-            @change="(v: number) => handleCellChange(row.rowKey, 'unadjustedDebit', v ?? 0)"
+            @change="(v: number | undefined) => handleCellChange(row.rowKey, 'unadjustedDebit', v ?? 0)"
           />
           <span v-else class="formula-cell">{{ fmtNum(row.unadjustedDebit) }}</span>
         </template>
@@ -122,7 +122,7 @@
             :controls="false"
             :precision="2"
             style="width: 100px"
-            @change="(v: number) => handleCellChange(row.rowKey, 'priorAmount', v ?? 0)"
+            @change="(v: number | undefined) => handleCellChange(row.rowKey, 'priorAmount', v ?? 0)"
           />
           <span v-else class="formula-cell">{{ fmtNum(row.priorAmount) }}</span>
         </template>
@@ -148,7 +148,7 @@
             :controls="false"
             :precision="2"
             style="width: 80px"
-            @change="(v: number) => handleCellChange(row.rowKey, 'aje', v ?? 0)"
+            @change="(v: number | undefined) => handleCellChange(row.rowKey, 'aje', v ?? 0)"
           />
           <span v-else class="formula-cell">{{ fmtNum(row.aje) }}</span>
         </template>
@@ -165,7 +165,7 @@
             :controls="false"
             :precision="2"
             style="width: 80px"
-            @change="(v: number) => handleCellChange(row.rowKey, 'rje', v ?? 0)"
+            @change="(v: number | undefined) => handleCellChange(row.rowKey, 'rje', v ?? 0)"
           />
           <span v-else class="formula-cell">{{ fmtNum(row.rje) }}</span>
         </template>

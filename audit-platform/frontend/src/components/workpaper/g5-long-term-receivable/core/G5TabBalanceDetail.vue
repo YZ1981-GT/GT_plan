@@ -181,7 +181,7 @@
             size="small"
             :controls="false"
             :disabled="props.readonly"
-            @update:model-value="(v: number) => { row.agingAudited[band.key] = v; onRowEdit(row) }"
+            @update:model-value="(v: number | undefined) => { row.agingAudited[band.key] = v; onRowEdit(row) }"
           />
         </template>
       </el-table-column>

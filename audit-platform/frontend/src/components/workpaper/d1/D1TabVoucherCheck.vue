@@ -595,7 +595,7 @@ const SAMPLING_METHOD_TEXTS = [
               :min="0"
               :disabled="isReadonly"
               style="width: 120px"
-              @change="(v: number) => updatePopulation('totalCount', v || 0)"
+              @change="(v: number | undefined) => updatePopulation('totalCount', v || 0)"
             />
           </div>
           <div class="population-field">
@@ -607,7 +607,7 @@ const SAMPLING_METHOD_TEXTS = [
               :precision="2"
               :disabled="isReadonly"
               style="width: 150px"
-              @change="(v: number) => updatePopulation('totalAmount', v || 0)"
+              @change="(v: number | undefined) => updatePopulation('totalAmount', v || 0)"
             />
             <span class="field-hint" v-if="population.totalAmount > 0" v-html="fmtAmount(population.totalAmount)" />
           </div>
@@ -620,7 +620,7 @@ const SAMPLING_METHOD_TEXTS = [
               :min="0"
               :disabled="isReadonly"
               style="width: 120px"
-              @change="(v: number) => updatePopulation('sampleSize', v || 0)"
+              @change="(v: number | undefined) => updatePopulation('sampleSize', v || 0)"
             />
           </div>
           <div class="population-field">
@@ -655,7 +655,7 @@ const SAMPLING_METHOD_TEXTS = [
               :min="0"
               :disabled="isReadonly"
               style="width: 120px"
-              @change="(v: number) => updatePopulation('actualDrawn', v || 0)"
+              @change="(v: number | undefined) => updatePopulation('actualDrawn', v || 0)"
             />
             <GtIndexChip
               v-if="population.sampleCalcRef"
@@ -695,7 +695,7 @@ const SAMPLING_METHOD_TEXTS = [
             :precision="2"
             :disabled="isReadonly"
             style="width: 130px"
-            @change="(v: number) => updateSpecificSample(sample.id, 'amount', v || 0)"
+            @change="(v: number | undefined) => updateSpecificSample(sample.id, 'amount', v || 0)"
           />
           <WpCommitInput
             :model-value="sample.reason"
@@ -1217,7 +1217,7 @@ const SAMPLING_METHOD_TEXTS = [
           :step="1"
           :disabled="isReadonly"
           style="width: 110px"
-          @change="(v: number) => updateTolerableErrorRate((v || 5) / 100)"
+          @change="(v: number | undefined) => updateTolerableErrorRate((v || 5) / 100)"
         />
         <span class="field-hint">%</span>
       </div>

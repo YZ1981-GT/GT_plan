@@ -296,7 +296,7 @@
           <template #default="{ row }">
             <el-input-number v-if="row.rowId !== 'total' && !isReadonly" :model-value="row.openingFairValue"
               size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => detail.updateCell(row.rowId, 'openingFairValue', v ?? 0)" />
+              @update:model-value="(v: number | undefined) => detail.updateCell(row.rowId, 'openingFairValue', v ?? 0)" />
             <span v-else>{{ fmt(row.openingFairValue) }}</span>
           </template>
         </el-table-column>
@@ -304,7 +304,7 @@
           <template #default="{ row }">
             <el-input-number v-if="row.rowId !== 'total' && !isReadonly" :model-value="row.closingFairValue"
               size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => detail.updateCell(row.rowId, 'closingFairValue', v ?? 0)" />
+              @update:model-value="(v: number | undefined) => detail.updateCell(row.rowId, 'closingFairValue', v ?? 0)" />
             <span v-else>{{ fmt(row.closingFairValue) }}</span>
           </template>
         </el-table-column>
@@ -326,7 +326,7 @@
             <div :class="{ 'adj-mismatch-cell': isBelongAdjMismatch(row.belongAccount) }">
               <el-input-number v-if="row.rowId !== 'total' && !isReadonly" :model-value="row.adjustment"
                 size="small" :controls="false" style="width:100%"
-                @update:model-value="(v: number) => detail.updateCell(row.rowId, 'adjustment', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => detail.updateCell(row.rowId, 'adjustment', v ?? 0)" />
               <span v-else :class="{ 'cell-error': isBelongAdjMismatch(row.belongAccount) }">{{ fmt(row.adjustment) }}</span>
             </div>
           </template>
@@ -365,7 +365,7 @@
             <template #default="{ row }">
               <el-input-number v-if="row.rowId !== 'total' && !isReadonly" :model-value="row.periodFvChange"
                 size="small" :controls="false" style="width:100%"
-                @update:model-value="(v: number) => detail.updateCell(row.rowId, 'periodFvChange', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => detail.updateCell(row.rowId, 'periodFvChange', v ?? 0)" />
               <span v-else>{{ fmt(row.periodFvChange) }}</span>
             </template>
           </el-table-column>
@@ -373,7 +373,7 @@
             <template #default="{ row }">
               <el-input-number v-if="row.rowId !== 'total' && !isReadonly" :model-value="row.cumulativeFvChange"
                 size="small" :controls="false" style="width:100%"
-                @update:model-value="(v: number) => detail.updateCell(row.rowId, 'cumulativeFvChange', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => detail.updateCell(row.rowId, 'cumulativeFvChange', v ?? 0)" />
               <span v-else>{{ fmt(row.cumulativeFvChange) }}</span>
             </template>
           </el-table-column>
@@ -389,7 +389,7 @@
             <template #default="{ row }">
               <el-input-number v-if="row.rowId !== 'total' && !isReadonly" :model-value="row.amountInPl"
                 size="small" :controls="false" style="width:100%"
-                @update:model-value="(v: number) => detail.updateCell(row.rowId, 'amountInPl', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => detail.updateCell(row.rowId, 'amountInPl', v ?? 0)" />
               <span v-else :class="{ 'cell-error': !row.plReconciled }">{{ fmt(row.amountInPl) }}</span>
             </template>
           </el-table-column>

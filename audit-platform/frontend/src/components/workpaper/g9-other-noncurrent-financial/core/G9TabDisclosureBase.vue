@@ -135,7 +135,7 @@
             size="small"
             :controls="false"
             style="width:100%"
-            @update:model-value="(v: number) => disc.updateField(row.rowKey, 'currentAmount', v ?? 0)"
+            @update:model-value="(v: number | undefined) => disc.updateField(row.rowKey, 'currentAmount', v ?? 0)"
           />
           <span v-else>{{ fmt(row.currentAmount) }}</span>
         </template>
@@ -150,7 +150,7 @@
             size="small"
             :controls="false"
             style="width:100%"
-            @update:model-value="(v: number) => disc.updateField(row.rowKey, 'priorAmount', v ?? 0)"
+            @update:model-value="(v: number | undefined) => disc.updateField(row.rowKey, 'priorAmount', v ?? 0)"
           />
           <span v-else>{{ fmt(row.priorAmount) }}</span>
         </template>

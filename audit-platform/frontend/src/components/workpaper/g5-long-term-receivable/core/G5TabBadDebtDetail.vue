@@ -128,7 +128,7 @@
               size="small"
               :controls="false"
               class="amt-input"
-              @change="(v: number) => onUpdate(row.id, 'otherIncrease', v ?? 0)"
+              @change="(v: number | undefined) => onUpdate(row.id, 'otherIncrease', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmt(row.otherIncrease) }}</span>
           </template>
@@ -144,7 +144,7 @@
               size="small"
               :controls="false"
               class="amt-input"
-              @change="(v: number) => onUpdate(row.id, 'reversal', v ?? 0)"
+              @change="(v: number | undefined) => onUpdate(row.id, 'reversal', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmt(row.reversal) }}</span>
           </template>
@@ -157,7 +157,7 @@
               size="small"
               :controls="false"
               class="amt-input"
-              @change="(v: number) => onUpdate(row.id, 'writeOff', v ?? 0)"
+              @change="(v: number | undefined) => onUpdate(row.id, 'writeOff', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmt(row.writeOff) }}</span>
           </template>
@@ -170,7 +170,7 @@
               size="small"
               :controls="false"
               class="amt-input"
-              @change="(v: number) => onUpdate(row.id, 'otherDecrease', v ?? 0)"
+              @change="(v: number | undefined) => onUpdate(row.id, 'otherDecrease', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmt(row.otherDecrease) }}</span>
           </template>

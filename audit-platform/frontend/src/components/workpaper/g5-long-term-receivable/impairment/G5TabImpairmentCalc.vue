@@ -134,7 +134,7 @@
               :max="1"
               size="small"
               style="width:100%"
-              @update:model-value="(v: number) => calc.updateSingleCell(row.rowId, 'lossRate', v ?? 0)"
+              @update:model-value="(v: number | undefined) => calc.updateSingleCell(row.rowId, 'lossRate', v ?? 0)"
             />
             <span v-else>{{ fmtPct(row.lossRate) }}</span>
           </template>
@@ -228,7 +228,7 @@
                 :max="1"
                 size="small"
                 style="width:100%"
-                @update:model-value="(v: number) => calc.updateCreditCell(group.groupId, row.rowId, 'lossRate', v ?? 0)"
+                @update:model-value="(v: number | undefined) => calc.updateCreditCell(group.groupId, row.rowId, 'lossRate', v ?? 0)"
               />
               <span v-else>{{ fmtPct(row.lossRate) }}</span>
             </template>
@@ -327,7 +327,7 @@
                 :max="1"
                 size="small"
                 style="width:100%"
-                @update:model-value="(v: number) => calc.updateAgingCell(group.groupId, row.rowId, 'lossRate', v ?? 0)"
+                @update:model-value="(v: number | undefined) => calc.updateAgingCell(group.groupId, row.rowId, 'lossRate', v ?? 0)"
               />
               <span v-else>{{ fmtPct(row.lossRate) }}</span>
             </template>

@@ -547,7 +547,7 @@ function onReview(sectionId: string) {
               size="small"
               :controls="false"
               :precision="2"
-              @change="(v: number) => updateCell(row.rowId, 'reclassification', v || 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'reclassification', v || 0)"
             />
             <span v-else v-html="fmtAmount(row.reclassification)" />
           </template>
@@ -605,7 +605,7 @@ function onReview(sectionId: string) {
               size="small"
               :controls="false"
               :precision="2"
-              @change="(v: number) => updateCell(row.rowId, 'postSettlement', v || 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'postSettlement', v || 0)"
             />
             <span v-else v-html="fmtAmount(row.postSettlement)" />
           </template>

@@ -375,7 +375,7 @@ async function generateAuditConclusionWithAI() {
               :precision="2"
               :disabled="isReadonly"
               style="width: 100%"
-              @change="(v: number) => updateRow(row.id, 'postHonored', v || 0)"
+              @change="(v: number | undefined) => updateRow(row.id, 'postHonored', v || 0)"
             />
           </template>
         </el-table-column>

@@ -105,14 +105,14 @@
         <el-table-column label="审定账面余额①" min-width="120" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.auditedBalance" :controls="false" size="small" class="amt"
-              @update:model-value="(v: number) => { calc.updateSingleCell(row.rowId, 'auditedBalance', v ?? 0); persist() }" />
+              @update:model-value="(v: number | undefined) => { calc.updateSingleCell(row.rowId, 'auditedBalance', v ?? 0); persist() }" />
             <span v-else class="amount-cell">{{ fmtAmt(row.auditedBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="预期信用损失率②" width="130" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.lossRate" :controls="false" :min="0" :max="1" :precision="4" size="small" class="amt"
-              @update:model-value="(v: number) => { calc.updateSingleCell(row.rowId, 'lossRate', v ?? 0); persist() }" />
+              @update:model-value="(v: number | undefined) => { calc.updateSingleCell(row.rowId, 'lossRate', v ?? 0); persist() }" />
             <span v-else>{{ pct(row.lossRate) }}</span>
           </template>
         </el-table-column>
@@ -124,7 +124,7 @@
         <el-table-column label="期末坏账准备账面④" min-width="130" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.bookProvision" :controls="false" size="small" class="amt"
-              @update:model-value="(v: number) => { calc.updateSingleCell(row.rowId, 'bookProvision', v ?? 0); persist() }" />
+              @update:model-value="(v: number | undefined) => { calc.updateSingleCell(row.rowId, 'bookProvision', v ?? 0); persist() }" />
             <span v-else class="amount-cell">{{ fmtAmt(row.bookProvision) }}</span>
           </template>
         </el-table-column>
@@ -173,14 +173,14 @@
           <el-table-column label="审定账面余额①" min-width="120" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.auditedBalance" :controls="false" size="small" class="amt"
-                @update:model-value="(v: number) => { calc.updateCreditCell(group.groupId, row.rowId, 'auditedBalance', v ?? 0); persist() }" />
+                @update:model-value="(v: number | undefined) => { calc.updateCreditCell(group.groupId, row.rowId, 'auditedBalance', v ?? 0); persist() }" />
               <span v-else class="amount-cell">{{ fmtAmt(row.auditedBalance) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="预期信用损失率②" width="130" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.lossRate" :controls="false" :min="0" :max="1" :precision="4" size="small" class="amt"
-                @update:model-value="(v: number) => { calc.updateCreditCell(group.groupId, row.rowId, 'lossRate', v ?? 0); persist() }" />
+                @update:model-value="(v: number | undefined) => { calc.updateCreditCell(group.groupId, row.rowId, 'lossRate', v ?? 0); persist() }" />
               <span v-else>{{ pct(row.lossRate) }}</span>
             </template>
           </el-table-column>
@@ -190,7 +190,7 @@
           <el-table-column label="期末坏账准备账面④" min-width="130" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.bookProvision" :controls="false" size="small" class="amt"
-                @update:model-value="(v: number) => { calc.updateCreditCell(group.groupId, row.rowId, 'bookProvision', v ?? 0); persist() }" />
+                @update:model-value="(v: number | undefined) => { calc.updateCreditCell(group.groupId, row.rowId, 'bookProvision', v ?? 0); persist() }" />
               <span v-else class="amount-cell">{{ fmtAmt(row.bookProvision) }}</span>
             </template>
           </el-table-column>
@@ -257,14 +257,14 @@
           <el-table-column label="审定账面余额①" min-width="120" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.auditedBalance" :controls="false" size="small" class="amt"
-                @update:model-value="(v: number) => { calc.updateAgingCell(group.groupId, row.rowId, 'auditedBalance', v ?? 0); persist() }" />
+                @update:model-value="(v: number | undefined) => { calc.updateAgingCell(group.groupId, row.rowId, 'auditedBalance', v ?? 0); persist() }" />
               <span v-else class="amount-cell">{{ fmtAmt(row.auditedBalance) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="预期信用损失率②" width="130" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.lossRate" :controls="false" :min="0" :max="1" :precision="4" size="small" class="amt"
-                @update:model-value="(v: number) => { calc.updateAgingCell(group.groupId, row.rowId, 'lossRate', v ?? 0); persist() }" />
+                @update:model-value="(v: number | undefined) => { calc.updateAgingCell(group.groupId, row.rowId, 'lossRate', v ?? 0); persist() }" />
               <span v-else>{{ pct(row.lossRate) }}</span>
             </template>
           </el-table-column>
@@ -274,7 +274,7 @@
           <el-table-column label="期末坏账准备账面④" min-width="130" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.bookProvision" :controls="false" size="small" class="amt"
-                @update:model-value="(v: number) => { calc.updateAgingCell(group.groupId, row.rowId, 'bookProvision', v ?? 0); persist() }" />
+                @update:model-value="(v: number | undefined) => { calc.updateAgingCell(group.groupId, row.rowId, 'bookProvision', v ?? 0); persist() }" />
               <span v-else class="amount-cell">{{ fmtAmt(row.bookProvision) }}</span>
             </template>
           </el-table-column>

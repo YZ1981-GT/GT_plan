@@ -257,7 +257,7 @@ onMounted(() => {
                     <el-date-picker :model-value="asCert(row).depositDate" :disabled="isReadonly" type="date" value-format="YYYY-MM-DD" size="small" style="width: 100%" @update:model-value="(val: string) => updateCell(row.id, 'depositDate', val || '')" />
                   </el-descriptions-item>
                   <el-descriptions-item label="利率(%)">
-                    <el-input-number :model-value="asCert(row).interestRate" :disabled="isReadonly" :controls="false" :precision="4" size="small" @change="(val: number) => updateCell(row.id, 'interestRate', val ?? 0)" />
+                    <el-input-number :model-value="asCert(row).interestRate" :disabled="isReadonly" :controls="false" :precision="4" size="small" @change="(val: number | undefined) => updateCell(row.id, 'interestRate', val ?? 0)" />
                   </el-descriptions-item>
                   <el-descriptions-item label="不一致原因">
                     <el-input :model-value="asCert(row).inconsistencyReason" :disabled="isReadonly" size="small" placeholder="账面不一致时说明" @change="(val: string) => updateCell(row.id, 'inconsistencyReason', val)" />

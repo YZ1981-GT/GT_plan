@@ -174,7 +174,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.beginBalance" size="small"
               :controls="false" class="amount-input"
-              @change="(v: number) => updateField(row.id, 'beginBalance', v ?? 0)" />
+              @change="(v: number | undefined) => updateField(row.id, 'beginBalance', v ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
           </template>
         </el-table-column>
@@ -182,7 +182,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.endBalance" size="small"
               :controls="false" class="amount-input"
-              @change="(v: number) => updateField(row.id, 'endBalance', v ?? 0)" />
+              @change="(v: number | undefined) => updateField(row.id, 'endBalance', v ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.endBalance) }}</span>
           </template>
         </el-table-column>
@@ -205,7 +205,7 @@
               size="small"
               :controls="false"
               class="amount-input"
-              @change="(v: number) => updateField(row.id, `agingAudited.${band.key}`, v ?? 0)"
+              @change="(v: number | undefined) => updateField(row.id, `agingAudited.${band.key}`, v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.agingAudited[band.key]) }}</span>
           </template>
@@ -249,7 +249,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.badDebtProvision" size="small"
               :controls="false" class="amount-input"
-              @change="(v: number) => updateField(row.id, 'badDebtProvision', v ?? 0)" />
+              @change="(v: number | undefined) => updateField(row.id, 'badDebtProvision', v ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.badDebtProvision) }}</span>
           </template>
         </el-table-column>

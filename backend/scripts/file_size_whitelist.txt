@@ -2039,3 +2039,6 @@ audit-platform/frontend/src/components/workpaper/shared/__tests__/helpers/x3KeyP
 #   拆分方向：「回函匹配队列 + 指派」与「OCR 比对 + 回填」两组端点各抽一个子 router
 #   （router_registry 同前缀挂载，路由级 confirmation_project_gate 随子 router 一并携带）。
 backend/app/routers/confirmations.py 894
+# G7TabEquityMethodCalc.vue —— 2026-11-27 入册：HEAD 已 2478 行且未登记，改一行类型标注即被拒。
+#   拆分方向：净资产调整 / 逐行计算 / 汇总三个区块各抽子组件，update*/recalc* 计算函数抽 composable。
+audit-platform/frontend/src/components/workpaper/g7-long-term-equity-method/calculation/G7TabEquityMethodCalc.vue 2478

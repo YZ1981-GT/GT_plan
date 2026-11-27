@@ -70,7 +70,7 @@
             :controls="false"
             size="small"
             style="width:160px"
-            @change="(v: number) => onSetD4Revenue(v ?? 0)"
+            @change="(v: number | undefined) => onSetD4Revenue(v ?? 0)"
           />
           <span v-else class="reconcile-value">{{ fmtAmt(reconcileResult.d4RevenueAudited) }}</span>
           <GtIndexChip value="wp:D4-1" :context-project-id="projectId" style="margin-left:6px" />

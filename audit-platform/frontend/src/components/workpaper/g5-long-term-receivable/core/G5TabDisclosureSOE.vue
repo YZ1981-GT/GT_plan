@@ -256,7 +256,7 @@
               :controls="false"
               class="amt-input"
               :disabled="isReadonly"
-              @change="(v: number) => dis.patchDerecog(row.id, { gainLoss: v ?? 0 })"
+              @change="(v: number | undefined) => dis.patchDerecog(row.id, { gainLoss: v ?? 0 })"
             />
           </template>
         </el-table-column>
@@ -591,7 +591,7 @@
                   size="small"
                   :controls="false"
                   class="amt-input"
-                  @change="(v: number) => dis.patchAgingCell(pf.id, row.id, 'endBalance', v ?? 0)"
+                  @change="(v: number | undefined) => dis.patchAgingCell(pf.id, row.id, 'endBalance', v ?? 0)"
                 />
                 <span v-else class="amount-cell">{{ fmt(row.endBalance) }}</span>
               </template>
@@ -623,7 +623,7 @@
                   size="small"
                   :controls="false"
                   class="amt-input"
-                  @change="(v: number) => dis.patchAgingCell(pf.id, row.id, 'priorBalance', v ?? 0)"
+                  @change="(v: number | undefined) => dis.patchAgingCell(pf.id, row.id, 'priorBalance', v ?? 0)"
                 />
                 <span v-else class="amount-cell">{{ fmt(row.priorBalance) }}</span>
               </template>

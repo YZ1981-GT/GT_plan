@@ -116,7 +116,7 @@
           <el-table-column label="调整" width="88" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.openingAdjustment" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v: number) => adj.updateField(row.rowKey, 'openingAdjustment', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => adj.updateField(row.rowKey, 'openingAdjustment', v ?? 0)" />
               <span v-else>{{ fmt(row.openingAdjustment) }}</span>
             </template>
           </el-table-column>
@@ -135,7 +135,7 @@
           <el-table-column label="调整" width="88" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.closingAdjustment" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v: number) => adj.updateField(row.rowKey, 'closingAdjustment', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => adj.updateField(row.rowKey, 'closingAdjustment', v ?? 0)" />
               <span v-else>{{ fmt(row.closingAdjustment) }}</span>
             </template>
           </el-table-column>
@@ -235,7 +235,7 @@
         size="small"
         :controls="false"
         style="width:140px"
-        @update:model-value="(v: number) => adj.updateTrialBalance(v ?? 0)"
+        @update:model-value="(v: number | undefined) => adj.updateTrialBalance(v ?? 0)"
       />
       <span v-else>{{ fmt(adj.trialBalanceAmount.value) }}</span>
       <span class="tb-var">差异 {{ fmt(adj.variance.value) }} {{ adj.hasVarianceHighlight.value ? '✗' : '✓' }}</span>

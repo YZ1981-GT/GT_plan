@@ -104,19 +104,19 @@
           <el-table-column label="期初" align="center">
             <el-table-column prop="beginUnadjusted" label="未审数" min-width="100" align="right">
               <template #default="{ row, $index }">
-                <el-input-number v-if="!isReadonly" :model-value="row.beginUnadjusted" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number) => adjudication.updateRow($index, 'beginUnadjusted', v ?? 0)" />
+                <el-input-number v-if="!isReadonly" :model-value="row.beginUnadjusted" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number | undefined) => adjudication.updateRow($index, 'beginUnadjusted', v ?? 0)" />
                 <span v-else :class="['cell-value', { negative: row.beginUnadjusted < 0 }]">{{ fmtAmt(row.beginUnadjusted) }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="beginAje" label="AJE" min-width="90" align="right">
               <template #default="{ row, $index }">
-                <el-input-number v-if="!isReadonly" :model-value="row.beginAje" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number) => adjudication.updateRow($index, 'beginAje', v ?? 0)" />
+                <el-input-number v-if="!isReadonly" :model-value="row.beginAje" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number | undefined) => adjudication.updateRow($index, 'beginAje', v ?? 0)" />
                 <span v-else :class="['cell-value', { negative: row.beginAje < 0 }]">{{ fmtAmt(row.beginAje) }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="beginRje" label="RJE" min-width="90" align="right">
               <template #default="{ row, $index }">
-                <el-input-number v-if="!isReadonly" :model-value="row.beginRje" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number) => adjudication.updateRow($index, 'beginRje', v ?? 0)" />
+                <el-input-number v-if="!isReadonly" :model-value="row.beginRje" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number | undefined) => adjudication.updateRow($index, 'beginRje', v ?? 0)" />
                 <span v-else :class="['cell-value', { negative: row.beginRje < 0 }]">{{ fmtAmt(row.beginRje) }}</span>
               </template>
             </el-table-column>
@@ -138,19 +138,19 @@
           <el-table-column label="期末" align="center">
             <el-table-column prop="endUnadjusted" label="未审数" min-width="100" align="right">
               <template #default="{ row, $index }">
-                <el-input-number v-if="!isReadonly" :model-value="row.endUnadjusted" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number) => adjudication.updateRow($index, 'endUnadjusted', v ?? 0)" />
+                <el-input-number v-if="!isReadonly" :model-value="row.endUnadjusted" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number | undefined) => adjudication.updateRow($index, 'endUnadjusted', v ?? 0)" />
                 <span v-else :class="['cell-value', { negative: row.endUnadjusted < 0 }]">{{ fmtAmt(row.endUnadjusted) }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="endAje" label="AJE" min-width="90" align="right">
               <template #default="{ row, $index }">
-                <el-input-number v-if="!isReadonly" :model-value="row.endAje" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number) => adjudication.updateRow($index, 'endAje', v ?? 0)" />
+                <el-input-number v-if="!isReadonly" :model-value="row.endAje" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number | undefined) => adjudication.updateRow($index, 'endAje', v ?? 0)" />
                 <span v-else :class="['cell-value', { negative: row.endAje < 0 }]">{{ fmtAmt(row.endAje) }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="endRje" label="RJE" min-width="90" align="right">
               <template #default="{ row, $index }">
-                <el-input-number v-if="!isReadonly" :model-value="row.endRje" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number) => adjudication.updateRow($index, 'endRje', v ?? 0)" />
+                <el-input-number v-if="!isReadonly" :model-value="row.endRje" size="small" :controls="false" :precision="2" class="cell-input" @change="(v: number | undefined) => adjudication.updateRow($index, 'endRje', v ?? 0)" />
                 <span v-else :class="['cell-value', { negative: row.endRje < 0 }]">{{ fmtAmt(row.endRje) }}</span>
               </template>
             </el-table-column>

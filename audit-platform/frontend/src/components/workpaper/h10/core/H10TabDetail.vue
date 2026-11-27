@@ -124,7 +124,7 @@
         <el-table-column label="税费" width="88" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.disposalTax" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.id, { disposalTax: v ?? 0 })" />
+              @update:model-value="(v: number | undefined) => detail.updateRow(row.id, { disposalTax: v ?? 0 })" />
             <span v-else>{{ fmt(row.disposalTax) }}</span>
           </template>
         </el-table-column>

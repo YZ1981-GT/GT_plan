@@ -409,7 +409,7 @@ function asFx(row: any): FxCountRow { return row }
                   :disabled="isReadonly"
                   :controls="false"
                   size="small"
-                  @change="(val: number) => updateCell(row.id, 'denomination', val ?? 0)"
+                  @change="(val: number | undefined) => updateCell(row.id, 'denomination', val ?? 0)"
                 />
               </template>
             </el-table-column>
@@ -420,7 +420,7 @@ function asFx(row: any): FxCountRow { return row }
                   :disabled="isReadonly"
                   :controls="false"
                   size="small"
-                  @change="(val: number) => updateCell(row.id, 'quantity', val ?? 0)"
+                  @change="(val: number | undefined) => updateCell(row.id, 'quantity', val ?? 0)"
                 />
               </template>
             </el-table-column>
@@ -464,7 +464,7 @@ function asFx(row: any): FxCountRow { return row }
                   :disabled="isReadonly"
                   :controls="false"
                   size="small"
-                  @change="(val: number) => updateCell(row.id, 'denomination', val ?? 0)"
+                  @change="(val: number | undefined) => updateCell(row.id, 'denomination', val ?? 0)"
                 />
               </template>
             </el-table-column>
@@ -475,7 +475,7 @@ function asFx(row: any): FxCountRow { return row }
                   :disabled="isReadonly"
                   :controls="false"
                   size="small"
-                  @change="(val: number) => updateCell(row.id, 'quantity', val ?? 0)"
+                  @change="(val: number | undefined) => updateCell(row.id, 'quantity', val ?? 0)"
                 />
               </template>
             </el-table-column>
@@ -496,7 +496,7 @@ function asFx(row: any): FxCountRow { return row }
                   :controls="false"
                   :precision="4"
                   size="small"
-                  @change="(val: number) => updateCell(row.id, 'fxRate', val ?? 0)"
+                  @change="(val: number | undefined) => updateCell(row.id, 'fxRate', val ?? 0)"
                 />
               </template>
             </el-table-column>
@@ -617,7 +617,7 @@ function asFx(row: any): FxCountRow { return row }
                   :controls="false"
                   :precision="6"
                   size="small"
-                  @change="(val: number) => updateRollForward('closingFxRate', val)"
+                  @change="(val: number | undefined) => updateRollForward('closingFxRate', val)"
                 />
               </el-descriptions-item>
               <el-descriptions-item label="报表日原币账面">

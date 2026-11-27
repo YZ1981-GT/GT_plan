@@ -243,7 +243,7 @@ onBeforeUnmount(() => { if (saveTimer) { clearTimeout(saveTimer); doSave() } })
           <template #default="{ row }">
             <el-input-number
               :model-value="getCellValue(row.code, seg.id)"
-              @update:model-value="(v: number) => setCellValue(row.code, seg.id, v || 0)"
+              @update:model-value="(v: number | undefined) => setCellValue(row.code, seg.id, v || 0)"
               :disabled="readonly"
               size="small"
               :controls="false"

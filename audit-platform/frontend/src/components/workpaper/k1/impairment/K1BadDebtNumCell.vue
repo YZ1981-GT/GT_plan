@@ -5,7 +5,7 @@
     :controls="false"
     size="small"
     class="num-cell-input"
-    @update:model-value="(v: number) => emit('change', v ?? 0)"
+    @update:model-value="(v: number | undefined) => emit('change', v ?? 0)"
   />
   <span v-else class="num-cell-read">{{ fmt(value) }}</span>
 </template>

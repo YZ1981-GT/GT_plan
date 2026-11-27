@@ -166,7 +166,7 @@
         align="right"
       >
         <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.agingPrior?.[band.key] ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, band.priorField, v ?? 0)" />
+          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.agingPrior?.[band.key] ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, band.priorField, v ?? 0)" />
           <span v-else>{{ fmtAmt(row.agingPrior?.[band.key]) }}</span>
         </template>
       </el-table-column>
@@ -191,7 +191,7 @@
       </el-table-column>
       <el-table-column label="重分类" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.entityReclass" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'entityReclass', v ?? 0)" />
+          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.entityReclass" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'entityReclass', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.entityReclass) }}</span>
         </template>
       </el-table-column>
@@ -223,7 +223,7 @@
         align="right"
       >
         <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.agingAudited?.[band.key] ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, band.auditedField, v ?? 0)" />
+          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.agingAudited?.[band.key] ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, band.auditedField, v ?? 0)" />
           <span v-else>{{ fmtAmt(row.agingAudited?.[band.key]) }}</span>
         </template>
       </el-table-column>

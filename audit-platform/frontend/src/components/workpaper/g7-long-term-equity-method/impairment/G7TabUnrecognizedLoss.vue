@@ -176,7 +176,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.longTermReceivable" size="small"
               :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateFieldWithRecalc(row.id, 'longTermReceivable', v)" />
+              @change="(v: number | undefined) => updateFieldWithRecalc(row.id, 'longTermReceivable', v)" />
             <span v-else>{{ fmtNum(row.longTermReceivable) }}</span>
           </template>
         </el-table-column>
@@ -185,7 +185,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.otherLongTermEquity" size="small"
               :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateFieldWithRecalc(row.id, 'otherLongTermEquity', v)" />
+              @change="(v: number | undefined) => updateFieldWithRecalc(row.id, 'otherLongTermEquity', v)" />
             <span v-else>{{ fmtNum(row.otherLongTermEquity) }}</span>
           </template>
         </el-table-column>
@@ -194,7 +194,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.estimatedLiability" size="small"
               :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateFieldWithRecalc(row.id, 'estimatedLiability', v)" />
+              @change="(v: number | undefined) => updateFieldWithRecalc(row.id, 'estimatedLiability', v)" />
             <span v-else>{{ fmtNum(row.estimatedLiability) }}</span>
           </template>
         </el-table-column>
@@ -211,7 +211,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.cumulativeLoss" size="small"
               :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateFieldWithRecalc(row.id, 'cumulativeLoss', v)" />
+              @change="(v: number | undefined) => updateFieldWithRecalc(row.id, 'cumulativeLoss', v)" />
             <span v-else>{{ fmtNum(row.cumulativeLoss) }}</span>
           </template>
         </el-table-column>
@@ -241,7 +241,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly && !isTab2Disabled(row)" :model-value="row.reduceInvestment" size="small"
               :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateReduceField(row.id, 'reduceInvestment', v)" />
+              @change="(v: number | undefined) => updateReduceField(row.id, 'reduceInvestment', v)" />
             <span v-else :class="{ 'text-disabled': isTab2Disabled(row) }">{{ fmtNum(row.reduceInvestment) }}</span>
           </template>
         </el-table-column>
@@ -250,7 +250,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly && !isTab2Disabled(row)" :model-value="row.reduceLongTermReceivable" size="small"
               :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateReduceField(row.id, 'reduceLongTermReceivable', v)" />
+              @change="(v: number | undefined) => updateReduceField(row.id, 'reduceLongTermReceivable', v)" />
             <span v-else :class="{ 'text-disabled': isTab2Disabled(row) }">{{ fmtNum(row.reduceLongTermReceivable) }}</span>
           </template>
         </el-table-column>
@@ -259,7 +259,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly && !isTab2Disabled(row)" :model-value="row.reduceOtherEquity" size="small"
               :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateReduceField(row.id, 'reduceOtherEquity', v)" />
+              @change="(v: number | undefined) => updateReduceField(row.id, 'reduceOtherEquity', v)" />
             <span v-else :class="{ 'text-disabled': isTab2Disabled(row) }">{{ fmtNum(row.reduceOtherEquity) }}</span>
           </template>
         </el-table-column>
@@ -268,7 +268,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly && !isTab2Disabled(row)" :model-value="row.recognizeEstimatedLiability" size="small"
               :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateReduceField(row.id, 'recognizeEstimatedLiability', v)" />
+              @change="(v: number | undefined) => updateReduceField(row.id, 'recognizeEstimatedLiability', v)" />
             <span v-else :class="{ 'text-disabled': isTab2Disabled(row) }">{{ fmtNum(row.recognizeEstimatedLiability) }}</span>
           </template>
         </el-table-column>
@@ -292,7 +292,7 @@
               :controls="false"
               :precision="2"
               class="compact-num"
-              @change="(v: number) => updateFieldWithRecalc(row.id, 'priorCumulative', v)"
+              @change="(v: number | undefined) => updateFieldWithRecalc(row.id, 'priorCumulative', v)"
             />
             <span v-else :class="{ 'text-disabled': isTab2Disabled(row) }">{{ fmtNum(row.priorCumulative) }}</span>
           </template>
@@ -307,7 +307,7 @@
                 :controls="false"
                 :precision="2"
                 class="compact-num"
-                @change="(v: number) => updateCurrentChangeManual(row.id, v)"
+                @change="(v: number | undefined) => updateCurrentChangeManual(row.id, v)"
               />
               <el-button
                 v-if="row.currentChangeManual"
@@ -655,7 +655,7 @@ function updateFieldWithRecalc(id: string, field: keyof UnrecognizedLossRow, val
 function updateReduceField(
   id: string,
   field: 'reduceInvestment' | 'reduceLongTermReceivable' | 'reduceOtherEquity' | 'recognizeEstimatedLiability',
-  value: number,
+  value: number | undefined,
 ) {
   const row = rows.find(r => r.id === id)
   if (!row) return
@@ -665,7 +665,7 @@ function updateReduceField(
   persistRows()
 }
 
-function updateCurrentChangeManual(id: string, value: number) {
+function updateCurrentChangeManual(id: string, value: number | undefined) {
   const row = rows.find(r => r.id === id)
   if (!row) return
   row.currentChangeManual = true

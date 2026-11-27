@@ -102,7 +102,7 @@
             <template #default="{ row }">
               <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentAdjustment"
                 size="small" :controls="false" style="width:100%"
-                @update:model-value="(v: number) => detail.updateCell(row.rowKey, 'currentAdjustment', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => detail.updateCell(row.rowKey, 'currentAdjustment', v ?? 0)" />
               <span v-else>{{ fmt(row.currentAdjustment) }}</span>
             </template>
           </el-table-column>
@@ -143,7 +143,7 @@
             <template #default="{ row }">
               <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentReversal"
                 size="small" :controls="false" style="width:100%" placeholder="正数"
-                @update:model-value="(v: number) => detail.updateCell(row.rowKey, 'currentReversal', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => detail.updateCell(row.rowKey, 'currentReversal', v ?? 0)" />
               <span v-else>{{ fmt(row.currentReversal) }}</span>
             </template>
           </el-table-column>
@@ -151,7 +151,7 @@
             <template #default="{ row }">
               <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentWriteoff"
                 size="small" :controls="false" style="width:100%"
-                @update:model-value="(v: number) => detail.updateCell(row.rowKey, 'currentWriteoff', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => detail.updateCell(row.rowKey, 'currentWriteoff', v ?? 0)" />
               <span v-else>{{ fmt(row.currentWriteoff) }}</span>
             </template>
           </el-table-column>

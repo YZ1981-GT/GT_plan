@@ -140,7 +140,7 @@
               :controls="false"
               :precision="2"
               style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.rowId, { investmentRatio: pctToRatio(v) })"
+              @update:model-value="(v: number | undefined) => detail.updateRow(row.rowId, { investmentRatio: pctToRatio(v) })"
             />
             <span v-else>{{ ratioPct(row.investmentRatio) }}%</span>
           </template>

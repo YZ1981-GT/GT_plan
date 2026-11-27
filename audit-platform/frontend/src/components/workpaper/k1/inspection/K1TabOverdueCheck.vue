@@ -151,7 +151,7 @@
               size="small"
               class="amt"
               :disabled="isReadonly"
-              @update:model-value="(v: number) => updateCell(row.id, 'openingBalance', v ?? 0)"
+              @update:model-value="(v: number | undefined) => updateCell(row.id, 'openingBalance', v ?? 0)"
             />
           </template>
         </el-table-column>
@@ -165,7 +165,7 @@
               size="small"
               class="amt"
               :disabled="isReadonly"
-              @update:model-value="(v: number) => updateCell(row.id, 'periodDebit', v ?? 0)"
+              @update:model-value="(v: number | undefined) => updateCell(row.id, 'periodDebit', v ?? 0)"
             />
           </template>
         </el-table-column>
@@ -179,7 +179,7 @@
               size="small"
               class="amt"
               :disabled="isReadonly"
-              @update:model-value="(v: number) => updateCell(row.id, 'periodCredit', v ?? 0)"
+              @update:model-value="(v: number | undefined) => updateCell(row.id, 'periodCredit', v ?? 0)"
             />
           </template>
         </el-table-column>
@@ -294,7 +294,7 @@
               class="amt"
               :class="{ 'provision-warn': isProvisionMismatch(row.debtorName) }"
               :disabled="isReadonly"
-              @update:model-value="(v: number) => updateCell(row.id, 'provision', v ?? 0)"
+              @update:model-value="(v: number | undefined) => updateCell(row.id, 'provision', v ?? 0)"
             />
           </template>
         </el-table-column>
@@ -308,7 +308,7 @@
                 size="small"
                 class="amt"
                 :disabled="isReadonly"
-                @update:model-value="(v: number) => updateCell(row.id, 'auditedBalance', v ?? 0)"
+                @update:model-value="(v: number | undefined) => updateCell(row.id, 'auditedBalance', v ?? 0)"
               />
               <el-button
                 v-if="!isReadonly"
@@ -331,7 +331,7 @@
               size="small"
               class="amt"
               :disabled="isReadonly"
-              @update:model-value="(v: number) => updateCell(row.id, 'postPeriodCollection', v ?? 0)"
+              @update:model-value="(v: number | undefined) => updateCell(row.id, 'postPeriodCollection', v ?? 0)"
             />
           </template>
         </el-table-column>

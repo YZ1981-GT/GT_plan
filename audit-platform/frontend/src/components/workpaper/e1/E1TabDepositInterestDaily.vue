@@ -272,7 +272,7 @@ async function handleImport(file: File): Promise<boolean> {
           :max="2100"
           size="small"
           style="width: 90px"
-          @change="(v: number) => setYear(v ?? pack.year)"
+          @change="(v: number | undefined) => setYear(v ?? pack.year)"
         />
       </span>
     </template>
@@ -337,7 +337,7 @@ async function handleImport(file: File): Promise<boolean> {
                 :step="0.0001"
                 size="small"
                 style="width: 110px"
-                @change="(v: number) => updateGroup(g.id, 'annualRate', v ?? 0)"
+                @change="(v: number | undefined) => updateGroup(g.id, 'annualRate', v ?? 0)"
               />
               <el-button size="small" :disabled="isReadonly" @click="addAccount(g.id)">+ 账号</el-button>
               <el-button size="small" type="danger" text :disabled="isReadonly" @click="removeGroup(g.id)">删除组</el-button>
@@ -401,7 +401,7 @@ async function handleImport(file: File): Promise<boolean> {
                       :precision="2"
                       size="small"
                       style="width: 100%"
-                      @change="(v: number) => setBalance(row, a.id, v ?? 0)"
+                      @change="(v: number | undefined) => setBalance(row, a.id, v ?? 0)"
                     />
                   </template>
                 </el-table-column>
@@ -421,7 +421,7 @@ async function handleImport(file: File): Promise<boolean> {
                         :step="0.0001"
                         size="small"
                         style="width: 100%"
-                        @change="(v: number) => setRateOverride(row, a.id, v ?? 0)"
+                        @change="(v: number | undefined) => setRateOverride(row, a.id, v ?? 0)"
                       />
                     </template>
                   </el-table-column>
@@ -471,7 +471,7 @@ async function handleImport(file: File): Promise<boolean> {
                   :precision="2"
                   size="small"
                   style="width: 100%"
-                  @change="(v: number) => setBookInterest(v ?? 0)"
+                  @change="(v: number | undefined) => setBookInterest(v ?? 0)"
                 />
                 <span v-else :class="{ 'diff-warn': row.item === '差异' && Math.abs(row.amount) >= 0.01 }">
                   {{ fmtAmt(row.amount) }}

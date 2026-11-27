@@ -134,7 +134,7 @@
               size="small"
               :controls="false"
               class="amount-input"
-              @change="(v: number) => detail.updateCell(row.rowId, 'beginBalance', v ?? 0)"
+              @change="(v: number | undefined) => detail.updateCell(row.rowId, 'beginBalance', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
           </template>
@@ -147,7 +147,7 @@
               size="small"
               :controls="false"
               class="amount-input"
-              @change="(v: number) => detail.updateCell(row.rowId, 'increase', v ?? 0)"
+              @change="(v: number | undefined) => detail.updateCell(row.rowId, 'increase', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.increase) }}</span>
           </template>
@@ -160,7 +160,7 @@
               size="small"
               :controls="false"
               class="amount-input"
-              @change="(v: number) => detail.updateCell(row.rowId, 'decrease', v ?? 0)"
+              @change="(v: number | undefined) => detail.updateCell(row.rowId, 'decrease', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.decrease) }}</span>
           </template>
@@ -200,7 +200,7 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.postPayment" size="small" :controls="false" class="amount-input" @change="(v: number) => detail.updateCell(row.rowId, 'postPayment', v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.postPayment" size="small" :controls="false" class="amount-input" @change="(v: number | undefined) => detail.updateCell(row.rowId, 'postPayment', v ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.postPayment) }}</span>
           </template>
         </el-table-column>
@@ -236,31 +236,31 @@
         </el-table-column>
         <el-table-column label="期初调整" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.openingAdjust" size="small" :controls="false" class="amount-input" @change="(v: number) => detail.updateCell(row.rowId, 'openingAdjust', v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.openingAdjust" size="small" :controls="false" class="amount-input" @change="(v: number | undefined) => detail.updateCell(row.rowId, 'openingAdjust', v ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.openingAdjust) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="账项调整-增" min-width="115" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.ajeIncrease" size="small" :controls="false" class="amount-input" @change="(v: number) => detail.updateCell(row.rowId, 'ajeIncrease', v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.ajeIncrease" size="small" :controls="false" class="amount-input" @change="(v: number | undefined) => detail.updateCell(row.rowId, 'ajeIncrease', v ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.ajeIncrease) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="账项调整-减" min-width="115" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.ajeDecrease" size="small" :controls="false" class="amount-input" @change="(v: number) => detail.updateCell(row.rowId, 'ajeDecrease', v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.ajeDecrease" size="small" :controls="false" class="amount-input" @change="(v: number | undefined) => detail.updateCell(row.rowId, 'ajeDecrease', v ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.ajeDecrease) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="重分类-增" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.rjeIncrease" size="small" :controls="false" class="amount-input" @change="(v: number) => detail.updateCell(row.rowId, 'rjeIncrease', v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.rjeIncrease" size="small" :controls="false" class="amount-input" @change="(v: number | undefined) => detail.updateCell(row.rowId, 'rjeIncrease', v ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.rjeIncrease) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="重分类-减" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.rjeDecrease" size="small" :controls="false" class="amount-input" @change="(v: number) => detail.updateCell(row.rowId, 'rjeDecrease', v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.rjeDecrease" size="small" :controls="false" class="amount-input" @change="(v: number | undefined) => detail.updateCell(row.rowId, 'rjeDecrease', v ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.rjeDecrease) }}</span>
           </template>
         </el-table-column>

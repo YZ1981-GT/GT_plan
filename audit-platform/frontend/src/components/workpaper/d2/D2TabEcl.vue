@@ -107,7 +107,7 @@ function fmtPct(v: number): string {
 function toPctInput(v: number): number {
   return Number((v * 100).toFixed(4))
 }
-function fromPctInput(v: number | null): number {
+function fromPctInput(v: number | null | undefined): number {
   return (Number(v) || 0) / 100
 }
 
@@ -219,7 +219,7 @@ const GUIDANCE_TEXTS = [
           </el-table-column>
           <el-table-column label="预期损失率%" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="toPctInput(row.expectedLossRate)" size="small" :controls="false" :precision="2" :min="0" :max="100" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'expectedLossRate', fromPctInput(v))" />
+              <el-input-number v-if="!isReadonly" :model-value="toPctInput(row.expectedLossRate)" size="small" :controls="false" :precision="2" :min="0" :max="100" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'expectedLossRate', fromPctInput(v))" />
               <span v-else>{{ fmtPct(row.expectedLossRate) }}</span>
             </template>
           </el-table-column>
@@ -318,19 +318,19 @@ const GUIDANCE_TEXTS = [
             </el-table-column>
             <el-table-column label="第1年%" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly" :model-value="toPctInput(row.year1Rate)" size="small" :controls="false" :precision="2" :min="0" :max="100" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'year1Rate', fromPctInput(v))" />
+                <el-input-number v-if="!isReadonly" :model-value="toPctInput(row.year1Rate)" size="small" :controls="false" :precision="2" :min="0" :max="100" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'year1Rate', fromPctInput(v))" />
                 <span v-else>{{ fmtPct(row.year1Rate) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="第2年%" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly" :model-value="toPctInput(row.year2Rate)" size="small" :controls="false" :precision="2" :min="0" :max="100" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'year2Rate', fromPctInput(v))" />
+                <el-input-number v-if="!isReadonly" :model-value="toPctInput(row.year2Rate)" size="small" :controls="false" :precision="2" :min="0" :max="100" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'year2Rate', fromPctInput(v))" />
                 <span v-else>{{ fmtPct(row.year2Rate) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="第3年%" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly" :model-value="toPctInput(row.year3Rate)" size="small" :controls="false" :precision="2" :min="0" :max="100" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'year3Rate', fromPctInput(v))" />
+                <el-input-number v-if="!isReadonly" :model-value="toPctInput(row.year3Rate)" size="small" :controls="false" :precision="2" :min="0" :max="100" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'year3Rate', fromPctInput(v))" />
                 <span v-else>{{ fmtPct(row.year3Rate) }}</span>
               </template>
             </el-table-column>

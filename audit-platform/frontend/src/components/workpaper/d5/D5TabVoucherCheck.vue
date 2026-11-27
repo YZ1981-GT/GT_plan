@@ -316,7 +316,7 @@
             :controls="false"
             size="small"
             style="width:100%"
-            @change="(val: number) => updateCell(row.rowId, 'entityReclass', val ?? 0)"
+            @change="(val: number | undefined) => updateCell(row.rowId, 'entityReclass', val ?? 0)"
           />
           <span v-else>{{ fmtAmount(row.entityReclass) }}</span>
         </template>

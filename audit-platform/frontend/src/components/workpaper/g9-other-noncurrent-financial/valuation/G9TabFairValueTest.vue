@@ -185,7 +185,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => fv.updateRow(row.rowId, { closingUnadjustedQty: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => fv.updateRow(row.rowId, { closingUnadjustedQty: v ?? 0 })"
             />
             <span v-else>{{ row.closingUnadjustedQty }}</span>
           </template>
@@ -215,7 +215,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => fv.updateRow(row.rowId, { closingAuditedQty: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => fv.updateRow(row.rowId, { closingAuditedQty: v ?? 0 })"
             />
             <span v-else>{{ row.closingAuditedQty }}</span>
           </template>
@@ -391,7 +391,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => fv.updateRow(row.rowId, { nonLiquidityDiscount: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => fv.updateRow(row.rowId, { nonLiquidityDiscount: v ?? 0 })"
             />
             <span v-else>{{ row.nonLiquidityDiscount }}</span>
           </template>

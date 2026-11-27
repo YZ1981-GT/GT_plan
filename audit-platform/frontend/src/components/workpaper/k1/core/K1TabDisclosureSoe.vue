@@ -324,7 +324,7 @@
               <template #default="{ row }">
                 <el-input-number v-if="!row.isTotal && !isReadonly" :model-value="row.endRatePct ?? 0" size="small" :controls="false"
                   :precision="2" :min="0" :max="100" style="width:100%"
-                  @change="(v: number) => dis.updateOtherPortfolioRow(row.rowId, 'endRatePct', v ?? 0)" />
+                  @change="(v: number | undefined) => dis.updateOtherPortfolioRow(row.rowId, 'endRatePct', v ?? 0)" />
                 <span v-else>{{ pct(row.endRatePct) }}</span>
               </template>
             </el-table-column>
@@ -349,7 +349,7 @@
               <template #default="{ row }">
                 <el-input-number v-if="!row.isTotal && !isReadonly" :model-value="row.priorRatePct ?? 0" size="small" :controls="false"
                   :precision="2" :min="0" :max="100" style="width:100%"
-                  @change="(v: number) => dis.updateOtherPortfolioRow(row.rowId, 'priorRatePct', v ?? 0)" />
+                  @change="(v: number | undefined) => dis.updateOtherPortfolioRow(row.rowId, 'priorRatePct', v ?? 0)" />
                 <span v-else>{{ pct(row.priorRatePct) }}</span>
               </template>
             </el-table-column>
@@ -682,7 +682,7 @@
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.gainLoss" size="small" :controls="false"
                 :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
-                @change="(v: number) => dis.updateTransferRow(row.rowId, 'gainLoss', v ?? 0)" />
+                @change="(v: number | undefined) => dis.updateTransferRow(row.rowId, 'gainLoss', v ?? 0)" />
               <span v-else class="amount-cell">{{ fmt(row.gainLoss) }}</span>
             </template>
           </el-table-column>

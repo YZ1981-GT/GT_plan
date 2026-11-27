@@ -89,7 +89,7 @@
               size="small"
               controls-position="right"
               style="width: 110px"
-              @update:model-value="(v: number) => setCell(proj.project_id, selectedDate, v ?? 0)"
+              @update:model-value="(v: number | undefined) => setCell(proj.project_id, selectedDate, v ?? 0)"
             />
           </div>
           <div class="ts-project-card-detail">

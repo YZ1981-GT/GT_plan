@@ -61,7 +61,7 @@
           size="small"
           :controls="false"
           style="width: 140px"
-          @update:model-value="(v: number) => detail.updateProfitTotal(v ?? 0)"
+          @update:model-value="(v: number | undefined) => detail.updateProfitTotal(v ?? 0)"
         />
         <span v-else>{{ fmt(detail.profitTotal.value) }}</span>
         <el-tag v-if="detail.totalRow.value.shareOfProfit != null" size="small" type="info">
@@ -207,7 +207,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.id, { currentAdjustment: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => detail.updateRow(row.id, { currentAdjustment: v ?? 0 })"
             />
             <span v-else class="formula-cell">{{ fmt(row.currentAdjustment) }}</span>
           </template>
@@ -240,7 +240,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.id, { priorAdjustment: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => detail.updateRow(row.id, { priorAdjustment: v ?? 0 })"
             />
             <span v-else>{{ fmt(row.priorAdjustment) }}</span>
           </template>

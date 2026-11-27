@@ -297,21 +297,21 @@
             <template #default="{ row }">
               <el-input-number :model-value="row.faceValue" size="small" :controls="false" :disabled="isReadonly"
                 style="width:100%"
-                @update:model-value="(v: number) => vc.updateDebitCell(row.id, 'faceValue', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => vc.updateDebitCell(row.id, 'faceValue', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="利率(%)" width="88" align="right">
             <template #default="{ row }">
               <el-input-number :model-value="row.rate" size="small" :controls="false" :disabled="isReadonly"
                 style="width:100%" :precision="4"
-                @update:model-value="(v: number) => vc.updateDebitCell(row.id, 'rate', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => vc.updateDebitCell(row.id, 'rate', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="天数" width="72" align="right">
             <template #default="{ row }">
               <el-input-number :model-value="row.accruedDays" size="small" :controls="false" :disabled="isReadonly"
                 style="width:100%"
-                @update:model-value="(v: number) => vc.updateDebitCell(row.id, 'accruedDays', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => vc.updateDebitCell(row.id, 'accruedDays', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="测算利息" width="100" align="right" class-name="auto-calc-col">

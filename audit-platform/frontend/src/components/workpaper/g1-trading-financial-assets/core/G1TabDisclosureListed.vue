@@ -191,7 +191,7 @@
                 size="small"
                 :controls="false"
                 style="width:100%"
-                @update:model-value="(v: number) => updateFvField(row.rowKey, 'l1', v ?? 0)"
+                @update:model-value="(v: number | undefined) => updateFvField(row.rowKey, 'l1', v ?? 0)"
               />
               <span v-else>{{ fmt(row.l1) }}</span>
             </template>
@@ -204,7 +204,7 @@
                 size="small"
                 :controls="false"
                 style="width:100%"
-                @update:model-value="(v: number) => updateFvField(row.rowKey, 'l2', v ?? 0)"
+                @update:model-value="(v: number | undefined) => updateFvField(row.rowKey, 'l2', v ?? 0)"
               />
               <span v-else>{{ fmt(row.l2) }}</span>
             </template>
@@ -217,7 +217,7 @@
                 size="small"
                 :controls="false"
                 style="width:100%"
-                @update:model-value="(v: number) => updateFvField(row.rowKey, 'l3', v ?? 0)"
+                @update:model-value="(v: number | undefined) => updateFvField(row.rowKey, 'l3', v ?? 0)"
               />
               <span v-else>{{ fmt(row.l3) }}</span>
             </template>

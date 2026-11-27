@@ -31,7 +31,7 @@
             :precision="2"
             size="small"
             class="diff-checklist-detail__input"
-            @change="(val: number) => $emit('update', company._row_id!, 'a_reply_amount', val)"
+            @change="(val: number | undefined) => $emit('update', company._row_id!, 'a_reply_amount', val)"
           />
           <span v-else class="diff-checklist-detail__value">{{ formatAmount(company.a_reply_amount) }}</span>
         </div>
@@ -93,7 +93,7 @@
             :precision="2"
             size="small"
             class="diff-checklist-detail__input"
-            @change="(val: number) => $emit('update', company._row_id!, 'e_book_amount', val)"
+            @change="(val: number | undefined) => $emit('update', company._row_id!, 'e_book_amount', val)"
           />
           <span v-else class="diff-checklist-detail__value">{{ formatAmount(company.e_book_amount) }}</span>
         </div>

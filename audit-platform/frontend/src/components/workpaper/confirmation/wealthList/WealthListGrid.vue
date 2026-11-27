@@ -188,7 +188,7 @@
             size="small"
             placeholder="份额"
             style="width: 100%"
-            @update:model-value="(v: number) => emitUpdate(row, 'units_held', v)"
+            @update:model-value="(v: number | undefined) => emitUpdate(row, 'units_held', v)"
           />
           <span v-else>{{ row.units_held ?? '—' }}</span>
         </template>

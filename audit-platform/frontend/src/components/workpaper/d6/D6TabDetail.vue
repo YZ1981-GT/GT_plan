@@ -256,7 +256,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(row.rowId, 'agePrior1y', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'agePrior1y', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.agePrior1y) }}</span>
           </template>
@@ -272,7 +272,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(row.rowId, 'agePrior1to2y', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'agePrior1to2y', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.agePrior1to2y) }}</span>
           </template>
@@ -288,7 +288,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(row.rowId, 'agePrior2to3y', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'agePrior2to3y', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.agePrior2to3y) }}</span>
           </template>
@@ -304,7 +304,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(row.rowId, 'agePrior3yAbove', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'agePrior3yAbove', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.agePrior3yAbove) }}</span>
           </template>
@@ -399,7 +399,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(row.rowId, 'ageEnd1y', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'ageEnd1y', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.ageEnd1y) }}</span>
           </template>
@@ -415,7 +415,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(row.rowId, 'ageEnd1to2y', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'ageEnd1to2y', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.ageEnd1to2y) }}</span>
           </template>
@@ -431,7 +431,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(row.rowId, 'ageEnd2to3y', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'ageEnd2to3y', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.ageEnd2to3y) }}</span>
           </template>
@@ -447,7 +447,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(row.rowId, 'ageEnd3yAbove', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'ageEnd3yAbove', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.ageEnd3yAbove) }}</span>
           </template>
@@ -465,7 +465,7 @@
             :controls="false"
             size="small"
             style="width:100%"
-            @change="(v: number) => updateCell(row.rowId, 'receivableWithin1y', v ?? 0)"
+            @change="(v: number | undefined) => updateCell(row.rowId, 'receivableWithin1y', v ?? 0)"
           />
           <span v-else>{{ fmtAmount(row.receivableWithin1y) }}</span>
         </template>
@@ -482,7 +482,7 @@
             :controls="false"
             size="small"
             style="width:100%"
-            @change="(v: number) => updateCell(row.rowId, 'receivableAbove1y', v ?? 0)"
+            @change="(v: number | undefined) => updateCell(row.rowId, 'receivableAbove1y', v ?? 0)"
           />
           <span v-else>{{ fmtAmount(row.receivableAbove1y) }}</span>
         </template>
@@ -539,7 +539,7 @@
             :controls="false"
             size="small"
             style="width:100%"
-            @change="(v: number) => updateCell(row.rowId, 'postPeriodSettlement', v ?? 0)"
+            @change="(v: number | undefined) => updateCell(row.rowId, 'postPeriodSettlement', v ?? 0)"
           />
           <span v-else>{{ fmtAmount(row.postPeriodSettlement) }}</span>
         </template>

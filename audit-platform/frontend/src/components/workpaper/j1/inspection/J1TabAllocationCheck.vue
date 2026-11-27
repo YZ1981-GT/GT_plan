@@ -82,7 +82,7 @@
         </el-table-column>
         <el-table-column label="其他" width="90" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isSection" :model-value="row.otherExpense" :controls="false" size="small" style="width:78px" @change="(v: number) => updateCell(row.id, 'otherExpense', v ?? 0)" />
+            <el-input-number v-if="!isReadonly && !row.isSection" :model-value="row.otherExpense" :controls="false" size="small" style="width:78px" @change="(v: number | undefined) => updateCell(row.id, 'otherExpense', v ?? 0)" />
             <span v-else>{{ fmtAmt(row.otherExpense) }}</span>
           </template>
         </el-table-column>

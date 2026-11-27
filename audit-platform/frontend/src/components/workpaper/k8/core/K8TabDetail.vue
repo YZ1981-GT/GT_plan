@@ -100,7 +100,7 @@
               :controls="false"
               :precision="2"
               style="width: 72px"
-              @change="(v: number) => handleCellChange(row.rowKey, `month-${mi}`, v ?? 0)"
+              @change="(v: number | undefined) => handleCellChange(row.rowKey, `month-${mi}`, v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmtNum(row.months[mi] ?? 0) }}</span>
           </template>
@@ -139,13 +139,13 @@
         </el-table-column>
         <el-table-column label="账项调整" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable" :model-value="row.aje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width: 80px" @change="(v: number) => handleCellChange(row.rowKey, 'aje', v ?? 0)" />
+            <el-input-number v-if="row.isEditable" :model-value="row.aje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width: 80px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'aje', v ?? 0)" />
             <span v-else class="formula-cell">{{ fmtNum(row.aje) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="重分类调整" width="105" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable" :model-value="row.rje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width: 85px" @change="(v: number) => handleCellChange(row.rowKey, 'rje', v ?? 0)" />
+            <el-input-number v-if="row.isEditable" :model-value="row.rje" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width: 85px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'rje', v ?? 0)" />
             <span v-else class="formula-cell">{{ fmtNum(row.rje) }}</span>
           </template>
         </el-table-column>
@@ -188,7 +188,7 @@
         </el-table-column>
         <el-table-column label="上期审定" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable" :model-value="row.priorAmount" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width: 100px" @change="(v: number) => handleCellChange(row.rowKey, 'priorAmount', v ?? 0)" />
+            <el-input-number v-if="row.isEditable" :model-value="row.priorAmount" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width: 100px" @change="(v: number | undefined) => handleCellChange(row.rowKey, 'priorAmount', v ?? 0)" />
             <span v-else class="formula-cell">{{ fmtNum(row.priorAmount) }}</span>
           </template>
         </el-table-column>

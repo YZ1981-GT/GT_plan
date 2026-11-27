@@ -140,7 +140,7 @@
                   :controls="false"
                   :precision="4"
                   class="compact-num"
-                  @change="(v: number) => detail.updateRow(row.id, col.prop, (v ?? 0) / 100)"
+                  @change="(v: number | undefined) => detail.updateRow(row.id, col.prop, (v ?? 0) / 100)"
                 />
               </template>
               <template v-else-if="col.type === 'number'">
@@ -150,7 +150,7 @@
                   :controls="false"
                   :precision="2"
                   class="compact-num"
-                  @change="(v: number) => detail.updateRow(row.id, col.prop, v ?? 0)"
+                  @change="(v: number | undefined) => detail.updateRow(row.id, col.prop, v ?? 0)"
                 />
               </template>
               <template v-else>

@@ -1342,7 +1342,7 @@ onBeforeUnmount(() => {
             </el-table-column>
             <el-table-column label="折算率" width="100" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!row.isGroup && !isReadonly" :model-value="row.endRate" :controls="false" :precision="4" size="small" style="width:100%" @change="(v: number) => updateFcCell(row.id, 'endRate', v ?? 0)" />
+                <el-input-number v-if="!row.isGroup && !isReadonly" :model-value="row.endRate" :controls="false" :precision="4" size="small" style="width:100%" @change="(v: number | undefined) => updateFcCell(row.id, 'endRate', v ?? 0)" />
                 <span v-else>{{ row.endRate ? row.endRate.toFixed(4) : '#N/A' }}</span>
               </template>
             </el-table-column>
@@ -1361,7 +1361,7 @@ onBeforeUnmount(() => {
             </el-table-column>
             <el-table-column label="折算率" width="100" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!row.isGroup && !isReadonly" :model-value="row.openRate" :controls="false" :precision="4" size="small" style="width:100%" @change="(v: number) => updateFcCell(row.id, 'openRate', v ?? 0)" />
+                <el-input-number v-if="!row.isGroup && !isReadonly" :model-value="row.openRate" :controls="false" :precision="4" size="small" style="width:100%" @change="(v: number | undefined) => updateFcCell(row.id, 'openRate', v ?? 0)" />
                 <span v-else>{{ row.openRate ? row.openRate.toFixed(4) : '#N/A' }}</span>
               </template>
             </el-table-column>

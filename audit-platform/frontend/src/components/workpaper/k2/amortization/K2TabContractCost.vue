@@ -170,7 +170,7 @@
               size="small"
               :controls="false"
               class="amount-input"
-              @change="(v: number) => updateCell(row.rowId, 'contractAmount', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'contractAmount', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.contractAmount) }}</span>
           </template>
@@ -271,7 +271,7 @@
               size="small"
               :controls="false"
               class="amount-input"
-              @change="(v: number) => updateCell(row.rowId, 'beginBalance', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'beginBalance', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
           </template>
@@ -284,7 +284,7 @@
               size="small"
               :controls="false"
               class="amount-input"
-              @change="(v: number) => updateCell(row.rowId, 'periodIncrease', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'periodIncrease', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.periodIncrease) }}</span>
           </template>
@@ -297,7 +297,7 @@
               size="small"
               :controls="false"
               class="amount-input"
-              @change="(v: number) => updateCell(row.rowId, 'periodAmort', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'periodAmort', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.periodAmort) }}</span>
           </template>
@@ -348,7 +348,7 @@
               :controls="false"
               :min="0"
               class="amount-input"
-              @change="(v: number) => updateCell(row.rowId, 'amortPeriod', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'amortPeriod', v ?? 0)"
             />
             <span v-else>{{ row.amortPeriod || '-' }}</span>
           </template>

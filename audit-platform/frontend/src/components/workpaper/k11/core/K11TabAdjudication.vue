@@ -106,7 +106,7 @@
               :controls="false"
               :precision="2"
               style="width: 95px"
-              @change="(v: number) => handleCellChange(row.rowKey, 'priorUnadjusted', v ?? 0)"
+              @change="(v: number | undefined) => handleCellChange(row.rowKey, 'priorUnadjusted', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmtNum(row.priorUnadjusted) }}</span>
           </template>
@@ -121,7 +121,7 @@
               :controls="false"
               :precision="2"
               style="width: 90px"
-              @change="(v: number) => handleCellChange(row.rowKey, 'priorAdjustment', v ?? 0)"
+              @change="(v: number | undefined) => handleCellChange(row.rowKey, 'priorAdjustment', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmtNum(row.priorAdjustment) }}</span>
           </template>
@@ -155,7 +155,7 @@
               :controls="false"
               :precision="2"
               style="width: 95px"
-              @change="(v: number) => handleCellChange(row.rowKey, 'currentOccurrence', v ?? 0)"
+              @change="(v: number | undefined) => handleCellChange(row.rowKey, 'currentOccurrence', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmtNum(row.currentOccurrence) }}</span>
           </template>
@@ -170,7 +170,7 @@
               :controls="false"
               :precision="2"
               style="width: 90px"
-              @change="(v: number) => handleCellChange(row.rowKey, 'aje', v ?? 0)"
+              @change="(v: number | undefined) => handleCellChange(row.rowKey, 'aje', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmtNum(row.aje) }}</span>
           </template>
@@ -185,7 +185,7 @@
               :controls="false"
               :precision="2"
               style="width: 85px"
-              @change="(v: number) => handleCellChange(row.rowKey, 'rje', v ?? 0)"
+              @change="(v: number | undefined) => handleCellChange(row.rowKey, 'rje', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmtNum(row.rje) }}</span>
           </template>

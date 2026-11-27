@@ -103,7 +103,7 @@
           <template #default="{ row }">
             <el-input-number v-if="row.rowKind === 'fv_allocation' && !isReadonly" v-model="row.instrumentFvCumulative"
               size="small" :controls="false" style="width:100%"
-              @change="(v: number) => hd.updateCell(row.rowId, 'instrumentFvCumulative', v)" />
+              @change="(v: number | undefined) => hd.updateCell(row.rowId, 'instrumentFvCumulative', v)" />
             <span v-else-if="row.rowKind === 'fv_allocation'">{{ fmt(row.instrumentFvCumulative) }}</span>
             <span v-else class="muted">—</span>
           </template>
@@ -112,7 +112,7 @@
           <template #default="{ row }">
             <el-input-number v-if="row.rowKind === 'fv_allocation' && !isReadonly" v-model="row.salesPortion"
               size="small" :controls="false" style="width:100%"
-              @change="(v: number) => hd.updateCell(row.rowId, 'salesPortion', v)" />
+              @change="(v: number | undefined) => hd.updateCell(row.rowId, 'salesPortion', v)" />
             <span v-else-if="row.rowKind === 'fv_allocation'">{{ fmt(row.salesPortion) }}</span>
             <span v-else class="muted">—</span>
           </template>
@@ -121,7 +121,7 @@
           <template #default="{ row }">
             <el-input-number v-if="row.rowKind === 'fv_allocation' && !isReadonly" v-model="row.purchasePortion"
               size="small" :controls="false" style="width:100%"
-              @change="(v: number) => hd.updateCell(row.rowId, 'purchasePortion', v)" />
+              @change="(v: number | undefined) => hd.updateCell(row.rowId, 'purchasePortion', v)" />
             <span v-else-if="row.rowKind === 'fv_allocation'">{{ fmt(row.purchasePortion) }}</span>
             <span v-else class="muted">—</span>
           </template>

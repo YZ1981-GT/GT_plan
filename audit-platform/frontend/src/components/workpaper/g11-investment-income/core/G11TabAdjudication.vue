@@ -130,7 +130,7 @@
           <el-table-column label="调整" width="100" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.currentAdjustment" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v: number) => adj.updateField(row.rowKey, 'currentAdjustment', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => adj.updateField(row.rowKey, 'currentAdjustment', v ?? 0)" />
               <span v-else>{{ fmt(row.currentAdjustment) }}</span>
             </template>
           </el-table-column>
@@ -151,7 +151,7 @@
           <el-table-column label="调整" width="100" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.priorAdjustment" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v: number) => adj.updateField(row.rowKey, 'priorAdjustment', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => adj.updateField(row.rowKey, 'priorAdjustment', v ?? 0)" />
               <span v-else>{{ fmt(row.priorAdjustment) }}</span>
             </template>
           </el-table-column>
@@ -212,7 +212,7 @@
     <div class="g11-tb-row">
       <span>试算平衡表数（6111）：</span>
       <el-input-number v-if="!isReadonly" :model-value="adj.trialBalanceAmount.value" size="small" :controls="false"
-        style="width:140px" @update:model-value="(v: number) => adj.updateTrialBalance(v ?? 0)" />
+        style="width:140px" @update:model-value="(v: number | undefined) => adj.updateTrialBalance(v ?? 0)" />
       <span v-else>{{ fmt(adj.trialBalanceAmount.value) }}</span>
       <span :class="['variance', { 'is-error': adj.hasVarianceHighlight.value }]">差异：{{ fmt(adj.variance.value) }}</span>
       <el-button

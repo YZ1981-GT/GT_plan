@@ -511,13 +511,13 @@ async function onRemovePerson(): Promise<void> {
             <el-table-column label="收入金额" width="110" align="right">
               <template #default="{ row }">
                 <el-input-number :model-value="row.income" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width: 100%"
-                  @change="(v: number) => updateRow(row.id, 'income', v ?? 0)" />
+                  @change="(v: number | undefined) => updateRow(row.id, 'income', v ?? 0)" />
               </template>
             </el-table-column>
             <el-table-column label="支出金额" width="110" align="right">
               <template #default="{ row }">
                 <el-input-number :model-value="row.expense" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width: 100%"
-                  @change="(v: number) => updateRow(row.id, 'expense', v ?? 0)" />
+                  @change="(v: number | undefined) => updateRow(row.id, 'expense', v ?? 0)" />
               </template>
             </el-table-column>
             <el-table-column label="对方户名" min-width="110">

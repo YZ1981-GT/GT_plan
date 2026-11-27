@@ -166,7 +166,7 @@
                 size="small"
                 :controls="false"
                 class="cell-input"
-                @update:model-value="(v: number) => adj.updatePriorField(row.rowKey, 'priorAdjustment', v ?? 0)"
+                @update:model-value="(v: number | undefined) => adj.updatePriorField(row.rowKey, 'priorAdjustment', v ?? 0)"
               />
               <span v-else>{{ fmt(row.priorAdjustment) }}</span>
             </template>
@@ -233,7 +233,7 @@
             size="small"
             :controls="false"
             class="tb-input"
-            @update:model-value="(v: number) => adj.updateTrialBalance(v ?? 0)"
+            @update:model-value="(v: number | undefined) => adj.updateTrialBalance(v ?? 0)"
           />
           <span v-else class="tb-readonly">{{ fmt(adj.trialBalanceAmount.value) }}</span>
         </div>

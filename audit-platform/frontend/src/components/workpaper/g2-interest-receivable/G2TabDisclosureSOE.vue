@@ -178,7 +178,7 @@
               size="small"
               :controls="false"
               style="width: 100%"
-              @change="(v: number) => dis.updateOverdueField(row.id, 'overdueMonths', v ?? '')"
+              @change="(v: number | undefined) => dis.updateOverdueField(row.id, 'overdueMonths', v ?? '')"
             />
             <span v-else>{{ row.isTotal ? '' : row.overdueMonths || '—' }}</span>
           </template>
@@ -258,7 +258,7 @@
               size="small"
               :controls="false"
               style="width: 100%"
-              @change="(v: number) => dis.updateEclAmount(row.rowKey, 'stage1', v)"
+              @change="(v: number | undefined) => dis.updateEclAmount(row.rowKey, 'stage1', v)"
             />
             <span v-else class="amount-cell">{{ fmt(row.stage1) }}</span>
           </template>
@@ -276,7 +276,7 @@
               size="small"
               :controls="false"
               style="width: 100%"
-              @change="(v: number) => dis.updateEclAmount(row.rowKey, 'stage2', v)"
+              @change="(v: number | undefined) => dis.updateEclAmount(row.rowKey, 'stage2', v)"
             />
             <span v-else class="amount-cell">{{ fmt(row.stage2) }}</span>
           </template>
@@ -294,7 +294,7 @@
               size="small"
               :controls="false"
               style="width: 100%"
-              @change="(v: number) => dis.updateEclAmount(row.rowKey, 'stage3', v)"
+              @change="(v: number | undefined) => dis.updateEclAmount(row.rowKey, 'stage3', v)"
             />
             <span v-else class="amount-cell">{{ fmt(row.stage3) }}</span>
           </template>

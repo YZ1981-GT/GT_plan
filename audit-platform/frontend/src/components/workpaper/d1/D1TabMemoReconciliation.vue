@@ -718,7 +718,7 @@ const GUIDANCE_TEXTS = [
                   size="small"
                   :controls="false"
                   :precision="2"
-                  @change="(v: number) => onNumberChange(row.rowId, col.field, v)"
+                  @change="(v: number | undefined) => onNumberChange(row.rowId, col.field, v)"
                 />
                 <el-date-picker
                   v-else-if="col.type === 'date'"
@@ -782,7 +782,7 @@ const GUIDANCE_TEXTS = [
                   size="small"
                   :controls="false"
                   :precision="2"
-                  @change="(v: number) => onNumberChange(row.rowId, col.field, v)"
+                  @change="(v: number | undefined) => onNumberChange(row.rowId, col.field, v)"
                 />
                 <el-date-picker
                   v-else-if="col.type === 'date'"
@@ -845,7 +845,7 @@ const GUIDANCE_TEXTS = [
                   size="small"
                   :controls="false"
                   :precision="2"
-                  @change="(v: number) => onNumberChange(row.rowId, col.field, v)"
+                  @change="(v: number | undefined) => onNumberChange(row.rowId, col.field, v)"
                 />
                 <el-select
                   v-else-if="col.type === 'select'"
@@ -898,7 +898,7 @@ const GUIDANCE_TEXTS = [
                   size="small"
                   :controls="false"
                   :precision="2"
-                  @change="(v: number) => onNumberChange(row.rowId, col.field, v)"
+                  @change="(v: number | undefined) => onNumberChange(row.rowId, col.field, v)"
                 />
                 <el-select
                   v-else-if="col.type === 'select'"

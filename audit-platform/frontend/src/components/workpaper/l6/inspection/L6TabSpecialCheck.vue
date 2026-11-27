@@ -146,7 +146,7 @@
               :precision="2"
               :min="0"
               style="width: 100%"
-              @change="(val: number) => handleRowUpdate($index, 'debitAmt', val ?? 0)"
+              @change="(val: number | undefined) => handleRowUpdate($index, 'debitAmt', val ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.debitAmt) }}</span>
           </template>
@@ -163,7 +163,7 @@
               :precision="2"
               :min="0"
               style="width: 100%"
-              @change="(val: number) => handleRowUpdate($index, 'creditAmt', val ?? 0)"
+              @change="(val: number | undefined) => handleRowUpdate($index, 'creditAmt', val ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.creditAmt) }}</span>
           </template>

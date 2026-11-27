@@ -448,7 +448,7 @@ const GUIDANCE_TEXTS = [
                   size="small"
                   :controls="false"
                   :precision="2"
-                  @change="(v: number) => onNumberChange(cfg.key, row.rowId, col.field, v)"
+                  @change="(v: number | undefined) => onNumberChange(cfg.key, row.rowId, col.field, v)"
                 />
                 <el-date-picker
                   v-else-if="col.type === 'date'"

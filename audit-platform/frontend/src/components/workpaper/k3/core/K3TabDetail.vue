@@ -122,7 +122,7 @@
               size="small"
               :controls="false"
               class="amount-input"
-              @change="(v: number) => detail.updateCell(row.rowId, 'beginBalance', v ?? 0)"
+              @change="(v: number | undefined) => detail.updateCell(row.rowId, 'beginBalance', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
           </template>
@@ -135,7 +135,7 @@
               size="small"
               :controls="false"
               class="amount-input"
-              @change="(v: number) => detail.updateCell(row.rowId, 'increase', v ?? 0)"
+              @change="(v: number | undefined) => detail.updateCell(row.rowId, 'increase', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.increase) }}</span>
           </template>
@@ -148,7 +148,7 @@
               size="small"
               :controls="false"
               class="amount-input"
-              @change="(v: number) => detail.updateCell(row.rowId, 'decrease', v ?? 0)"
+              @change="(v: number | undefined) => detail.updateCell(row.rowId, 'decrease', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.decrease) }}</span>
           </template>
@@ -183,7 +183,7 @@
               size="small"
               :controls="false"
               class="amount-input"
-              @change="(v: number) => detail.updateCell(row.rowId, `agingAudited.${band.key}`, v ?? 0)"
+              @change="(v: number | undefined) => detail.updateCell(row.rowId, `agingAudited.${band.key}`, v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.agingAudited[band.key]) }}</span>
           </template>

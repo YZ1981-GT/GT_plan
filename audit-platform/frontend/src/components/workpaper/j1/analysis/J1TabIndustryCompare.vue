@@ -92,7 +92,7 @@
           <el-table-column label="本期计提" align="center">
             <el-table-column label="人数" width="80" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly && row.id !== 'total'" :model-value="row.curHeadcount" :controls="false" size="small" style="width:68px" @change="(v: number) => updateDeptCell(row.id, 'curHeadcount', v ?? 0)" />
+                <el-input-number v-if="!isReadonly && row.id !== 'total'" :model-value="row.curHeadcount" :controls="false" size="small" style="width:68px" @change="(v: number | undefined) => updateDeptCell(row.id, 'curHeadcount', v ?? 0)" />
                 <span v-else>{{ row.curHeadcount || '-' }}</span>
               </template>
             </el-table-column>
@@ -109,7 +109,7 @@
           <el-table-column label="上期计提" align="center">
             <el-table-column label="人数" width="80" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly && row.id !== 'total'" :model-value="row.priorHeadcount" :controls="false" size="small" style="width:68px" @change="(v: number) => updateDeptCell(row.id, 'priorHeadcount', v ?? 0)" />
+                <el-input-number v-if="!isReadonly && row.id !== 'total'" :model-value="row.priorHeadcount" :controls="false" size="small" style="width:68px" @change="(v: number | undefined) => updateDeptCell(row.id, 'priorHeadcount', v ?? 0)" />
                 <span v-else>{{ row.priorHeadcount || '-' }}</span>
               </template>
             </el-table-column>
@@ -135,7 +135,7 @@
           </el-table-column>
           <el-table-column label="行业人均" width="100" align="right" show-overflow-tooltip>
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && row.id !== 'total'" :model-value="row.industryAvg" :controls="false" size="small" style="width:88px" @change="(v: number) => updateDeptCell(row.id, 'industryAvg', v ?? 0)" />
+              <el-input-number v-if="!isReadonly && row.id !== 'total'" :model-value="row.industryAvg" :controls="false" size="small" style="width:88px" @change="(v: number | undefined) => updateDeptCell(row.id, 'industryAvg', v ?? 0)" />
               <span v-else>{{ fmtAmt(row.industryAvg) }}</span>
             </template>
           </el-table-column>
@@ -172,7 +172,7 @@
               <el-table-column prop="label" label="类别" min-width="200" />
               <el-table-column label="人数" width="100" align="right">
                 <template #default="{ row, $index }">
-                  <el-input-number v-if="!isReadonly" :model-value="row.count" :controls="false" size="small" style="width:88px" @change="(v: number) => { socialLeft[$index].count = v ?? 0; scheduleSave() }" />
+                  <el-input-number v-if="!isReadonly" :model-value="row.count" :controls="false" size="small" style="width:88px" @change="(v: number | undefined) => { socialLeft[$index].count = v ?? 0; scheduleSave() }" />
                   <span v-else>{{ row.count }}</span>
                 </template>
               </el-table-column>
@@ -185,7 +185,7 @@
               <el-table-column prop="label" label="类别" min-width="200" />
               <el-table-column label="人数" width="100" align="right">
                 <template #default="{ row, $index }">
-                  <el-input-number v-if="!isReadonly" :model-value="row.count" :controls="false" size="small" style="width:88px" @change="(v: number) => { socialRight[$index].count = v ?? 0; scheduleSave() }" />
+                  <el-input-number v-if="!isReadonly" :model-value="row.count" :controls="false" size="small" style="width:88px" @change="(v: number | undefined) => { socialRight[$index].count = v ?? 0; scheduleSave() }" />
                   <span v-else>{{ row.count }}</span>
                 </template>
               </el-table-column>
@@ -209,7 +209,7 @@
           </el-table-column>
           <el-table-column label="生产人数" width="90" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.headcount" :controls="false" size="small" style="width:78px" @change="(v: number) => updateProdCell(row.id, 'headcount', v ?? 0)" />
+              <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.headcount" :controls="false" size="small" style="width:78px" @change="(v: number | undefined) => updateProdCell(row.id, 'headcount', v ?? 0)" />
               <span v-else>{{ row.headcount || '-' }}</span>
             </template>
           </el-table-column>
@@ -279,7 +279,7 @@
           <el-table-column label="销售人员" align="center">
             <el-table-column label="销售人数" width="85" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.salesCount" :controls="false" size="small" style="width:73px" @change="(v: number) => updateSMRCell(row.id, 'salesCount', v ?? 0)" />
+                <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.salesCount" :controls="false" size="small" style="width:73px" @change="(v: number | undefined) => updateSMRCell(row.id, 'salesCount', v ?? 0)" />
                 <span v-else>{{ row.salesCount || '-' }}</span>
               </template>
             </el-table-column>
@@ -300,7 +300,7 @@
           <el-table-column label="管理人员" align="center">
             <el-table-column label="管理人数" width="85" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.mgmtCount" :controls="false" size="small" style="width:73px" @change="(v: number) => updateSMRCell(row.id, 'mgmtCount', v ?? 0)" />
+                <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.mgmtCount" :controls="false" size="small" style="width:73px" @change="(v: number | undefined) => updateSMRCell(row.id, 'mgmtCount', v ?? 0)" />
                 <span v-else>{{ row.mgmtCount || '-' }}</span>
               </template>
             </el-table-column>
@@ -321,7 +321,7 @@
           <el-table-column label="研发人员" align="center">
             <el-table-column label="研发人数" width="85" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.rdCount" :controls="false" size="small" style="width:73px" @change="(v: number) => updateSMRCell(row.id, 'rdCount', v ?? 0)" />
+                <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.rdCount" :controls="false" size="small" style="width:73px" @change="(v: number | undefined) => updateSMRCell(row.id, 'rdCount', v ?? 0)" />
                 <span v-else>{{ row.rdCount || '-' }}</span>
               </template>
             </el-table-column>

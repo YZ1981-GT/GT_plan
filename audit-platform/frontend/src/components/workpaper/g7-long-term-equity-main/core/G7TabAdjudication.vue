@@ -228,7 +228,7 @@
                     v-if="!row._isSubtotal && !isReadonly"
                     :model-value="row.openingUnadjusted"
                     size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateCell(group.id, row._idx, 'openingUnadjusted', v)"
+                    @update:model-value="(v: number | undefined) => updateCell(group.id, row._idx, 'openingUnadjusted', v)"
                   />
                   <span v-else :class="{ 'row-bold': row._isSubtotal }">{{ fmt(row.openingUnadjusted) }}</span>
                 </template>
@@ -239,7 +239,7 @@
                     v-if="!row._isSubtotal && !isReadonly"
                     :model-value="row.openingAJE"
                     size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateCell(group.id, row._idx, 'openingAJE', v)"
+                    @update:model-value="(v: number | undefined) => updateCell(group.id, row._idx, 'openingAJE', v)"
                   />
                   <span v-else :class="{ 'row-bold': row._isSubtotal }">{{ fmt(row.openingAJE) }}</span>
                 </template>
@@ -250,7 +250,7 @@
                     v-if="!row._isSubtotal && !isReadonly"
                     :model-value="row.openingRJE"
                     size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateCell(group.id, row._idx, 'openingRJE', v)"
+                    @update:model-value="(v: number | undefined) => updateCell(group.id, row._idx, 'openingRJE', v)"
                   />
                   <span v-else :class="{ 'row-bold': row._isSubtotal }">{{ fmt(row.openingRJE) }}</span>
                 </template>
@@ -271,7 +271,7 @@
                     v-if="!row._isSubtotal && !isReadonly"
                     :model-value="row.debitAmount"
                     size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateCell(group.id, row._idx, 'debitAmount', v)"
+                    @update:model-value="(v: number | undefined) => updateCell(group.id, row._idx, 'debitAmount', v)"
                   />
                   <span v-else :class="{ 'row-bold': row._isSubtotal }">{{ fmt(row.debitAmount) }}</span>
                 </template>
@@ -282,7 +282,7 @@
                     v-if="!row._isSubtotal && !isReadonly"
                     :model-value="row.creditAmount"
                     size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateCell(group.id, row._idx, 'creditAmount', v)"
+                    @update:model-value="(v: number | undefined) => updateCell(group.id, row._idx, 'creditAmount', v)"
                   />
                   <span v-else :class="{ 'row-bold': row._isSubtotal }">{{ fmt(row.creditAmount) }}</span>
                 </template>
@@ -298,7 +298,7 @@
                     v-else-if="!isReadonly"
                     :model-value="row.closingUnadjusted"
                     size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateCell(group.id, row._idx, 'closingUnadjusted', v)"
+                    @update:model-value="(v: number | undefined) => updateCell(group.id, row._idx, 'closingUnadjusted', v)"
                   />
                   <span v-else>{{ fmt(row.closingUnadjusted) }}</span>
                 </template>
@@ -309,7 +309,7 @@
                     v-if="!row._isSubtotal && !isReadonly"
                     :model-value="row.closingAJE"
                     size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateCell(group.id, row._idx, 'closingAJE', v)"
+                    @update:model-value="(v: number | undefined) => updateCell(group.id, row._idx, 'closingAJE', v)"
                   />
                   <span v-else :class="{ 'row-bold': row._isSubtotal }">{{ fmt(row.closingAJE) }}</span>
                 </template>
@@ -320,7 +320,7 @@
                     v-if="!row._isSubtotal && !isReadonly"
                     :model-value="row.closingRJE"
                     size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateCell(group.id, row._idx, 'closingRJE', v)"
+                    @update:model-value="(v: number | undefined) => updateCell(group.id, row._idx, 'closingRJE', v)"
                   />
                   <span v-else :class="{ 'row-bold': row._isSubtotal }">{{ fmt(row.closingRJE) }}</span>
                 </template>
@@ -996,7 +996,7 @@ watch(
   () => schedulePublish(),
 )
 
-function updateCell(groupId: string, rowIdx: number, field: string, value: number | string): void {
+function updateCell(groupId: string, rowIdx: number, field: string, value: number | string | undefined): void {
   const group = groups.find(g => g.id === groupId)
   if (!group || rowIdx < 0 || rowIdx >= group.rows.length) return
   const row = group.rows[rowIdx]

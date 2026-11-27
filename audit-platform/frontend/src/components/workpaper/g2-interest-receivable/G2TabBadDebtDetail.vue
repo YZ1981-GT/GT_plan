@@ -138,7 +138,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => bd.updateCell(row.id, 'otherIncrease', v ?? 0)"
+              @update:model-value="(v: number | undefined) => bd.updateCell(row.id, 'otherIncrease', v ?? 0)"
             />
             <span v-else>{{ fmtNum(row.otherIncrease) }}</span>
           </template>
@@ -154,7 +154,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => bd.updateCell(row.id, 'reversal', v ?? 0)"
+              @update:model-value="(v: number | undefined) => bd.updateCell(row.id, 'reversal', v ?? 0)"
             />
             <span v-else>{{ fmtNum(row.reversal) }}</span>
           </template>
@@ -167,7 +167,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => bd.updateCell(row.id, 'writeOff', v ?? 0)"
+              @update:model-value="(v: number | undefined) => bd.updateCell(row.id, 'writeOff', v ?? 0)"
             />
             <span v-else>{{ fmtNum(row.writeOff) }}</span>
           </template>
@@ -180,7 +180,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => bd.updateCell(row.id, 'otherDecrease', v ?? 0)"
+              @update:model-value="(v: number | undefined) => bd.updateCell(row.id, 'otherDecrease', v ?? 0)"
             />
             <span v-else>{{ fmtNum(row.otherDecrease) }}</span>
           </template>

@@ -180,7 +180,7 @@
         <el-table-column label="未审数量" width="92" align="right">
           <template #default="{ row }">
             <el-input-number v-model="row.closingUnadjustedQty" size="small" :controls="false" :disabled="isReadonly"
-              style="width:100%" @change="(v: number) => fv.updateCell(row.rowId, 'closingUnadjustedQty', v)" />
+              style="width:100%" @change="(v: number | undefined) => fv.updateCell(row.rowId, 'closingUnadjustedQty', v)" />
           </template>
         </el-table-column>
         <el-table-column label="未审单价" width="92" align="right">
@@ -195,7 +195,7 @@
         <el-table-column label="审定数量" width="92" align="right">
           <template #default="{ row }">
             <el-input-number v-model="row.closingAuditedQty" size="small" :controls="false" :disabled="isReadonly"
-              style="width:100%" @change="(v: number) => fv.updateCell(row.rowId, 'closingAuditedQty', v)" />
+              style="width:100%" @change="(v: number | undefined) => fv.updateCell(row.rowId, 'closingAuditedQty', v)" />
           </template>
         </el-table-column>
         <el-table-column label="审定单价" width="92" align="right">

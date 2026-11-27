@@ -208,19 +208,19 @@ function fmtPct(v: number): string {
         </el-table-column>
         <el-table-column label="损失Y1" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.lossY1" :controls="false" size="small" @change="(v: number) => updateHistoricalCell(row.rowId, 'lossY1', v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.lossY1" :controls="false" size="small" @change="(v: number | undefined) => updateHistoricalCell(row.rowId, 'lossY1', v ?? 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.lossY1) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="损失Y2" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.lossY2" :controls="false" size="small" @change="(v: number) => updateHistoricalCell(row.rowId, 'lossY2', v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.lossY2" :controls="false" size="small" @change="(v: number | undefined) => updateHistoricalCell(row.rowId, 'lossY2', v ?? 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.lossY2) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="损失Y3" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.lossY3" :controls="false" size="small" @change="(v: number) => updateHistoricalCell(row.rowId, 'lossY3', v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.lossY3" :controls="false" size="small" @change="(v: number | undefined) => updateHistoricalCell(row.rowId, 'lossY3', v ?? 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.lossY3) }}</span>
           </template>
         </el-table-column>
@@ -243,19 +243,19 @@ function fmtPct(v: number): string {
         <el-table-column prop="agingBand" label="账龄段" width="90" fixed />
         <el-table-column label="年度1" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.year1Rate" :controls="false" :step="0.01" :max="1" size="small" @change="(v: number) => updateMigrationCell(row.rowId, 'year1Rate', v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.year1Rate" :controls="false" :step="0.01" :max="1" size="small" @change="(v: number | undefined) => updateMigrationCell(row.rowId, 'year1Rate', v ?? 0)" />
             <span v-else>{{ fmtPct(row.year1Rate) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="年度2" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.year2Rate" :controls="false" :step="0.01" :max="1" size="small" @change="(v: number) => updateMigrationCell(row.rowId, 'year2Rate', v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.year2Rate" :controls="false" :step="0.01" :max="1" size="small" @change="(v: number | undefined) => updateMigrationCell(row.rowId, 'year2Rate', v ?? 0)" />
             <span v-else>{{ fmtPct(row.year2Rate) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="年度3" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.year3Rate" :controls="false" :step="0.01" :max="1" size="small" @change="(v: number) => updateMigrationCell(row.rowId, 'year3Rate', v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.year3Rate" :controls="false" :step="0.01" :max="1" size="small" @change="(v: number | undefined) => updateMigrationCell(row.rowId, 'year3Rate', v ?? 0)" />
             <span v-else>{{ fmtPct(row.year3Rate) }}</span>
           </template>
         </el-table-column>

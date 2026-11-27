@@ -88,7 +88,7 @@
             :controls="false"
             size="small"
             style="width:100%"
-            @change="(val: number) => updateCell(row.rowKey, 'priorUnadjusted', val ?? 0)"
+            @change="(val: number | undefined) => updateCell(row.rowKey, 'priorUnadjusted', val ?? 0)"
           />
           <span v-else :class="cellClass(row)">{{ fmtAmount(row.priorUnadjusted) }}</span>
         </template>

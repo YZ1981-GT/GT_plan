@@ -413,25 +413,25 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       <!-- 期初 -->
       <el-table-column label="期初未审" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.priorUnadjusted ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'priorUnadjusted', v ?? 0)" />
+          <el-input-number v-if="!isReadonly" :model-value="row.priorUnadjusted ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number | undefined) => handleEdit(row, 'priorUnadjusted', v ?? 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.priorUnadjusted) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="期初AJE" min-width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.priorAje ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'priorAje', v ?? 0)" />
+          <el-input-number v-if="!isReadonly" :model-value="row.priorAje ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number | undefined) => handleEdit(row, 'priorAje', v ?? 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.priorAje) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="期初RJE" min-width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.priorRje ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'priorRje', v ?? 0)" />
+          <el-input-number v-if="!isReadonly" :model-value="row.priorRje ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number | undefined) => handleEdit(row, 'priorRje', v ?? 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.priorRje) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="期初审定" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.priorAudited ?? 0" :controls="false" size="small" class="aging-input" style="font-weight: 600" @change="(v: number) => handleEdit(row, 'priorAudited', v ?? 0)" />
+          <el-input-number v-if="!isReadonly" :model-value="row.priorAudited ?? 0" :controls="false" size="small" class="aging-input" style="font-weight: 600" @change="(v: number | undefined) => handleEdit(row, 'priorAudited', v ?? 0)" />
           <span v-else style="font-weight: 600">{{ displayPrefs.fmtAmount(row.priorAudited) }}</span>
         </template>
       </el-table-column>
@@ -440,7 +440,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       <el-table-column label="期初审定账龄" align="center">
         <el-table-column v-for="band in bands" :key="'p-' + band.key" :label="band.label" min-width="95" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.agingPrior?.[band.key] ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, `agingPrior.${band.key}`, v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.agingPrior?.[band.key] ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number | undefined) => handleEdit(row, `agingPrior.${band.key}`, v ?? 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.agingPrior?.[band.key] ?? 0) }}</span>
           </template>
         </el-table-column>
@@ -449,25 +449,25 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       <!-- 本期发生 -->
       <el-table-column label="借方发生" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.debitOccurrence ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'debitOccurrence', v ?? 0)" />
+          <el-input-number v-if="!isReadonly" :model-value="row.debitOccurrence ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number | undefined) => handleEdit(row, 'debitOccurrence', v ?? 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.debitOccurrence) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="贷方发生" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.creditOccurrence ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'creditOccurrence', v ?? 0)" />
+          <el-input-number v-if="!isReadonly" :model-value="row.creditOccurrence ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number | undefined) => handleEdit(row, 'creditOccurrence', v ?? 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.creditOccurrence) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="期末余额" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.endBalance ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'endBalance', v ?? 0)" />
+          <el-input-number v-if="!isReadonly" :model-value="row.endBalance ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number | undefined) => handleEdit(row, 'endBalance', v ?? 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.endBalance) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="重分类" min-width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.reclassification ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'reclassification', v ?? 0)" />
+          <el-input-number v-if="!isReadonly" :model-value="row.reclassification ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number | undefined) => handleEdit(row, 'reclassification', v ?? 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.reclassification) }}</span>
         </template>
       </el-table-column>
@@ -475,7 +475,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       <!-- 期末未审 -->
       <el-table-column label="期末未审" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.currentUnadjusted ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'currentUnadjusted', v ?? 0)" />
+          <el-input-number v-if="!isReadonly" :model-value="row.currentUnadjusted ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number | undefined) => handleEdit(row, 'currentUnadjusted', v ?? 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.currentUnadjusted) }}</span>
         </template>
       </el-table-column>
@@ -484,7 +484,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       <el-table-column label="期末未审账龄" align="center">
         <el-table-column v-for="band in bands" :key="'c-' + band.key" :label="band.label" min-width="95" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.agingCurrent?.[band.key] ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, `agingCurrent.${band.key}`, v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.agingCurrent?.[band.key] ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number | undefined) => handleEdit(row, `agingCurrent.${band.key}`, v ?? 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.agingCurrent?.[band.key] ?? 0) }}</span>
           </template>
         </el-table-column>
@@ -492,19 +492,19 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 
       <el-table-column label="期末AJE" min-width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.currentAje ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'currentAje', v ?? 0)" />
+          <el-input-number v-if="!isReadonly" :model-value="row.currentAje ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number | undefined) => handleEdit(row, 'currentAje', v ?? 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.currentAje) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="期末RJE" min-width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.currentRje ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number) => handleEdit(row, 'currentRje', v ?? 0)" />
+          <el-input-number v-if="!isReadonly" :model-value="row.currentRje ?? 0" :controls="false" size="small" class="aging-input" @change="(v: number | undefined) => handleEdit(row, 'currentRje', v ?? 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.currentRje) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="期末审定" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.currentAudited ?? 0" :controls="false" size="small" class="aging-input" style="font-weight: 600" @change="(v: number) => handleEdit(row, 'currentAudited', v ?? 0)" />
+          <el-input-number v-if="!isReadonly" :model-value="row.currentAudited ?? 0" :controls="false" size="small" class="aging-input" style="font-weight: 600" @change="(v: number | undefined) => handleEdit(row, 'currentAudited', v ?? 0)" />
           <span v-else style="font-weight: 600">{{ displayPrefs.fmtAmount(row.currentAudited) }}</span>
         </template>
       </el-table-column>
@@ -519,7 +519,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
               :controls="false"
               size="small"
               class="aging-input"
-              @change="(v: number) => handleEdit(row, `agingAudited.${band.key}`, v ?? 0)"
+              @change="(v: number | undefined) => handleEdit(row, `agingAudited.${band.key}`, v ?? 0)"
             />
             <span v-else class="audited-aging">{{ displayPrefs.fmtAmount(row.agingAudited?.[band.key] ?? 0) }}</span>
           </template>

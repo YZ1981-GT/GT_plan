@@ -33,7 +33,7 @@
           :min="0"
           :max="100"
           style="width: 100%"
-          @change="(v: number) => emit('update', row.rowId, 'eclRate', v ?? 0)"
+          @change="(v: number | undefined) => emit('update', row.rowId, 'eclRate', v ?? 0)"
         />
         <span v-else>{{ row.kind === 'header' ? '—' : formatRate(row.eclRate) }}</span>
       </template>

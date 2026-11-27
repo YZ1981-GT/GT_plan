@@ -449,7 +449,7 @@ function onReview(sectionId: string) {
               size="small"
               :controls="false"
               :precision="2"
-              @change="(v: number) => updateCell(row.rowId, 'currentReversal', v || 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'currentReversal', v || 0)"
             />
             <span v-else v-html="fmtAmount(row.currentReversal)" />
           </template>
@@ -464,7 +464,7 @@ function onReview(sectionId: string) {
               size="small"
               :controls="false"
               :precision="2"
-              @change="(v: number) => updateCell(row.rowId, 'currentWriteOff', v || 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'currentWriteOff', v || 0)"
             />
             <span v-else v-html="fmtAmount(row.currentWriteOff)" />
           </template>

@@ -90,7 +90,7 @@
         <!-- 期初 -->
         <el-table-column label="期初未审" width="115" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="canEdit(row, 'priorUnadjusted')" :model-value="row.priorUnadjusted" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowKey, 'priorUnadjusted', v ?? 0)" />
+            <el-input-number v-if="canEdit(row, 'priorUnadjusted')" :model-value="row.priorUnadjusted" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowKey, 'priorUnadjusted', v ?? 0)" />
             <span v-else :class="cellClass(row)">{{ fmtAmount(row.priorUnadjusted) }}</span>
             <!-- 逐格四态覆盖徽标（Task 20）：性质区 prior 是 cross_sheet 派生格 -->
             <DerivedCellOverrideBadge
@@ -103,13 +103,13 @@
         </el-table-column>
         <el-table-column label="AJE" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="canEdit(row, 'priorAje')" :model-value="row.priorAje" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowKey, 'priorAje', v ?? 0)" />
+            <el-input-number v-if="canEdit(row, 'priorAje')" :model-value="row.priorAje" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowKey, 'priorAje', v ?? 0)" />
             <span v-else>{{ fmtAmount(row.priorAje) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="RJE" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="canEdit(row, 'priorRje')" :model-value="row.priorRje" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowKey, 'priorRje', v ?? 0)" />
+            <el-input-number v-if="canEdit(row, 'priorRje')" :model-value="row.priorRje" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowKey, 'priorRje', v ?? 0)" />
             <span v-else>{{ fmtAmount(row.priorRje) }}</span>
           </template>
         </el-table-column>
@@ -122,7 +122,7 @@
         <!-- 期末 -->
         <el-table-column label="期末未审" width="115" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="canEdit(row, 'currentUnadjusted')" :model-value="row.currentUnadjusted" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowKey, 'currentUnadjusted', v ?? 0)" />
+            <el-input-number v-if="canEdit(row, 'currentUnadjusted')" :model-value="row.currentUnadjusted" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowKey, 'currentUnadjusted', v ?? 0)" />
             <span v-else :class="cellClass(row)">{{ fmtAmount(row.currentUnadjusted) }}</span>
             <DerivedCellOverrideBadge
               :overrides="row.cellOverrides"
@@ -134,13 +134,13 @@
         </el-table-column>
         <el-table-column label="AJE" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="canEdit(row, 'currentAje')" :model-value="row.currentAje" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowKey, 'currentAje', v ?? 0)" />
+            <el-input-number v-if="canEdit(row, 'currentAje')" :model-value="row.currentAje" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowKey, 'currentAje', v ?? 0)" />
             <span v-else>{{ fmtAmount(row.currentAje) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="RJE" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="canEdit(row, 'currentRje')" :model-value="row.currentRje" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowKey, 'currentRje', v ?? 0)" />
+            <el-input-number v-if="canEdit(row, 'currentRje')" :model-value="row.currentRje" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowKey, 'currentRje', v ?? 0)" />
             <span v-else>{{ fmtAmount(row.currentRje) }}</span>
           </template>
         </el-table-column>

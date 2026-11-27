@@ -233,7 +233,7 @@
           size="small"
           :controls="false"
           :disabled="isReadonly"
-          @update:model-value="(v: number) => updateTrialBalance(v ?? 0)"
+          @update:model-value="(v: number | undefined) => updateTrialBalance(v ?? 0)"
         />
       </span>
       <span :class="{ 'diff-red': trialBalanceDiff !== 0 }">

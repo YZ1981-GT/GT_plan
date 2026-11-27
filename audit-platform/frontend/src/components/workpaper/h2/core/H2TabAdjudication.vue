@@ -232,7 +232,7 @@
                 :controls="false"
                 size="small"
                 class="amt-input"
-                @change="(v: number) => state.updateMaterials('tbAmount', v ?? 0)"
+                @change="(v: number | undefined) => state.updateMaterials('tbAmount', v ?? 0)"
               />
             </template>
             <span v-else class="amt-cell">{{ fmtAmt(row.tbAmount) }}</span>

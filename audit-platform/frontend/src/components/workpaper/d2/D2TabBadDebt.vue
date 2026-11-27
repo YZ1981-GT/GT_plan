@@ -205,13 +205,13 @@ const GUIDANCE_TEXTS = [
         <!-- 本期减少 -->
         <el-table-column label="转回" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentReversal" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentReversal', v || 0)" />
+            <el-input-number v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentReversal" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'currentReversal', v || 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.currentReversal) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="核销" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentWriteOff" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentWriteOff', v || 0)" />
+            <el-input-number v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentWriteOff" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'currentWriteOff', v || 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.currentWriteOff) }}</span>
           </template>
         </el-table-column>

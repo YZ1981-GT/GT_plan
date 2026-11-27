@@ -355,7 +355,7 @@ async function generateAuditConclusion(): Promise<void> {
             <template #default="{ row }">
               <el-input-number :model-value="row.amount" :disabled="isReadonly"
                 :controls="false" :precision="2" size="small"
-                @change="(val: number) => updateCell(row.id, 'amount', val ?? 0)" />
+                @change="(val: number | undefined) => updateCell(row.id, 'amount', val ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="对方账户" min-width="150">

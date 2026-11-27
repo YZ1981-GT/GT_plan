@@ -148,7 +148,7 @@
               :controls="false"
               :disabled="isReadonly"
               style="width:100%"
-              @update:model-value="(v: number) => detail.updateRow(row.id, { [col.prop]: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => detail.updateRow(row.id, { [col.prop]: v ?? 0 })"
             />
           </template>
 

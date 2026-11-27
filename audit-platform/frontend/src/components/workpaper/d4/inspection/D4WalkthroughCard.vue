@@ -168,7 +168,7 @@ const conclusionOptions = [
               :controls="false"
               :precision="2"
               style="width: 100%"
-              @update:model-value="(v: number) => onFieldChange(group.key, field.key, v)"
+              @update:model-value="(v: number | undefined) => onFieldChange(group.key, field.key, v)"
             />
             <el-input
               v-else-if="field.type === 'textarea'"

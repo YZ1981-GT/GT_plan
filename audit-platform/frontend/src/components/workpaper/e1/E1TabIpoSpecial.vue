@@ -309,7 +309,7 @@ async function generateAuditConclusion(): Promise<void> {
                 :disabled="isReadonly"
                 :controls="false"
                 size="small"
-                @change="(val: number) => updateCell(row.id, col.key, val ?? 0)"
+                @change="(val: number | undefined) => updateCell(row.id, col.key, val ?? 0)"
               />
               <!-- Boolean -->
               <el-checkbox

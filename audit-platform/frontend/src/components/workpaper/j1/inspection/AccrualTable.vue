@@ -39,7 +39,7 @@
     <!-- 计提比例 -->
     <el-table-column label="计提比例" width="90" align="right">
       <template #default="{ row }">
-        <el-input-number v-if="!isReadonly" :model-value="row.rate * 100" :controls="false" size="small" style="width:68px" :precision="2" @change="(v: number) => $emit('update', row.id, 'rate', (v ?? 0) / 100)">
+        <el-input-number v-if="!isReadonly" :model-value="row.rate * 100" :controls="false" size="small" style="width:68px" :precision="2" @change="(v: number | undefined) => $emit('update', row.id, 'rate', (v ?? 0) / 100)">
           <template #suffix>%</template>
         </el-input-number>
         <span v-else>{{ row.rate > 0 ? (row.rate * 100).toFixed(2) + '%' : '-' }}</span>

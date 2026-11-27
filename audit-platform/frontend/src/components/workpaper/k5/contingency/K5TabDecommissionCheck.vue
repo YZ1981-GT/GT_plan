@@ -236,7 +236,7 @@
           <el-table :data="debitRows" border size="small" style="width:100%">
             <el-table-column type="index" label="序" width="42" align="center" />
             <el-table-column label="对应科目" min-width="120"><template #default="{ row }"><el-input v-model="row.offsetAccount" :disabled="isReadonly" size="small" @change="(v: string) => updateAmountCell('debit', row.rowId, 'offsetAccount', v)" /></template></el-table-column>
-            <el-table-column label="对应金额" width="120" align="right"><template #default="{ row }"><el-input-number v-model="row.amount" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number) => updateAmountCell('debit', row.rowId, 'amount', v)" /></template></el-table-column>
+            <el-table-column label="对应金额" width="120" align="right"><template #default="{ row }"><el-input-number v-model="row.amount" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number | undefined) => updateAmountCell('debit', row.rowId, 'amount', v)" /></template></el-table-column>
             <el-table-column label="备注" min-width="110"><template #default="{ row }"><el-input v-model="row.remark" :disabled="isReadonly" size="small" @change="(v: string) => updateAmountCell('debit', row.rowId, 'remark', v)" /></template></el-table-column>
             <el-table-column v-if="!isReadonly" label="" width="42" align="center"><template #default="{ $index }"><el-button link type="danger" size="small" @click="removeAmountRow('debit', $index)"><el-icon><Delete /></el-icon></el-button></template></el-table-column>
             <template #append><div class="table-total">借方小计：{{ fmtNum(debitTotal) }}</div></template>
@@ -250,7 +250,7 @@
           <el-table :data="creditRows" border size="small" style="width:100%">
             <el-table-column type="index" label="序" width="42" align="center" />
             <el-table-column label="对应科目" min-width="120"><template #default="{ row }"><el-input v-model="row.offsetAccount" :disabled="isReadonly" size="small" @change="(v: string) => updateAmountCell('credit', row.rowId, 'offsetAccount', v)" /></template></el-table-column>
-            <el-table-column label="对应金额" width="120" align="right"><template #default="{ row }"><el-input-number v-model="row.amount" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number) => updateAmountCell('credit', row.rowId, 'amount', v)" /></template></el-table-column>
+            <el-table-column label="对应金额" width="120" align="right"><template #default="{ row }"><el-input-number v-model="row.amount" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number | undefined) => updateAmountCell('credit', row.rowId, 'amount', v)" /></template></el-table-column>
             <el-table-column label="备注" min-width="110"><template #default="{ row }"><el-input v-model="row.remark" :disabled="isReadonly" size="small" @change="(v: string) => updateAmountCell('credit', row.rowId, 'remark', v)" /></template></el-table-column>
             <el-table-column v-if="!isReadonly" label="" width="42" align="center"><template #default="{ $index }"><el-button link type="danger" size="small" @click="removeAmountRow('credit', $index)"><el-icon><Delete /></el-icon></el-button></template></el-table-column>
             <template #append><div class="table-total">贷方小计：{{ fmtNum(creditTotal) }}</div></template>

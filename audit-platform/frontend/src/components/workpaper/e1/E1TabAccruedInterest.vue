@@ -291,7 +291,7 @@ async function generateAuditConclusion(): Promise<void> {
             <template #default="{ row }">
               <el-input-number :model-value="asAccrued(row).dailyRate" :disabled="isReadonly"
                 :controls="false" :precision="8" size="small"
-                @change="(val: number) => updateCell(row.id, 'dailyRate', val ?? 0)" />
+                @change="(val: number | undefined) => updateCell(row.id, 'dailyRate', val ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="应计利息原币" width="130" align="right" class-name="auto-calc-col">
@@ -303,7 +303,7 @@ async function generateAuditConclusion(): Promise<void> {
             <template #default="{ row }">
               <el-input-number :model-value="asAccrued(row).fxRate" :disabled="isReadonly"
                 :controls="false" :precision="4" size="small"
-                @change="(val: number) => updateCell(row.id, 'fxRate', val ?? 0)" />
+                @change="(val: number | undefined) => updateCell(row.id, 'fxRate', val ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="应计利息人民币" width="140" align="right" class-name="auto-calc-col">

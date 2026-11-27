@@ -123,7 +123,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(row.rowId, col.field, v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, col.field, v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row[col.field]) }}</span>
           </template>
@@ -171,7 +171,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(row.rowId, col.field, v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowId, col.field, v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row[col.field]) }}</span>
           </template>

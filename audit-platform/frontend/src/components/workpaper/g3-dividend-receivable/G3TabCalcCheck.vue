@@ -135,7 +135,7 @@
               :controls="false"
               :disabled="isReadonly"
               style="width:100%"
-              @update:model-value="(v: number) => calcCheck.updateRow(row.id, { [col.prop]: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => calcCheck.updateRow(row.id, { [col.prop]: v ?? 0 })"
             />
           </template>
           <template v-else-if="col.type === 'yn'">
@@ -228,7 +228,7 @@
                 :controls="false"
                 :disabled="isReadonly || calcCheck.isVoucherRowLocked(row)"
                 style="width:100%"
-                @update:model-value="(v: number) => calcCheck.updateSubsequentRow(row.id, { [col.prop]: v ?? 0 })"
+                @update:model-value="(v: number | undefined) => calcCheck.updateSubsequentRow(row.id, { [col.prop]: v ?? 0 })"
               />
             </template>
             <template v-else-if="col.type === 'check'">

@@ -254,7 +254,7 @@
     <div class="g10-tb-row">
       <span>试算平衡表数（{{ tbBarLabel }}）：</span>
       <el-input-number v-if="!isReadonly" :model-value="adj.trialBalanceAmount.value" size="small" :controls="false"
-        style="width:140px" @update:model-value="(v: number) => adj.updateTrialBalance(v ?? 0)" />
+        style="width:140px" @update:model-value="(v: number | undefined) => adj.updateTrialBalance(v ?? 0)" />
       <span v-else>{{ fmt(adj.trialBalanceAmount.value) }}</span>
       <span :class="['variance', { 'is-error': adj.hasVarianceHighlight.value }]">差异：{{ fmt(adj.variance.value) }}</span>
       <el-button

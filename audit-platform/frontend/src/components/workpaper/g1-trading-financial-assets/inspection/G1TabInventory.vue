@@ -162,7 +162,7 @@
               size="small"
               :controls="false"
               style="width: 100%"
-              @update:model-value="(v: number) => inv.updateRow(row.id, { bookQuantity: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => inv.updateRow(row.id, { bookQuantity: v ?? 0 })"
             />
             <span v-else>{{ fmt(row.bookQuantity) }}</span>
           </template>
@@ -175,7 +175,7 @@
               size="small"
               :controls="false"
               style="width: 100%"
-              @update:model-value="(v: number) => inv.updateRow(row.id, { bookFaceValue: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => inv.updateRow(row.id, { bookFaceValue: v ?? 0 })"
             />
             <span v-else>{{ fmt(row.bookFaceValue) }}</span>
           </template>
@@ -220,7 +220,7 @@
               size="small"
               :controls="false"
               style="width: 100%"
-              @update:model-value="(v: number) => inv.updateRow(row.id, { stockQuantity: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => inv.updateRow(row.id, { stockQuantity: v ?? 0 })"
             />
             <span v-else>{{ fmt(row.stockQuantity) }}</span>
           </template>
@@ -233,7 +233,7 @@
               size="small"
               :controls="false"
               style="width: 100%"
-              @update:model-value="(v: number) => inv.updateRow(row.id, { stockFaceValue: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => inv.updateRow(row.id, { stockFaceValue: v ?? 0 })"
             />
             <span v-else>{{ fmt(row.stockFaceValue) }}</span>
           </template>
@@ -254,7 +254,7 @@
               size="small"
               :controls="false"
               style="width: 100%"
-              @update:model-value="(v: number) => inv.updateRow(row.id, { stmtQuantity: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => inv.updateRow(row.id, { stmtQuantity: v ?? 0 })"
             />
             <span v-else>{{ fmt(row.stmtQuantity) }}</span>
           </template>
@@ -267,7 +267,7 @@
               size="small"
               :controls="false"
               style="width: 100%"
-              @update:model-value="(v: number) => inv.updateRow(row.id, { stmtFaceValue: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => inv.updateRow(row.id, { stmtFaceValue: v ?? 0 })"
             />
             <span v-else>{{ fmt(row.stmtFaceValue) }}</span>
           </template>
@@ -288,7 +288,7 @@
               size="small"
               :controls="false"
               style="width: 100%"
-              @update:model-value="(v: number) => inv.updateRow(row.id, { confQuantity: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => inv.updateRow(row.id, { confQuantity: v ?? 0 })"
             />
             <span v-else>{{ fmt(row.confQuantity) }}</span>
           </template>
@@ -301,7 +301,7 @@
               size="small"
               :controls="false"
               style="width: 100%"
-              @update:model-value="(v: number) => inv.updateRow(row.id, { confFaceValue: v ?? 0 })"
+              @update:model-value="(v: number | undefined) => inv.updateRow(row.id, { confFaceValue: v ?? 0 })"
             />
             <span v-else>{{ fmt(row.confFaceValue) }}</span>
           </template>

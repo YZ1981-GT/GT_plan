@@ -127,7 +127,7 @@
               v-if="row.rowKey !== 'total' && !row.autoCurrent && !isReadonly"
               :model-value="row.currentAdjustment"
               size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => adj.updatePriorField(row.rowKey, 'currentAdjustment', v ?? 0)"
+              @update:model-value="(v: number | undefined) => adj.updatePriorField(row.rowKey, 'currentAdjustment', v ?? 0)"
             />
             <span v-else class="formula-cell" :title="row.autoCurrent ? '自 G13-2 明细汇总' : ''">
               {{ fmt(row.currentAdjustment) }}
@@ -154,7 +154,7 @@
           <template #default="{ row }">
             <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.priorAdjustment"
               size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => adj.updatePriorField(row.rowKey, 'priorAdjustment', v ?? 0)" />
+              @update:model-value="(v: number | undefined) => adj.updatePriorField(row.rowKey, 'priorAdjustment', v ?? 0)" />
             <span v-else>{{ fmt(row.priorAdjustment) }}</span>
           </template>
         </el-table-column>
@@ -199,7 +199,7 @@
       <div class="g13-tb-row">
         <span>试算平衡表数（6101）：</span>
         <el-input-number v-if="!isReadonly" :model-value="adj.trialBalanceAmount.value" size="small" :controls="false"
-          style="width:140px" @update:model-value="(v: number) => adj.updateTrialBalance(v ?? 0)" />
+          style="width:140px" @update:model-value="(v: number | undefined) => adj.updateTrialBalance(v ?? 0)" />
         <span v-else>{{ fmt(adj.trialBalanceAmount.value) }}</span>
         <span :class="['variance', { 'is-error': adj.hasVarianceHighlight.value }]">
           差异数：{{ fmt(adj.variance.value) }}

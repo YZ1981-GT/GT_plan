@@ -79,22 +79,22 @@
           </template>
         </el-table-column>
         <el-table-column label="本期实际发生" width="115" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.currentActual" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number) => updateHistoryCell(row.rowId, 'currentActual', v)" /></template>
+          <template #default="{ row }"><el-input-number v-model="row.currentActual" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number | undefined) => updateHistoryCell(row.rowId, 'currentActual', v)" /></template>
         </el-table-column>
         <el-table-column label="本期收入" width="115" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.currentRevenue" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number) => updateHistoryCell(row.rowId, 'currentRevenue', v)" /></template>
+          <template #default="{ row }"><el-input-number v-model="row.currentRevenue" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number | undefined) => updateHistoryCell(row.rowId, 'currentRevenue', v)" /></template>
         </el-table-column>
         <el-table-column label="前1年实际发生" width="115" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.year1Actual" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number) => updateHistoryCell(row.rowId, 'year1Actual', v)" /></template>
+          <template #default="{ row }"><el-input-number v-model="row.year1Actual" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number | undefined) => updateHistoryCell(row.rowId, 'year1Actual', v)" /></template>
         </el-table-column>
         <el-table-column label="前1年收入" width="115" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.year1Revenue" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number) => updateHistoryCell(row.rowId, 'year1Revenue', v)" /></template>
+          <template #default="{ row }"><el-input-number v-model="row.year1Revenue" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number | undefined) => updateHistoryCell(row.rowId, 'year1Revenue', v)" /></template>
         </el-table-column>
         <el-table-column label="前2年实际发生" width="115" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.year2Actual" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number) => updateHistoryCell(row.rowId, 'year2Actual', v)" /></template>
+          <template #default="{ row }"><el-input-number v-model="row.year2Actual" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number | undefined) => updateHistoryCell(row.rowId, 'year2Actual', v)" /></template>
         </el-table-column>
         <el-table-column label="前2年收入" width="115" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.year2Revenue" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number) => updateHistoryCell(row.rowId, 'year2Revenue', v)" /></template>
+          <template #default="{ row }"><el-input-number v-model="row.year2Revenue" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number | undefined) => updateHistoryCell(row.rowId, 'year2Revenue', v)" /></template>
         </el-table-column>
         <el-table-column label="3年平均保修率" width="120" align="right">
           <template #default="{ row }">
@@ -210,13 +210,13 @@
           <template #default="{ row }"><el-input v-model="row.productName" :disabled="isReadonly" size="small" @change="(v: string) => updateTimingCell(row.rowId, 'productName', v)" /></template>
         </el-table-column>
         <el-table-column label="期末数" width="130" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.endBalance" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number) => updateTimingCell(row.rowId, 'endBalance', v)" /></template>
+          <template #default="{ row }"><el-input-number v-model="row.endBalance" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number | undefined) => updateTimingCell(row.rowId, 'endBalance', v)" /></template>
         </el-table-column>
         <el-table-column label="1年以内" width="130" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.within1Year" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number) => updateTimingCell(row.rowId, 'within1Year', v)" /></template>
+          <template #default="{ row }"><el-input-number v-model="row.within1Year" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number | undefined) => updateTimingCell(row.rowId, 'within1Year', v)" /></template>
         </el-table-column>
         <el-table-column label="1年以上" width="130" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.over1Year" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number) => updateTimingCell(row.rowId, 'over1Year', v)" /></template>
+          <template #default="{ row }"><el-input-number v-model="row.over1Year" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number | undefined) => updateTimingCell(row.rowId, 'over1Year', v)" /></template>
         </el-table-column>
         <el-table-column label="校验" width="70" align="center">
           <template #default="{ row }">

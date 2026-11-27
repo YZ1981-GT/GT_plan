@@ -139,7 +139,7 @@
             <template #default="{ row }">
               <template v-if="row.rowKey?.endsWith('_subtotal')"><span class="formula-cell">{{ fmt(row.openingRJE) }}</span></template>
               <el-input-number v-else-if="!isReadonly" :model-value="row.openingRJE" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v: number) => adj.updateField(row.rowKey, 'openingRJE', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => adj.updateField(row.rowKey, 'openingRJE', v ?? 0)" />
               <span v-else>{{ fmt(row.openingRJE) }}</span>
             </template>
           </el-table-column>
@@ -169,7 +169,7 @@
             <template #default="{ row }">
               <template v-if="row.rowKey?.endsWith('_subtotal')"><span class="formula-cell">{{ fmt(row.closingRJE) }}</span></template>
               <el-input-number v-else-if="!isReadonly" :model-value="row.closingRJE" size="small" :controls="false" style="width:100%"
-                @update:model-value="(v: number) => adj.updateField(row.rowKey, 'closingRJE', v ?? 0)" />
+                @update:model-value="(v: number | undefined) => adj.updateField(row.rowKey, 'closingRJE', v ?? 0)" />
               <span v-else>{{ fmt(row.closingRJE) }}</span>
             </template>
           </el-table-column>
@@ -236,7 +236,7 @@
       </template>
       <template v-else>
         <el-input-number v-if="!isReadonly" :model-value="adj.trialBalanceAmount.value" size="small" :controls="false"
-          style="width:140px" @update:model-value="(v: number) => adj.updateTrialBalance(v ?? 0)" />
+          style="width:140px" @update:model-value="(v: number | undefined) => adj.updateTrialBalance(v ?? 0)" />
         <span v-else>{{ fmt(adj.trialBalanceAmount.value) }}</span>
         <span :class="['variance', { 'is-error': adj.hasVarianceHighlight.value }]">差异数：{{ fmt(adj.variance.value) }}</span>
       </template>

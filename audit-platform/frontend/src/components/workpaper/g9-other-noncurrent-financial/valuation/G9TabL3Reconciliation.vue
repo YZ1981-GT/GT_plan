@@ -113,7 +113,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => l3.updateRow(row.rowId, 'purchaseAmount', v ?? 0)"
+              @update:model-value="(v: number | undefined) => l3.updateRow(row.rowId, 'purchaseAmount', v ?? 0)"
             />
             <span v-else>{{ fmt(row.purchaseAmount) }}</span>
           </template>
@@ -126,7 +126,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => l3.updateRow(row.rowId, 'disposalAmount', v ?? 0)"
+              @update:model-value="(v: number | undefined) => l3.updateRow(row.rowId, 'disposalAmount', v ?? 0)"
             />
             <span v-else>{{ fmt(row.disposalAmount) }}</span>
           </template>
@@ -142,7 +142,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => l3.updateRow(row.rowId, 'transferIn', v ?? 0)"
+              @update:model-value="(v: number | undefined) => l3.updateRow(row.rowId, 'transferIn', v ?? 0)"
             />
             <span v-else>{{ fmt(row.transferIn) }}</span>
           </template>
@@ -155,7 +155,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => l3.updateRow(row.rowId, 'transferOut', v ?? 0)"
+              @update:model-value="(v: number | undefined) => l3.updateRow(row.rowId, 'transferOut', v ?? 0)"
             />
             <span v-else>{{ fmt(row.transferOut) }}</span>
           </template>
@@ -171,7 +171,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => l3.updateRow(row.rowId, 'fvChangePL', v ?? 0)"
+              @update:model-value="(v: number | undefined) => l3.updateRow(row.rowId, 'fvChangePL', v ?? 0)"
             />
             <span v-else>{{ fmt(row.fvChangePL) }}</span>
           </template>
@@ -184,7 +184,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => l3.updateRow(row.rowId, 'fvChangeOCI', v ?? 0)"
+              @update:model-value="(v: number | undefined) => l3.updateRow(row.rowId, 'fvChangeOCI', v ?? 0)"
             />
             <span v-else>{{ fmt(row.fvChangeOCI) }}</span>
           </template>
@@ -197,7 +197,7 @@
               size="small"
               :controls="false"
               style="width:100%"
-              @update:model-value="(v: number) => l3.updateRow(row.rowId, 'interestIncome', v ?? 0)"
+              @update:model-value="(v: number | undefined) => l3.updateRow(row.rowId, 'interestIncome', v ?? 0)"
             />
             <span v-else>{{ fmt(row.interestIncome) }}</span>
           </template>
@@ -224,7 +224,7 @@
             size="small"
             :controls="false"
             style="width:100%"
-            @update:model-value="(v: number) => l3.updateRow(row.rowId, 'otherChanges', v ?? 0)"
+            @update:model-value="(v: number | undefined) => l3.updateRow(row.rowId, 'otherChanges', v ?? 0)"
           />
           <span v-else>{{ fmt(row.otherChanges) }}</span>
         </template>
@@ -251,7 +251,7 @@
             :controls="false"
             style="width:100%"
             :class="{ 'uh-warn': hasUnrealizedWarn(row.rowId) }"
-            @update:model-value="(v: number) => l3.updateRow(row.rowId, 'unrealizedHeld', v ?? 0)"
+            @update:model-value="(v: number | undefined) => l3.updateRow(row.rowId, 'unrealizedHeld', v ?? 0)"
           />
           <span v-else :class="{ 'var-warn': hasUnrealizedWarn(row.rowId) }">{{ fmt(row.unrealizedHeld) }}</span>
         </template>
@@ -264,7 +264,7 @@
             size="small"
             :controls="false"
             style="width:100%"
-            @update:model-value="(v: number) => l3.updateRow(row.rowId, 'reportedClosing', v ?? 0)"
+            @update:model-value="(v: number | undefined) => l3.updateRow(row.rowId, 'reportedClosing', v ?? 0)"
           />
           <span v-else>{{ fmt(row.reportedClosing) }}</span>
         </template>

@@ -82,7 +82,7 @@
           size="small"
           placeholder="输入重要性金额"
           style="width:180px"
-          @change="(val: number) => $emit('update-materiality', val)"
+          @change="(val: number | undefined) => $emit('update-materiality', val ?? 0)"
         />
         <span v-else class="checklist-audit-note__amount">
           {{ materialityConfig?.performance_materiality != null ? formatAmount(materialityConfig.performance_materiality) : '未配置' }}

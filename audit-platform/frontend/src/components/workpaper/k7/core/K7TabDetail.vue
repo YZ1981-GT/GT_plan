@@ -145,7 +145,7 @@
                 :controls="false"
                 :precision="2"
                 class="amount-input"
-                @change="(v: number) => detail.updateCell(row.rowId, 'receivedAmount', v ?? 0)"
+                @change="(v: number | undefined) => detail.updateCell(row.rowId, 'receivedAmount', v ?? 0)"
               />
               <span v-else class="amount-cell">{{ fmtNum(row.receivedAmount) }}</span>
             </template>
@@ -203,7 +203,7 @@
                 :controls="false"
                 :min="0"
                 class="period-input"
-                @change="(v: number) => detail.updateCell(row.rowId, 'period', v ?? 0)"
+                @change="(v: number | undefined) => detail.updateCell(row.rowId, 'period', v ?? 0)"
               />
               <span v-else>{{ row.period || '-' }}</span>
             </template>
@@ -220,7 +220,7 @@
                 :controls="false"
                 :precision="2"
                 class="amount-input"
-                @change="(v: number) => detail.updateCell(row.rowId, 'beginBalance', v ?? 0)"
+                @change="(v: number | undefined) => detail.updateCell(row.rowId, 'beginBalance', v ?? 0)"
               />
               <span v-else class="amount-cell">{{ fmtNum(row.beginBalance) }}</span>
             </template>
@@ -237,7 +237,7 @@
                 :controls="false"
                 :precision="2"
                 class="amount-input"
-                @change="(v: number) => detail.updateCell(row.rowId, 'currentAmort', v ?? 0)"
+                @change="(v: number | undefined) => detail.updateCell(row.rowId, 'currentAmort', v ?? 0)"
               />
               <span v-else class="amount-cell">{{ fmtNum(row.currentAmort) }}</span>
             </template>

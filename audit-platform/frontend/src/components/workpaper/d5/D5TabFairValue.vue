@@ -95,7 +95,7 @@
             size="small"
             style="width: 100px"
             :disabled="isReadonly"
-            @change="(val: number) => setDefaultRate(val ?? 0)"
+            @change="(val: number | undefined) => setDefaultRate(val ?? 0)"
           />
           <span class="rate-pct">{{ ((defaultDiscountRate ?? 0) * 100).toFixed(2) }}%</span>
         </div>
@@ -265,7 +265,7 @@
             :controls="false"
             size="small"
             style="width:100%"
-            @change="(val: number) => updateCell(row.rowId, 'discountRate', val ?? 0)"
+            @change="(val: number | undefined) => updateCell(row.rowId, 'discountRate', val ?? 0)"
           />
           <span v-else>{{ (row.discountRate * 100).toFixed(2) }}%</span>
         </template>

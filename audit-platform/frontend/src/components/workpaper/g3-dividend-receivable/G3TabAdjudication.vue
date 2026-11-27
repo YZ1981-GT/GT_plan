@@ -117,7 +117,7 @@
             :disabled="isReadonly"
             :precision="2"
             style="width:100%"
-            @update:model-value="(v: number) => adj.updateCell(row.id, 'shareholdingRatio', v ?? 0)"
+            @update:model-value="(v: number | undefined) => adj.updateCell(row.id, 'shareholdingRatio', v ?? 0)"
           />
           <span v-else :class="rowLabelClass(row)" />
         </template>
@@ -392,7 +392,7 @@
         :controls="false"
         :disabled="isReadonly"
         style="width:140px"
-        @update:model-value="(v: number) => adj.setTrialBalance(v ?? 0)"
+        @update:model-value="(v: number | undefined) => adj.setTrialBalance(v ?? 0)"
       />
       <span :class="['diff-value', { 'diff-red': adj.hasVarianceHighlight.value }]">
         差异：{{ fmtNum(adj.variance.value) }}

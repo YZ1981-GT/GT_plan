@@ -143,7 +143,7 @@
                 v-if="!isReadonly && row.editable"
                 :model-value="row.months[m-1]"
                 :controls="false" size="small" style="width:88px"
-                @change="(v: number) => updateBottomCell(row.field, m-1, v ?? 0)"
+                @change="(v: number | undefined) => updateBottomCell(row.field, m-1, v ?? 0)"
               />
               <span v-else>{{ fmtNum(row.months[m-1]) }}</span>
             </template>

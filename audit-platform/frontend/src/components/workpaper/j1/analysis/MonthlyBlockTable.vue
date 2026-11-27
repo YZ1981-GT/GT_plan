@@ -30,7 +30,7 @@
               :model-value="row.months[m-1]"
               :controls="false" size="small" style="width:78px"
               :precision="isInteger ? 0 : 2"
-              @change="(v: number) => $emit('update', row.dept, m-1, v ?? 0)"
+              @change="(v: number | undefined) => $emit('update', row.dept, m-1, v ?? 0)"
             />
           </template>
         </template>

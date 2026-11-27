@@ -232,7 +232,7 @@
         <template #default="{ row }">
           <el-input-number v-if="!isReadonly" :model-value="row.endBalance" size="small"
             :controls="false" class="amount-input"
-            @change="(v: number) => handleUpdate(row.id, 'endBalance', v ?? 0)" />
+            @change="(v: number | undefined) => handleUpdate(row.id, 'endBalance', v ?? 0)" />
           <span v-else class="amount-cell">{{ fmtAmt(row.endBalance) }}</span>
         </template>
       </el-table-column>

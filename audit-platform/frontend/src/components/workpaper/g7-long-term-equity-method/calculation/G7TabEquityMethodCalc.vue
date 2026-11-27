@@ -216,7 +216,7 @@
               :precision="4"
               size="small"
               style="width: 110px"
-              @update:model-value="(v: number) => { adj.ownershipRatio = normalizeOwnershipRatio(v); onNetAssetChanged(adj) }"
+              @update:model-value="(v: number | undefined) => { adj.ownershipRatio = normalizeOwnershipRatio(v); onNetAssetChanged(adj) }"
             />
             <span v-else>{{ fmtPercent(adj.ownershipRatio) }}</span>
             <span class="na-summary">调整后净资产期末 {{ fmtAmount(calcAdjustedEquityTotal(adj, 'end')) }}</span>
@@ -235,7 +235,7 @@
                 size="small"
                 :controls="false"
                 style="width:100%"
-                @update:model-value="(v: number) => updateNaField(adj, row.key, 'begin', v)"
+                @update:model-value="(v: number | undefined) => updateNaField(adj, row.key, 'begin', v)"
               />
               <span v-else>{{ fmtAmount((adj as any)[row.key].begin) }}</span>
             </template>
@@ -248,7 +248,7 @@
                 size="small"
                 :controls="false"
                 style="width:100%"
-                @update:model-value="(v: number) => updateNaField(adj, row.key, 'increase', v)"
+                @update:model-value="(v: number | undefined) => updateNaField(adj, row.key, 'increase', v)"
               />
               <span v-else>{{ fmtAmount((adj as any)[row.key].increase) }}</span>
             </template>
@@ -261,7 +261,7 @@
                 size="small"
                 :controls="false"
                 style="width:100%"
-                @update:model-value="(v: number) => updateNaField(adj, row.key, 'decrease', v)"
+                @update:model-value="(v: number | undefined) => updateNaField(adj, row.key, 'decrease', v)"
               />
               <span v-else>{{ fmtAmount((adj as any)[row.key].decrease) }}</span>
             </template>
@@ -347,7 +347,7 @@
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.reportedNetProfit" size="small"
                     :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'reportedNetProfit', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'reportedNetProfit', v)" />
                   <span v-else>{{ fmtAmount(row.reportedNetProfit) }}</span>
                 </template>
               </el-table-column>
@@ -357,7 +357,7 @@
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.internalTransactionAdj" size="small"
                     :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'internalTransactionAdj', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'internalTransactionAdj', v)" />
                   <span v-else>{{ fmtAmount(row.internalTransactionAdj) }}</span>
                 </template>
               </el-table-column>
@@ -367,7 +367,7 @@
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.fvDepreciationAdj" size="small"
                     :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'fvDepreciationAdj', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'fvDepreciationAdj', v)" />
                   <span v-else>{{ fmtAmount(row.fvDepreciationAdj) }}</span>
                 </template>
               </el-table-column>
@@ -377,7 +377,7 @@
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.accountingPolicyAdj" size="small"
                     :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'accountingPolicyAdj', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'accountingPolicyAdj', v)" />
                   <span v-else>{{ fmtAmount(row.accountingPolicyAdj) }}</span>
                 </template>
               </el-table-column>
@@ -387,7 +387,7 @@
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.otherAdj" size="small"
                     :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'otherAdj', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'otherAdj', v)" />
                   <span v-else>{{ fmtAmount(row.otherAdj) }}</span>
                 </template>
               </el-table-column>
@@ -408,7 +408,7 @@
                   <el-input-number v-if="!isReadonly" :model-value="row.investmentRatio" size="small"
                     :controls="false" :precision="4" :step="0.01" :min="0" :max="1"
                     style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'investmentRatio', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'investmentRatio', v)" />
                   <span v-else>{{ fmtPercent(row.investmentRatio) }}</span>
                 </template>
               </el-table-column>
@@ -428,7 +428,7 @@
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.confirmedIncome" size="small"
                     :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'confirmedIncome', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'confirmedIncome', v)" />
                   <span v-else>{{ fmtAmount(row.confirmedIncome) }}</span>
                 </template>
               </el-table-column>
@@ -438,7 +438,7 @@
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.dividendDistributed" size="small"
                     :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'dividendDistributed', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'dividendDistributed', v)" />
                   <span v-else>{{ fmtAmount(row.dividendDistributed) }}</span>
                 </template>
               </el-table-column>
@@ -468,14 +468,14 @@
               <el-table-column label="成本期初" min-width="110" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.costOpening" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'costOpening', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'costOpening', v)" />
                   <span v-else>{{ fmtAmount(row.costOpening) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="成本增减" min-width="110" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.costChange" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'costChange', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'costChange', v)" />
                   <span v-else>{{ fmtAmount(row.costChange) }}</span>
                 </template>
               </el-table-column>
@@ -487,14 +487,14 @@
               <el-table-column label="损益调整期初" min-width="120" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.pnlAdjOpening" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'pnlAdjOpening', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'pnlAdjOpening', v)" />
                   <span v-else>{{ fmtAmount(row.pnlAdjOpening) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="损益调整增减" min-width="120" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.pnlAdjChange" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'pnlAdjChange', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'pnlAdjChange', v)" />
                   <span v-else>{{ fmtAmount(row.pnlAdjChange) }}</span>
                   <div class="hint-line" title="建议=测算投资收益−已宣告股利">建议 {{ fmtAmount(suggestedPnlAdjChange(row)) }}</div>
                 </template>
@@ -502,21 +502,21 @@
               <el-table-column label="OCI期初" min-width="110" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.ociBalOpening" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'ociBalOpening', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'ociBalOpening', v)" />
                   <span v-else>{{ fmtAmount(row.ociBalOpening) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="其他权益期初" min-width="120" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.otherEqBalOpening" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'otherEqBalOpening', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'otherEqBalOpening', v)" />
                   <span v-else>{{ fmtAmount(row.otherEqBalOpening) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="经审计净资产" min-width="130" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.auditedNetAssets" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'auditedNetAssets', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'auditedNetAssets', v)" />
                   <span v-else>{{ fmtAmount(row.auditedNetAssets) }}</span>
                 </template>
               </el-table-column>
@@ -538,7 +538,7 @@
               <el-table-column label="G7-2期初总额" min-width="130" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.g72OpeningTotal" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'g72OpeningTotal', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'g72OpeningTotal', v)" />
                   <span v-else>{{ fmtAmount(row.g72OpeningTotal) }}</span>
                 </template>
               </el-table-column>
@@ -554,7 +554,7 @@
               <el-table-column label="G7-2期末总额" min-width="130" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.g72ClosingTotal" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'g72ClosingTotal', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'g72ClosingTotal', v)" />
                   <span v-else>{{ fmtAmount(row.g72ClosingTotal) }}</span>
                 </template>
               </el-table-column>
@@ -574,7 +574,7 @@
               <el-table-column label="OCI变动" min-width="110" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.ociChange" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'ociChange', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'ociChange', v)" />
                   <span v-else>{{ fmtAmount(row.ociChange) }}</span>
                 </template>
               </el-table-column>
@@ -586,7 +586,7 @@
               <el-table-column label="账面确认OCI⑪" min-width="130" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.confirmedOci" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'confirmedOci', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'confirmedOci', v)" />
                   <span v-else>{{ fmtAmount(row.confirmedOci) }}</span>
                 </template>
               </el-table-column>
@@ -602,7 +602,7 @@
               <el-table-column label="其他权益变动" min-width="120" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.otherEquityChange" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'otherEquityChange', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'otherEquityChange', v)" />
                   <span v-else>{{ fmtAmount(row.otherEquityChange) }}</span>
                 </template>
               </el-table-column>
@@ -614,7 +614,7 @@
               <el-table-column label="账面确认其他权益⑬" min-width="150" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.confirmedOtherEquity" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'confirmedOtherEquity', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'confirmedOtherEquity', v)" />
                   <span v-else>{{ fmtAmount(row.confirmedOtherEquity) }}</span>
                 </template>
               </el-table-column>
@@ -630,21 +630,21 @@
               <el-table-column label="商誉/初始差额" min-width="130" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.goodwill" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'goodwill', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'goodwill', v)" />
                   <span v-else>{{ fmtAmount(row.goodwill) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="累计FV调整" min-width="120" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.cumulativeFvAdj" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'cumulativeFvAdj', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'cumulativeFvAdj', v)" />
                   <span v-else>{{ fmtAmount(row.cumulativeFvAdj) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="减值准备" min-width="110" align="right">
                 <template #default="{ row }">
                   <el-input-number v-if="!isReadonly" :model-value="row.impairment" size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateNumField(row, 'impairment', v)" />
+                    @update:model-value="(v: number | undefined) => updateNumField(row, 'impairment', v)" />
                   <span v-else>{{ fmtAmount(row.impairment) }}</span>
                 </template>
               </el-table-column>
@@ -1241,7 +1241,7 @@ function recalcRow(row: EquityMethodCalcRow): void {
 
 // ═══ 字段更新 + 触发重算 ═══════════════════════════════════════════════════
 
-function updateNumField(row: EquityMethodCalcRow, field: keyof EquityMethodCalcRow, value: number): void {
+function updateNumField(row: EquityMethodCalcRow, field: keyof EquityMethodCalcRow, value: number | undefined): void {
   let next = value ?? 0
   if (field === 'investmentRatio') next = normalizeOwnershipRatio(next)
   ;(row as any)[field] = next
@@ -1621,7 +1621,7 @@ function updateNaField(
   adj: NetAssetAdjustment,
   key: keyof NetAssetAdjustment,
   field: 'begin' | 'increase' | 'decrease',
-  value: number,
+  value: number | undefined,
 ): void {
   const item = (adj as any)[key]
   if (!item || typeof item !== 'object') return

@@ -137,7 +137,7 @@
             :min="0"
             placeholder="从 B15 自动获取"
             style="width: 180px"
-            @change="(val: number) => $emit('update-materiality', val)"
+            @change="(val: number | undefined) => $emit('update-materiality', val ?? 0)"
           />
           <span style="margin-left:6px;font-size:12px;color:#909399">元</span>
         </el-form-item>

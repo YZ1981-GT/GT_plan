@@ -102,7 +102,7 @@
               :controls="false"
               :precision="2"
               class="cell-input"
-              @change="(v: number) => adjudication.updateCell(row.rowKey, 'unadjusted', v ?? 0)"
+              @change="(v: number | undefined) => adjudication.updateCell(row.rowKey, 'unadjusted', v ?? 0)"
             />
             <span v-else :class="['cell-value', { negative: row.unadjusted < 0 }]">{{ fmtAmt(row.unadjusted) }}</span>
           </template>
@@ -118,7 +118,7 @@
               :controls="false"
               :precision="2"
               class="cell-input"
-              @change="(v: number) => adjudication.updateCell(row.rowKey, 'aje', v ?? 0)"
+              @change="(v: number | undefined) => adjudication.updateCell(row.rowKey, 'aje', v ?? 0)"
             />
             <span v-else :class="['cell-value', { negative: row.aje < 0 }]">{{ fmtAmt(row.aje) }}</span>
           </template>
@@ -134,7 +134,7 @@
               :controls="false"
               :precision="2"
               class="cell-input"
-              @change="(v: number) => adjudication.updateCell(row.rowKey, 'rje', v ?? 0)"
+              @change="(v: number | undefined) => adjudication.updateCell(row.rowKey, 'rje', v ?? 0)"
             />
             <span v-else :class="['cell-value', { negative: row.rje < 0 }]">{{ fmtAmt(row.rje) }}</span>
           </template>
@@ -164,7 +164,7 @@
               :controls="false"
               :precision="2"
               class="cell-input"
-              @change="(v: number) => adjudication.updateCell(row.rowKey, 'priorUnadj', v ?? 0)"
+              @change="(v: number | undefined) => adjudication.updateCell(row.rowKey, 'priorUnadj', v ?? 0)"
             />
             <span v-else :class="['cell-value', { negative: row.priorUnadj < 0 }]">{{ fmtAmt(row.priorUnadj) }}</span>
           </template>
@@ -180,7 +180,7 @@
               :controls="false"
               :precision="2"
               class="cell-input"
-              @change="(v: number) => adjudication.updateCell(row.rowKey, 'priorAje', v ?? 0)"
+              @change="(v: number | undefined) => adjudication.updateCell(row.rowKey, 'priorAje', v ?? 0)"
             />
             <span v-else :class="['cell-value', { negative: row.priorAje < 0 }]">{{ fmtAmt(row.priorAje) }}</span>
           </template>
@@ -196,7 +196,7 @@
               :controls="false"
               :precision="2"
               class="cell-input"
-              @change="(v: number) => adjudication.updateCell(row.rowKey, 'priorRje', v ?? 0)"
+              @change="(v: number | undefined) => adjudication.updateCell(row.rowKey, 'priorRje', v ?? 0)"
             />
             <span v-else :class="['cell-value', { negative: row.priorRje < 0 }]">{{ fmtAmt(row.priorRje) }}</span>
           </template>

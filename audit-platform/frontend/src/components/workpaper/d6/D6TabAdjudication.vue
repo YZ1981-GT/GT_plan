@@ -99,7 +99,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(block.blockKey, row.rowKey, 'priorUnadjusted', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(block.blockKey, row.rowKey, 'priorUnadjusted', v ?? 0)"
             />
             <span v-else :class="amtCellClass(row)">{{ fmtAmount(row.priorUnadjusted) }}</span>
             <!--
@@ -124,7 +124,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(block.blockKey, row.rowKey, 'priorAje', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(block.blockKey, row.rowKey, 'priorAje', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.priorAje) }}</span>
           </template>
@@ -139,7 +139,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(block.blockKey, row.rowKey, 'priorRje', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(block.blockKey, row.rowKey, 'priorRje', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.priorRje) }}</span>
           </template>
@@ -161,7 +161,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(block.blockKey, row.rowKey, 'currentUnadjusted', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(block.blockKey, row.rowKey, 'currentUnadjusted', v ?? 0)"
             />
             <span v-else :class="amtCellClass(row)">{{ fmtAmount(row.currentUnadjusted) }}</span>
             <DerivedCellOverrideBadge
@@ -182,7 +182,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(block.blockKey, row.rowKey, 'currentAje', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(block.blockKey, row.rowKey, 'currentAje', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.currentAje) }}</span>
           </template>
@@ -197,7 +197,7 @@
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(block.blockKey, row.rowKey, 'currentRje', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(block.blockKey, row.rowKey, 'currentRje', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.currentRje) }}</span>
           </template>

@@ -119,37 +119,37 @@
       <el-table-column label="期初" width="96" align="right">
         <template #default="{ row }">
           <el-input-number v-model="row.openingBalance" size="small" :controls="false" :disabled="isReadonly"
-            style="width:100%" @change="(v: number) => l3.updateCell(row.rowId, 'openingBalance', v)" />
+            style="width:100%" @change="(v: number | undefined) => l3.updateCell(row.rowId, 'openingBalance', v)" />
         </template>
       </el-table-column>
       <el-table-column label="本期新增" width="96" align="right">
         <template #default="{ row }">
           <el-input-number v-model="row.currentNew" size="small" :controls="false" :disabled="isReadonly"
-            style="width:100%" @change="(v: number) => l3.updateCell(row.rowId, 'currentNew', v)" />
+            style="width:100%" @change="(v: number | undefined) => l3.updateCell(row.rowId, 'currentNew', v)" />
         </template>
       </el-table-column>
       <el-table-column label="本期终止" width="96" align="right">
         <template #default="{ row }">
           <el-input-number v-model="row.currentTerminated" size="small" :controls="false" :disabled="isReadonly"
-            style="width:100%" @change="(v: number) => l3.updateCell(row.rowId, 'currentTerminated', v)" />
+            style="width:100%" @change="(v: number | undefined) => l3.updateCell(row.rowId, 'currentTerminated', v)" />
         </template>
       </el-table-column>
       <el-table-column label="转入L3" width="88" align="right">
         <template #default="{ row }">
           <el-input-number v-model="row.transferIntoL3" size="small" :controls="false" :disabled="isReadonly"
-            style="width:100%" @change="(v: number) => l3.updateCell(row.rowId, 'transferIntoL3', v)" />
+            style="width:100%" @change="(v: number | undefined) => l3.updateCell(row.rowId, 'transferIntoL3', v)" />
         </template>
       </el-table-column>
       <el-table-column label="转出L3" width="88" align="right">
         <template #default="{ row }">
           <el-input-number v-model="row.transferOutOfL3" size="small" :controls="false" :disabled="isReadonly"
-            style="width:100%" @change="(v: number) => l3.updateCell(row.rowId, 'transferOutOfL3', v)" />
+            style="width:100%" @change="(v: number | undefined) => l3.updateCell(row.rowId, 'transferOutOfL3', v)" />
         </template>
       </el-table-column>
       <el-table-column label="FV变动" width="88" align="right">
         <template #default="{ row }">
           <el-input-number v-model="row.fairValueChange" size="small" :controls="false" :disabled="isReadonly"
-            style="width:100%" @change="(v: number) => l3.updateCell(row.rowId, 'fairValueChange', v)" />
+            style="width:100%" @change="(v: number | undefined) => l3.updateCell(row.rowId, 'fairValueChange', v)" />
         </template>
       </el-table-column>
       <el-table-column label="利息费用" width="88" align="right">
@@ -161,7 +161,7 @@
       <el-table-column label="其他" width="88" align="right">
         <template #default="{ row }">
           <el-input-number v-model="row.otherChanges" size="small" :controls="false" :disabled="isReadonly"
-            style="width:100%" @change="(v: number) => l3.updateCell(row.rowId, 'otherChanges', v)" />
+            style="width:100%" @change="(v: number | undefined) => l3.updateCell(row.rowId, 'otherChanges', v)" />
         </template>
       </el-table-column>
       <el-table-column label="期末(公式)" width="100" align="right">
@@ -170,7 +170,7 @@
       <el-table-column label="企业期末" width="100" align="right">
         <template #default="{ row }">
           <el-input-number v-model="row.reportedClosing" size="small" :controls="false" :disabled="isReadonly"
-            style="width:100%" @change="(v: number) => l3.updateCell(row.rowId, 'reportedClosing', v)" />
+            style="width:100%" @change="(v: number | undefined) => l3.updateCell(row.rowId, 'reportedClosing', v)" />
         </template>
       </el-table-column>
       <el-table-column label="差异" width="88" align="right">

@@ -282,7 +282,7 @@ function handleUpload(file: any): boolean {
                 :precision="2"
                 :disabled="isReadonly"
                 style="width: 100%"
-                @change="(v: number) => emit('update', 'discountInterest', v || 0)"
+                @change="(v: number | undefined) => emit('update', 'discountInterest', v || 0)"
               />
             </el-form-item>
           </el-col>

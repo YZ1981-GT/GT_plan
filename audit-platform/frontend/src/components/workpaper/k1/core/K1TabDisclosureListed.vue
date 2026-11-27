@@ -669,7 +669,7 @@
           :formatter="amountFormatter"
           :parser="amountParser"
           style="width: 200px"
-          @change="(v: number) => disc.updateFundCentralization('amount', v ?? 0)"
+          @change="(v: number | undefined) => disc.updateFundCentralization('amount', v ?? 0)"
         />
         <span v-else class="amount-cell">{{ fmt(disc.payload.value.fundCentralizationAmount) }}</span>
       </div>
@@ -807,7 +807,7 @@
               :formatter="amountFormatter"
               :parser="amountParser"
               style="width: 100%"
-              @change="(v: number) => disc.updateTransferRow(row.rowId, 'gainLoss', v ?? 0)"
+              @change="(v: number | undefined) => disc.updateTransferRow(row.rowId, 'gainLoss', v ?? 0)"
             />
             <span v-else class="amount-cell">{{ fmt(row.gainLoss) }}</span>
           </template>

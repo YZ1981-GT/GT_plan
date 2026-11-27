@@ -297,7 +297,7 @@ async function confirmAdjudication() {
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(row.rowKey, 'openingRje', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowKey, 'openingRje', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.openingRje) }}</span>
           </template>
@@ -335,7 +335,7 @@ async function confirmAdjudication() {
               :controls="false"
               size="small"
               style="width:100%"
-              @change="(v: number) => updateCell(row.rowKey, 'closingRje', v ?? 0)"
+              @change="(v: number | undefined) => updateCell(row.rowKey, 'closingRje', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.closingRje) }}</span>
           </template>

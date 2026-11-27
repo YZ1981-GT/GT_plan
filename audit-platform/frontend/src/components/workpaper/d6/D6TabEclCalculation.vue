@@ -98,7 +98,7 @@
       </el-table-column>
       <el-table-column label="损失率②" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.lossRate" :controls="false" :step="0.01" :max="1" size="small" style="width:100%" @change="(v: number) => updateSingleCell(row.rowId, 'lossRate', v ?? 0)" />
+          <el-input-number v-if="!isReadonly" :model-value="row.lossRate" :controls="false" :step="0.01" :max="1" size="small" style="width:100%" @change="(v: number | undefined) => updateSingleCell(row.rowId, 'lossRate', v ?? 0)" />
           <span v-else>{{ fmtPct(row.lossRate) }}</span>
         </template>
       </el-table-column>
@@ -173,7 +173,7 @@
         </el-table-column>
         <el-table-column label="损失率②" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.lossRate" :controls="false" :step="0.01" :max="1" size="small" style="width:100%" @change="(v: number) => updateAgingCell(group.groupId, row.rowId, 'lossRate', v ?? 0)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.lossRate" :controls="false" :step="0.01" :max="1" size="small" style="width:100%" @change="(v: number | undefined) => updateAgingCell(group.groupId, row.rowId, 'lossRate', v ?? 0)" />
             <span v-else>{{ fmtPct(row.lossRate) }}</span>
           </template>
         </el-table-column>

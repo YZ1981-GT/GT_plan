@@ -102,7 +102,7 @@
             :controls="false"
             :disabled="isReadonly"
             style="width:100%"
-            @update:model-value="(v: number) => updateTableRow(row.id, 'currentChange', v ?? 0)"
+            @update:model-value="(v: number | undefined) => updateTableRow(row.id, 'currentChange', v ?? 0)"
           />
         </template>
       </el-table-column>

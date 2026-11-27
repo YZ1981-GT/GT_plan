@@ -164,7 +164,7 @@
             :disabled="isReadonly"
             style="width:100%"
             :precision="4"
-            @update:model-value="(v: number) => calc.updateCell(row.id, 'couponRate', v ?? 0)"
+            @update:model-value="(v: number | undefined) => calc.updateCell(row.id, 'couponRate', v ?? 0)"
           />
         </template>
       </el-table-column>
@@ -218,7 +218,7 @@
             :disabled="isReadonly"
             style="width:100%"
             :class="{ 'input-warn': calc.isMaturedOverAccrued(row) }"
-            @update:model-value="(v: number) => calc.updateCell(row.id, 'maturedCollectible', v ?? 0)"
+            @update:model-value="(v: number | undefined) => calc.updateCell(row.id, 'maturedCollectible', v ?? 0)"
           />
           <span v-else class="eir-muted" title="实际利率法：不进 1132">—</span>
         </template>
@@ -231,7 +231,7 @@
             :controls="false"
             :disabled="isReadonly"
             style="width:100%"
-            @update:model-value="(v: number) => calc.updateCell(row.id, 'companyAccrual', v ?? 0)"
+            @update:model-value="(v: number | undefined) => calc.updateCell(row.id, 'companyAccrual', v ?? 0)"
           />
         </template>
       </el-table-column>

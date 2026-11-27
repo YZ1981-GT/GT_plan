@@ -204,7 +204,7 @@ const filledCount = computed(() => {
             :precision="2"
             :min="0"
             style="width: 100%"
-            @update:model-value="(v: number) => onFieldUpdate(field.key, v)"
+            @update:model-value="(v: number | undefined) => onFieldUpdate(field.key, v)"
           />
           <!-- 多行文本 -->
           <el-input
