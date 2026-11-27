@@ -27,8 +27,8 @@ export interface BlockColumnDef {
   width?: number
   /** 最小列宽 */
   minWidth?: number
-  /** 数据类型 */
-  type?: 'text' | 'number' | 'select' | 'date'
+  /** 数据类型（formula = 只读公式列，如「对账差异 = 对方余额 − 本方余额」） */
+  type?: 'text' | 'number' | 'select' | 'date' | 'formula'
   /** 是否参与合计 */
   sumField?: boolean
   /** 分组表头名称（同 group 的列合并表头） */

@@ -414,7 +414,7 @@
             <template #description>
               <p>请先导入会计分录数据后再执行借贷发生额完整性测试。</p>
             </template>
-            <el-button v-if="!isReadonly" type="primary" size="small" @click="loadFromLedger">从序时账导入</el-button>
+            <el-button v-if="!isReadonly" type="primary" size="small" @click="loadFromLedger()">从序时账导入</el-button>
             <el-button v-if="!isReadonly" size="small" @click="jumpToSheet('C24A')">返回程序表</el-button>
           </el-empty>
         </div>
@@ -435,7 +435,7 @@
             <template #description>
               <p>请先导入会计分录数据后再执行科目余额对比测试。</p>
             </template>
-            <el-button v-if="!isReadonly" type="primary" size="small" @click="loadFromLedger">从序时账导入</el-button>
+            <el-button v-if="!isReadonly" type="primary" size="small" @click="loadFromLedger()">从序时账导入</el-button>
             <el-button v-if="!isReadonly" size="small" @click="jumpToSheet('C24A')">返回程序表</el-button>
           </el-empty>
         </div>
@@ -456,7 +456,7 @@
             <template #description>
               <p>请先导入会计分录数据后再执行跳号测试。</p>
             </template>
-            <el-button v-if="!isReadonly" type="primary" size="small" @click="loadFromLedger">从序时账导入</el-button>
+            <el-button v-if="!isReadonly" type="primary" size="small" @click="loadFromLedger()">从序时账导入</el-button>
             <el-button v-if="!isReadonly" size="small" @click="jumpToSheet('C24A')">返回程序表</el-button>
           </el-empty>
         </div>
@@ -480,7 +480,7 @@
             <template #description>
               <p>请先导入会计分录数据后再执行异常账户测试。</p>
             </template>
-            <el-button v-if="!isReadonly" type="primary" size="small" @click="loadFromLedger">从序时账导入</el-button>
+            <el-button v-if="!isReadonly" type="primary" size="small" @click="loadFromLedger()">从序时账导入</el-button>
             <el-button v-if="!isReadonly" size="small" @click="jumpToSheet('C24A')">返回程序表</el-button>
           </el-empty>
         </div>
@@ -503,7 +503,7 @@
             <template #description>
               <p>请先导入会计分录数据后再执行异常分录测试。</p>
             </template>
-            <el-button v-if="!isReadonly" type="primary" size="small" @click="loadFromLedger">从序时账导入</el-button>
+            <el-button v-if="!isReadonly" type="primary" size="small" @click="loadFromLedger()">从序时账导入</el-button>
             <el-button v-if="!isReadonly" size="small" @click="jumpToSheet('C24A')">返回程序表</el-button>
           </el-empty>
         </div>
@@ -536,7 +536,7 @@
             <template #description>
               <p>请先导入会计分录数据后再执行本福特定律测试。</p>
             </template>
-            <el-button v-if="!isReadonly" type="primary" size="small" @click="loadFromLedger">从序时账导入</el-button>
+            <el-button v-if="!isReadonly" type="primary" size="small" @click="loadFromLedger()">从序时账导入</el-button>
             <el-button v-if="!isReadonly" size="small" @click="jumpToSheet('C24A')">返回程序表</el-button>
           </el-empty>
         </div>
@@ -804,7 +804,9 @@ function c24StepRowClass(stepIdx: number): Record<string, boolean> {
   return { 'c24-step-done': s === 'done', 'c24-step-wip': s === 'wip' }
 }
 
-function c24ConclusionType(conclusion: string): string {
+type TagType = 'success' | 'warning' | 'info' | 'primary' | 'danger'
+
+function c24ConclusionType(conclusion: string): TagType {
   if (conclusion === '已执行' || conclusion === '无异常') return 'success'
   if (conclusion === '有异常') return 'danger'
   return 'warning'
@@ -890,7 +892,7 @@ function testConclusionText(key: string): string {
   return conclusions.value[key] ? '已结论' : ''
 }
 
-function testConclusionType(key: string): string {
+function testConclusionType(key: string): TagType {
   const c = conclusions.value[key] || ''
   if (c.includes('异常') || c.includes('不一致') || c.includes('偏离')) return 'danger'
   return 'success'

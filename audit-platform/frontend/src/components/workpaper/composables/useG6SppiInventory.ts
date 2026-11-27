@@ -68,7 +68,8 @@ export interface InventoryMeta {
 }
 
 export interface SecuritiesInventoryData {
-  items: InventoryItem[]
+  /** 存档行允许只写部分键：`loadData` 一律经 `_normalizeItem` 补默认值（历史存档就有缺列的行） */
+  items: InventoryFlatRow[]
   auditConclusion: string
   meta?: InventoryMeta
 }

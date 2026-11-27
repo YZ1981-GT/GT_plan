@@ -10,6 +10,11 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { nextTick } from 'vue'
 import { useG6SppiInventory } from '../useG6SppiInventory'
+import type { InventoryFlatRow } from '../useG6SppiInventory'
+
+/** 测试夹具只写基础键，其余由 loadData 归一补齐（故用平铺行类型而非完整 InventoryItem） */
+const flat = (rows: Array<Partial<InventoryFlatRow> & Pick<InventoryFlatRow, 'id' | 'securitiesName'>>) =>
+  rows as InventoryFlatRow[]
 import type { SecuritiesInventoryData, InventoryItem } from '../useG6SppiInventory'
 import { useG6SppiReconciliation, CURRENT_FORMULA_VERSION, securityMatchKey } from '../useG6SppiReconciliation'
 import type { ReconciliationData, ReconciliationItem } from '../useG6SppiReconciliation'
@@ -36,8 +41,8 @@ describe('useG6SppiInventory', () => {
     it('盘点数 > 账面数 → 正差异', () => {
       const { items, loadData } = useG6SppiInventory()
       loadData({
-        items: [{ id: 'a', seq: 1, securitiesName: '债券A', securitiesCode: 'B001',
-          faceValue: 100, countQuantity: 120, bookQuantity: 100, variance: 0 }],
+        items: flat([{ id: 'a', seq: 1, securitiesName: '债券A', securitiesCode: 'B001',
+          faceValue: 100, countQuantity: 120, bookQuantity: 100 }]),
         auditConclusion: '',
       })
       expect(items.value[0].variance).toBe(20)
@@ -46,8 +51,8 @@ describe('useG6SppiInventory', () => {
     it('盘点数 < 账面数 → 负差异', () => {
       const { items, loadData } = useG6SppiInventory()
       loadData({
-        items: [{ id: 'b', seq: 1, securitiesName: '债券B', securitiesCode: 'B002',
-          faceValue: 100, countQuantity: 80, bookQuantity: 100, variance: 0 }],
+        items: flat([{ id: 'b', seq: 1, securitiesName: '债券B', securitiesCode: 'B002',
+          faceValue: 100, countQuantity: 80, bookQuantity: 100 }]),
         auditConclusion: '',
       })
       expect(items.value[0].variance).toBe(-20)
@@ -56,8 +61,8 @@ describe('useG6SppiInventory', () => {
     it('盘点数 = 账面数 → 差异为0', () => {
       const { items, loadData } = useG6SppiInventory()
       loadData({
-        items: [{ id: 'c', seq: 1, securitiesName: '债券C', securitiesCode: 'B003',
-          faceValue: 100, countQuantity: 500, bookQuantity: 500, variance: 0 }],
+        items: flat([{ id: 'c', seq: 1, securitiesName: '债券C', securitiesCode: 'B003',
+          faceValue: 100, countQuantity: 500, bookQuantity: 500 }]),
         auditConclusion: '',
       })
       expect(items.value[0].variance).toBe(0)
@@ -71,8 +76,8 @@ describe('useG6SppiInventory', () => {
     it('差异≠0 返回 true', () => {
       const { hasVariance, loadData, items } = useG6SppiInventory()
       loadData({
-        items: [{ id: 'x', seq: 1, securitiesName: 'X', securitiesCode: '',
-          faceValue: 0, countQuantity: 10, bookQuantity: 5, variance: 0 }],
+        items: flat([{ id: 'x', seq: 1, securitiesName: 'X', securitiesCode: '',
+          faceValue: 0, countQuantity: 10, bookQuantity: 5 }]),
         auditConclusion: '',
       })
       expect(hasVariance(items.value[0])).toBe(true)
@@ -81,8 +86,8 @@ describe('useG6SppiInventory', () => {
     it('差异=0 返回 false', () => {
       const { hasVariance, loadData, items } = useG6SppiInventory()
       loadData({
-        items: [{ id: 'y', seq: 1, securitiesName: 'Y', securitiesCode: '',
-          faceValue: 0, countQuantity: 100, bookQuantity: 100, variance: 0 }],
+        items: flat([{ id: 'y', seq: 1, securitiesName: 'Y', securitiesCode: '',
+          faceValue: 0, countQuantity: 100, bookQuantity: 100 }]),
         auditConclusion: '',
       })
       expect(hasVariance(items.value[0])).toBe(false)
@@ -96,8 +101,8 @@ describe('useG6SppiInventory', () => {
     it('差异≠0时返回红色样式', () => {
       const { getVarianceCellStyle, loadData, items } = useG6SppiInventory()
       loadData({
-        items: [{ id: 's1', seq: 1, securitiesName: 'S1', securitiesCode: '',
-          faceValue: 0, countQuantity: 15, bookQuantity: 10, variance: 0 }],
+        items: flat([{ id: 's1', seq: 1, securitiesName: 'S1', securitiesCode: '',
+          faceValue: 0, countQuantity: 15, bookQuantity: 10 }]),
         auditConclusion: '',
       })
       const style = getVarianceCellStyle(items.value[0])
@@ -109,8 +114,8 @@ describe('useG6SppiInventory', () => {
     it('差异=0时返回空样式', () => {
       const { getVarianceCellStyle, loadData, items } = useG6SppiInventory()
       loadData({
-        items: [{ id: 's2', seq: 1, securitiesName: 'S2', securitiesCode: '',
-          faceValue: 0, countQuantity: 50, bookQuantity: 50, variance: 0 }],
+        items: flat([{ id: 's2', seq: 1, securitiesName: 'S2', securitiesCode: '',
+          faceValue: 0, countQuantity: 50, bookQuantity: 50 }]),
         auditConclusion: '',
       })
       const style = getVarianceCellStyle(items.value[0])
@@ -127,9 +132,9 @@ describe('useG6SppiInventory', () => {
       const input: SecuritiesInventoryData = {
         items: [
           { id: 'rt1', seq: 1, securitiesName: '国债A', securitiesCode: 'GZ001',
-            faceValue: 1000000, countQuantity: 200, bookQuantity: 195, variance: 0 },
+            faceValue: 1000000, countQuantity: 200, bookQuantity: 195 },
           { id: 'rt2', seq: 2, securitiesName: '企业债B', securitiesCode: 'QY002',
-            faceValue: 500000, countQuantity: 300, bookQuantity: 300, variance: 0 },
+            faceValue: 500000, countQuantity: 300, bookQuantity: 300 },
         ],
         auditConclusion: '盘点无重大差异',
       }
@@ -137,16 +142,16 @@ describe('useG6SppiInventory', () => {
       const output = toJSON()
       expect(output.items).toHaveLength(2)
       expect(output.items[0].securitiesName).toBe('国债A')
-      expect(output.items[0].variance).toBe(5) // 200-195
-      expect(output.items[1].variance).toBe(0) // 300-300
+      expect((output.items[0] as any).variance).toBe(5) // 200-195
+      expect((output.items[1] as any).variance).toBe(0) // 300-300
       expect(output.auditConclusion).toBe('盘点无重大差异')
     })
 
     it('loadData(null) 重置为空', () => {
       const { loadData, toJSON, items } = useG6SppiInventory()
       loadData({
-        items: [{ id: 'z', seq: 1, securitiesName: 'Z', securitiesCode: '',
-          faceValue: 0, countQuantity: 10, bookQuantity: 5, variance: 0 }],
+        items: flat([{ id: 'z', seq: 1, securitiesName: 'Z', securitiesCode: '',
+          faceValue: 0, countQuantity: 10, bookQuantity: 5 }]),
         auditConclusion: 'test',
       })
       expect(items.value).toHaveLength(1)
@@ -164,11 +169,11 @@ describe('useG6SppiInventory', () => {
       loadData({
         items: [
           { id: 'a1', seq: 99, securitiesName: '债券1', securitiesCode: '',
-            faceValue: 0, countQuantity: 10, bookQuantity: 10, variance: 0 },
+            faceValue: 0, countQuantity: 10, bookQuantity: 10 },
           { id: 'a2', seq: 88, securitiesName: '债券2', securitiesCode: '',
-            faceValue: 0, countQuantity: 20, bookQuantity: 20, variance: 0 },
+            faceValue: 0, countQuantity: 20, bookQuantity: 20 },
           { id: 'a3', seq: 77, securitiesName: '债券3', securitiesCode: '',
-            faceValue: 0, countQuantity: 30, bookQuantity: 30, variance: 0 },
+            faceValue: 0, countQuantity: 30, bookQuantity: 30 },
         ],
         auditConclusion: '',
       })
@@ -183,11 +188,11 @@ describe('useG6SppiInventory', () => {
       loadData({
         items: [
           { id: 'd1', seq: 1, securitiesName: 'A', securitiesCode: '',
-            faceValue: 0, countQuantity: 0, bookQuantity: 0, variance: 0 },
+            faceValue: 0, countQuantity: 0, bookQuantity: 0 },
           { id: 'd2', seq: 2, securitiesName: 'B', securitiesCode: '',
-            faceValue: 0, countQuantity: 0, bookQuantity: 0, variance: 0 },
+            faceValue: 0, countQuantity: 0, bookQuantity: 0 },
           { id: 'd3', seq: 3, securitiesName: 'C', securitiesCode: '',
-            faceValue: 0, countQuantity: 0, bookQuantity: 0, variance: 0 },
+            faceValue: 0, countQuantity: 0, bookQuantity: 0 },
         ],
         auditConclusion: '',
       })
@@ -224,7 +229,7 @@ describe('useG6SppiInventory', () => {
       loadData({
         items: [{
           id: 'ex1', seq: 1, securitiesName: '旧名称', securitiesCode: 'CODE1',
-          faceValue: 0, countQuantity: 0, bookQuantity: 0, variance: 0,
+          faceValue: 0, countQuantity: 0, bookQuantity: 0,
           varianceReason: '', varianceConclusion: '', indexRef: '',
           ownershipEntity: '', restrictionType: '', restrictionNote: '', evidenceIndex: '',
         }],
@@ -246,7 +251,7 @@ describe('useG6SppiInventory', () => {
       loadData({
         items: [{
           id: 'r1', seq: 1, securitiesName: '债X', securitiesCode: '',
-          faceValue: 0, countQuantity: 1, bookQuantity: 1, variance: 0,
+          faceValue: 0, countQuantity: 1, bookQuantity: 1,
           varianceReason: '', varianceConclusion: '', indexRef: '',
           ownershipEntity: '公司A', restrictionType: 'pledge', restrictionNote: '质押融资',
           evidenceIndex: '对账单-1',
