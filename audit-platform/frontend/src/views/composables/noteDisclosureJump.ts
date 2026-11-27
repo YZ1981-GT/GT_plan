@@ -196,8 +196,9 @@ export interface NoteDisclosureJumpTarget {
   variant: 'listed' | 'soe'
   /** 推断依据说明 */
   reason: string
-  /** 底稿族代码（ACNR 回退解析） */
-  wpCode?: 'D1' | 'D3' | 'D4' | 'D5' | 'D6' | 'D7' | 'E1' | 'F1' | 'F2' | 'F3' | 'G1' | 'G7' | 'G8' | 'G9' | 'G10' | 'G11' | 'G12' | 'G13' | 'G14' | 'H1' | 'H2' | 'H3' | 'H8' | 'H9' | 'H10' | 'I1' | 'I2' | 'I3' | 'I4' | 'I5' | 'I6' | 'J1' | 'K1' | 'K11' | 'K13' | 'L1' | 'N1' | 'N2' | 'N4' | 'N5'
+  /** 底稿族代码（ACNR 回退解析）。本文件内所有 `wpCode:` 字面量必须在本联合里 —— 原先漏了
+   *  D2 / H5 / K2~K10 / L3 / L5 / L7 / M2~M7 / M9 / M10 共 22 个实际在用的族码。 */
+  wpCode?: 'D1' | 'D2' | 'D3' | 'D4' | 'D5' | 'D6' | 'D7' | 'E1' | 'F1' | 'F2' | 'F3' | 'G1' | 'G7' | 'G8' | 'G9' | 'G10' | 'G11' | 'G12' | 'G13' | 'G14' | 'H1' | 'H2' | 'H3' | 'H5' | 'H8' | 'H9' | 'H10' | 'I1' | 'I2' | 'I3' | 'I4' | 'I5' | 'I6' | 'J1' | 'K1' | 'K2' | 'K3' | 'K4' | 'K5' | 'K6' | 'K7' | 'K8' | 'K9' | 'K10' | 'K11' | 'K13' | 'L1' | 'L3' | 'L5' | 'L7' | 'M2' | 'M3' | 'M4' | 'M5' | 'M6' | 'M7' | 'M9' | 'M10' | 'N1' | 'N2' | 'N4' | 'N5'
 }
 
 function asRecord(raw: unknown): Record<string, unknown> | null {

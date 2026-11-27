@@ -31,7 +31,7 @@
             :precision="2"
             size="small"
             class="diff-checklist-detail__input"
-            @change="(val: number | undefined) => $emit('update', company._row_id!, 'a_reply_amount', val)"
+            @change="(val: number | undefined) => $emit('update', company!._row_id!, 'a_reply_amount', val)"
           />
           <span v-else class="diff-checklist-detail__value">{{ formatAmount(company.a_reply_amount) }}</span>
         </div>
@@ -43,9 +43,9 @@
           :rows="company.b_rows ?? []"
           :total="company.b_total ?? 0"
           :readonly="readonly"
-          @add-row="$emit('add-sub-row', company._row_id!, 'b')"
-          @delete-row="(rowId: string) => $emit('delete-sub-row', company._row_id!, 'b', rowId)"
-          @update-row="(rowId: string, field: string, val: any) => $emit('update-sub-row', company._row_id!, 'b', rowId, field, val)"
+          @add-row="$emit('add-sub-row', company!._row_id!, 'b')"
+          @delete-row="(rowId: string) => $emit('delete-sub-row', company!._row_id!, 'b', rowId)"
+          @update-row="(rowId: string, field: string, val: any) => $emit('update-sub-row', company!._row_id!, 'b', rowId, field, val)"
         />
 
         <!-- C: 我方已付对方未收 -->
@@ -55,9 +55,9 @@
           :rows="company.c_rows ?? []"
           :total="company.c_total ?? 0"
           :readonly="readonly"
-          @add-row="$emit('add-sub-row', company._row_id!, 'c')"
-          @delete-row="(rowId: string) => $emit('delete-sub-row', company._row_id!, 'c', rowId)"
-          @update-row="(rowId: string, field: string, val: any) => $emit('update-sub-row', company._row_id!, 'c', rowId, field, val)"
+          @add-row="$emit('add-sub-row', company!._row_id!, 'c')"
+          @delete-row="(rowId: string) => $emit('delete-sub-row', company!._row_id!, 'c', rowId)"
+          @update-row="(rowId: string, field: string, val: any) => $emit('update-sub-row', company!._row_id!, 'c', rowId, field, val)"
         />
 
         <!-- D: 调节后对方余额 -->
@@ -93,7 +93,7 @@
             :precision="2"
             size="small"
             class="diff-checklist-detail__input"
-            @change="(val: number | undefined) => $emit('update', company._row_id!, 'e_book_amount', val)"
+            @change="(val: number | undefined) => $emit('update', company!._row_id!, 'e_book_amount', val)"
           />
           <span v-else class="diff-checklist-detail__value">{{ formatAmount(company.e_book_amount) }}</span>
         </div>
@@ -105,9 +105,9 @@
           :rows="company.f_rows ?? []"
           :total="company.f_total ?? 0"
           :readonly="readonly"
-          @add-row="$emit('add-sub-row', company._row_id!, 'f')"
-          @delete-row="(rowId: string) => $emit('delete-sub-row', company._row_id!, 'f', rowId)"
-          @update-row="(rowId: string, field: string, val: any) => $emit('update-sub-row', company._row_id!, 'f', rowId, field, val)"
+          @add-row="$emit('add-sub-row', company!._row_id!, 'f')"
+          @delete-row="(rowId: string) => $emit('delete-sub-row', company!._row_id!, 'f', rowId)"
+          @update-row="(rowId: string, field: string, val: any) => $emit('update-sub-row', company!._row_id!, 'f', rowId, field, val)"
         />
 
         <!-- G: 对方已付我方未收 -->
@@ -117,9 +117,9 @@
           :rows="company.g_rows ?? []"
           :total="company.g_total ?? 0"
           :readonly="readonly"
-          @add-row="$emit('add-sub-row', company._row_id!, 'g')"
-          @delete-row="(rowId: string) => $emit('delete-sub-row', company._row_id!, 'g', rowId)"
-          @update-row="(rowId: string, field: string, val: any) => $emit('update-sub-row', company._row_id!, 'g', rowId, field, val)"
+          @add-row="$emit('add-sub-row', company!._row_id!, 'g')"
+          @delete-row="(rowId: string) => $emit('delete-sub-row', company!._row_id!, 'g', rowId)"
+          @update-row="(rowId: string, field: string, val: any) => $emit('update-sub-row', company!._row_id!, 'g', rowId, field, val)"
         />
 
         <!-- H: 调节后我方余额 -->
@@ -185,7 +185,7 @@
           :autosize="{ minRows: 2, maxRows: 5 }"
           size="small"
           placeholder="记录差异原因分析及处理意见（点击 AI 生成可根据调节数据自动填写）"
-          @change="(val: string) => $emit('update', company._row_id!, 'audit_note', val)"
+          @change="(val: string) => $emit('update', company!._row_id!, 'audit_note', val)"
         />
         <span v-else>{{ company.audit_note || '—' }}</span>
       </div>
@@ -259,7 +259,9 @@ function formatAmount(val?: number): string {
   return prefs.fmt(val)
 }
 
-function statusTagType(status?: string): string {
+type TagType = 'success' | 'warning' | 'info' | 'primary' | 'danger'
+
+function statusTagType(status?: string): TagType {
   if (status === 'balanced') return 'success'
   if (status === 'over_materiality') return 'danger'
   if (status === 'diff') return 'warning'
