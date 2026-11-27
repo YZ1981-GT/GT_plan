@@ -119,7 +119,7 @@
               :controls="false"
               :precision="2"
               class="amt-input"
-              @change="(v: number | null) => onCellEdit(row.rowId, col.key, v ?? 0)"
+              @change="(v: number | null | undefined) => onCellEdit(row.rowId, col.key, v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row[col.key]) }}</span>
           </template>

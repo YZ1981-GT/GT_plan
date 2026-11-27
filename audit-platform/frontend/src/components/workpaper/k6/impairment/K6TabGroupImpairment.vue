@@ -259,7 +259,7 @@
               :controls="false"
               size="small"
               class="amt-input"
-              @change="(v: number | null) => updateCell(row.rowId, 'bookValue', v ?? 0)"
+              @change="(v: number | null | undefined) => updateCell(row.rowId, 'bookValue', v ?? 0)"
             />
             <span v-else class="amt-cell">{{ fmtAmt(row.bookValue) }}</span>
           </template>
@@ -319,7 +319,7 @@
               :controls="false"
               size="small"
               class="amt-input"
-              @change="(v: number | null) => updateCell(row.rowId, 'impairmentFloor', v ?? 0)"
+              @change="(v: number | null | undefined) => updateCell(row.rowId, 'impairmentFloor', v ?? 0)"
             />
             <span v-else class="amt-cell">{{ row.isGoodwill ? '—' : fmtAmt(row.impairmentFloor) }}</span>
           </template>
@@ -486,7 +486,7 @@ function syncFromK6_5() {
   }
 }
 
-function handleGroupImpairmentChange(v: number | null) {
+function handleGroupImpairmentChange(v: number | null | undefined) {
   setGroupImpairment(v ?? 0)
 }
 

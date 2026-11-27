@@ -181,7 +181,7 @@
             size="small"
             class="cct-sample-size-input"
             placeholder="样本量"
-            @change="(v: number | null) => onSampleSizeChange(v ?? null)"
+            @change="(v: number | null | undefined) => onSampleSizeChange(v ?? null)"
           />
         </el-tooltip>
         <span class="cct-sample-size-hint" v-if="sampleSizeTooltip">

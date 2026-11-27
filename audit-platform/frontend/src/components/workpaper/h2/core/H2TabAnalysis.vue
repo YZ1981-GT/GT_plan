@@ -171,7 +171,7 @@
               :controls="false"
               size="small"
               class="cell-num"
-              @change="(v: number | null) => state.updateCustomManual(row.id, 'manualCurrent', v)"
+              @change="(v: number | null | undefined) => state.updateCustomManual(row.id, 'manualCurrent', v ?? null)"
             />
             <span v-else :class="['formula-cell', { 'auto-src': row.autoCurrent }]" :title="row.formulaHint">
               {{ fmtIndicator(row.current, row.unit) }}
@@ -186,7 +186,7 @@
               :controls="false"
               size="small"
               class="cell-num"
-              @change="(v: number | null) => state.updateCustomManual(row.id, 'manualPrior', v)"
+              @change="(v: number | null | undefined) => state.updateCustomManual(row.id, 'manualPrior', v ?? null)"
             />
             <span v-else :class="['formula-cell', { 'auto-src': row.autoPrior }]" :title="row.formulaHint">
               {{ fmtIndicator(row.prior, row.unit) }}

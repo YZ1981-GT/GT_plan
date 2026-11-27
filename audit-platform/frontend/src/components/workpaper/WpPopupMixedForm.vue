@@ -334,7 +334,7 @@ onBeforeUnmount(() => {
                 :controls="false"
                 placeholder="金额"
                 style="width: 130px"
-                @update:model-value="(val: number | null) => updateEquity(row.key, 'retainedEarnings', val)"
+                @update:model-value="(val: number | null | undefined) => updateEquity(row.key, 'retainedEarnings', val ?? null)"
               />
             </template>
           </el-table-column>
@@ -346,7 +346,7 @@ onBeforeUnmount(() => {
                 :controls="false"
                 placeholder="金额"
                 style="width: 130px"
-                @update:model-value="(val: number | null) => updateEquity(row.key, 'otherComprehensive', val)"
+                @update:model-value="(val: number | null | undefined) => updateEquity(row.key, 'otherComprehensive', val ?? null)"
               />
             </template>
           </el-table-column>

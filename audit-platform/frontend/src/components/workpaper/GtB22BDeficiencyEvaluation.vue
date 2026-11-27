@@ -301,7 +301,9 @@ async function handleAiOverallNote() {
   }
 }
 
-function handleManualMaterialityChange(val: number | null) {
+function handleManualMaterialityChange(input: number | null | undefined) {
+  // 数值框清空时 Element Plus 给 undefined：与 null 同义，原先会把字符串 'undefined' 存进 remark
+  const val = input ?? null
   manualMaterialityInput.value = val
   if (val !== null) {
     setFieldImmediate('B22B-materiality-manual', { remark: String(val) })
@@ -637,7 +639,7 @@ const b22BEntrySync = useEntrySyncReadiness({
             :precision="2"
             placeholder="输入金额"
             style="width: 200px"
-            @change="(val: number | null) => handleAmountChange(index, val)"
+            @change="(val: number | null | undefined) => handleAmountChange(index, val ?? null)"
           />
           <span
             v-if="getMaterialityComparison(item.potentialMisstatement)"

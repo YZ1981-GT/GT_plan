@@ -81,13 +81,13 @@
         <el-table-column label="借方" width="150">
           <template #default="{ row }">
             <el-input-number v-model="row.debit_amount" :min="0" :precision="2" :controls="false" size="small" style="width: 100%"
-              :placeholder="row.side === 'debit' ? '借方金额' : ''" @change="(v: number | null) => onAmount(row, 'debit_amount', v)" />
+              :placeholder="row.side === 'debit' ? '借方金额' : ''" @change="(v: number | null | undefined) => onAmount(row, 'debit_amount', v ?? null)" />
           </template>
         </el-table-column>
         <el-table-column label="贷方" width="150">
           <template #default="{ row }">
             <el-input-number v-model="row.credit_amount" :min="0" :precision="2" :controls="false" size="small" style="width: 100%"
-              :placeholder="row.side === 'credit' ? '贷方金额' : ''" @change="(v: number | null) => onAmount(row, 'credit_amount', v)" />
+              :placeholder="row.side === 'credit' ? '贷方金额' : ''" @change="(v: number | null | undefined) => onAmount(row, 'credit_amount', v ?? null)" />
           </template>
         </el-table-column>
         <el-table-column width="46" align="center">

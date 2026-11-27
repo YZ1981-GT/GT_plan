@@ -153,7 +153,7 @@
               :controls="false"
               :precision="2"
               class="amt-input"
-              @change="(v: number | null) => onCellEdit(row.rowId, col.path || col.key, v ?? 0)"
+              @change="(v: number | null | undefined) => onCellEdit(row.rowId, col.path || col.key, v ?? 0)"
             />
             <span v-else>{{ fmtAmount(getCellValue(row, col)) }}</span>
           </template>

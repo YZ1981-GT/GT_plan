@@ -28,7 +28,7 @@ import { useF5Adjudication } from '../useF5Adjudication'
 
 // ─── mock apiProxy（隔离网络） ───
 const { mockPost, mockPut, confirmRef } = vi.hoisted(() => ({
-  mockPost: vi.fn(async () => ({ message: '已发布审定数到试算表', published: true })),
+  mockPost: vi.fn(async (..._args: any[]) => ({ message: '已发布审定数到试算表', published: true })),
   mockPut: vi.fn(async () => ({})),
   confirmRef: { resolve: true },
 }))

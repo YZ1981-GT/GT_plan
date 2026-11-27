@@ -47,7 +47,7 @@ describe('useI2FormulaEngine — 会计跨期 vs 滞后天数', () => {
 describe('useI2Cutoff', () => {
   const allResponses = ref(new Map<string, any>())
   const projectId = ref('proj-1')
-  const saveResponses = vi.fn(async () => {})
+  const saveResponses = vi.fn(async (..._args: any[]) => {})
 
   beforeEach(() => {
     allResponses.value = new Map()

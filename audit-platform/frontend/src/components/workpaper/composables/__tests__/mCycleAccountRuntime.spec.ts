@@ -23,10 +23,10 @@ import { useM10Adjustment } from '../useM10Adjustment'
 import type { TbSourceCodes } from '../shared/tbSourceCodes'
 
 const { mockPost, mockPut, mockGet, confirmSpy, warningSpy } = vi.hoisted(() => ({
-  mockPost: vi.fn(async () => ({ published: true })),
+  mockPost: vi.fn(async (..._args: any[]) => ({ published: true })),
   mockPut: vi.fn(async () => ({})),
   mockGet: vi.fn(async (): Promise<any> => []),
-  confirmSpy: vi.fn(async () => 'confirm'),
+  confirmSpy: vi.fn(async (..._args: any[]) => 'confirm'),
   warningSpy: vi.fn(),
 }))
 

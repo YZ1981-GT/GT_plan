@@ -12,7 +12,7 @@ vi.mock('vue', async () => {
   return { ...actual as object, onMounted: vi.fn(), onBeforeUnmount: vi.fn() }
 })
 
-const { mockPost } = vi.hoisted(() => ({ mockPost: vi.fn(async () => ({ message: 'ok' })) }))
+const { mockPost } = vi.hoisted(() => ({ mockPost: vi.fn(async (..._args: any[]) => ({ message: 'ok' })) }))
 vi.mock('@/services/apiProxy', () => ({
   api: { get: vi.fn().mockResolvedValue({ data: [] }), post: mockPost },
 }))

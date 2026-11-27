@@ -17,7 +17,7 @@ import GtAuditSheet, { type AuditSheetHtmlData } from '../GtAuditSheet.vue'
 
 // ─── mock apiProxy（隔离网络） ───
 const { mockPost, confirmRef } = vi.hoisted(() => ({
-  mockPost: vi.fn(async () => ({ message: '已发布 2 个科目的审定数到试算表', published: true })),
+  mockPost: vi.fn(async (..._args: any[]) => ({ message: '已发布 2 个科目的审定数到试算表', published: true })),
   confirmRef: { resolve: true },
 }))
 

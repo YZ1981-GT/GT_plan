@@ -198,7 +198,7 @@
               :controls="false"
               :precision="2"
               class="amt-input"
-              @change="(v: number | null) => onCellChange(row.id, `month_${idx}`, v ?? 0)"
+              @change="(v: number | null | undefined) => onCellChange(row.id, `month_${idx}`, v ?? 0)"
             />
             <span v-else :class="{ 'anomaly-cell': isAnomalyMonth(row, idx) }">
               {{ fmtAmount(row.months[idx]) }}
@@ -230,7 +230,7 @@
               size="small"
               :controls="false"
               :precision="2"
-              @change="(v: number | null) => onCellChange(row.id, 'aje', v ?? 0)"
+              @change="(v: number | null | undefined) => onCellChange(row.id, 'aje', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.aje) }}</span>
           </template>
@@ -243,7 +243,7 @@
               size="small"
               :controls="false"
               :precision="2"
-              @change="(v: number | null) => onCellChange(row.id, 'rje', v ?? 0)"
+              @change="(v: number | null | undefined) => onCellChange(row.id, 'rje', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.rje) }}</span>
           </template>
@@ -271,7 +271,7 @@
               size="small"
               :controls="false"
               :precision="2"
-              @change="(v: number | null) => onCellChange(row.id, 'priorUnadj', v ?? 0)"
+              @change="(v: number | null | undefined) => onCellChange(row.id, 'priorUnadj', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.priorUnadj) }}</span>
           </template>
@@ -284,7 +284,7 @@
               size="small"
               :controls="false"
               :precision="2"
-              @change="(v: number | null) => onCellChange(row.id, 'priorAje', v ?? 0)"
+              @change="(v: number | null | undefined) => onCellChange(row.id, 'priorAje', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.priorAje) }}</span>
           </template>
@@ -297,7 +297,7 @@
               size="small"
               :controls="false"
               :precision="2"
-              @change="(v: number | null) => onCellChange(row.id, 'priorRje', v ?? 0)"
+              @change="(v: number | null | undefined) => onCellChange(row.id, 'priorRje', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.priorRje) }}</span>
           </template>
@@ -339,7 +339,7 @@
               size="small"
               :controls="false"
               :precision="2"
-              @change="(v: number | null) => onCellChange(row.id, 'individualReclass', v ?? 0)"
+              @change="(v: number | null | undefined) => onCellChange(row.id, 'individualReclass', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.individualReclass) }}</span>
           </template>
@@ -352,7 +352,7 @@
               size="small"
               :controls="false"
               :precision="2"
-              @change="(v: number | null) => onCellChange(row.id, 'consolidatedReclass', v ?? 0)"
+              @change="(v: number | null | undefined) => onCellChange(row.id, 'consolidatedReclass', v ?? 0)"
             />
             <span v-else>{{ fmtAmount(row.consolidatedReclass) }}</span>
           </template>

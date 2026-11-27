@@ -16,7 +16,7 @@ vi.mock('@/services/apiProxy', () => ({
   },
 }))
 
-const mockExportData = vi.fn(async () => {})
+const mockExportData = vi.fn(async (..._args: any[]) => {})
 vi.mock('@/composables/useExcelIO', () => ({
   useExcelIO: () => ({
     exportData: mockExportData,

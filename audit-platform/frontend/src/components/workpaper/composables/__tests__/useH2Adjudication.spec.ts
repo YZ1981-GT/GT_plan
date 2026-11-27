@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, nextTick } from 'vue'
 
 // spec: tb-writeback-explicit-publish-gate Task 10 —— publishToTb 走 apiProxy + ElMessageBox 确认
-const { mockPost } = vi.hoisted(() => ({ mockPost: vi.fn(async () => ({ published: true })) }))
+const { mockPost } = vi.hoisted(() => ({ mockPost: vi.fn(async (..._args: any[]) => ({ published: true })) }))
 vi.mock('@/services/apiProxy', () => ({
   api: { post: mockPost, put: vi.fn(async () => ({})), get: vi.fn(async () => ({ data: [] })) },
 }))

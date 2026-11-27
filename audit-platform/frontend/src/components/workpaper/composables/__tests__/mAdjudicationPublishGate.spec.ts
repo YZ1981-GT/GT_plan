@@ -60,7 +60,7 @@ const M8_SRC: TbSourceCodes = {
 
 // ─── mock apiProxy（隔离网络） ───
 const { mockPost, mockPut, mockGet, confirmRef } = vi.hoisted(() => ({
-  mockPost: vi.fn(async () => ({ message: '已发布审定数到试算表', published: true })),
+  mockPost: vi.fn(async (..._args: any[]) => ({ message: '已发布审定数到试算表', published: true })),
   mockPut: vi.fn(async () => ({})),
   mockGet: vi.fn(async () => []),
   confirmRef: { resolve: true },

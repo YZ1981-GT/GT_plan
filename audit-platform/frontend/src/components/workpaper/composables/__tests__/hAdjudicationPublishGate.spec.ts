@@ -27,7 +27,7 @@ import { eventBus } from '@/utils/eventBus'
 
 // ─── mock apiProxy（隔离网络）；get 返回空数组（组件 loadOwn 期望 list 可迭代） ───
 const { mockPost, mockPut, mockGet } = vi.hoisted(() => ({
-  mockPost: vi.fn(async () => ({ message: '已发布到试算表', published: true })),
+  mockPost: vi.fn(async (..._args: any[]) => ({ message: '已发布到试算表', published: true })),
   mockPut: vi.fn(async () => ({})),
   mockGet: vi.fn(async () => [] as any[]),
 }))

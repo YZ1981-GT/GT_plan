@@ -35,7 +35,7 @@ import J1TabAdjudication from '@/components/workpaper/j1/core/J1TabAdjudication.
 
 // ─── mock apiProxy（隔离网络） ───
 const { mockPost, mockPut, mockGet } = vi.hoisted(() => ({
-  mockPost: vi.fn(async () => ({ message: '已发布到试算表', published: true })),
+  mockPost: vi.fn(async (..._args: any[]) => ({ message: '已发布到试算表', published: true })),
   mockPut: vi.fn(async () => ({})),
   mockGet: vi.fn(async () => ({ data: [] })),
 }))

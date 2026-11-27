@@ -109,7 +109,7 @@ function harness(
       expiresAt: '2026-10-10T00:05:00Z',
       idempotencyKey: `idem-${revision}`,
     })),
-    materialize: vi.fn(async () => descriptor()),
+    materialize: vi.fn(async (..._args: any[]) => descriptor()),
     ...api,
   } as Record<string, unknown>
   // flush 每次读一次「当前 revision」：首版之后 revision 前进，重走必须拿到新值。
@@ -150,7 +150,7 @@ describe('readiness 报首版缺失时允许进入首版重试链', () => {
       }
     })
     const onFirstPublication = vi.fn(async () => {})
-    const materialize = vi.fn(async () => descriptor())
+    const materialize = vi.fn(async (..._args: any[]) => descriptor())
     const readEntrySyncReadiness = vi.fn(async () => readinessWithoutFirstPublication())
     const pendingFlush = vi.fn(async () => {})
     const scope = effectScope()
@@ -238,7 +238,7 @@ describe('materialize 报 substrate_not_published ⇒ 发一次首版并整链�
         contentRevision: 1,
       }
     })
-    const materialize = vi.fn(async () => {
+    const materialize = vi.fn(async (..._args: any[]) => {
       throw NOT_PUBLISHED()
     })
     const h = harness({ materialize, ensureFirstPublication })
@@ -259,7 +259,7 @@ describe('materialize 报 substrate_not_published ⇒ 发一次首版并整链�
         '请先在结构化视图录入内容后再进入在线编辑',
       )
     })
-    const materialize = vi.fn(async () => {
+    const materialize = vi.fn(async (..._args: any[]) => {
       throw NOT_PUBLISHED()
     })
     const h = harness({ materialize, ensureFirstPublication })
@@ -282,7 +282,7 @@ describe('只有这一个码触发首版', () => {
     ['422 契约缺失', wireError(422, 'per_entry_contract_required', '缺契约')],
   ])('%s：不调首版，按原分支失败', async (_label, error) => {
     const ensureFirstPublication = vi.fn()
-    const materialize = vi.fn(async () => {
+    const materialize = vi.fn(async (..._args: any[]) => {
       throw error
     })
     const h = harness({ materialize, ensureFirstPublication })
@@ -294,7 +294,7 @@ describe('只有这一个码触发首版', () => {
   })
 
   it('API 面未提供首版能力（旧 stub）：原样失败，不调 undefined', async () => {
-    const materialize = vi.fn(async () => {
+    const materialize = vi.fn(async (..._args: any[]) => {
       throw NOT_PUBLISHED()
     })
     const h = harness({ materialize })

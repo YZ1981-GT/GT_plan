@@ -248,7 +248,7 @@
               :controls="false"
               size="small"
               class="cct-sample-size-input"
-              @change="(v: number | null) => onSampleSizeChange($index, v ?? null)"
+              @change="(v: number | null | undefined) => onSampleSizeChange($index, v ?? null)"
             />
           </el-tooltip>
         </template>
