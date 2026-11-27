@@ -119,9 +119,9 @@ export function useD4KeyIndicator(options: UseD4KeyIndicatorOptions) {
           // INDICATOR_DEFINITIONS 固定 12 行，缺字段回退空值。
           const peerCount = Array.isArray(parsed.peers) ? parsed.peers.length : 0
           if (Array.isArray(parsed.rows) && parsed.rows.length) {
-            const byMetric = new Map(parsed.rows.map((r: any) => [String(r.metricName ?? r.label ?? ''), r]))
+            const byMetric = new Map<string, Record<string, any>>(parsed.rows.map((r: any) => [String(r.metricName ?? r.label ?? ''), r]))
             rows.value = INDICATOR_DEFINITIONS.map(def => {
-              const src = byMetric.get(def.label) ?? {}
+              const src: Record<string, any> = byMetric.get(def.label) ?? {}
               const peers: (number | string)[] = []
               for (let i = 1; i <= Math.max(peerCount, 0); i++) {
                 peers.push(src[`peer_${i}`] ?? '')

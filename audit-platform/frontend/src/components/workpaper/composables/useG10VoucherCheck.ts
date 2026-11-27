@@ -97,10 +97,10 @@ export function enrichG10VoucherRow(raw: Partial<G10VoucherCheckRow> & { id?: st
     periodScope: (raw.periodScope as G10VoucherPeriodScope) ?? 'current',
     voucherDate: raw.voucherDate ?? '',
     voucherNo: raw.voucherNo ?? '',
-    businessContent: raw.businessContent ?? raw.summary ?? '',
+    businessContent: raw.businessContent ?? (raw as any).summary ?? '',
     counterAccount: raw.counterAccount ?? '',
     debitAmount: parseNum(raw.debitAmount),
-    creditAmount: parseNum(raw.creditAmount ?? raw.amount),
+    creditAmount: parseNum(raw.creditAmount ?? (raw as any).amount),
     attachment: raw.attachment ?? null,
     supportingDocDesc: raw.supportingDocDesc ?? '',
     check1OriginalComplete: raw.check1OriginalComplete === undefined ? true : toBoolCheck(raw.check1OriginalComplete),
@@ -111,14 +111,15 @@ export function enrichG10VoucherRow(raw: Partial<G10VoucherCheckRow> & { id?: st
     check6FairValueCorrect: raw.check6FairValueCorrect === undefined
       ? toBoolCheck((raw as any).check4FairValueCorrect ?? true)
       : toBoolCheck(raw.check6FairValueCorrect),
-    indexNo: raw.indexNo ?? raw.indexRef ?? '',
+    indexNo: raw.indexNo ?? (raw as any).indexRef ?? '',
     isAbnormal: false,
     abnormalDesc: raw.abnormalDesc ?? '',
     riskLevel: (raw.riskLevel as G10VoucherCheckRow['riskLevel']) ?? '',
     remark: raw.remark ?? '',
     source: raw.source ?? '',
   }
-  if (raw.isAbnormal === true || raw.isAbnormal === '是' || raw.isAbnormal === '✓') {
+  const abnormalRaw = (raw as Record<string, unknown>).isAbnormal
+  if (abnormalRaw === true || abnormalRaw === '是' || abnormalRaw === '✓') {
     base.isAbnormal = true
   }
   return recalcG10VoucherAbnormal(base)

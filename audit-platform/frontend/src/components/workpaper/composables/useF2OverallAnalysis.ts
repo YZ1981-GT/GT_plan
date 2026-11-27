@@ -248,9 +248,9 @@ function parsePack(jsonStr: string | null | undefined): F2OverallPack {
       base.yearLabels = [String(parsed.yearLabels[0]), String(parsed.yearLabels[1]), String(parsed.yearLabels[2])]
     }
     if (Array.isArray(parsed.composition)) {
-      const map = new Map(parsed.composition.map((r: any) => [r.key, r]))
+      const map = new Map<string, Record<string, any>>(parsed.composition.map((r: any) => [String(r.key), r]))
       base.composition = F2_CATEGORIES.map((c) => {
-        const src = map.get(c.rowKey) || {}
+        const src: Record<string, any> = map.get(c.rowKey) ?? {}
         return {
           key: c.rowKey,
           label: c.label,

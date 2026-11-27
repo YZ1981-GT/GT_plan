@@ -123,14 +123,13 @@ export function resolveWorkpaperSheetContext(
     sheetCode,
     sheetName,
     wholeWorkbook: isWholeWorkbook,
-    explicitUid: sheet?.sheet_uid,
-    codeReason: sheet?.sheet_uid_null_reason || sheet?.sheet_code_reason,
+    codeReason: sheet?.sheet_code_reason,
   })
   // Prefer server-annotated uid when present; client projection is fallback only.
-  const sheetUid = sheet?.sheet_uid?.trim() || projected.sheetUid
+  const sheetUid = projected.sheetUid
   const sheetUidNullReason = sheetUid
     ? null
-    : (sheet?.sheet_uid_null_reason ?? projected.nullReason)
+    : projected.nullReason
   return {
     sheetName,
     sheetCode,
@@ -160,13 +159,12 @@ export function resolveUniverSheetContext(
     sheetCode,
     sheetName,
     wholeWorkbook: false,
-    explicitUid: renderSheet?.sheet_uid,
-    codeReason: renderSheet?.sheet_uid_null_reason || renderSheet?.sheet_code_reason,
+    codeReason: renderSheet?.sheet_code_reason,
   })
-  const sheetUid = renderSheet?.sheet_uid?.trim() || projected.sheetUid
+  const sheetUid = projected.sheetUid
   const sheetUidNullReason = sheetUid
     ? null
-    : (renderSheet?.sheet_uid_null_reason ?? projected.nullReason)
+    : projected.nullReason
   return {
     sheetName,
     sheetCode,

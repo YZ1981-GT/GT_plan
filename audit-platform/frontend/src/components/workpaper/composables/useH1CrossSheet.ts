@@ -44,6 +44,10 @@ export interface H1DetailRowRaw {
   impairmentBegin?: number   // 减值准备期初
   impairmentProvision?: number
   impairmentReversal?: number
+  /** 期末审定数（跨表汇总取审定口径；旧键 originalCostEnd 等为未审期末） */
+  costEndAud?: number
+  depEndAud?: number
+  impairEndAud?: number
   impairmentEnd?: number     // 减值准备期末
   netValue?: number
 }

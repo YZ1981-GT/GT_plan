@@ -189,46 +189,49 @@ export function applyG44InterestToDetailRows<T extends Record<string, any>>(
       (sum, period) => sum + (Number(period.effectiveInterest) || 0) - (Number(period.cashInflow) || 0),
       0,
     )
-    if ('periodInterestAdjChange' in row) {
-      row.periodInterestAdjChange = Math.round(adjustment * 100) / 100
-      if ('periodChangeSubtotal' in row) {
-        row.periodChangeSubtotal = Math.round((
-          (Number(row.periodCostChange) || 0)
-          + row.periodInterestAdjChange
-          + (Number(row.periodAccruedInterestChange) || 0)
+    // 泛型 T 上 `in` 收窄后再赋值会被 TS 拒；G4-2/G4-2X 两套行结构字段不同，这里按同一行的字典视图读写，
+    // 保留「只在行上已有该列时才写」的运行时语义（新增行型不凭空长列）
+    const rec = row as Record<string, any>
+    if ('periodInterestAdjChange' in rec) {
+      rec.periodInterestAdjChange = Math.round(adjustment * 100) / 100
+      if ('periodChangeSubtotal' in rec) {
+        rec.periodChangeSubtotal = Math.round((
+          (Number(rec.periodCostChange) || 0)
+          + rec.periodInterestAdjChange
+          + (Number(rec.periodAccruedInterestChange) || 0)
         ) * 100) / 100
       }
-      if ('closingInterestAdj' in row) {
-        row.closingInterestAdj = Math.round((
-          (Number(row.openingInterestAdj) || 0) + row.periodInterestAdjChange
+      if ('closingInterestAdj' in rec) {
+        rec.closingInterestAdj = Math.round((
+          (Number(rec.openingInterestAdj) || 0) + rec.periodInterestAdjChange
         ) * 100) / 100
       }
-      if ('closingSubtotal' in row) {
-        row.closingSubtotal = Math.round((
-          (Number(row.closingCost) || 0)
-          + (Number(row.closingInterestAdj) || 0)
-          + (Number(row.closingAccruedInterest) || 0)
+      if ('closingSubtotal' in rec) {
+        rec.closingSubtotal = Math.round((
+          (Number(rec.closingCost) || 0)
+          + (Number(rec.closingInterestAdj) || 0)
+          + (Number(rec.closingAccruedInterest) || 0)
         ) * 100) / 100
       }
-      if ('closingAudited' in row) {
-        row.closingAudited = Math.round((
-          (Number(row.closingSubtotal) || 0) + (Number(row.closingAdjustment) || 0)
+      if ('closingAudited' in rec) {
+        rec.closingAudited = Math.round((
+          (Number(rec.closingSubtotal) || 0) + (Number(rec.closingAdjustment) || 0)
         ) * 100) / 100
       }
-      if ('amortizedCost' in row) {
-        row.amortizedCost = Math.round((
-          (Number(row.closingAudited) || 0)
-          - (Number(row.closingImpairment ?? row.impairmentAdjusted) || 0)
+      if ('amortizedCost' in rec) {
+        rec.amortizedCost = Math.round((
+          (Number(rec.closingAudited) || 0)
+          - (Number(rec.closingImpairment ?? rec.impairmentAdjusted) || 0)
         ) * 100) / 100
       }
-      if ('bookValue' in row) {
-        row.bookValue = Math.round((
-          (Number(row.amortizedCost) || 0) - (Number(row.oneYearSubtotal) || 0)
+      if ('bookValue' in rec) {
+        rec.bookValue = Math.round((
+          (Number(rec.amortizedCost) || 0) - (Number(rec.oneYearSubtotal) || 0)
         ) * 100) / 100
       }
     }
-    row.interestWritebackSource = 'G4-4'
-    row.interestWritebackUpdatedAt = new Date().toISOString()
+    rec.interestWritebackSource = 'G4-4'
+    rec.interestWritebackUpdatedAt = new Date().toISOString()
     matched.push(String(row.investProject || label))
   }
   return { rows, matched, unmatched }

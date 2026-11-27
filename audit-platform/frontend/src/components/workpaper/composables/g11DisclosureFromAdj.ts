@@ -465,14 +465,14 @@ export function parseG11DiscStore(
         ...base,
         rows: base.rows.map((r) => ({
           ...r,
-          currentAmount: parseNum(byKey.get(r.rowKey)?.currentAmount),
-          priorAmount: parseNum(byKey.get(r.rowKey)?.priorAmount),
-          remark: String(byKey.get(r.rowKey)?.remark ?? ''),
+          currentAmount: parseNum((byKey.get(r.rowKey) as Record<string, any> | undefined)?.currentAmount),
+          priorAmount: parseNum((byKey.get(r.rowKey) as Record<string, any> | undefined)?.priorAmount),
+          remark: String((byKey.get(r.rowKey) as Record<string, any> | undefined)?.remark ?? ''),
         })),
       }
     }
     if (parsed?.version === 2 && Array.isArray(parsed.rows)) {
-      const byKey = new Map(parsed.rows.map((r: any) => [r.rowKey, r]))
+      const byKey = new Map<string, Record<string, any>>(parsed.rows.map((r: any) => [String(r.rowKey), r]))
       const tradingDispose = variant === 'listed'
         ? {
             ...emptyTradingDisposeMap(),
@@ -483,9 +483,9 @@ export function parseG11DiscStore(
         version: 2,
         rows: base.rows.map((r) => ({
           ...r,
-          currentAmount: parseNum(byKey.get(r.rowKey)?.currentAmount),
-          priorAmount: parseNum(byKey.get(r.rowKey)?.priorAmount),
-          remark: String(byKey.get(r.rowKey)?.remark ?? ''),
+          currentAmount: parseNum((byKey.get(r.rowKey) as Record<string, any> | undefined)?.currentAmount),
+          priorAmount: parseNum((byKey.get(r.rowKey) as Record<string, any> | undefined)?.priorAmount),
+          remark: String((byKey.get(r.rowKey) as Record<string, any> | undefined)?.remark ?? ''),
         })),
         tradingDispose,
         repatriationNote: variant === 'soe'

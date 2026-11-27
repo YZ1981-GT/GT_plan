@@ -150,6 +150,10 @@ export interface H8DetailRowRaw {
   accDep?: number           // 累计折旧
   currentDep?: number       // 本期计提
   netValue?: number         // 期末净值
+  /** 期末审定原值口径（H8-2 审定列） */
+  costEndAud?: number
+  /** 使用权资产原值（H8 旧键） */
+  rouAmount?: number
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
