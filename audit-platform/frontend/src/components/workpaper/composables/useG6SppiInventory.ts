@@ -73,7 +73,7 @@ export interface SecuritiesInventoryData {
   meta?: InventoryMeta
 }
 
-export type InventoryFlatRow = Omit<InventoryItem, 'variance' | 'seq'> & { seq?: number }
+export type InventoryFlatRow = Partial<Omit<InventoryItem, 'variance' | 'seq'>> & Pick<InventoryItem, 'id' | 'securitiesName'> & { seq?: number }
 
 export interface InventorySeed {
   id?: string

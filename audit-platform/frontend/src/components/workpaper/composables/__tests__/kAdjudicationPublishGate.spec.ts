@@ -31,7 +31,7 @@ import { useK11Adjudication } from '../useK11Adjudication'
 // ─── mock apiProxy（隔离网络） ───
 const { mockPost, mockPut, mockGet } = vi.hoisted(() => ({
   mockPost: vi.fn(async (..._args: any[]) => ({ message: '已发布到试算表', published: true })),
-  mockPut: vi.fn(async () => ({})),
+  mockPut: vi.fn(async (..._args: any[]) => ({})),
   mockGet: vi.fn(async () => ({ data: [] })),
 }))
 

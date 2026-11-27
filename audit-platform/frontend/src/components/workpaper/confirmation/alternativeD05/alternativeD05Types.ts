@@ -119,6 +119,11 @@ export interface BalanceSummary {
   /** 本期投资收益 / 公允价值变动 */
   investment_income?: number
   fv_change?: number
+  /**
+   * 基准金额（替代程序通用口径：各循环 config 的 `baseAmount` 取它做比例分母；
+   * 具体科目名以 `item_name` 为准，本键只是容器里的一个可选金额槽）。
+   */
+  base_amount?: number
 }
 
 // ─── 审计结论 ───────────────────────────────────────────────────────────────

@@ -46,7 +46,7 @@ vi.mock('@/services/apiProxy', () => ({
 
 // ─── mock http（默认落库 defaultSave / AI / 若有其他直调都被隔离） ───
 const { mockHttpPut, mockHttpPost } = vi.hoisted(() => ({
-  mockHttpPut: vi.fn(async () => ({ data: {} })),
+  mockHttpPut: vi.fn(async (..._args: any[]) => ({ data: {} })),
   mockHttpPost: vi.fn(async () => ({ data: {} })),
 }))
 vi.mock('@/utils/http', () => ({

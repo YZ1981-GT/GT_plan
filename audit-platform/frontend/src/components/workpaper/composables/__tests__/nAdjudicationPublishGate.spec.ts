@@ -42,8 +42,8 @@ import { useN5FormData } from '../useN5FormData'
 
 // ─── mock apiProxy（隔离网络） ───
 const { mockPost, mockPut, mockGet, confirmRef } = vi.hoisted(() => ({
-  mockPost: vi.fn(async () => ({ message: '已发布审定数到试算表', published: true })),
-  mockPut: vi.fn(async () => ({})),
+  mockPost: vi.fn(async (..._args: any[]) => ({ message: '已发布审定数到试算表', published: true })),
+  mockPut: vi.fn(async (..._args: any[]) => ({})),
   mockGet: vi.fn(async () => []),
   confirmRef: { resolve: true },
 }))
