@@ -81,12 +81,12 @@ describe('G11 集成 — G11-4 收益率 5pp', () => {
 
 describe('G11 集成 — G11-5 核对异常', () => {
   it('核对列任一 ✗ → isAbnormal', () => {
-    const row = enrichG11VoucherRow({ check1: '✓', check2: '✗', check3: '✓', check4: '✓', check5: '✓' }, 1)
+    const row = enrichG11VoucherRow({ check1: true, check2: false, check3: true, check4: true, check5: true }, 1)
     expect(row.isAbnormal).toBe(true)
   })
 
   it('全部 ✓ → 非异常', () => {
-    const row = enrichG11VoucherRow({ check1: '✓', check2: '✓', check3: '✓', check4: '✓', check5: '✓' }, 1)
+    const row = enrichG11VoucherRow({ check1: true, check2: true, check3: true, check4: true, check5: true }, 1)
     expect(row.isAbnormal).toBe(false)
   })
 

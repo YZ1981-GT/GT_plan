@@ -715,13 +715,15 @@ describe('NoteFormulaDialog — S2 检查回执', () => {
     await flushPromises()
     const panel = w.findComponent(GtFormulaIssuePanel)
     expect(panel.exists()).toBe(true)
-    expect(panel.props('issues').map((c: any) => c.formula_id)).toEqual(['fail', 'missing', 'error'])
-    expect(panel.props('issues')[0]).toMatchObject({ left_value: '0', right_value: '2',
+    const issues = panel.props('issues') as any[]
+    const outcomes = panel.props('outcomes') as any[]
+    expect(issues.map((c: any) => c.formula_id)).toEqual(['fail', 'missing', 'error'])
+    expect(issues[0]).toMatchObject({ left_value: '0', right_value: '2',
       status: 'failed', severity: 'blocking', label: '未通过', addr_id: 'note:五、3' })
-    expect(panel.props('issues')[1]).toMatchObject({ left_value: null, right_value: '0' })
-    expect(panel.props('outcomes').map((c: any) => c.status)).toEqual(CHECKS.map((c) => c.status))
-    expect(panel.props('outcomes').map((c: any) => c.severity)).toEqual(CHECKS.map((c) => c.severity))
-    expect(panel.props('outcomes').map((c: any) => c.passed)).toEqual([true, false, false, false, false])
+    expect(issues[1]).toMatchObject({ left_value: null, right_value: '0' })
+    expect(outcomes.map((c: any) => c.status)).toEqual(CHECKS.map((c) => c.status))
+    expect(outcomes.map((c: any) => c.severity)).toEqual(CHECKS.map((c) => c.severity))
+    expect(outcomes.map((c: any) => c.passed)).toEqual([true, false, false, false, false])
     expect(panel.props('lastComputedAt')).toEqual(expect.any(String))
     expect(panel.props('showRefresh')).toBe(false)
     expect(panel.text()).toContain('3 项待处理')

@@ -9,7 +9,7 @@
  * 宿主改按试算表有无油气资产科目提示（spec trim-followup-residual-findings-closure R1）。
  */
 import { describe, it, expect, vi } from 'vitest'
-import { ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import { useH5CrossSheet } from '../composables/useH5CrossSheet'
 
 // ============================================================
@@ -18,7 +18,7 @@ import { useH5CrossSheet } from '../composables/useH5CrossSheet'
 
 describe('useH5CrossSheet — 跨Sheet一致性检查', () => {
   // 辅助：构造 allResponses Map
-  function buildResponses(entries: Record<string, number>): ReturnType<typeof ref> {
+  function buildResponses(entries: Record<string, number>): Ref<Map<string, any>> {
     const map = new Map<string, any>()
     for (const [key, val] of Object.entries(entries)) {
       map.set(key, { remark: String(val) })

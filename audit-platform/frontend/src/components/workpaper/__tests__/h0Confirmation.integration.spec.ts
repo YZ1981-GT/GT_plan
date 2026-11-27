@@ -62,7 +62,9 @@ describe('H0 集成: H0-5 替代程序', () => {
   it('权属/验收检查比例基于期末余额', () => {
     const { getCheckRatio, addCompany, updateCompany, addBlockRow, updateBlockField } =
       useAlternativeH05Data({
-        htmlData: () => ({ _format: 'alternative-h05-v1', companies: [] }),
+        wpId: 'wp-h0',
+        projectId: 'p-h0',
+htmlData: () => ({ _format: 'alternative-h05-v1', companies: [] }),
         readonly: false,
       })
 
@@ -81,7 +83,9 @@ describe('H0 集成: H0-5 替代程序', () => {
 
   it('buildPayload 输出 alternative-h05-v1', () => {
     const { buildPayload, addCompany } = useAlternativeH05Data({
-      htmlData: () => ({ _format: 'alternative-h05-v1', companies: [] }),
+      wpId: 'wp-h0',
+      projectId: 'p-h0',
+htmlData: () => ({ _format: 'alternative-h05-v1', companies: [] }),
       readonly: false,
     })
     addCompany({ entity_name: 'A公司' })
@@ -121,7 +125,9 @@ describe('H0 集成: H0-1 → H0-5 反向联动', () => {
 
   it('映射为 H0-5 公司清单并 importCompanies 去重', () => {
     const d = useAlternativeH05Data({
-      htmlData: () => ({ _format: 'alternative-h05-v1', companies: [] }),
+      wpId: 'wp-h0',
+      projectId: 'p-h0',
+htmlData: () => ({ _format: 'alternative-h05-v1', companies: [] }),
       readonly: false,
     })
     const companies = mapToCompanies(filterUnreplied(h01Rows))
@@ -144,7 +150,9 @@ describe('H0 集成: useH0ImportExport API 前缀', () => {
 describe('H0 集成: 四区块 CRUD', () => {
   function makeData() {
     return useAlternativeH05Data({
-      htmlData: () => ({ _format: 'alternative-h05-v1', companies: [] }),
+      wpId: 'wp-h0',
+      projectId: 'p-h0',
+htmlData: () => ({ _format: 'alternative-h05-v1', companies: [] }),
       readonly: false,
     })
   }
@@ -254,7 +262,9 @@ describe('H0 集成: 导入导出 round-trip', () => {
   it('buildPayload → loadAll 数据完整还原', () => {
     // Step 1: 构造带数据的 composable，生成 payload
     const d1 = useAlternativeH05Data({
-      htmlData: () => ({ _format: 'alternative-h05-v1', companies: [] }),
+      wpId: 'wp-h0',
+      projectId: 'p-h0',
+htmlData: () => ({ _format: 'alternative-h05-v1', companies: [] }),
       readonly: false,
     })
     const c = d1.addCompany({ entity_name: '往返测试公司', confirm_index: 'H0-RT-001' })
@@ -273,7 +283,9 @@ describe('H0 集成: 导入导出 round-trip', () => {
 
     // Step 2: 用 payload 初始化新 composable，验证数据还原
     const d2 = useAlternativeH05Data({
-      htmlData: () => payload,
+      wpId: 'wp-h0',
+      projectId: 'p-h0',
+htmlData: () => payload,
       readonly: false,
     })
     expect(d2.companies.value).toHaveLength(1)
@@ -290,7 +302,9 @@ describe('H0 集成: 导入导出 round-trip', () => {
 
   it('payload 含 ownership/acceptance 比例字段', () => {
     const d = useAlternativeH05Data({
-      htmlData: () => ({ _format: 'alternative-h05-v1', companies: [] }),
+      wpId: 'wp-h0',
+      projectId: 'p-h0',
+htmlData: () => ({ _format: 'alternative-h05-v1', companies: [] }),
       readonly: false,
     })
     const c = d.addCompany({ entity_name: '比例测试' })
@@ -305,13 +319,17 @@ describe('H0 集成: 导入导出 round-trip', () => {
 
   it('空 payload 加载不崩溃', () => {
     const d = useAlternativeH05Data({
-      htmlData: () => null,
+      wpId: 'wp-h0',
+      projectId: 'p-h0',
+htmlData: () => null,
       readonly: false,
     })
     expect(d.companies.value).toHaveLength(0)
 
     const d2 = useAlternativeH05Data({
-      htmlData: () => ({ _format: 'wrong-format', companies: [{ entity_name: 'x' }] }),
+      wpId: 'wp-h0',
+      projectId: 'p-h0',
+htmlData: () => ({ _format: 'wrong-format', companies: [{ entity_name: 'x' }] }),
       readonly: false,
     })
     expect(d2.companies.value).toHaveLength(0)
