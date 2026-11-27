@@ -284,6 +284,42 @@ def _decide(*, mode: str, projected: bool, value: Any, formula: dict | None, bin
     return final, steps, conflicts
 
 
+async def _provenance_facts(
+    db: AsyncSession, project_id: UUID, td: dict[str, Any], section: str, target: str,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, bool]:
+    """该格最近一次公式运行的来源信封（按项目可见范围脱敏）+ 那次运行的摘要；没有就回 ``None``。"""
+    from app.services.formula_provenance import redact_final_provenance
+
+    sidecar = td.get("_formula_provenance")
+    raw = sidecar.get(f"note:{section}!{target}") if isinstance(sidecar, dict) else None
+    if raw is None:
+        return None, None, False
+    provenance, inputs_redacted, _legacy = redact_final_provenance(raw, allowed_project_ids={project_id})
+    run_id = None
+    for key in ("applied_attempt", "last_calculation"):
+        attempt = (provenance or {}).get(key)
+        if isinstance(attempt, dict) and attempt.get("run_id"):
+            run_id = attempt["run_id"]
+            break
+    formula_run = None
+    if run_id:
+        from app.models.note_formula_models import NoteFormulaRun
+
+        try:
+            run = await db.get(NoteFormulaRun, UUID(str(run_id)))
+        except (ValueError, TypeError):
+            run = None
+        if run is not None and run.project_id == project_id:
+            formula_run = {
+                "id": str(run.id), "status": run.status, "trigger": run.trigger,
+                "started_at": run.started_at.isoformat() if run.started_at else None,
+                "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+                "executed_count": run.executed_count, "updated_count": run.updated_count,
+                "failed_count": run.failed_count, "error_summary": run.error_summary,
+            }
+    return provenance, formula_run, inputs_redacted
+
+
 async def diagnose_cell(db: AsyncSession, project_id: UUID, year: int, section: str, *, table_index: int = 0,
                         row: int = 0, col: int = 0, sub_table_key: str | None = None,
                         value_key: str | None = None) -> dict[str, Any]:
@@ -337,6 +373,7 @@ async def diagnose_cell(db: AsyncSession, project_id: UUID, year: int, section: 
     final, steps, conflicts = _decide(mode=mode, projected=projected, value=value, formula=formula, binding=binding,
                                       pushes=pushes, section_locked=section_locked, sync=sync)
     target = (formula or {}).get("target") or (f"{r}:{c}" if t == 0 else f"t{t}:{r}:{c}")
+    provenance, formula_run, inputs_redacted = await _provenance_facts(db, project_id, td, section, target)
     return {
         "section": section, "target": target, "table_index": t, "row": r, "col": c,
         "table_name": catalog[t]["name"], "row_label": catalog[t]["rows"][r], "column_label": catalog[t]["columns"][c],
@@ -346,4 +383,5 @@ async def diagnose_cell(db: AsyncSession, project_id: UUID, year: int, section: 
         if binding else None,
         "formula": formula, "pushes": pushes, "sync": sync if projected else None,
         "section_manual_override": section_locked, "final": final, "steps": steps, "conflicts": conflicts,
+        "formula_provenance": provenance, "formula_run": formula_run, "inputs_redacted": inputs_redacted,
     }

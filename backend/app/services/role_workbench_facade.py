@@ -886,7 +886,9 @@ class RoleWorkbenchFacade:
             if not group_ids:
                 return [_build_item("adj-mat-0", "暂无重大调整", missing_reason="no_data")]
             from app.services.project_audit_year import fetch_project_audit_year
-            year = await fetch_project_audit_year(self.db, self.project_id) or 2025
+            year = await fetch_project_audit_year(self.db, self.project_id)
+            if year is None:
+                return [_build_item("adj-mat-noyear", "项目未设置审计年度", missing_reason="no_audit_year")]
             risks = await project_adjustment_risks(self.db, project_id=self.project_id, year=year, group_ids=group_ids)
             material = [
                 (gid, risk) for gid, risk in risks.items()
@@ -913,7 +915,9 @@ class RoleWorkbenchFacade:
         try:
             from app.services.wp_adjustment_helpers import count_unresolved_adjustment_groups
             from app.services.project_audit_year import fetch_project_audit_year
-            year = await fetch_project_audit_year(self.db, self.project_id) or 2025
+            year = await fetch_project_audit_year(self.db, self.project_id)
+            if year is None:
+                return [_build_item("adj-exc-noyear", "项目未设置审计年度", missing_reason="no_audit_year")]
             unresolved = await count_unresolved_adjustment_groups(self.db, self.project_id, year)
             if unresolved == 0:
                 return [_build_item("adj-exc-0", "全部分录均已完成内部复核", missing_reason="no_data")]
@@ -932,7 +936,9 @@ class RoleWorkbenchFacade:
         try:
             from app.services.eqcr_snapshot_service import get_current_snapshot
             from app.services.project_audit_year import fetch_project_audit_year
-            year = await fetch_project_audit_year(self.db, self.project_id) or 2025
+            year = await fetch_project_audit_year(self.db, self.project_id)
+            if year is None:
+                return [_build_item("adj-snap-noyear", "项目未设置审计年度", missing_reason="no_audit_year")]
             snapshot = await get_current_snapshot(self.db, self.project_id, year)
             if snapshot is None:
                 return [_build_item("adj-snap-none", "尚未创建 EQCR 快照", missing_reason="no_snapshot",

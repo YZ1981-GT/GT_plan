@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import inspect
 import weakref
 from datetime import datetime, timezone
@@ -299,3 +300,16 @@ class NoteProvenanceRecorder:
             self.provenance, addr_id, attempt, value_state=value_state, applied=applied,
         )
         return True
+
+
+#: 公式运行写进 table_data 的服务端伴生字段：编辑器保存的载荷没带它们时沿用库里的
+SERVER_OWNED_SIDECARS: tuple[str, ...] = ("_formula_provenance", "_formula_last_values")
+
+
+def replace_keeping_server_sidecars(workspace: dict[str, Any], incoming: dict[str, Any]) -> None:
+    """整体换成编辑器载荷，但载荷里没有的服务端伴生字段（来源信封 / 末次公式值）沿用原值。"""
+    kept = {key: workspace[key] for key in SERVER_OWNED_SIDECARS if key in workspace}
+    workspace.clear()
+    workspace.update(incoming)
+    for key, value in kept.items():
+        workspace.setdefault(key, copy.deepcopy(value))

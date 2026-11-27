@@ -2765,6 +2765,7 @@ class DisclosureEngine:
         from app.services.disclosure.note_section_write_kernel import mutate_note_by_id
         from app.services.note_content_digest import note_content_digest, note_content_conflict
         from app.services.note_edit_stamp import stamp_note_edit
+        from app.services.note_formula_provenance import replace_keeping_server_sidecars
         from app.services.note_pushed_row_guard import PUSHED_ROW_PROTECTED, pushed_row_violations
 
         captured: dict[str, DisclosureNote | None] = {"note": None}
@@ -2809,8 +2810,7 @@ class DisclosureEngine:
 
             if table_data is not None:
                 # 内核按 workspace 的新旧 hash 比较；直接把 workspace 内容替换成 new table_data
-                workspace.clear()
-                workspace.update(table_data)
+                replace_keeping_server_sidecars(workspace, table_data)
             if text_content is not None:
                 note.text_content = text_content
             if guidance_text is not None:

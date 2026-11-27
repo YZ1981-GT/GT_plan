@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 import tests.conftest  # noqa: F401  注册全部模型 + SQLite JSONB 兼容
 from app.models.base import Base, ProjectStatus
 from app.models.core import Project, User
+from app.models.formula_push_models import FormulaPushState
 from app.models.note_formula_models import NoteFormulaRun
 from app.models.report_models import ContentType, DisclosureNote
 from app.services.note_formula_generator import execute_note_formulas
@@ -59,7 +60,8 @@ async def env():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: Base.metadata.create_all(
-            c, tables=[User.__table__, Project.__table__, DisclosureNote.__table__, NoteFormulaRun.__table__]))
+            c, tables=[User.__table__, Project.__table__, DisclosureNote.__table__, NoteFormulaRun.__table__,
+                    FormulaPushState.__table__]))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     pid = uuid.uuid4()
     async with factory() as s:
