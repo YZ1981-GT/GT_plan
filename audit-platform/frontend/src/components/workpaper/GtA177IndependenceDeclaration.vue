@@ -378,7 +378,7 @@ async function handleMemberSign(index: number) {
   const row = teamSignTable.value[index]
   if (!row) return
   const authStore = useAuthStore()
-  const userName = authStore.user?.display_name || authStore.user?.username || '当前用户'
+  const userName = authStore.user?.full_name || authStore.user?.username || '当前用户'
   try {
     await ElMessageBox.confirm(
       `<div style="line-height:1.8">
@@ -401,7 +401,7 @@ async function handleMemberSign(index: number) {
 // ─── Partner sign via button popup ───
 async function handlePartnerSignConfirm(key: string) {
   const authStore = useAuthStore()
-  const userName = authStore.user?.display_name || authStore.user?.username || '当前用户'
+  const userName = authStore.user?.full_name || authStore.user?.username || '当前用户'
   const role = key === 'partner_sign' ? '项目合伙人' : '负责经理'
   try {
     await ElMessageBox.confirm(

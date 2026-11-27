@@ -119,7 +119,17 @@ const {
 })
 
 const loadingPostSettlement = ref(false)
+// 🔴 原先「从辅助余额表导入」整段被插进了 onImportPostSettlement 的函数体里：loadingAux / onImportFromAux
+//    成了它的局部变量，模板里的按钮拿不到（点击无效），期后兑付导入每次还会重新声明一遍 ⇒ 移回顶层
 async function onImportPostSettlement() {
+  if (loadingPostSettlement.value) return
+  loadingPostSettlement.value = true
+  try {
+    await importPostSettlementFromLedger()
+  } finally {
+    loadingPostSettlement.value = false
+  }
+}
 
 const loadingAux = ref(false)
 
@@ -136,14 +146,6 @@ async function onImportFromAux(): Promise<void> {
     await importFromAuxBalance()
   } finally {
     loadingAux.value = false
-  }
-}
-  if (loadingPostSettlement.value) return
-  loadingPostSettlement.value = true
-  try {
-    await importPostSettlementFromLedger()
-  } finally {
-    loadingPostSettlement.value = false
   }
 }
 

@@ -2093,8 +2093,9 @@ async function loadLatestAdjustmentTime() {
   const y = year.value
   if (y == null) { latestAdjustmentAt.value = null; return }
   try {
-    const adjs = await listAdjustments(projectId.value, y)
-    if (adjs && adjs.length > 0) {
+    const page = await listAdjustments(projectId.value, y)
+    const adjs = Array.isArray(page?.items) ? page.items : []
+    if (adjs.length > 0) {
       const times = adjs.map((a: any) => a.updated_at).filter(Boolean).sort().reverse()
       latestAdjustmentAt.value = times[0] || null
     } else {
@@ -2911,8 +2912,8 @@ function onTbSumDblClick(row: any) {
     const found = Object.values(wpMappingIndex.value).find((m: any) => m.wp_name?.includes(row.row_name))
     if (found) {
       const wp = wpList.value.find((w: any) => w.wp_code === found.wp_code)
-      if (wp?.wp_id) {
-        router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: wp.wp_id } })
+      if (wp?.id) {
+        router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: wp.id } })
         return
       }
     }
@@ -3042,8 +3043,8 @@ function onTbSumGoWorkpaper(row: any) {
   const found = Object.values(mapping).find((m: any) => m.wp_name?.includes(row.row_name))
   if (found) {
     const wp = wpList.value.find((w: any) => w.wp_code === found.wp_code)
-    if (wp?.wp_id) {
-      router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: wp.wp_id } })
+    if (wp?.id) {
+      router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: wp.id } })
       return
     }
   }

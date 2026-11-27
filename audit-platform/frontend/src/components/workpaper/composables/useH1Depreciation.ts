@@ -529,7 +529,7 @@ export function useH1Depreciation(
         bookAccDepEnd: row.bookAccDepEnd,
       })
       _applyTestResult(row, r)
-      row.postImpairmentMonthlyDep = r.postImpairmentMonthlyDep
+      row.postImpairmentMonthlyDep = r.postImpairmentMonthly
       row.monthsBeforeImpairment = r.monthsBeforeImpairmentInPeriod
       row.monthsAfterImpairment = r.monthsAfterImpairmentInPeriod
       row.accDepAtImpairment = r.accDepAtImpairment
@@ -543,7 +543,7 @@ export function useH1Depreciation(
           eventDate: e.eventDate || '',
           amount: e.amount,
           remainingLife: round2(remainingLife),
-          newMonthlyDep: seg?.monthly ?? r.postImpairmentMonthlyDep,
+          newMonthlyDep: seg?.monthly ?? r.postImpairmentMonthly,
           elapsedMonths: e.elapsedMonths,
         }
       })
@@ -569,7 +569,7 @@ export function useH1Depreciation(
       })
       _applyTestResult(row, r)
       row.impairmentAmount = impairAmt
-      row.postImpairmentMonthlyDep = r.postImpairmentMonthlyDep
+      row.postImpairmentMonthlyDep = r.postImpairmentMonthly
       row.postImpairmentNetValue = round2(cost - r.accDepAtImpairment - impairAmt)
       row.monthsBeforeImpairment = r.monthsBeforeImpairmentInPeriod
       row.monthsAfterImpairment = r.monthsAfterImpairmentInPeriod

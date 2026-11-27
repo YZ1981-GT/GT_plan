@@ -26,6 +26,8 @@ export interface B14Section {
   content?: string | null
   rows?: Record<string, any>[]
   table_id?: string
+  /** 模板自带的列定义（有则优先于默认列） */
+  columns?: { key: string; label: string; width?: number }[]
 }
 
 export interface B14ChapterData {
@@ -79,6 +81,9 @@ export interface UseB14Return {
   sourceSheet: Ref<string>
   saveStatus: Ref<'saved' | 'saving' | 'unsaved'>
   loading: Ref<boolean>
+  /** 试算表指标（ch6 预填用）与 B19 关联方（ch10 预填用）——实现里早已返回，接口漏声明 */
+  financialIndicators: Ref<Record<string, number>>
+  relatedParties: Ref<{ name: string; relation_type: string; detail?: any }[]>
   // Actions
   updateTextarea: (chapterId: string, field: string, content: string) => void
   updateTableRows: (chapterId: string, tableId: string, rows: Record<string, any>[]) => void

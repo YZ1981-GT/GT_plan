@@ -245,12 +245,11 @@
           <QueryRunBanner
             :run-info="evidence.runInfo.value"
             :version="evidence.version.value"
-            :captured-at="evidence.version.value?.captured_at ?? null"
             :freshness="evidence.freshness.value"
             :checking="evidence.checking.value"
             :unavailable="Boolean(evidence.checkError.value)"
             @check="evidence.checkFreshness()"
-            @requery="executeQuery()"
+            @requery="onExecute()"
             @open-drawer="evidence.drawerVisible.value = true"
           />
           <AcnrTargetResults :block="result.acnr_results" :project-id="formCtx.project_id" />

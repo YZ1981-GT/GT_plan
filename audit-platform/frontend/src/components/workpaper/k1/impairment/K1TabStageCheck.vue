@@ -607,9 +607,10 @@ function fmtPct(stageTotal: number): string {
 async function handleAiGenerate(_section: string) {
   const content = await generateAndConfirm('overall-opinion', auditNote.value, {
     rowCount: rows.value.length,
-    stage1: summary.value.stage1,
-    stage2: summary.value.stage2,
-    stage3: summary.value.stage3,
+    stage1: { count: summary.value.stage1Count, total: summary.value.stage1Total },
+    stage2: { count: summary.value.stage2Count, total: summary.value.stage2Total },
+    stage3: { count: summary.value.stage3Count, total: summary.value.stage3Total },
+    inconsistentCount: summary.value.inconsistentCount,
   }, 'AI 生成 K1-7 审计说明')
   if (content) {
     auditNote.value = content

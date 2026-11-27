@@ -109,6 +109,8 @@ export interface UseAlternativeK05DataReturn {
   deleteBlockRow: (companyId: string, blockType: BlockType, rowId: string) => void
   updateBlockField: (companyId: string, blockType: BlockType, rowId: string, field: string, value: any) => void
   getBlockTotal: (company: AlternativeCompany, blockType: BlockType) => Record<string, number>
+  /** 借贷拆表时按方向小计（由公共工厂 `...core` 提供，原先接口漏声明） */
+  getBlockTotalByDirection: (company: AlternativeCompany, blockType: BlockType, direction: 'debit' | 'credit') => Record<string, number>
   getCheckRatio: (company: AlternativeCompany, type: 'post_receipt' | 'reconcile') => number | null
   getReconcileDiff: (row: CheckRow) => number
   getCompletionStatus: (company: AlternativeCompany) => { completed: number; total: number; rate: number }
