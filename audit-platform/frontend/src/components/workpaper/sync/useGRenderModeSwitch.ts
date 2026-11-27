@@ -99,7 +99,11 @@ export interface GRenderModeSwitch {
    * （与桥并行的第二条路径，异步且先于用户点击）。disabled 在未就绪时会把入口锁死、
    * 点击被彻底吞掉 —— D4 已实证的 bug ③。门禁改在 `switchRenderMode` 里 await 兜底。
    */
-  readonly modeOptions: readonly DualModeSegmentedOption[]
+  /**
+   * 切换器选项。运行时已 `Object.freeze`（禁止任何方改写），但对外声明为可变数组 ——
+   * `el-segmented` 的 `options` prop 类型是可变的 `Option[]`，只读数组传进去会在类型上报错。
+   */
+  readonly modeOptions: DualModeSegmentedOption[]
   /** 正在切换（供宿主给切换器加 loading / 禁重复点击）。 */
   readonly switching: Ref<boolean>
   /** 切换入口 —— 直接接 `el-segmented` 的 `@change`。 */
@@ -130,7 +134,7 @@ export function useGRenderModeSwitch(options: GRenderModeSwitchOptions): GRender
       : legacy.currentMode.value,
   )
 
-  const modeOptions = Object.freeze(dualModeHtmlOoOptions())
+  const modeOptions = Object.freeze(dualModeHtmlOoOptions()) as DualModeSegmentedOption[]
   let authorizedLegacyTransitionDepth = 0
   let restoringLegacyPreference = false
   let deferredLegacyPreference = false
