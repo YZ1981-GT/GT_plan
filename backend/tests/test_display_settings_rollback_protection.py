@@ -35,8 +35,8 @@ ROLLBACK_PROTECTION: dict[str, tuple[str, ...]] = {
         "word_export_task_versions",
         "working_paper_content_version",
     ),
-    "R271__rollback_ledger_import_attempts.sql": ("ledger_import_attempts",),
-    "R272__rollback_custom_template_publication_registry.sql": (
+    "R273__rollback_ledger_import_attempts.sql": ("ledger_import_attempts",),
+    "R275__rollback_custom_template_publication_registry.sql": (
         "custom_template_publications",
         "custom_template_publication_pins",
     ),
@@ -62,7 +62,7 @@ class TestRollbackRaisesBeforeDrop:
     """判据必须只看**可执行 SQL**，不看注释。
 
     🔴 M1/M2 首轮存活暴露的正是这一点：`test_has_raise_exception` 原先只做
-    `"RAISE EXCEPTION" in text`，而 R272 的文件头注释里引用了 NFR 原文
+    `"RAISE EXCEPTION" in text`，而 R275 的文件头注释里引用了 NFR 原文
     （含「必须 `RAISE EXCEPTION`」字样）⇒ 把整个 `DO $$ ... END $$;` 块删掉后
     注释里的字样仍在，判据照样通过。这就是 memory 铁律 ㉖
     「判断代码是否真做了 X 一律用结构化分析，禁文本 `in` 匹配 ——
@@ -136,7 +136,7 @@ class TestRollbackRaisesBeforeDrop:
 
         两种真实写法都要认（穷举变体，memory 铁律 ⑮）：
 
-        1. `IF EXISTS (SELECT 1 FROM <table>)` —— R271/R272 的形态；
+        1. `IF EXISTS (SELECT 1 FROM <table>)` —— R273/R275 的形态；
         2. `IF to_regclass('public.<table>') IS NOT NULL` +
            `SELECT count(*) INTO ... FROM <table>` —— R250 的形态
            （表可能已被删掉，用 `to_regclass` 判存在更稳）。
@@ -190,8 +190,8 @@ class TestForwardMigrationIsIdempotent:
         [
             "V250__display_preferences_and_project_amount_unit.sql",
             "V265__add_export_unit_policy_columns.sql",
-            "V271__ledger_import_attempts.sql",
-            "V272__custom_template_publication_registry.sql",
+            "V273__ledger_import_attempts.sql",
+            "V275__custom_template_publication_registry.sql",
         ],
     )
     def test_create_statements_are_idempotent(self, forward: str) -> None:

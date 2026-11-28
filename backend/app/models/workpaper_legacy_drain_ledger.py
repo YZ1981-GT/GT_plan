@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""旧式 doc key / callback 的 drain ledger ORM（V274）。
+"""旧式 doc key / callback 的 drain ledger ORM（V277）。
 
 spec: onlyoffice-sheet-open-via-published-artifact 任务 4.2
 
@@ -13,7 +13,7 @@ spec: onlyoffice-sheet-open-via-published-artifact 任务 4.2
 
 那张字典的语义是「V151 的 28 张表」，`test_orm_covers_exactly_the_v151_tables`
 以完全相等锁死它（多一张即红）。本表 DDL 真源是
-`backend/migrations/V274__workpaper_legacy_drain_ledger.sql`，由本 spec 自己的
+`backend/migrations/V277__workpaper_legacy_drain_ledger.sql`，由本 spec 自己的
 守卫做 DDL 与 ORM 双向比对，不挂在 V151 的分母上。
 """
 from __future__ import annotations
@@ -30,7 +30,7 @@ from app.models.workpaper_sync_models import _DIGEST, _TS, _UUID, _pk
 
 
 class WorkpaperLegacyDrainLedger(Base):
-    """旧式 doc key / callback 签发与结算的 append-only ledger（V274）。
+    """旧式 doc key / callback 签发与结算的 append-only ledger（V277）。
 
     为什么 append-only（签发行 + 结算行两行）：
     「已签发 -> 已结算」是状态跃迁，但审计要能回答「这一条何时被结算」。

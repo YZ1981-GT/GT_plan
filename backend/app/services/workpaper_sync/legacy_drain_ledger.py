@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """旧式 doc key / callback 的 drain ledger（spec onlyoffice-sheet-open 任务 4.2）。
 
-本模块是 V274 表的**唯一**读写入口。写入侧若散落在 router / gate / callback 三处，
+本模块是 V277 表的**唯一**读写入口。写入侧若散落在 router / gate / callback 三处，
 三处对「什么算一次签发」的口径必然漂移，而漂移后的计数无法用于 4.4 的删除判据。
 
 职责边界（刻意不做的事）：
@@ -33,7 +33,7 @@ EVENT_ISSUED = "issued"
 #: 结算行的 event_kind。
 EVENT_SETTLED = "settled"
 
-#: 终结状态封闭集（与 V274 的 ck_wpldl_terminal_state 逐值一致）。
+#: 终结状态封闭集（与 V277 的 ck_wpldl_terminal_state 逐值一致）。
 TERMINAL_SAVED = "saved"
 TERMINAL_REJECTED = "rejected"
 TERMINAL_EXPIRED = "expired"
@@ -151,7 +151,7 @@ async def settle_issuance(
     Raises:
         ValueError: terminal_state 不在封闭集 / reason 为空白 / 该签发已被结算过。
 
-    一行只能结算一次由 V274 的 ux_wpldl_one_settlement_per_issuance 唯一索引在 DB 层
+    一行只能结算一次由 V277 的 ux_wpldl_one_settlement_per_issuance 唯一索引在 DB 层
     强制。这里先查一次是为了给出中文原因（否则调用方只能拿到 IntegrityError）。
     """
     state = str(terminal_state or "").strip()

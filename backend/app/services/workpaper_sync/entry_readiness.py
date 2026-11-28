@@ -174,8 +174,8 @@ def _reason(code: str, detail: str | None = None) -> ReadinessReason:
             "请使用已登记的替代入口；旧桩将按删除计划移除。",
         ),
         "REPRESENTATION_MISSING": (
-            "当前底稿尚未发布可用于在线编辑的版本。",
-            "先完成该底稿的首版 representation 发布，再重新检查。",
+            "当前底稿尚未发布在线编辑版本。",
+            "首次进入在线编辑时会自动发布首版。",
         ),
         "ADAPTER_NOT_READY": (
             "当前底稿的双向 adapter 尚未就绪。",
@@ -467,12 +467,18 @@ async def evaluate_entry_readiness(
         session, wp_id=wp_id, entry_id=effective_entry_id
     )
     if representation is None:
+        # 尚无首版 ≠ 不能在线编辑：首版只在「首次进入在线编辑」时由
+        # `ensure_first_publication` 按需发布（spec d2-online-edit-platform-closure R7）。
+        # 这里若只放行 html，入口被藏、桥也拒绝，首版永远发不出来（死锁）。
+        # ⇒ runtime.ready 如实保持 False，但按 capability 放行 oo；首版准入（lane / bundle /
+        #   契约复核等）仍由首版端点自己判，不满足时返回 422 中文原因。
+        capability = entry.get("capability")
         return EntrySyncReadiness(
             entry_id=str(entry_id),
             effective_entry_id=effective_entry_id,
-            capability=str(entry.get("capability")),
+            capability=str(capability),
             adjudication_state=str(entry.get("adjudication_state")),
-            allowed_modes=("html",),
+            allowed_modes=_ALLOWED_MODES.get(capability, ("html",)),
             can_claim_bidirectional=False,
             runtime=RuntimeReadiness(ready=False),
             acceptance=AcceptanceReadiness(state="missing", stale=False),

@@ -8,11 +8,25 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from uuid import UUID
+
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import _project_level_visible_ids, get_current_user
 from app.services.dashboard_service import DashboardService
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
+
+
+async def _visible(user, db: AsyncSession) -> set[UUID] | None:
+    """当前用户可见的项目集合；admin 返回 None（不过滤）。
+
+    与项目列表同一口径（deps._project_level_visible_ids）：admin 全部、partner 名下项目、
+    其他角色参与的项目。看板所有统计都只算这些项目。
+    """
+    role = getattr(getattr(user, "role", None), "value", None)
+    if role == "admin":
+        return None
+    return set(await _project_level_visible_ids(user, db))
 
 
 @router.get("/overview")
@@ -21,7 +35,7 @@ async def overview(
     user=Depends(get_current_user),
 ):
     """关键指标聚合"""
-    svc = DashboardService(db)
+    svc = DashboardService(db, await _visible(user, db))
     return await svc.get_overview()
 
 
@@ -31,7 +45,7 @@ async def project_progress(
     user=Depends(get_current_user),
 ):
     """项目进度列表"""
-    svc = DashboardService(db)
+    svc = DashboardService(db, await _visible(user, db))
     return await svc.get_project_progress()
 
 
@@ -41,7 +55,7 @@ async def staff_workload(
     user=Depends(get_current_user),
 ):
     """人员负荷排行"""
-    svc = DashboardService(db)
+    svc = DashboardService(db, await _visible(user, db))
     return await svc.get_staff_workload()
 
 
@@ -51,7 +65,7 @@ async def schedule(
     user=Depends(get_current_user),
 ):
     """人员排期甘特图数据"""
-    svc = DashboardService(db)
+    svc = DashboardService(db, await _visible(user, db))
     return await svc.get_schedule()
 
 
@@ -61,7 +75,7 @@ async def hours_heatmap(
     user=Depends(get_current_user),
 ):
     """工时热力图数据"""
-    svc = DashboardService(db)
+    svc = DashboardService(db, await _visible(user, db))
     return await svc.get_hours_heatmap()
 
 
@@ -71,7 +85,7 @@ async def risk_alerts(
     user=Depends(get_current_user),
 ):
     """风险预警"""
-    svc = DashboardService(db)
+    svc = DashboardService(db, await _visible(user, db))
     return await svc.get_risk_alerts()
 
 
@@ -81,7 +95,7 @@ async def quality_metrics(
     user=Depends(get_current_user),
 ):
     """审计质量指标"""
-    svc = DashboardService(db)
+    svc = DashboardService(db, await _visible(user, db))
     return await svc.get_quality_metrics()
 
 
@@ -91,7 +105,7 @@ async def group_progress(
     user=Depends(get_current_user),
 ):
     """集团审计子公司进度对比"""
-    svc = DashboardService(db)
+    svc = DashboardService(db, await _visible(user, db))
     return await svc.get_group_progress()
 
 
@@ -157,6 +171,9 @@ async def project_staff_hours(
 
     if project_id:
         q = q.where(Project.id == project_id)
+    visible = await _visible(user, db)
+    if visible is not None:
+        q = q.where(Project.id.in_(visible) if visible else sa.false())
 
     q = q.order_by(Project.name, StaffMember.name)
     rows = (await db.execute(q)).all()
@@ -220,6 +237,9 @@ async def staff_detail(
         )
         .order_by(Project.name)
     )
+    visible = await _visible(user, db)
+    if visible is not None:
+        proj_q = proj_q.where(Project.id.in_(visible) if visible else sa.false())
     projects = (await db.execute(proj_q)).all()
 
     # 本周工时
@@ -238,6 +258,8 @@ async def staff_detail(
         )
         .order_by(WorkHour.work_date)
     )
+    if visible is not None:
+        wh_q = wh_q.where(WorkHour.project_id.in_(visible) if visible else sa.false())
     work_hours = (await db.execute(wh_q)).all()
 
     # 未来一周安排（基于参与的活跃项目）
@@ -290,13 +312,35 @@ async def available_staff(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """查询未来一周可用人员（本周工时低于阈值的人员）"""
+    """查询未来一周可用人员（本周工时低于阈值的人员）。
+
+    人员名单不按项目收窄（要找的是可用的人）；项目数与工时只算当前用户可见的项目。
+    """
     from app.models.staff_models import StaffMember, WorkHour, ProjectAssignment
     import sqlalchemy as sa
     from datetime import date, timedelta
 
     today = date.today()
     week_start = today - timedelta(days=today.weekday())
+    visible = await _visible(user, db)
+
+    def _hours_in_scope():
+        conds = [
+            WorkHour.staff_id == StaffMember.id,
+            WorkHour.work_date >= week_start,
+            WorkHour.work_date <= today,
+            WorkHour.is_deleted == False,
+        ]
+        if visible is not None:
+            conds.append(WorkHour.project_id.in_(visible) if visible else sa.false())
+        return sa.select(sa.func.sum(WorkHour.hours)).where(*conds).correlate(StaffMember).scalar_subquery()
+
+    assignment_join = [
+        ProjectAssignment.staff_id == StaffMember.id,
+        ProjectAssignment.is_deleted == False,
+    ]
+    if visible is not None:
+        assignment_join.append(ProjectAssignment.project_id.in_(visible) if visible else sa.false())
 
     q = (
         sa.select(
@@ -305,39 +349,12 @@ async def available_staff(
             StaffMember.title,
             StaffMember.department,
             sa.func.count(sa.distinct(ProjectAssignment.project_id)).label("project_count"),
-            sa.func.coalesce(
-                sa.select(sa.func.sum(WorkHour.hours))
-                .where(
-                    WorkHour.staff_id == StaffMember.id,
-                    WorkHour.work_date >= week_start,
-                    WorkHour.work_date <= today,
-                    WorkHour.is_deleted == False,
-                )
-                .correlate(StaffMember)
-                .scalar_subquery(),
-                0,
-            ).label("week_hours"),
+            sa.func.coalesce(_hours_in_scope(), 0).label("week_hours"),
         )
-        .outerjoin(ProjectAssignment, sa.and_(
-            ProjectAssignment.staff_id == StaffMember.id,
-            ProjectAssignment.is_deleted == False,
-        ))
+        .outerjoin(ProjectAssignment, sa.and_(*assignment_join))
         .where(StaffMember.is_deleted == False)
         .group_by(StaffMember.id, StaffMember.name, StaffMember.title, StaffMember.department)
-        .having(
-            sa.func.coalesce(
-                sa.select(sa.func.sum(WorkHour.hours))
-                .where(
-                    WorkHour.staff_id == StaffMember.id,
-                    WorkHour.work_date >= week_start,
-                    WorkHour.work_date <= today,
-                    WorkHour.is_deleted == False,
-                )
-                .correlate(StaffMember)
-                .scalar_subquery(),
-                0,
-            ) < max_hours
-        )
+        .having(sa.func.coalesce(_hours_in_scope(), 0) < max_hours)
         .order_by(sa.asc("week_hours"))
         .limit(50)
     )
@@ -364,7 +381,7 @@ async def stats_trend(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    svc = DashboardService(db)
+    svc = DashboardService(db, await _visible(user, db))
     return await svc.get_stats_trend(project_id=project_id, days=days)
 
 
@@ -376,5 +393,5 @@ async def stats_compare(
     user=Depends(get_current_user),
 ):
     """KPI 环比：最近 window 天 vs 前 window 天，返回 current/previous/delta_pct。"""
-    svc = DashboardService(db)
+    svc = DashboardService(db, await _visible(user, db))
     return await svc.get_stats_compare(project_id=project_id, window=window)

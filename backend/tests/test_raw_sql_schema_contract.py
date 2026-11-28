@@ -54,7 +54,7 @@ _INFRA_TABLES = {
     "pg_constraint",
     # SQLite 系统表（方言分支里查 sqlite_master 判表存在，PG 上不执行）
     "sqlite_master",
-    # 2026-11-24 V275 起，下列 3 张表由 V275 持有（原先只靠历史 create_all 兜底）：
+    # 2026-11-24 V278 起，下列 3 张表由 V278 持有（原先只靠历史 create_all 兜底）：
     # review_conversation_participants / review_conversation_exports / tb_aux_balance_summary
     # —— 它们现在同时出现在迁移 CREATE 里，_collect_migration_tables 已能覆盖；
     # 此处保留只为兼容从旧快照读到的缓存，避免双向漂移。

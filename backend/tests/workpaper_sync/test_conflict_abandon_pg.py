@@ -16,7 +16,7 @@ Property: **Property 3**（状态变了但内容没落地不可能出现）
 
 ═══ 隔离 ═══
 
-scratch schema `tmp_ca_<hex>` + `SET search_path` 只含它；**真跑 V151 与 V273**
+scratch schema `tmp_ca_<hex>` + `SET search_path` 只含它；**真跑 V151 与 V276**
 （不手抄 DDL —— 抄一份就等于「迁移写错也照样绿」）。结束 `DROP SCHEMA CASCADE`。
 
 `DATABASE_URL` 非 PostgreSQL 时**直接失败而不是 skip** —— 与 Task 10/15/21~27 同约定。
@@ -49,7 +49,7 @@ _MIGRATION_V151 = (
 _MIGRATION_V264 = (
     _BACKEND / "migrations" / "V264__sync_conflict_schema_anomaly.sql"
 )
-_MIGRATION_V273 = _BACKEND / "migrations" / "V273__sync_conflict_abandon_columns.sql"
+_MIGRATION_V276 = _BACKEND / "migrations" / "V276__sync_conflict_abandon_columns.sql"
 
 #: 本判据只需要的三个 stub 父表（V151 里它们由平台侧建，不在那份迁移内）。
 _STUB_DDL = """
@@ -110,7 +110,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 一次采集覆盖全部
             "作废判据（DB 三列约束 / append-only event 计数 / 状态 CHECK）必须真实 PostgreSQL；"
             f"当前 {settings.DATABASE_URL.split('://')[0]}"
         )
-    for required in (_MIGRATION_V151, _MIGRATION_V264, _MIGRATION_V273):
+    for required in (_MIGRATION_V151, _MIGRATION_V264, _MIGRATION_V276):
         if not required.exists():
             raise RuntimeError(f"缺迁移 {required}")
 
@@ -153,7 +153,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 一次采集覆盖全部
         async with engine.begin() as conn:
             for stmt in [s.strip() for s in _STUB_DDL.strip().split(";") if s.strip()]:
                 await conn.exec_driver_sql(stmt)
-        for migration in (_MIGRATION_V151, _MIGRATION_V264, _MIGRATION_V273):
+        for migration in (_MIGRATION_V151, _MIGRATION_V264, _MIGRATION_V276):
             for idx, stmt in enumerate(
                 MigrationRunner._split_sql_statements(
                     migration.read_text(encoding="utf-8")
@@ -171,7 +171,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 一次采集覆盖全部
         if snap["apply_errors"]:
             raise RuntimeError(f"迁移应用失败: {snap['apply_errors'][:3]}")
 
-        # 建表阶段就证明 V273 真的加了列（否则后面每条判据都是空转）
+        # 建表阶段就证明 V276 真的加了列（否则后面每条判据都是空转）
         async with engine.connect() as conn:
             snap["columns"] = sorted(
                 r[0]
@@ -595,9 +595,9 @@ def test_harness_did_not_crash(snap: dict[str, Any]) -> None:
 
 
 def test_the_migration_really_added_three_columns(snap: dict[str, Any]) -> None:
-    """V273 真的加了列 —— 后面每条判据的前提。"""
+    """V276 真的加了列 —— 后面每条判据的前提。"""
     for column in ("abandoned_at", "abandon_reason", "abandoned_by"):
-        assert column in snap["columns"], f"V273 没有加列 {column}：{snap['columns']}"
+        assert column in snap["columns"], f"V276 没有加列 {column}：{snap['columns']}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

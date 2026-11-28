@@ -24,7 +24,7 @@
    `abandoned_by` 三列。
 2. **不复用 `superseded_at`**。该列的唯一写入方是 `repository.record_conflicts`
    （观测同步），它还会对**本轮命中**的行执行 `row.superseded_at = None` **清零** ——
-   拿它存人工作废会被下一次重观测静默抹掉。故 V273 新起三列。
+   拿它存人工作废会被下一次重观测静默抹掉。故 V276 新起三列。
 3. **不裸 SQL 改 `state`**。状态推进必须经
    :meth:`~.repository.WorkpaperSyncRepository.append_operation_event`（它内部
    `assert_transition` 校验登记边，再写 append-only event，最后投影 current state）——

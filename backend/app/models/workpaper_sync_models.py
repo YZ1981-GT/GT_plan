@@ -967,7 +967,7 @@ class WorkpaperSyncConflict(Base):
     #: 观测同步语义的「本轮不再出现的旧 key」（唯一写入方 = `repository.record_conflicts`，
     #: 且同函数对**本轮命中**的行清零）—— **不得**拿它存人工作废，会被下一次重观测抹掉。
     superseded_at: Mapped[datetime | None] = mapped_column(_TS, nullable=True)
-    #: 🔴 V273 三列：人工作废（spec frozen-contract-read-path 任务 8 / R3.3）。
+    #: 🔴 V276 三列：人工作废（spec frozen-contract-read-path 任务 8 / R3.3）。
     #:
     #: 与 `superseded_at` **语义不同、写入方不同**：那套是观测同步（自动化、可被下一轮
     #: 清零），这套是人工审计动作（一次性、永不改写）。复用同一列会让「本轮不再出现」

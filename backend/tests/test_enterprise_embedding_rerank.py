@@ -138,7 +138,12 @@ def test_enterprise_presets_share_the_qwen38_gateway_and_declare_index_dims():
 
 
 def test_v262_seed_rows_match_the_preset_single_source():
-    sql = next(MIGRATIONS.glob("V262__*.sql")).read_text(encoding="utf-8")
+    # 向量预设的固定 id 在 dev1.0 合并时改为 …0006（…0004 已被 V208 的 qwen3.7-max 占用），由 V271 补建；
+    # V262 已在部分库落地，不改它的内容（否则 checksum 漂移）⇒ 种子来源 = V262 + V271。
+    sql = "\n".join(
+        next(MIGRATIONS.glob(pattern)).read_text(encoding="utf-8")
+        for pattern in ("V262__*.sql", "V271__*.sql")
+    )
     for preset in (GT_WEMM_EMBEDDING_4B, GT_QWEN3_RERANKER_4B):
         for value in (str(preset.id), preset.preset_key, preset.model_name, preset.endpoint_url,
                       preset.performance_notes, f"'{preset.model_type.value}'::ai_model_type_enum"):

@@ -9,8 +9,8 @@ Design: advanced-query-module design.md §Components 7「OwnershipGuard（防 ID
     + RLS session context（``set_rls_context``）。
   - **补充** ``project_assignments`` 有效分派校验（列名 ``staff_id``，经
     ``staff_members.user_id`` 映射到当前用户）。用户「可访问项目集合」=
-    project_users 成员 ∪ project_assignments 有效分派；admin / partner 视为
-    可访问全部项目（与 ``deps.get_visible_project_ids`` 语义一致）。
+    project_users 成员 ∪ project_assignments 有效分派；admin 视为可访问全部项目，
+    partner 为自己名下的项目（与 ``deps.get_visible_project_ids`` 语义一致）。
 
 铁律：
   - 校验在任何数据读写**之前**执行（R9.1 / R9.5）；不通过 → HTTP 403 且不触达
@@ -43,8 +43,8 @@ if TYPE_CHECKING:  # 避免对尚未落地的 addressing_service（task 2.1）�
 
 logger = logging.getLogger(__name__)
 
-# 视为可访问全部项目的系统角色（与 deps.get_visible_project_ids 一致）
-_ALL_ACCESS_ROLES = ("admin", "partner")
+# 视为可访问全部项目的系统角色（与 deps.get_visible_project_ids 一致：只有 admin；partner 只见自己名下的项目）
+_ALL_ACCESS_ROLES = ("admin",)
 
 
 def _to_uuid(value: Any) -> UUID | None:
@@ -72,11 +72,16 @@ class OwnershipGuard:
     ) -> set[UUID] | None:
         """返回当前用户可访问的 project_id 集合。
 
-        返回 ``None`` 作为哨兵表示「可访问全部项目」（admin / partner）。
-        否则返回 project_users 成员 ∪ project_assignments 有效分派的并集。
+        返回 ``None`` 作为哨兵表示「可访问全部项目」（仅 admin）。
+        partner 返回自己名下的项目（``partner_visible_project_ids``）；
+        其余角色返回 project_users 成员 ∪ project_assignments 有效分派的并集。
         """
         if getattr(getattr(user, "role", None), "value", None) in _ALL_ACCESS_ROLES:
             return None
+        if getattr(getattr(user, "role", None), "value", None) == "partner":
+            from app.services.partner_visibility_service import partner_visible_project_ids
+
+            return await partner_visible_project_ids(user, db)
 
         user_id = getattr(user, "id", None)
         if user_id is None:
@@ -125,7 +130,7 @@ class OwnershipGuard:
 
         供同包消费方（如 ``TemplateService`` 的模板可见性判定 R13.4）复用同一份
         「可访问项目集合」语义，避免各处重造。返回 ``None`` 作为哨兵表示
-        「可访问全部项目」（admin / partner）。
+        「可访问全部项目」（仅 admin）。
         """
         return await self._accessible_project_ids(user, db)
 
@@ -147,7 +152,7 @@ class OwnershipGuard:
         if accessible is not None:
             # 普通用户的集合查询已 JOIN projects 并排除软删项目。
             return project_id in accessible
-        # admin / partner 的 None 哨兵只代表「全部活项目」，不是回收站旁路。
+        # admin 的 None 哨兵只代表「全部活项目」，不是回收站旁路。
         return await self._project_is_live(project_id, db)
 
     # ── 审计：越权尝试 ──────────────────────────────────────────────────

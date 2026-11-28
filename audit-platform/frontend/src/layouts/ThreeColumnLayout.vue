@@ -190,7 +190,6 @@
                 {{ item.label }}
                 <span v-if="item.maturity === 'pilot'" class="gt-maturity-badge gt-maturity-pilot">试点</span>
                 <span v-else-if="item.maturity === 'experimental'" class="gt-maturity-badge gt-maturity-exp">实验</span>
-                <span v-else-if="item.maturity === 'developing'" class="gt-maturity-badge gt-maturity-dev">📌 即将上线</span>
               </span>
             </transition>
           </div>
@@ -304,6 +303,21 @@
         :error="dshPanelLoadError"
         @update:model-value="onDshLoadErrorVisibilityChange"
       />
+      <!-- 面板按需加载（首次打开才下载 DshPanel）：加载前由这里占位右侧「AI」竖条，
+           外观与 DshPanel 折叠态触发按钮一致；加载后由 DshPanel 自己的触发按钮接管。 -->
+      <div v-else class="gt-dsh-dock">
+        <button
+          class="gt-dsh-dock-trigger"
+          type="button"
+          aria-label="打开 AI 助手"
+          :aria-expanded="false"
+          aria-controls="dsh-panel-region"
+          @click="showDshPanel = true"
+        >
+          <el-icon :size="20"><ChatDotSquare /></el-icon>
+          <span class="gt-dsh-dock-text">AI</span>
+        </button>
+      </div>
     </div>
 
     <!-- 全局公式管理弹窗 -->
@@ -376,7 +390,7 @@ import {
   Stamp, Box, Setting, ArrowDown, SwitchButton,
   DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
   DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, Loading,
-  Search,
+  Search, OfficeBuilding,
 } from '@element-plus/icons-vue'
 const FormulaManagerDialog = defineAsyncComponent(() => import('@/components/formula/FormulaManagerDialog.vue'))
 import { useMountOnFirstOpen } from '@/composables/useMountOnFirstOpen'
@@ -464,8 +478,11 @@ const FALLBACK_NAV = [
   { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor'] },
   { key: 'template-library', label: '模板库', icon: Document, path: '/template-library', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'qc'] },
   { key: 'formula-global', label: '全局公式', icon: Grid, path: '/settings/formula-global', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'qc'] },
-  { key: 'users', label: '账号权限', icon: UserFilled, path: '/settings/users', maturity: 'production', roles: ['admin'] },
+  { key: 'permissions', label: '权限管理', icon: UserFilled, path: '/settings/permissions', maturity: 'production', roles: ['admin'] },
+  { key: 'departments', label: '部门管理', icon: OfficeBuilding, path: '/settings/departments', maturity: 'production', roles: ['admin'] },
+  { key: 'operation-logs', label: '操作日志', icon: Document, path: '/settings/operation-logs', maturity: 'production', roles: ['admin'] },
   { key: 'knowledge', label: '知识库', icon: Reading, path: '/knowledge', maturity: 'production', roles: null },
+  { key: 'agent-store', label: '智能体商店', icon: Box, path: '/extension/agent-store', maturity: 'developing', roles: null },
   { key: 'private-storage', label: '私人库', icon: Suitcase, path: '/private-storage', maturity: 'production', roles: null },
   { key: 'ai-models', label: 'AI 模型', icon: Cpu, path: '/settings/ai-models', maturity: 'production', roles: ['admin'] },
 ]
@@ -1236,6 +1253,49 @@ onUnmounted(() => {
   30%, 70% { opacity: 1; }
 }
 .gt-dsh-badge :deep(.el-badge__content) { top: 2px; right: 4px; }
+
+/* AI 面板加载前的右侧「AI」竖条（与 DshPanel .dsh-panel / .dsh-panel-trigger 同一外观） */
+.gt-dsh-dock {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  height: 100%;
+  z-index: 10;
+}
+.gt-dsh-dock-trigger {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 6px;
+  background: var(--el-color-primary, #4b2d77);
+  color: #fff;
+  border: none;
+  border-radius: 8px 0 0 8px;
+  cursor: pointer;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  transition: padding 0.2s, background 0.2s;
+  writing-mode: vertical-rl;
+  user-select: none;
+  font-family: inherit;
+}
+.gt-dsh-dock-trigger:hover,
+.gt-dsh-dock-trigger:focus-visible {
+  padding: 12px 10px;
+  background: var(--el-color-primary-dark-2, #3d2460);
+}
+.gt-dsh-dock-text {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gt-dsh-dock-trigger { transition: none; }
+}
 .gt-theme-toggle {
   font-size: 16px;
 }

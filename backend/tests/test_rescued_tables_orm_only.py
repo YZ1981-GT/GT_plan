@@ -3,7 +3,7 @@ Spec: 平台技术债清偿（2026-11-25）——三张 rescued 表的 ORM-only 
 
 背景：`linkage_audit_log` / `seed_load_history` / `wp_review_records` 此前是
 「裸 SQL 在用、无迁移、无 ORM」的幽灵表（写入/查询被 try/except 吞掉，功能
-静默失效）。V275/V276 补迁移、`rescued_runtime_tables.py` 补 ORM、生产调用方
+静默失效）。V278/V279 补迁移、`rescued_runtime_tables.py` 补 ORM、生产调用方
 已全部改走 ORM（stale_propagation_engine / linkage_bus / template_library_mgmt /
 quality_rating_service 共 6 处）。
 

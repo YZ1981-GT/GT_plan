@@ -214,6 +214,11 @@ export const useChatRunStateStore = defineStore('chatRunState', () => {
         break
       case 'done':
         phase.value = 'done'
+        // 🔴 2026-10-28 重复渲染修复：done 后清空流式缓冲。此前只在本轮
+        // reset()（下一轮发送前）才清，导致 finalizeMessage push 正式消息后，
+        // 模板底部 v-if="streamingDelta" 的流式占位块继续显示同一全文 ——
+        // 同一回复在 UI 上出现两份，直到用户再发下一条才消失。
+        streamingDelta.value = ''
         break
     }
 

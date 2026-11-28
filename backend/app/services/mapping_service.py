@@ -864,7 +864,25 @@ async def get_mappings(
         ).order_by(AccountMapping.original_account_code)
     )
     mappings = result.scalars().all()
-    return [MappingResponse.model_validate(m) for m in mappings]
+    std_codes = {m.standard_account_code for m in mappings}
+    std_names: dict[str, str] = {}
+    if std_codes:
+        name_result = await db.execute(
+            select(AccountChart.account_code, AccountChart.account_name).where(
+                AccountChart.project_id == project_id,
+                AccountChart.source == AccountSource.standard,
+                AccountChart.is_deleted == False,  # noqa: E712
+                AccountChart.account_code.in_(std_codes),
+            )
+        )
+        for code, name in name_result.all():
+            std_names.setdefault(code, name)
+    responses = []
+    for m in mappings:
+        item = MappingResponse.model_validate(m)
+        item.standard_account_name = std_names.get(m.standard_account_code)
+        responses.append(item)
+    return responses
 
 
 # ---------------------------------------------------------------------------

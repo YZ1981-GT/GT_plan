@@ -3,7 +3,7 @@
 
 四组判据，每组都断言观测到的副作用而非「不抛异常」：
 
-1. 写入侧：签发真的落库，字段形态符合 V274 的 CHECK。
+1. 写入侧：签发真的落库，字段形态符合 V277 的 CHECK。
 2. append-only：结算写新行、原行不变；重复结算被拒。
 3. 计数：drain_metrics 三个数各自能独立非零。
 4. 交付物与接线：迁移成对、DDL 与 ORM 双向一致、端点真的调了记账。
@@ -24,8 +24,8 @@ from app.services.workpaper_sync import legacy_drain_ledger as ledger
 
 REPO = Path(__file__).resolve().parents[3]
 ROUTER = REPO / "backend" / "app" / "routers" / "wp_onlyoffice_router.py"
-MIG = REPO / "backend" / "migrations" / "V274__workpaper_legacy_drain_ledger.sql"
-ROLLBACK = REPO / "backend" / "migrations" / "R274__rollback_workpaper_legacy_drain_ledger.sql"
+MIG = REPO / "backend" / "migrations" / "V277__workpaper_legacy_drain_ledger.sql"
+ROLLBACK = REPO / "backend" / "migrations" / "R277__rollback_workpaper_legacy_drain_ledger.sql"
 
 #: 记账入口的两种形态：record_issuance 会抛（供测试），record_issuance_quietly
 #: 永不抛（端点用）。判据必须认两者：只认前者会在端点改用 quietly 后恒红，
@@ -72,7 +72,7 @@ async def test_issuance_row_carries_all_required_fields(session):
     assert row.generation == 7
     assert row.issued_at is not None
     assert row.expires_at - row.issued_at == timedelta(hours=2)
-    # 签发行不得带终结字段（V274 的 ck_wpldl_issued_shape）
+    # 签发行不得带终结字段（V277 的 ck_wpldl_issued_shape）
     assert row.issuance_id is None
     assert row.terminal_state is None
     assert row.settled_at is None
@@ -105,7 +105,7 @@ async def test_non_positive_ttl_is_rejected(session):
         with pytest.raises(ValueError) as exc:
             await _issue(session, ttl=bad)
         # 必须断言到「是我们的 TTL 校验拒的」，不能只看抛了 ValueError：
-        # 删掉 TTL 校验后，expires_at == issued_at 会撞 V274 的 ck_wpldl_ttl_order，
+        # 删掉 TTL 校验后，expires_at == issued_at 会撞 V277 的 ck_wpldl_ttl_order，
         # 同样抛 ValueError —— 只断言类型会让变异存活（首轮实测 M1 SURVIVED）。
         assert "TTL" in str(exc.value), (
             "拒绝理由必须点名 TTL —— 否则无法区分是我们的校验还是数据库 CHECK 兜住的"
@@ -302,7 +302,7 @@ def test_model_is_not_in_v151_registry():
 
 
 def test_ddl_columns_match_orm_columns():
-    """V274 DDL 与 ORM 双向比对（多一列或少一列即红）。"""
+    """V277 DDL 与 ORM 双向比对（多一列或少一列即红）。"""
     import re
     ddl = MIG.read_text(encoding="utf-8")
     head = "CREATE TABLE IF NOT EXISTS working_paper_legacy_drain_ledger ("
@@ -320,7 +320,7 @@ def test_ddl_columns_match_orm_columns():
 
 
 def test_terminal_states_match_migration_check():
-    """封闭集必须与 V274 的 ck_wpldl_terminal_state 逐值一致。"""
+    """封闭集必须与 V277 的 ck_wpldl_terminal_state 逐值一致。"""
     import re
     ddl = MIG.read_text(encoding="utf-8")
     m = re.search(r"terminal_state IN \(([^)]+)\)", ddl)
@@ -412,8 +412,8 @@ def test_residual_guard_is_not_vacuous():
 
 #: 本 spec 全部交付物。新增交付物必须同步登记到这里。
 DELIVERABLES = (
-    "backend/migrations/V274__workpaper_legacy_drain_ledger.sql",
-    "backend/migrations/R274__rollback_workpaper_legacy_drain_ledger.sql",
+    "backend/migrations/V277__workpaper_legacy_drain_ledger.sql",
+    "backend/migrations/R277__rollback_workpaper_legacy_drain_ledger.sql",
     "backend/app/models/workpaper_legacy_drain_ledger.py",
     "backend/app/services/workpaper_sync/legacy_drain_ledger.py",
     "backend/tests/workpaper_sync/test_legacy_drain_ledger.py",
@@ -463,7 +463,7 @@ def test_deliverables_have_no_encoding_damage():
 def test_every_pytest_raises_asserts_the_rejection_reason():
     """每个 pytest.raises 块必须断言拒绝理由，不能只看异常类型。
 
-    M1 首轮存活的原因：删掉 TTL 校验后 expires_at == issued_at 会撞 V274 的
+    M1 首轮存活的原因：删掉 TTL 校验后 expires_at == issued_at 会撞 V277 的
     ck_wpldl_ttl_order，同样抛 ValueError，只断言类型的判据被第二道防线兜住。
     这类判据被兜底机制遮蔽的问题只有元判据能系统性地挡住。
 

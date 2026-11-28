@@ -206,9 +206,26 @@ async def test_staff_members_role_gate_runs_before_any_data_access(tables: list[
     assert exc.value.status_code == 403
     assert exc.value.detail["error_code"] == "TABLE_ROLE_FORBIDDEN"
     assert exc.value.detail["message"] == "表「人员」仅对管理员、合伙人开放"
-    for role in ("admin", "partner"):  # 不限项目的角色：门禁放行、作用域不查库
-        scope = await resolve_builder_scope(user=user(role), dsl_tables=tables, db=None)
-        assert scope.is_all_projects
+    # admin：不限项目，作用域不查库
+    scope = await resolve_builder_scope(user=user("admin"), dsl_tables=tables, db=None)
+    assert scope.is_all_projects
+    # partner：门禁放行（人员表对合伙人开放），但作用域限于名下项目
+    from unittest.mock import AsyncMock, patch
+
+    pid = uuid.uuid4()
+    with patch(
+        "app.services.partner_visibility_service.partner_visible_project_ids",
+        AsyncMock(return_value={pid}),
+    ), patch(
+        "app.services.custom_query.builder_scope._live_project_ids",
+        AsyncMock(side_effect=lambda _db, ids: frozenset(ids)),
+    ), patch(
+        "app.services.custom_query.builder_scope._cycle_scoped",
+        AsyncMock(return_value=frozenset()),
+    ):
+        scope = await resolve_builder_scope(user=user("partner"), dsl_tables=tables, db=None)
+    assert not scope.is_all_projects
+    assert set(scope.project_ids) == {pid}
 
 
 async def test_staff_members_rejection_is_audited_as_pii_denied(monkeypatch: pytest.MonkeyPatch) -> None:

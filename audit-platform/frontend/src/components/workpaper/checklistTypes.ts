@@ -64,6 +64,25 @@ export interface ChecklistHtmlData {
   responses: Record<string, ResponseData>
 }
 
+/**
+ * 空的 checklist HTML 载荷（props 默认值）。
+ *
+ * 🔴 必须放在模块级而非 SFC `<script setup>` 内：`defineProps` 的默认值会被
+ * 编译器提升到 setup() 之外，引用组件内局部变量会报
+ * 「cannot reference locally declared variables」（vite build 直接失败，
+ * vue-tsc 查不出——2026-10-28 服务器部署实测）。
+ */
+export const EMPTY_CHECKLIST_HTML_DATA: ChecklistHtmlData = {
+  template: {
+    wp_code: '',
+    title: '',
+    sections: [],
+    toc: [],
+    stats: { total_actionable: 0, total_guidance: 0, total_sections: 0 },
+  },
+  responses: {},
+}
+
 /** 复核签字提示（A17-5 复核建议） */
 export interface ReviewSignHint {
   suggested_conclusion?: string
@@ -77,19 +96,4 @@ export interface SearchMatch {
   sectionTitle: string
   item: ChecklistItem
   matchField: 'content' | 'standard_ref' | 'child'
-}
-
-/**
- * 空核对表（GtChecklistTable 的 htmlData 默认值）。放在这里而不是组件的 `<script setup>` 里：
- * defineProps 的默认值会被提升到 setup() 之外，引用本地变量编译期即报错（组件整页加载失败）。
- */
-export const EMPTY_CHECKLIST_HTML_DATA: ChecklistHtmlData = {
-  template: {
-    wp_code: '',
-    title: '',
-    sections: [],
-    toc: [],
-    stats: { total_actionable: 0, total_guidance: 0, total_sections: 0 },
-  },
-  responses: {},
 }

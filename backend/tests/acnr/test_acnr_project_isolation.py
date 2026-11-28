@@ -7,7 +7,7 @@ Property 3 (P3): 当用户无权访问某 project 时，resolve/resolve-instance
 - Hypothesis 生成随机 project_id (非用户所属)
 - Mock DB 查询使 project_users / project_assignments 均返回 None
 - 验证 check_project_access 对无权限用户 raise 403
-- 验证 admin/partner 角色始终放行
+- 验证 admin 角色始终放行；partner 只对自己名下的项目放行（其余项目 403）
 
 Validates: Requirements 3.1, 3.3
 """
@@ -39,8 +39,8 @@ _uuid_strategy = st.uuids()
 # 非特权角色（这些角色需要项目关联才能访问）
 _non_privileged_roles = st.sampled_from(["auditor", "preparer", "reviewer", "manager"])
 
-# 特权角色（无需项目关联即可访问）
-_privileged_roles = st.sampled_from(["admin", "partner"])
+# 特权角色（无需项目关联即可访问）：只有 admin。partner 只看自己名下的项目
+_privileged_roles = st.sampled_from(["admin"])
 
 
 def _make_user(role: str, user_id: UUID | None = None) -> SimpleNamespace:
@@ -114,7 +114,7 @@ class TestP3ProjectIsolation:
     def test_privileged_user_always_passes(
         self, project_id: UUID, role: str, user_id: UUID
     ):
-        """admin/partner 角色无论项目 → 始终放行（无 DB 查询）。"""
+        """admin 角色无论项目 → 始终放行（无 DB 查询）。"""
         import asyncio
 
         user = _make_user(role, user_id)
@@ -125,8 +125,30 @@ class TestP3ProjectIsolation:
             check_project_access(user, project_id, session)
         )
 
-        # admin/partner 跳过 DB 查询
+        # admin 跳过 DB 查询
         session.execute.assert_not_called()
+
+    @settings(max_examples=5, deadline=None)
+    @given(project_id=_uuid_strategy, user_id=_uuid_strategy)
+    def test_partner_only_passes_own_projects(self, project_id: UUID, user_id: UUID):
+        """partner：项目在其名下可见集里 → 放行；不在 → 403（不再全局放行）。"""
+        import asyncio
+        from unittest.mock import patch
+
+        user = _make_user("partner", user_id)
+        session = AsyncMock()
+        target = "app.services.partner_visibility_service.partner_visible_project_ids"
+
+        with patch(target, AsyncMock(return_value={project_id})):
+            asyncio.new_event_loop().run_until_complete(
+                check_project_access(user, project_id, session)
+            )
+        with patch(target, AsyncMock(return_value=set())):
+            with pytest.raises(HTTPException) as exc:
+                asyncio.new_event_loop().run_until_complete(
+                    check_project_access(user, project_id, session)
+                )
+            assert exc.value.status_code == 403
 
     @settings(max_examples=5, deadline=None)
     @given(

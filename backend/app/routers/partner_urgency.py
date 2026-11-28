@@ -19,13 +19,14 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
-from app.models.core import Project, ProjectUser, User
+from app.models.core import Project, User
 
 router = APIRouter(
     prefix="/api/partner/projects",
@@ -92,16 +93,14 @@ async def get_partner_urgency(
             Project.status != "archived",
         )
     else:
-        # Partner sees projects they're assigned to
-        proj_stmt = (
-            select(Project)
-            .join(ProjectUser, ProjectUser.project_id == Project.id)
-            .where(
-                ProjectUser.user_id == current_user.id,
-                ProjectUser.is_deleted == False,  # noqa: E712
-                Project.is_deleted == False,  # noqa: E712
-                Project.status != "archived",
-            )
+        # Partner：只看名下项目（与项目列表同一口径）
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        pids = await partner_visible_project_ids(current_user, db)
+        proj_stmt = select(Project).where(
+            Project.id.in_(pids) if pids else sa.false(),
+            Project.is_deleted == False,  # noqa: E712
+            Project.status != "archived",
         )
 
     result = await db.execute(proj_stmt)

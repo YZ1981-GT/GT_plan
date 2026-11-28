@@ -1,15 +1,15 @@
-"""V275/V276 补齐的运行时表 ORM（2026-11-25 平台技术债清偿）。
+"""V278/V279 补齐的运行时表 ORM（2026-11-25 平台技术债清偿）。
 
 三张表此前的形态是「生产裸 SQL 在用、ORM 无模型、迁移无建表」——
 `linkage_audit_log` / `seed_load_history` / `wp_review_records` 在共享库根本
 不存在，对应代码路径被 try/except 吞掉，功能静默失效（联动审计日志不落库、
-种子加载历史恒空、复核深度评分恒走默认值）。V275 补齐迁移建表，本文件补齐
+种子加载历史恒空、复核深度评分恒走默认值）。V278 补齐迁移建表，本文件补齐
 ORM 声明（三层一致：DB 迁移 + ORM `Mapped[]` + service）。
 
 🔴 列型对齐记录：
-* `seed_load_history.errors` 是 **JSONB**（错误明细数组）——V275 首版按
+* `seed_load_history.errors` 是 **JSONB**（错误明细数组）——V278 首版按
   SELECT 反推建成了 integer，与生产 INSERT 的 `CAST(:errors AS JSONB)` 不匹配
-  （一写就炸、被 try/except 吞掉）。V276 修正为 JSONB NOT NULL DEFAULT '[]'。
+  （一写就炸、被 try/except 吞掉）。V279 修正为 JSONB NOT NULL DEFAULT '[]'。
 * `wp_review_records` 的列集按生产唯一消费方
   `quality_rating_service._review_depth_score` 的 SELECT 反推
   （project_id / review_status 两列参与聚合）；若后续接入真实写入方，
@@ -49,7 +49,7 @@ class LinkageAuditLog(Base):
         # ?? Python ?????????server_default=gen_random_uuid() ? PG ???
         #    SQLite create_all ?? flush ?? unknown function?2026-11-25 ??
         #    test_seed_all_savepoint_isolation ? PendingRollbackError??
-        #    DB ? default ?? V275 ?????gen_random_uuid()??????????
+        #    DB ? default ?? V278 ?????gen_random_uuid()??????????
         default=uuid.uuid4,
     )
     source_uri: Mapped[str] = mapped_column(String, nullable=False)
@@ -67,7 +67,7 @@ class SeedLoadHistory(Base):
     """模板库种子加载审计轨迹（template_library_mgmt 写/读）。
 
     🔴 `errors` 是 JSONB（错误明细数组），不是条数 —— 见模块 docstring 的
-    V275/V276 列型修正记录。
+    V278/V279 列型修正记录。
     """
 
     __tablename__ = "seed_load_history"
@@ -78,7 +78,7 @@ class SeedLoadHistory(Base):
         # ?? Python ?????????server_default=gen_random_uuid() ? PG ???
         #    SQLite create_all ?? flush ?? unknown function?2026-11-25 ??
         #    test_seed_all_savepoint_isolation ? PendingRollbackError??
-        #    DB ? default ?? V275 ?????gen_random_uuid()??????????
+        #    DB ? default ?? V278 ?????gen_random_uuid()??????????
         default=uuid.uuid4,
     )
     seed_name: Mapped[str] = mapped_column(String, nullable=False)
@@ -119,7 +119,7 @@ class WpReviewRecord(Base):
         # ?? Python ?????????server_default=gen_random_uuid() ? PG ???
         #    SQLite create_all ?? flush ?? unknown function?2026-11-25 ??
         #    test_seed_all_savepoint_isolation ? PendingRollbackError??
-        #    DB ? default ?? V275 ?????gen_random_uuid()??????????
+        #    DB ? default ?? V278 ?????gen_random_uuid()??????????
         default=uuid.uuid4,
     )
     project_id: Mapped[uuid.UUID] = mapped_column(

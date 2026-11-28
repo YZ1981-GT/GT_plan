@@ -259,7 +259,7 @@ def summarize_conflicts(rows: Iterable[Mapping[str, Any]]) -> ConflictRollup:
         if not (has_resolved_at or has_abandoned_at or has_superseded_at):
             unsettled += 1
 
-        # 三列同生共死（V273 的 `ck_wpsc_abandon_triplet` 在 DB 上强制，这里复核读回值）。
+        # 三列同生共死（V276 的 `ck_wpsc_abandon_triplet` 在 DB 上强制，这里复核读回值）。
         if has_abandoned_at or has_abandon_reason or has_abandoned_by:
             if has_abandoned_at and has_abandon_reason and has_abandoned_by:
                 triplet += 1

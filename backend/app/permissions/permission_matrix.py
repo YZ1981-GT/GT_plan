@@ -23,29 +23,28 @@ from typing import Any
 
 from app.services.permission_matrix_service import (
     OPERATION_CODES,
+    ROLE_ALIAS_MAP,
     can as _matrix_can,
     get_allowed_operations,
+    normalize_role,
 )
 
 # ─── 5 审计角色常量 ──────────────────────────────────────────────────────────
 AUDIT_ROLES = ("assistant", "manager", "partner", "qc_partner", "eqcr")
 
 # ─── 角色别名→系统角色映射（归一化） ──────────────────────────────────────────
-ROLE_ALIAS_MAP: dict[str, str] = {
-    # 审计 5 角色 → 系统角色
-    "assistant": "auditor",
-    "auditor": "auditor",
-    "manager": "manager",
-    "partner": "partner",
-    "signing_partner": "partner",
-    "qc_partner": "qc",
-    "qc": "qc",
-    "qc_reviewer": "qc",
-    "quality_control": "qc",
-    "eqcr": "eqcr",
-    # admin 保留
-    "admin": "admin",
-}
+#
+# 🔴 **定义已下沉到 `app/services/permission_matrix_service.py`**，
+#    这里只是**重导出**（`ROLE_ALIAS_MAP` / `normalize_role` 均从上方 import 而来，
+#    是**同一个对象**、不是 copy）⇒ `from app.permissions.permission_matrix import
+#    ROLE_ALIAS_MAP` 这个既有路径行为不变。
+#
+#    下沉的原因：别名需要在 **6 个查表处**生效（明细见 service 层 `normalize_role`
+#    的 docstring），其中 `wp_cell_lock_service.py` 与 service 层本身都是
+#    **零 app 依赖的叶子模块**，而本模块**不能被它们 import**。
+#
+#    ⚠️ 本模块的 `can()` / `get_operations_for_role()` 仍照旧先归一化再委托；
+#       区别只在于**下层现在也归一化了**（原先只有上层归一化，是那 6 处缺陷的根因）。
 
 # ─── 资源→操作前缀映射 ────────────────────────────────────────────────────────
 RESOURCE_ACTION_MAP: dict[str, dict[str, str]] = {
@@ -79,19 +78,6 @@ LOCKED_OVERRIDE_ROLES = {"admin", "partner"}
 # ─── 复核后限制 ───────────────────────────────────────────────────────────────
 # 已复核底稿，编辑操作降级为只读（除非是 partner/admin 重新打开）
 POST_REVIEW_EDIT_ROLES = {"admin", "partner", "manager"}
-
-
-def normalize_role(role: str) -> str:
-    """将审计角色名/别名归一化为系统角色名。
-
-    Args:
-        role: 原始角色字符串（如 "assistant", "qc_partner", "signing_partner"）
-
-    Returns:
-        系统角色名（如 "auditor", "qc", "partner"）
-    """
-    r = role.lower().strip()
-    return ROLE_ALIAS_MAP.get(r, r)
 
 
 def can(

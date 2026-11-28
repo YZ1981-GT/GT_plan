@@ -87,13 +87,18 @@ async def test_single_html_needs_no_adapter_or_representation():
 
 @pytest.mark.asyncio
 async def test_bidirectional_without_representation_is_fail_visible():
+    """尚无首版：如实报未就绪 + 原因，但放行 oo —— 首版在首次进入在线编辑时按需发布。
+
+    旧口径只放行 html ⇒ 入口被藏、桥也拒绝，首版永远发不出来（死锁）。
+    """
     result = await R.evaluate_entry_readiness(
         session=object(), registry=object(), project_id=PROJECT, wp_id=WP,
         entry_id=ENTRY, manifest=manifest(entry()),
         read_representation=AsyncMock(return_value=None),
     )
-    assert result.allowed_modes == ("html",)
+    assert result.allowed_modes == ("html", "oo")
     assert result.runtime.ready is False
+    assert result.can_claim_bidirectional is False
     assert result.reason and result.reason.code == "REPRESENTATION_MISSING"
 
 

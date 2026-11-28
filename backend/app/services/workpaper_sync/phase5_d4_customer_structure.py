@@ -15,7 +15,7 @@ sibling provider 接口（契约 sheet payload / instrumentation spec / store �
 ═══ 结构：单 sheet 三 table ═══
 
 受管 sheet = ``重要客户结构分析D4-9``（openpyxl 直读权威模板 ``D/D4 收入底稿.xlsx``，
-sha256=``2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62``）：
+sha256=``8d64194aff461a76b94e0ee785232be73b70b6f94ab97aad0f67aaff969471e2``）：
 
 * **本期段**（``customer_current_rows``）：表头 R12，数据 R13-22（10 行），合计 R23，
   本期销售总额 R24（C24 金额 / E24 数量）；隐藏 UUID 列 **W**。
@@ -58,7 +58,7 @@ class StorePayloadError(ValueError):
 #: 与父模块共享的模板身份（同 workbook）。
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4 收入底稿.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62"
+    "8d64194aff461a76b94e0ee785232be73b70b6f94ab97aad0f67aaff969471e2"
 )
 
 MANAGED_SHEET_D49: Final[str] = "重要客户结构分析D4-9"
@@ -100,7 +100,7 @@ FOOTER_MARKER_D49: Final[str] = "合计"
 
 #: Task 3 冻结的 mapping_digest（openpyxl 实测几何，compute_mapping_digest 现算）。
 EXPECTED_MAPPING_DIGEST_D49: Final[str] = (
-    "148f5f85728e0d18d9965cf19d3e8decf49c5ba330bb32f9c7dfaf4908340de5"
+    "1e88ac7e5bd1e16d1ea797013c5894e31ec3bbb2fd1385b2f5865cba2166f1b8"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════

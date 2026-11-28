@@ -15,7 +15,7 @@ Property: **Property 3**（「状态变了但内容没落地」不可能出现�
 
 ═══ 隔离 ═══
 
-scratch schema `tmp_sosr_<hex>` + `SET search_path` 只含它；**真跑 V151 / V264 / V273**
+scratch schema `tmp_sosr_<hex>` + `SET search_path` 只含它；**真跑 V151 / V264 / V276**
 （不手抄 DDL —— 抄一份就等于「迁移写错也照样绿」）。结束 `DROP SCHEMA CASCADE`。
 🔴 **不写共享库**：全部数据在临时 schema 内。真实库的只读复核由
 `check_sync_operation_settlement.py --all` 承担（它跑在 `SET TRANSACTION READ ONLY` 里）。
@@ -45,7 +45,7 @@ _MIGRATION_V151 = (
     _BACKEND / "migrations" / "V151__workpaper_sync_content_application_bundle_scope.sql"
 )
 _MIGRATION_V264 = _BACKEND / "migrations" / "V264__sync_conflict_schema_anomaly.sql"
-_MIGRATION_V273 = _BACKEND / "migrations" / "V273__sync_conflict_abandon_columns.sql"
+_MIGRATION_V276 = _BACKEND / "migrations" / "V276__sync_conflict_abandon_columns.sql"
 
 #: 本判据只需要的三个 stub 父表（V151 里它们由平台侧建，不在那份迁移内）。
 _STUB_DDL = """
@@ -101,7 +101,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 一次采集覆盖全部
             "结算复核探针判据（DB 约束 / READ ONLY / 三跳 JOIN）必须真实 PostgreSQL；"
             f"当前 {settings.DATABASE_URL.split('://')[0]}"
         )
-    for required in (_MIGRATION_V151, _MIGRATION_V264, _MIGRATION_V273):
+    for required in (_MIGRATION_V151, _MIGRATION_V264, _MIGRATION_V276):
         if not required.exists():
             raise RuntimeError(f"缺迁移 {required}")
 
@@ -144,7 +144,7 @@ async def _collect() -> dict[str, Any]:  # noqa: C901 - 一次采集覆盖全部
         async with engine.begin() as conn:
             for stmt in [s.strip() for s in _STUB_DDL.strip().split(";") if s.strip()]:
                 await conn.exec_driver_sql(stmt)
-        for migration in (_MIGRATION_V151, _MIGRATION_V264, _MIGRATION_V273):
+        for migration in (_MIGRATION_V151, _MIGRATION_V264, _MIGRATION_V276):
             for idx, stmt in enumerate(
                 MigrationRunner._split_sql_statements(migration.read_text(encoding="utf-8")),
                 1,
@@ -635,7 +635,7 @@ def test_harness_did_not_crash(snap: dict[str, Any]) -> None:
 
 
 def test_the_three_columns_really_exist(snap: dict[str, Any]) -> None:
-    """V273 真的加了列 —— 后面每条判据的前提（由 `collect_report` 成功读出证明）。"""
+    """V276 真的加了列 —— 后面每条判据的前提（由 `collect_report` 成功读出证明）。"""
     assert snap["scenarios"]["probe"]["conflicts"]["total"] == 3
 
 

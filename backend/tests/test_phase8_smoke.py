@@ -94,14 +94,19 @@ class TestAPIEndpointSmoke:
         assert hasattr(engine, "validate_project") or hasattr(engine, "validate")
 
     def test_security_monitor_endpoint_exists(self):
-        """API 3: 安全监控服务存在且有关键方法"""
+        """API 3: 安全监控服务存在且有关键方法
+
+        V274：record_login_attempt / get_login_attempts（内存列表，登录流程从未调用）
+        已删除；登录尝试记录持久化到 sys_login_log，读取端点改查持久表。
+        """
         from app.services.security_monitor import SecurityMonitor
 
         monitor = SecurityMonitor()
-        # Verify actual methods from the implementation
-        assert hasattr(monitor, "record_login_attempt")
-        assert hasattr(monitor, "get_login_attempts")
         assert hasattr(monitor, "is_suspicious_ip")
+        assert hasattr(monitor, "get_active_sessions")
+        # 读取端点仍在（改读持久表）
+        from app.routers import security as security_router
+        assert hasattr(security_router, "get_login_attempts")
 
     def test_audit_log_service_exists(self):
         """API 4: 审计日志增强服务存在"""

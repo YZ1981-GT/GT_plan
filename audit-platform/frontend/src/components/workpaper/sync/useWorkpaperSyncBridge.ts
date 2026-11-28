@@ -568,6 +568,10 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
       pendingKey = receipt.idempotencyKey
       pendingMutationToken.value = token
     } catch (error) {
+      // 尚无首版时 adapter 注册不上，服务端在 pending-mutations 这一步就回报
+      // substrate_not_published（还到不了 materialize）⇒ 同样发一次首版后整链重走。
+      const retried = await retryAfterFirstPublication(error, allowFirstPublication)
+      if (retried !== null) return retried
       return failIdentityOrSync('pending_mutation', error)
     }
     apply('pending_mutation_created')

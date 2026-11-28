@@ -73,9 +73,17 @@ async def attach_subsidiaries(
     except ProjectCreationGrantStale as exc:
         raise HTTPException(status_code=409, detail="当前用户状态已变化，请重新登录后重试") from exc
     role = getattr(getattr(actor, "role", None), "value", getattr(actor, "role", None))
-    if role in {"admin", "partner"}:
-        # 沿用既有产品口径：管理员 / 合伙人可整理任意同年度单体项目。
+    if role == "admin":
+        # 管理员可整理任意同年度单体项目。
         writable_ids = set(child_identities)
+    elif role == "partner":
+        # 合伙人只能整理自己名下的项目（本合并项目与各下级都须在其可见集内）。
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        partner_pids = await partner_visible_project_ids(actor, db)
+        if parent_project_id not in partner_pids:
+            raise HTTPException(status_code=403, detail="权限不足")
+        writable_ids = set(child_identities) & partner_pids
     else:
         # 其他角色既要能维护本合并范围，也要对每个下级有编制权限；只读成员不能改三码。
         await assert_project_permission(db, actor, parent_project_id, "edit")

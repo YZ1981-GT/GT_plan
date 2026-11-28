@@ -1,4 +1,4 @@
-"""自定义底稿模板的不可变 publication 登记（V272）。
+"""自定义底稿模板的不可变 publication 登记（V275）。
 
 Spec: custom-workpaper-template-ingestion-and-sync-closure, Task 16 / 20
 关联：`app.services.custom_template_ingestion.publication_ops.PublicationRegistry`

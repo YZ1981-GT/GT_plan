@@ -1,4 +1,4 @@
-"""V271/R271 与 LedgerImportAttempt 的隔离迁移合同测试。"""
+"""V273/R273（合并入 dev1.0 时由 V271/R271 改号） 与 LedgerImportAttempt 的隔离迁移合同测试。"""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ from app.models.dataset_models import LedgerImportAttempt
 
 _BACKEND = Path(__file__).resolve().parents[1]
 _MIGRATIONS = _BACKEND / "migrations"
-_V271 = _MIGRATIONS / "V271__ledger_import_attempts.sql"
-_R271 = _MIGRATIONS / "R271__rollback_ledger_import_attempts.sql"
+_V273 = _MIGRATIONS / "V273__ledger_import_attempts.sql"
+_R273 = _MIGRATIONS / "R273__rollback_ledger_import_attempts.sql"
 _REQUIRED_COLUMNS = {
     "id",
     "project_id",
@@ -44,20 +44,20 @@ def _migration_file(path: Path, version: str) -> MigrationFile:
     )
 
 
-def test_v271_is_current_unique_vr_pair_and_model_shape() -> None:
+def test_v273_is_current_unique_vr_pair_and_model_shape() -> None:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     runner = MigrationRunner(engine=engine, migrations_dir=_MIGRATIONS)
     try:
-        versions = [migration for migration in runner.scan_migrations() if migration.version == "271"]
-        rollbacks = [migration for migration in runner.scan_rollback_scripts() if migration.version == "271"]
-        assert [migration.filename for migration in versions] == [_V271.name]
-        assert [migration.filename for migration in rollbacks] == [_R271.name]
-        # 🔴 原断言是 `max(...) == 271`，它把「V271 是本 spec 的迁移」和
-        #    「V271 是仓库当前最高迁移号」两件事绑在一起 —— 后者每有新迁移就失效
+        versions = [migration for migration in runner.scan_migrations() if migration.version == "273"]
+        rollbacks = [migration for migration in runner.scan_rollback_scripts() if migration.version == "273"]
+        assert [migration.filename for migration in versions] == [_V273.name]
+        assert [migration.filename for migration in rollbacks] == [_R273.name]
+        # 🔴 原断言是 `max(...) == 273`，它把「V273 是本 spec 的迁移」和
+        #    「V273 是仓库当前最高迁移号」两件事绑在一起 —— 后者每有新迁移就失效
         #    （实测：并发会话引入 V273/V274 后本用例恒红，与本 spec 无关）。
-        #    真正要守的是「V271 在扫描结果里唯一且与 R271 配对」，已由上面两条断言覆盖；
-        #    这里只额外钉住「V271 之后仍存在更高号」不构成对本 spec 的破坏。
-        assert any(int(migration.version) >= 271 for migration in runner.scan_migrations())
+        #    真正要守的是「V273 在扫描结果里唯一且与 R273 配对」，已由上面两条断言覆盖；
+        #    这里只额外钉住「V273 之后仍存在更高号」不构成对本 spec 的破坏。
+        assert any(int(migration.version) >= 273 for migration in runner.scan_migrations())
     finally:
         # scan_migrations 不会打开连接，但释放测试引擎避免资源告警。
         import asyncio
@@ -69,12 +69,12 @@ def test_v271_is_current_unique_vr_pair_and_model_shape() -> None:
     assert "ck_ledger_import_attempt_status" in {
         constraint.name for constraint in LedgerImportAttempt.__table__.constraints
     }
-    assert "RAISE EXCEPTION" in _R271.read_text(encoding="utf-8")
-    assert "DROP TABLE IF EXISTS ledger_import_attempts" in _R271.read_text(encoding="utf-8")
+    assert "RAISE EXCEPTION" in _R273.read_text(encoding="utf-8")
+    assert "DROP TABLE IF EXISTS ledger_import_attempts" in _R273.read_text(encoding="utf-8")
 
 
 @pytest.mark.asyncio
-async def test_v271_and_r271_run_without_pg_syntax_on_empty_sqlite_table() -> None:
+async def test_v273_and_r273_run_without_pg_syntax_on_empty_sqlite_table() -> None:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     runner = MigrationRunner(engine=engine, migrations_dir=_MIGRATIONS)
     try:
@@ -82,7 +82,7 @@ async def test_v271_and_r271_run_without_pg_syntax_on_empty_sqlite_table() -> No
             await conn.exec_driver_sql("CREATE TABLE projects (id UUID PRIMARY KEY)")
             await conn.exec_driver_sql("CREATE TABLE users (id UUID PRIMARY KEY)")
             await conn.exec_driver_sql("CREATE TABLE ledger_datasets (id UUID PRIMARY KEY)")
-            for statement in runner._split_sql_statements(_V271.read_text(encoding="utf-8")):
+            for statement in runner._split_sql_statements(_V273.read_text(encoding="utf-8")):
                 await conn.exec_driver_sql(statement)
             columns = {
                 row[1]
@@ -90,7 +90,7 @@ async def test_v271_and_r271_run_without_pg_syntax_on_empty_sqlite_table() -> No
             }
             assert _REQUIRED_COLUMNS <= columns
 
-        await runner._execute_rollback_script(_migration_file(_R271, "271"))
+        await runner._execute_rollback_script(_migration_file(_R273, "273"))
         async with engine.connect() as conn:
             exists = await conn.execute(text(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='ledger_import_attempts'"
@@ -101,7 +101,7 @@ async def test_v271_and_r271_run_without_pg_syntax_on_empty_sqlite_table() -> No
 
 
 @pytest.mark.asyncio
-async def test_r271_sqlite_protection_rejects_non_empty_attempts() -> None:
+async def test_r273_sqlite_protection_rejects_non_empty_attempts() -> None:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     runner = MigrationRunner(engine=engine, migrations_dir=_MIGRATIONS)
     try:
@@ -110,7 +110,7 @@ async def test_r271_sqlite_protection_rejects_non_empty_attempts() -> None:
             await conn.exec_driver_sql("INSERT INTO ledger_import_attempts (id) VALUES (1)")
 
         with pytest.raises(RuntimeError, match="仍有数据"):
-            await runner._execute_rollback_script(_migration_file(_R271, "271"))
+            await runner._execute_rollback_script(_migration_file(_R273, "273"))
 
         async with engine.connect() as conn:
             row = await conn.execute(text("SELECT COUNT(*) FROM ledger_import_attempts"))

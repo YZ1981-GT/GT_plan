@@ -172,11 +172,39 @@
           <div class="gt-form-section-title">项目团队</div>
 
           <el-form-item label="签字合伙人">
-            <el-input v-model="form.signing_partner_id" placeholder="请输入签字合伙人" />
+            <el-select
+              v-model="form.signing_partner_id"
+              placeholder="请选择签字合伙人"
+              style="width: 100%"
+              filterable
+              clearable
+              :loading="teamLoading"
+            >
+              <el-option
+                v-for="u in partnerOptions"
+                :key="u.id"
+                :label="u.full_name || u.username"
+                :value="u.id"
+              />
+            </el-select>
           </el-form-item>
 
           <el-form-item label="项目经理">
-            <el-input v-model="form.manager_id" placeholder="请输入项目经理" />
+            <el-select
+              v-model="form.manager_id"
+              placeholder="请选择项目经理"
+              style="width: 100%"
+              filterable
+              clearable
+              :loading="teamLoading"
+            >
+              <el-option
+                v-for="u in managerOptions"
+                :key="u.id"
+                :label="u.full_name || u.username"
+                :value="u.id"
+              />
+            </el-select>
           </el-form-item>
 
           <div class="gt-form-section-title" style="margin-top: 20px">预算与合同</div>
@@ -301,6 +329,35 @@ const customTemplateLoading = ref(false)
 const customTemplates = ref<Array<{ id: string; name: string; version?: string }>>([])
 const recommendation = ref<TemplateRecommendation | null>(null)
 
+// ─── 项目团队下拉（签字合伙人 / 项目经理）──────────────────────────────────
+// 后端 ProjectCreate 要求 signing_partner_id / manager_id 为 UUID，
+// 原先的 el-input 让用户手输姓名 → 422 uuid_parsing。
+// 数据源 /api/users/（须登录），按角色过滤：partner → 签字合伙人，manager → 项目经理。
+// 🔴 label 用 full_name（审计师认人名不认登录名），full_name 缺失（V149 前历史账号）才回落 username。
+interface TeamUserOption { id: string; username: string; full_name?: string | null; role: string; is_active: boolean }
+const teamLoading = ref(false)
+const teamUsers = ref<TeamUserOption[]>([])
+const partnerOptions = computed(() => teamUsers.value.filter((u) => u.role === 'partner'))
+const managerOptions = computed(() => teamUsers.value.filter((u) => u.role === 'manager'))
+
+async function loadTeamUsers() {
+  if (teamUsers.value.length > 0) return
+  teamLoading.value = true
+  try {
+    const list = await api.get('/api/users/')
+    teamUsers.value = (Array.isArray(list) ? list : (list as any)?.data ?? []) as TeamUserOption[]
+    // UUID → 全名映射写入 store，ConfirmationStep 显示人名用（full_name 缺失回落 username）
+    const map: Record<string, string> = {}
+    for (const u of teamUsers.value) map[u.id] = u.full_name || u.username
+    wizardStore.teamUserNames = map
+  } catch {
+    // 拉取失败不阻断向导；下拉为空时用户仍可跳过这两个可空字段
+    teamUsers.value = []
+  } finally {
+    teamLoading.value = false
+  }
+}
+
 const SUBTYPE_DESC: Record<string, string> = {
   type_a: '上市公司、三板创新层及公开发债',
   type_b: '三板基础层、银行、保险、期货、证券',
@@ -327,7 +384,7 @@ const showCategoryReference = ref(false)
 
 const currentCategoryLetter = computed(() => {
   const map: Record<string, string> = { type_a: 'A', type_b: 'B', type_c: 'C' }
-  return map[form.company_subtype] || ''
+  return map[form.company_subtype || ''] || ''
 })
 
 function onCategorySelect(value: string) {
@@ -632,6 +689,8 @@ onMounted(async () => {
   if (saved) {
     applySaved(saved)
   }
+  // 项目团队下拉数据（签字合伙人/项目经理）
+  loadTeamUsers()
   if (form.template_type === 'custom') {
     await loadCustomTemplates()
     if (form.custom_template_id) {
@@ -737,6 +796,12 @@ defineExpose({ validate, formRef })
 
 /* 业务类型参考链接 */
 .gt-category-ref-link { margin-left: 8px; font-size: 12px; }
+
+/* 下拉框文字与输入框同字号：Element Plus 的 .el-select__wrapper 写死 14px，
+   输入框则跟随全局字号（--el-font-size-base），两者并排时下拉框显得偏大 */
+.gt-basic-info-step :deep(.el-select__wrapper) {
+  font-size: var(--el-select-font-size, var(--el-font-size-base));
+}
 
 /* 上级代码 = 本企业代码时的说明 */
 .gt-self-ref-hint {

@@ -776,7 +776,7 @@ async def _record_history(
 ) -> None:
     """写入 seed_load_history 表（D15 审计轨迹）。
 
-    2026-11-25 由裸 SQL 改 ORM（`SeedLoadHistory`）——列型由迁移 V276 修正为
+    2026-11-25 由裸 SQL 改 ORM（`SeedLoadHistory`）——列型由迁移 V279 修正为
     JSONB（错误明细数组），`errors` 列 ORM 直接收 list（SQLAlchemy JSONB 自动
     序列化，无需手工 json.dumps + CAST）。
     """

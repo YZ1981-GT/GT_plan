@@ -54,6 +54,32 @@ DOCX_DOCS: list[dict] = [
     {"wp_code": "K18", "wp_name": "递延收益审定表", "class_code": "K-审定表", "class": "K"},
     # S 专项：S17 非经常性损益模板是旧版 .xls（analyze 脚本只扫 .xlsx → 漏）。override 已配 audit-sheet。
     {"wp_code": "S17", "wp_name": "非经常性损益", "class_code": "S-审定表", "class": "S"},
+    # ─── 标准模板库无对应 xlsx/docx 模板的「虚拟码」底稿 ────────────────────
+    # 这些 wp_code 在项目初始化（init_wp_index 等）时会建底稿，但致同模板目录
+    # 里没有同名文件 → xlsx/docx 扫描器都不产分类行 → /api/wp-classifications 404。
+    # componentType 由 wp_code_overrides.json 决定（b60-strategy / m1-dividends-payable
+    # / b1-3-business-evaluation 等），class_code 仅语义归属，与已拆分的 M2A/J1A
+    # 等程序表行保持一致（A-实质性程序 / A-程序表）。
+    # B1-3/B1-4 业务评价/尽调报告、B1-7 质量控制委员会会议记录（docx 类）
+    {"wp_code": "B1-3", "wp_name": "业务评价表", "class_code": "A-程序表", "class": "A"},
+    {"wp_code": "B1-4", "wp_name": "业务承接阶段尽职调查报告", "class_code": "A-报告文档", "class": "A"},
+    {"wp_code": "B1-7", "wp_name": "质量控制委员会会议记录", "class_code": "A-报告文档", "class": "A"},
+    # B60 系列：特殊事项策略/函件（overrides → b60-strategy）
+    {"wp_code": "B60A", "wp_name": "对内控审计的特殊考虑", "class_code": "B-报告文档", "class": "B"},
+    {"wp_code": "B60B", "wp_name": "对IPO申报财务报表审计的特殊考虑", "class_code": "B-报告文档", "class": "B"},
+    {"wp_code": "B60C", "wp_name": "对国有企业年度财务报表审计的特殊考虑", "class_code": "B-报告文档", "class": "B"},
+    {"wp_code": "B60D", "wp_name": "向监管机构报送总体审计策略和具体审计计划的函副本", "class_code": "B-报告文档", "class": "B"},
+    {"wp_code": "B60-2-1", "wp_name": "IT复杂性判断表", "class_code": "B-报告文档", "class": "B"},
+    {"wp_code": "B60-2-2", "wp_name": "IT复杂性判断表", "class_code": "B-报告文档", "class": "B"},
+    {"wp_code": "B60-2-3", "wp_name": "IT复杂性判断表", "class_code": "B-报告文档", "class": "B"},
+    {"wp_code": "B60-3", "wp_name": "IT复杂性判断表", "class_code": "B-报告文档", "class": "B"},
+    # M1A 应付股利程序表（overrides → m1-dividends-payable，与 M2A 行格式一致）
+    {"wp_code": "M1A", "wp_name": "应付股利实质性程序表", "class_code": "A-实质性程序", "class": "A"},
+    # B5 附件：数据分级确认函（B5 业务约定书控制表的附件底稿，无模板文件）
+    {"wp_code": "B5附件", "wp_name": "数据分级确认函", "class_code": "B-报告文档", "class": "B"},
+    # S12A 评估专家报告 / S33-REV 程序修订说明（overrides → word-template）
+    {"wp_code": "S12A", "wp_name": "评估专家报告", "class_code": "S-审定表", "class": "S"},
+    {"wp_code": "S33-REV", "wp_name": "综合核查-程序修订说明", "class_code": "S-审定表", "class": "S"},
 ]
 
 # 默认 class_code：A 报告循环文档（语义归属 A），componentType 由 class_code 前缀派生

@@ -455,7 +455,7 @@ class StalePropagationEngine:
     ) -> None:
         """写入传播审计日志到 linkage_audit_log 表。
 
-        2026-11-25 由裸 SQL 改 ORM（`LinkageAuditLog`）——三层一致：表由 V275
+        2026-11-25 由裸 SQL 改 ORM（`LinkageAuditLog`）——三层一致：表由 V278
         迁移持有、模型在 `app.models.rescued_runtime_tables`、本处走 ORM 写入。
         `id` / `created_at` 由 DB server_default 生成（模型已声明），写入方不传。
         """

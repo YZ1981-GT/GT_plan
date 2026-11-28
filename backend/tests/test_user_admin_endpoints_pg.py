@@ -133,7 +133,9 @@ async def test_update_user_is_admin_only_and_edits_fields(db):
         assert (await c.put(url, json={"password": ""}, headers=_auth(admin))).status_code == 200
         assert verify_password("Init#2026", (await _reload(db, target.id)).hashed_password)
         assert (await c.put(url, json={"password": "1234567"}, headers=_auth(admin))).status_code == 422
-        assert (await c.put(url, json={"username": "renamed"}, headers=_auth(admin))).status_code == 422
+        # V149 权限中心：用户名可改（唯一性由 service 校验）
+        assert (await c.put(url, json={"username": "renamed"}, headers=_auth(admin))).status_code == 200
+        assert (await _reload(db, target.id)).username == "renamed"
         assert (await c.put(url, json={"password": "Rst#2026"}, headers=_auth(admin))).status_code == 200  # 恰 8 位
         # 邮箱全表唯一
         assert (await c.put(url, json={"email": admin.email}, headers=_auth(admin))).status_code == 409

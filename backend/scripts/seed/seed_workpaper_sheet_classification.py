@@ -46,6 +46,25 @@ from app.models.workpaper_template_version import WorkpaperTemplateVersion
 ANALYSIS_JSON = Path(__file__).resolve().parents[3] / ".kiro" / "specs" / "workpaper-html-renderer" / "workpaper_template_analysis.json"
 
 
+def _resolve_analysis_json() -> Path:
+    """解析 workpaper_template_analysis.json 实际位置。
+
+    spec 归档后原路径（.kiro/specs/workpaper-html-renderer/）已不存在，
+    依次回退到 _archive 下的两个副本（优先 renderer spec 的权威副本）。
+    """
+    if ANALYSIS_JSON.exists():
+        return ANALYSIS_JSON
+    archive_base = ANALYSIS_JSON.parents[1] / "_archive" / "07-workpaper-slimdown"
+    for candidate in (
+        archive_base / "workpaper-html-renderer" / ANALYSIS_JSON.name,
+        archive_base / "workpaper-editor-slimdown" / ANALYSIS_JSON.name,
+    ):
+        if candidate.exists():
+            print(f"[WARN] {ANALYSIS_JSON} 不存在（spec 已归档），回退使用: {candidate}")
+            return candidate
+    return ANALYSIS_JSON  # 保持原行为：main() 里给出明确的错误提示
+
+
 # ─── class_code → 字段派生规则 ───────────────────────────────────────────────
 
 def derive_extra_fields(class_code: str) -> dict:
@@ -158,12 +177,13 @@ async def get_or_create_template_version(s) -> UUID:
 
 
 async def main():
-    if not ANALYSIS_JSON.exists():
-        print(f"[ERROR] Analysis JSON not found: {ANALYSIS_JSON}")
-        print("Run: python backend/scripts/analyze_wp_templates.py")
+    analysis_path = _resolve_analysis_json()
+    if not analysis_path.exists():
+        print(f"[ERROR] Analysis JSON not found: {analysis_path}")
+        print("Run: python backend/scripts/analyze/analyze_wp_templates.py")
         sys.exit(1)
 
-    with ANALYSIS_JSON.open("r", encoding="utf-8") as f:
+    with analysis_path.open("r", encoding="utf-8") as f:
         analysis = json.load(f)
 
     # ─── Step 1: 收集所有 (wp_code, sheet_name, class_code) 三元组 ─────────

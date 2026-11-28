@@ -24,7 +24,7 @@ from typing import Any, Final, Iterator, Mapping
 #: 与 phase5_d4_revenue_detail 共享的模板身份（同 workbook）。
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4 收入底稿.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62"
+    "8d64194aff461a76b94e0ee785232be73b70b6f94ab97aad0f67aaff969471e2"
 )
 
 MANAGED_SHEET_D435: Final[str] = "其他业务收入检查表D4-35"
@@ -47,7 +47,7 @@ ROW_IDENTITY_STORE_KEY_D435: Final[str] = "id"
 
 #: 冻结的列映射摘要（本 provider 首交付即冻结，防后续漂移）。
 EXPECTED_MAPPING_DIGEST_D435: Final[str] = (
-    "2e87471ada6a3dcda4a8025e56fd4274d07a297fd6b8f08f1762f2a274ca36b4"
+    "0dda0e3b12e7952bd33408d98b1f58eb724bd7cdd8bcfa2be7c9133d15bee201"
 )
 
 #: 16 个契约字段：`(column_key, 列标, mode, value_type, store json 路径, 表头文本)`。

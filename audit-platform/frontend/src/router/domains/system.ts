@@ -29,6 +29,12 @@ export const systemRoutes: RouteRecordRaw[] = [
           component: () => import('@/views/StaffManagement.vue'),
         },
 {
+          path: 'settings/departments',
+          name: 'DepartmentManagement',
+          component: () => import('@/views/DepartmentManagement.vue'),
+          meta: { permission: 'admin' },
+        },
+{
           path: 'work-hours',
           name: 'WorkHours',
           component: () => import('@/views/WorkHoursPage.vue'),
@@ -45,10 +51,24 @@ export const systemRoutes: RouteRecordRaw[] = [
           meta: { permission: 'sign:execute' },
         },
 {
+          // （spec nav-grouping-and-permission-center Task 5.2）
+          path: 'settings/permissions',
+          name: 'PermissionCenter',
+          component: () => import('@/views/PermissionCenter.vue'),
+          meta: { permission: 'admin' },
+        },
+{
+          // V274（operation-log-and-last-login）：操作日志页，仅 admin。
+          path: 'settings/operation-logs',
+          name: 'OperationLogs',
+          component: () => import('@/views/OperationLogs.vue'),
+          meta: { permission: 'admin' },
+        },
+        // 旧路径保留为重定向：书签与外链继续可用，落到合并后的「账号权限」Tab。
+        {
           path: 'settings/users',
           name: 'UserManagement',
-          component: () => import('@/views/UserManagement.vue'),
-          meta: { permission: 'admin' },
+          redirect: { name: 'PermissionCenter', query: { tab: 'users' } },
         },
 {
           path: 'private-storage',

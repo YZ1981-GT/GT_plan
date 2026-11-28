@@ -11,7 +11,7 @@ Property: **Property 3**（状态变了但内容没落地不可能出现）
 * 纯函数（原因归一、操作者校验、状态准入）；
 * 封闭枚举取值（终态必须来自既有 `OperationState`，不得新造字面量）；
 * 结构形态（状态推进只经 `append_operation_event`；不物理删除；不碰 `superseded_at`）；
-* 迁移与 ORM 的三层一致（V273 三列 ↔ ORM `Mapped[]` ↔ service 写入）。
+* 迁移与 ORM 的三层一致（V276 三列 ↔ ORM `Mapped[]` ↔ service 写入）。
 
 跨表跨事务的行为判据（三列真落库、幂等重放零写入、不删行、`superseded_at` 未被清零、
 operation 真的离开 `conflict`）全部在 `test_conflict_abandon_pg.py` —— 那些离线断言不了。
@@ -37,8 +37,8 @@ BACKEND = Path(__file__).resolve().parents[2]
 SVC = BACKEND / "app" / "services" / "workpaper_sync"
 ABANDON_PY = SVC / "conflict_abandon.py"
 REPO_PY = SVC / "repository.py"
-MIGRATION_V = BACKEND / "migrations" / "V273__sync_conflict_abandon_columns.sql"
-MIGRATION_R = BACKEND / "migrations" / "R273__rollback_sync_conflict_abandon_columns.sql"
+MIGRATION_V = BACKEND / "migrations" / "V276__sync_conflict_abandon_columns.sql"
+MIGRATION_R = BACKEND / "migrations" / "R276__rollback_sync_conflict_abandon_columns.sql"
 
 
 def _tree(path: Path) -> ast.Module:
@@ -343,7 +343,7 @@ class TestTheAbandonServiceNeverCommits:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 五、三层一致：V273 迁移 ↔ ORM ↔ 白名单/回退
+# 五、三层一致：V276 迁移 ↔ ORM ↔ 白名单/回退
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -354,7 +354,7 @@ class TestMigrationOrmAndServiceAgree:
         sql = MIGRATION_V.read_text(encoding="utf-8")
         for column in ("abandoned_at", "abandon_reason", "abandoned_by"):
             assert f"ADD COLUMN IF NOT EXISTS {column}" in sql, (
-                f"V273 没有幂等地加列 {column}（CREATE/ALTER 必 IF NOT EXISTS）"
+                f"V276 没有幂等地加列 {column}（CREATE/ALTER 必 IF NOT EXISTS）"
             )
 
     def test_the_migration_declares_the_triplet_check(self) -> None:
@@ -367,7 +367,7 @@ class TestMigrationOrmAndServiceAgree:
     def test_the_rollback_drops_exactly_those_three(self) -> None:
         sql = MIGRATION_R.read_text(encoding="utf-8")
         for column in ("abandoned_at", "abandon_reason", "abandoned_by"):
-            assert f"DROP COLUMN IF EXISTS {column}" in sql, f"R273 没有删列 {column}"
+            assert f"DROP COLUMN IF EXISTS {column}" in sql, f"R276 没有删列 {column}"
         # 有作废行时必须拒绝回滚，而不是静默抹掉审计事实
         assert "RAISE EXCEPTION" in sql
         assert "abandoned_at IS NOT NULL" in sql

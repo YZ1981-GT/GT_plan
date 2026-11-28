@@ -1,0 +1,87 @@
+# ============================================================
+# sw-plan — sw-dev1.0 分支的独立容器环境 override
+#
+# 目的：让 sw-dev1.0（税务 demo）与 dev1.0 使用**完全独立**的容器、
+#       数据卷和数据库，互不干扰。
+#
+# 用法（必须在 GT_plan 目录下执行，务必带 --env-file）：
+#   启动：docker compose -p sw-plan --env-file .env.sw-plan \
+#           -f docker-compose.yml -f docker-compose.sw-plan.yml \
+#           --profile onlyoffice up -d postgres redis onlyoffice
+#   查看：docker compose -p sw-plan ps
+#   停止：docker compose -p sw-plan --env-file .env.sw-plan \
+#           -f docker-compose.yml -f docker-compose.sw-plan.yml \
+#           --profile onlyoffice down
+#
+# 🔴 onlyoffice 在基础 compose 里带 profiles:[onlyoffice]，不加
+#    --profile onlyoffice 它不会出现在解析结果中（up 会报 no such service）。
+#
+# 便捷脚本（已固定好全部参数，推荐）：scripts/sw-plan.ps1 {up|down|ps|logs|env}
+#
+# ============================================================
+# 与 dev1.0（gt-new-plan 项目 / audit-* 容器）的隔离点
+# ============================================================
+# 1. 项目名   -p sw-plan        ⇒ Docker Desktop 里独立成组
+# 2. 容器名   sw-* 前缀         ⇒ 与 audit-* 不冲突
+# 3. 数据卷   下方 volumes 段全部改名 sw_plan_*，**不复用**
+#             gt_workplan_pg_data（那是 dev1.0 的业务库，422 表）
+#             ⇒ sw-plan 的 PG 是全新空库，首次启动由 MigrationRunner 建表
+# 4. 端口     全部 +100 偏移（见 .env.sw-plan），避免与运行中的
+#             dev1.0 容器抢宿主端口
+# 5. 网络     项目名不同 ⇒ 自动得到独立的 sw-plan_default 网络
+#
+# 🔴 注意：容器名与端口来自 .env.sw-plan，**漏掉 --env-file 会直接套用
+#    根 .env 的默认端口**，与 dev1.0 的容器抢 5432/6379/8080 导致启动失败。
+# ============================================================
+
+services:
+  postgres:
+    container_name: sw-postgres
+    volumes:
+      # 覆盖基础文件里指向 gt_workplan_pg_data 的外部卷挂载，
+      # 换成本项目独立卷（见文件末尾 volumes 段）。
+      - sw_pg_data:/var/lib/postgresql/data
+
+  pgbouncer:
+    container_name: sw-pgbouncer
+
+  redis:
+    container_name: sw-redis
+    volumes:
+      - sw_redis_data:/data
+
+  onlyoffice:
+    container_name: sw-onlyoffice
+    # 🔴 volumes 是**整列表替换**（不是按条合并）⇒ 必须把基础文件里的全部条目
+    #    照抄一遍，挂载点也必须逐字一致，否则会变成"新增一条"而不是"覆盖"，
+    #    结果共用 dev1.0 的卷。基础文件对应段见 docker-compose.yml 的 onlyoffice.volumes。
+    volumes:
+      - sw_office_data:/var/lib/onlyoffice
+      - sw_office_logs:/var/log/onlyoffice
+      - sw_office_data_certs:/var/www/onlyoffice/Data
+      # 插件为宿主机只读挂载（非命名卷），两边共用同一份源码，无需隔离
+      - ./backend/onlyoffice_plugins/audit-legend:/var/www/onlyoffice/documentserver/sdkjs-plugins/audit-legend:ro
+      - ./backend/onlyoffice_plugins/tb-fetch:/var/www/onlyoffice/documentserver/sdkjs-plugins/tb-fetch:ro
+
+  metabase:
+    container_name: sw-metabase
+    volumes:
+      - sw_metabase_data:/metabase-data
+
+  ollama:
+    container_name: sw-ollama
+    volumes:
+      - sw_ollama_data:/root/.ollama
+
+# ------------------------------------------------------------
+# 独立命名卷：不写 external/name ⇒ compose 自动按项目名加前缀，
+# 实际卷名为 sw-plan_sw_pg_data 等，与 dev1.0 的卷物理隔离。
+# ------------------------------------------------------------
+volumes:
+  sw_pg_data:
+  sw_redis_data:
+  sw_office_data:
+  sw_office_logs:
+  sw_office_data_certs:
+  sw_metabase_data:
+  sw_ollama_data:

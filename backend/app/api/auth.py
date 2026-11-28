@@ -3,7 +3,7 @@
 Validates: Requirements 3.1, 3.2, 3.11
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,7 @@ router = APIRouter(tags=["认证"])
 @router.post("/login", response_model=TokenResponse)
 async def login(
     body: LoginRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
 ) -> TokenResponse:
@@ -30,6 +31,7 @@ async def login(
         password=body.password,
         db=db,
         redis=redis,
+        request=request,
     )
 
 
@@ -60,15 +62,17 @@ async def refresh(
 @router.post("/logout")
 async def logout(
     body: RefreshRequest,
+    request: Request,
     redis: Redis = Depends(get_redis),
 ) -> dict:
-    """登出，将 refresh_token 加入黑名单使其失效。
+    """登出，将 refresh_token 加入黑名单使其失效并留痕。
 
     Validates: Requirements 3.11
     """
     await auth_service.logout(
         refresh_token=body.refresh_token,
         redis=redis,
+        request=request,
     )
     return {"message": "登出成功"}
 

@@ -44,7 +44,7 @@ from app.services.workpaper_sync.json_path import (
 # 与 phase5_d4_revenue_detail 共享的模板身份（同 workbook）。
 TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4 收入底稿.xlsx"
 TEMPLATE_SHA256: Final[str] = (
-    "2765d1991215accb2e16f52baeb2fc14bd30ca42b57251479e98461491647a62"
+    "8d64194aff461a76b94e0ee785232be73b70b6f94ab97aad0f67aaff969471e2"
 )
 
 

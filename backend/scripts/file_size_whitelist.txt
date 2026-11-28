@@ -212,7 +212,7 @@ backend/tests/test_snapshot_writer.py  1230
 # ═══════════════════════════════════════════════════════════════════════════
 
 # ── 生产代码（优先拆分对象）──────────────────────────────────────────
-backend/app/models/audit_platform_schemas.py  1088
+backend/app/models/audit_platform_schemas.py  1144
 backend/app/models/workpaper_models.py  1116
 backend/app/models/workpaper_sync_models.py  1152
 backend/app/routers/wp_onlyoffice_router.py  1933
@@ -688,7 +688,7 @@ backend/app/services/workpaper_sync/excel_workbook_row_change.py  3021
 #     StartupTaskSpec.singleton 字段 + 18 个任务的标记、执行器的 deferred 状态与 report 开关、报告投影的
 #     deferred 清单）。交接逻辑在 app/core/reload_handoff.py、核验在 app/core/lazy_api_routes.py，留在本文件的
 #     只是执行器与序列声明本身；单文件理由同上。
-backend/app/core/startup_registry.py  991
+backend/app/core/startup_registry.py  1105
 backend/app/routers/wp_render_pipeline.py  1219
 backend/scripts/gen/generate_component_capability_manifest.py  852
 
@@ -1303,11 +1303,11 @@ backend/scripts/fix/fix_note_parent_company_chapter.py  2308
 backend/tests/test_note_parent_company_chapter.py  2823
 
 # --- batch-1 platform push: existing large files, baseline = current lines ---
-audit-platform/frontend/src/services/commonApi.ts  2243
+audit-platform/frontend/src/services/commonApi.ts  2403
 backend/app/core/migration_runner.py  1115
 backend/app/routers/doc_ai_chat.py  1324
 backend/app/routers/template_library_mgmt.py  1069
-backend/app/routers/wp_bulk_router.py  888
+backend/app/routers/wp_bulk_router.py  1100
 backend/app/routers/wp_html_save.py  875
 # wp_sync_router 历史大文件（3257 行），本次仅删 display_name 死分支一行
 backend/app/routers/wp_sync_router.py  3642
@@ -1400,7 +1400,7 @@ backend/tests/test_formula_push_engine.py 934
 #          `WalStageProbe` 已抽到伴生 `profiler.py`，没有塞进本文件。
 #       ⇒ 按「baseline 必须填当前真实行数、不得虚高」把基线改为 923，并把 ① 的欠账如实登记
 #       在这里（拆分责任归 attempt CAS 那条 lane）。本 spec 交付后本文件不得再涨。
-backend/app/services/ledger_import/pipeline.py 923
+backend/app/services/ledger_import/pipeline.py 973
 #   ConsolidationIndex.vue —— 2026-10-23 汇总提交（用户要求推送并发会话的在制改动）：合并首页左侧常驻企业树面板
 #     （U-1：搜索 / 收起 / 点击复用原节点逻辑）+ 样式，HEAD 2206 → 2368。2026-11-05 `platform-heavy-jobs-and-capacity-closure` B4/B5
 #     把合并附注重新汇总改走 durable job：新增 PlatformJobProgress 嵌入、`reaggregateJobId`、`onReaggregateCompleted`/`onReaggregateFailed`
@@ -1428,7 +1428,7 @@ backend/tests/test_formula_push_batch_e_mnf_note.py 829
 #   （12 行 CSS 动画 + 3 行 computed + 模板 class 绑定）。
 #   拆分应在布局组件整体重构时一并做，不塞进本 spec。
 #   2026-10-31：formula-template-dual-project-pilot 增模板深链消费（+83 行）。
-audit-platform/frontend/src/layouts/ThreeColumnLayout.vue 1598
+audit-platform/frontend/src/layouts/ThreeColumnLayout.vue 1699
 
 #   store_item_registry.py —— 2026-10-06 入册。STORE_MERGE_REGISTRY 字典是全平台
 #     adapter 注册表的单一真源（69 条），每条包含 adapter_id / provider_module /
@@ -2008,7 +2008,7 @@ backend/app/routers/recycle_bin.py 837
 audit-platform/frontend/src/views/KnowledgeBase.vue  1733
 #   ledger_import_application_service.py — 历史大文件（HEAD 已 883 行超 800 上限且此前未登记），
 #     本次账簿导入确认门与分段校验逻辑接线。拆分方向：确认门/编排/查询三块拆模块。
-backend/app/services/ledger_import_application_service.py  883
+backend/app/services/ledger_import_application_service.py  945
 # 2026-11-22 登记：HEAD 已 1131 行（本文件超 800 上限，非本轮引入）。本轮仅补
 # _run_live 的 Windows 不可达形态（+8 行，Windows 侧 WinError 5/1225 应 skip 而非 fail）。
 # 拆分方向：连库判据组（_live_engine/_run_live/5 条 test_live_*）抽 _completeness_scope_live.py。
@@ -2045,3 +2045,13 @@ audit-platform/frontend/src/components/workpaper/g7-long-term-equity-method/calc
 # g7DisclosureCrossSheet.ts —— 2026-11-27 入册：HEAD 已 3011 行且未登记，补一个漏传的实参即被拒。
 #   拆分方向：按取数来源（G7-1~G7-7 各 sheet 解析器）与组装（bundle 构建）拆成两个模块。
 audit-platform/frontend/src/components/workpaper/composables/g7DisclosureCrossSheet.ts 3011
+
+# 2026-11-28 合并 dev1.0（19e305fb0）至 spec/disclosure-note-doc-upload-and-batch-fill：
+#   以下文件在分叉点 f9439bc8d 就已超 800 行或贴着基线，dev1.0 与本分支各自追加后在合并结果里
+#   叠加超门。合并提交只整合两边已有改动、不做重构，故按合并后真实行数登记 / 更新基线；
+#   拆分方向：deps.py 按鉴权依赖族拆子模块；review_dialog.py 按复核对话 / 意见 / 状态流转拆路由；
+#   ledger_import/detector.py 按表型识别规则拆；其余沿用各自原登记的拆分方向。
+#   本次更新基线：backend/app/models/audit_platform_schemas.py 1088 -> 1144；backend/app/core/startup_registry.py 991 -> 1105；audit-platform/frontend/src/services/commonApi.ts 2243 -> 2403；backend/app/routers/wp_bulk_router.py 888 -> 1100；backend/app/services/ledger_import/pipeline.py 923 -> 973；audit-platform/frontend/src/layouts/ThreeColumnLayout.vue 1598 -> 1699；backend/app/services/ledger_import_application_service.py 883 -> 945
+backend/app/deps.py  847
+backend/app/routers/review_dialog.py  1151
+backend/app/services/ledger_import/detector.py  1484

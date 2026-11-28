@@ -40,8 +40,8 @@ logger = logging.getLogger(__name__)
 
 # build_entity_graph 要求年度非空：年度无法解析的项目用哨兵值自成一组，输出时还原为 None
 _NO_YEAR = 0
-# 与 deps.get_visible_project_ids 同一口径：这两类角色看全部项目，其余角色只看参与的项目
-_SEE_ALL_ROLES = frozenset({"admin", "partner"})
+# 只有 admin 看全部项目；partner 走 partner_visible_project_ids（自己名下），其余角色只看参与的项目
+_SEE_ALL_ROLES = frozenset({"admin"})
 
 
 def project_year(p: Any) -> int | None:
@@ -303,7 +303,8 @@ async def load_forest(
 ) -> dict:
     """装载可见项目后构建森林并富集持股比例 / 合并方式。
 
-    ``user`` 为空 ⇒ 不做可见性过滤（内部调用）；admin/partner 看全部，其余角色只看自己参与的项目（需求 8.3）。
+    ``user`` 为空 ⇒ 不做可见性过滤（内部调用）；admin 看全部，partner 只看自己名下的项目，
+    其余角色只看自己参与的项目（需求 8.3）。
     """
     stmt = sa.select(Project).where(Project.is_deleted == sa.false())
     if year is not None:
@@ -312,7 +313,13 @@ async def load_forest(
     existing_codes: dict[int | None, set[str]] | None = None
     if user is not None:
         role = getattr(getattr(user, "role", None), "value", getattr(user, "role", None))
-        if role not in _SEE_ALL_ROLES:
+        if role == "partner":
+            from app.services.partner_visibility_service import partner_visible_project_ids
+
+            existing_codes = await _existing_codes_by_year(db, year)
+            pids = await partner_visible_project_ids(user, db)
+            stmt = stmt.where(Project.id.in_(pids)) if pids else stmt.where(sa.false())
+        elif role not in _SEE_ALL_ROLES:
             existing_codes = await _existing_codes_by_year(db, year)
             stmt = stmt.where(Project.id.in_(
                 sa.select(ProjectUser.project_id).where(

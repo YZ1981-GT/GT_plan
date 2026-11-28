@@ -24,6 +24,13 @@
 | 文件 | 说明 |
 |------|------|
 | `workpaper-developer-guide.md` | 底稿组件开发指南（Runtime Boundary 模式） |
+| `audit-project-workflow.md` | 审计项目流程：建项 → 导入 → 底稿 → 报表附注 → 签发 → 归档（2026-11-18） |
+| `audit-platform-function-rules.md` | 整体功能规则：按 A~T 二十个模块拆分的业务规则与已知缺口（2026-11-18） |
+| `database-tables.md` | 数据表结构概览：374 张 ORM 表 + 21 张只由迁移建的表，按 17 个业务域分组、核心表关系图（2026-11-18） |
+| `database-tables-columns.md` | 数据表字段明细：每张表每个字段的中文名、说明、取值、类型、外键（2026-11-20 补中文说明） |
+| `database-relationships.md` | 表关联关系分析：连接逻辑、外键与业务键、核心链路 JOIN 条件、配置依赖、风险（2026-11-18） |
+| `database-relationships-fk.md` | 全部 831 条外键约束与无外键的引用列明细（2026-11-18） |
+| `data-processing-rules.md` | 数据处理规则：Excel 解析落库、借贷方向与跨表计算、余额表到报表的映射、端到端示例（2026-11-18） |
 
 ## 使用说明
 

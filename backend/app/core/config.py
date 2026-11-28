@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # 登录安全
     LOGIN_MAX_ATTEMPTS: int = 5
     LOGIN_LOCK_MINUTES: int = 30
+    # V274（operation-log-and-last-login）：日志保留期（天）
+    LOGIN_LOG_RETENTION_DAYS: int = 180
+    OPERATION_LOG_RETENTION_DAYS: int = 365
     # ONLYOFFICE（向后兼容，底稿编辑已迁移至 Univer）
     ONLYOFFICE_URL: str = "http://onlyoffice:80"
     # JWT secret 默认空=禁用 JWT 签名（适用于容器 JWT_ENABLED=false 的开发环境）。

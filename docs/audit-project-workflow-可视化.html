@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>致同审计作业平台 · 项目流程（可视化）</title>
+<style>
+:root {
+    --gt-primary: #4b2d77;
+    --gt-primary-light: #A06DFF;
+    --gt-primary-dark: #2B1D4D;
+    --gt-primary-gradient: linear-gradient(135deg, #4b2d77 0%, #A06DFF 100%);
+    --gt-water-blue: #0094B3;
+    --gt-coral-orange: #FF5149;
+    --gt-wheat-yellow: #FFC23D;
+    --gt-success: #28A745;
+    --gt-info: #17A2B8;
+    --gt-white: #FFFFFF;
+    --gt-neutral-light: #F8F9FA;
+    --gt-neutral-medium: #E9ECEF;
+    --gt-gray: #6C757D;
+    --gt-dark-gray: #343A40;
+    --gt-border: #DEE2E6;
+    --gt-text-primary: #2C3E50;
+    --gt-text-secondary: #666666;
+    --gt-font-sm: 14px;
+    --gt-font-base: 16px;
+    --gt-font-lg: 18px;
+    --gt-font-xl: 20px;
+    --gt-font-2xl: 24px;
+    --gt-font-3xl: 30px;
+    --gt-font-4xl: 36px;
+    --gt-space-xs: 4px;
+    --gt-space-sm: 8px;
+    --gt-space-md: 16px;
+    --gt-space-lg: 24px;
+    --gt-space-xl: 32px;
+    --gt-space-2xl: 48px;
+    --gt-space-3xl: 64px;
+    --gt-radius-sm: 4px;
+    --gt-radius-md: 8px;
+    --gt-radius-lg: 12px;
+    --gt-shadow-sm: 0 2px 4px rgba(75,45,119,0.075);
+    --gt-shadow-md: 0 4px 8px rgba(75,45,119,0.15);
+    --gt-font-stack: 'GT Walsheim','FZYueHei','Microsoft YaHei','PingFang SC','Hiragino Sans GB',Arial,sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; scroll-padding-top:72px; }
+body { font-family:var(--gt-font-stack); font-size:var(--gt-font-base); line-height:1.6; color:var(--gt-text-primary); background:var(--gt-neutral-light); }
+
+.gt-hero { background:var(--gt-primary-gradient); color:#fff; padding:var(--gt-space-3xl) var(--gt-space-lg); text-align:center; }
+.gt-hero h1 { font-size:var(--gt-font-4xl); color:#fff; margin-bottom:var(--gt-space-sm); }
+.gt-hero p { color:#FFFFFFD9; font-size:var(--gt-font-lg); }
+.gt-hero-chips { margin-top:var(--gt-space-md); display:flex; gap:var(--gt-space-sm); justify-content:center; flex-wrap:wrap; }
+.gt-chip { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.35); padding:4px 14px; border-radius:999px; font-size:var(--gt-font-sm); }
+
+.gt-topnav { position:sticky; top:0; z-index:100; background:rgba(255,255,255,.96); backdrop-filter:blur(8px); border-bottom:1px solid var(--gt-border); box-shadow:var(--gt-shadow-sm); }
+.gt-topnav-inner { max-width:1280px; margin:0 auto; padding:0 var(--gt-space-lg); display:flex; gap:var(--gt-space-xs); overflow-x:auto; white-space:nowrap; }
+.gt-topnav a { display:inline-block; padding:var(--gt-space-sm) var(--gt-space-md); color:var(--gt-text-secondary); text-decoration:none; font-size:var(--gt-font-sm); font-weight:600; border-radius:var(--gt-radius-sm); }
+.gt-topnav a:hover { background:var(--gt-neutral-light); color:var(--gt-primary); }
+.gt-topnav a:focus-visible { outline:3px solid var(--gt-primary-light); outline-offset:2px; }
+
+.gt-container { max-width:1280px; margin:0 auto; padding:0 var(--gt-space-lg); width:100%; }
+.gt-section { margin:var(--gt-space-3xl) 0; }
+.gt-section-header { background:var(--gt-primary-gradient); color:#fff; padding:var(--gt-space-2xl) var(--gt-space-lg); border-radius:var(--gt-radius-lg); margin-bottom:var(--gt-space-xl); }
+.gt-section-header h1 { font-size:var(--gt-font-3xl); color:#fff; margin-bottom:var(--gt-space-sm); }
+.gt-section-subtitle { color:#FFFFFFD9; font-size:var(--gt-font-lg); }
+
+.gt-card { background:var(--gt-white); border-radius:var(--gt-radius-md); box-shadow:var(--gt-shadow-sm); border:1px solid var(--gt-border); overflow:hidden; transition:box-shadow .2s; }
+.gt-card:hover { box-shadow:var(--gt-shadow-md); }
+.gt-card-header { display:flex; align-items:center; gap:var(--gt-space-sm); padding:var(--gt-space-md) var(--gt-space-lg); background:var(--gt-primary); color:#fff; }
+.gt-card-header h3 { margin:0; color:#fff; font-size:var(--gt-font-xl); }
+.gt-card-content { padding:var(--gt-space-lg); }
+.gt-grid { display:grid; gap:var(--gt-space-lg); }
+.gt-grid-2 { grid-template-columns:repeat(2,1fr); }
+.gt-grid-3 { grid-template-columns:repeat(3,1fr); }
+
+table.gt-table { width:100%; border-collapse:collapse; font-size:var(--gt-font-sm); }
+.gt-table caption { caption-side:top; text-align:left; font-weight:600; padding:var(--gt-space-sm) 0; }
+.gt-table thead th { background:var(--gt-primary); color:#fff; padding:var(--gt-space-sm) var(--gt-space-md); text-align:left; }
+.gt-table tbody td { padding:var(--gt-space-sm) var(--gt-space-md); border-bottom:1px solid var(--gt-border); vertical-align:top; }
+.gt-table tbody tr:hover { background:var(--gt-neutral-light); }
+
+.gt-badge { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:700; color:#fff; }
+.gt-badge-blue { background:var(--gt-water-blue); }
+.gt-badge-orange { background:var(--gt-coral-orange); }
+.gt-badge-green { background:var(--gt-success); }
+.gt-badge-purple { background:var(--gt-primary); }
+.gt-badge-gray { background:var(--gt-gray); }
+.gt-badge-yellow { background:#B8860B; }
+
+.gt-note { border-left:4px solid var(--gt-info); background:var(--gt-white); padding:var(--gt-space-md) var(--gt-space-lg); border-radius:var(--gt-radius-md); font-size:var(--gt-font-sm); color:var(--gt-text-secondary); }
+.gt-warn { border-left:4px solid var(--gt-coral-orange); background:#FFF5F4; padding:var(--gt-space-md) var(--gt-space-lg); border-radius:var(--gt-radius-md); font-size:var(--gt-font-sm); }
+.gt-code { font-family:Consolas,monospace; background:var(--gt-neutral-light); border:1px solid var(--gt-border); border-radius:var(--gt-radius-sm); padding:1px 6px; font-size:13px; }
+
+.gt-step-card { border-left:4px solid var(--gt-primary); }
+.gt-step-num { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; background:var(--gt-primary); color:#fff; font-weight:700; font-size:15px; flex-shrink:0; }
+.gt-detail-row { display:grid; grid-template-columns:110px 1fr; gap:var(--gt-space-sm); padding:var(--gt-space-sm) 0; border-bottom:1px dashed var(--gt-border); font-size:var(--gt-font-sm); }
+.gt-detail-row:last-child { border-bottom:none; }
+.gt-detail-key { font-weight:700; color:var(--gt-primary); }
+.gt-ai-tag { display:inline-block; background:#E1F5EE; color:#0F6E56; border:1px solid #9FE1CB; border-radius:999px; padding:0 8px; font-size:12px; font-weight:700; margin-right:6px; }
+.gt-phase-tag { display:inline-block; background:var(--gt-neutral-light); border:1px solid var(--gt-border); color:var(--gt-text-secondary); border-radius:999px; padding:0 10px; font-size:12px; font-weight:700; }
+
+.gt-footer { background:var(--gt-primary-dark); color:#B7A9D6; text-align:center; padding:var(--gt-space-xl) var(--gt-space-lg); font-size:var(--gt-font-sm); margin-top:var(--gt-space-3xl); }
+.gt-footer strong { color:#fff; }
+
+@media (max-width:1024px){ .gt-grid-3 { grid-template-columns:repeat(2,1fr); } }
+@media (max-width:768px){ .gt-grid-2,.gt-grid-3 { grid-template-columns:1fr; } .gt-hero h1 { font-size:var(--gt-font-3xl); } .gt-section-header h1 { font-size:var(--gt-font-2xl); } }
+@media print {
+    .gt-topnav { display:none !important; }
+    body { color:#000; background:#fff; }
+    .gt-section-header { background:none; border-bottom:3px solid #4b2d77; }
+    .gt-section-header h1,.gt-section-subtitle { color:#000; }
+    .gt-card { box-shadow:none; border:1px solid #333; break-inside:avoid; }
+    .gt-card-header { background:#F0F0F0 !important; } .gt-card-header h3 { color:#000 !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="gt-hero">
+    <h1>致同审计作业平台 · 项目流程</h1>
+    <p>建项 → 归档的完整链路 · 可视化版</p>
+    <div class="gt-hero-chips">
+        <span class="gt-chip">依据：平台代码 dev1.0（v1.0.261）</span>
+        <span class="gt-chip">15 环节 · 5 阶段 · 6 角色</span>
+        <span class="gt-chip">更新：2026-11-18</span>
+    </div>
+</header>
+
+<nav class="gt-topnav" aria-label="文档目录导航">
+    <div class="gt-topnav-inner">
+        <a href="#roles">① 总则 · 角色与状态</a>
+        <a href="#flow">② 主流程 15 环节</a>
+        <a href="#merge">③ 合并项目</a>
+        <a href="#aux">④ 辅助功能</a>
+        <a href="#faq">⑤ 常见问题</a>
+        <a href="#gaps">附录 · 已知缺口</a>
+    </div>
+</nav>
+
+<main class="gt-container">
+
+<!-- ============ ① 总则 ============ -->
+<section id="roles" class="gt-section" aria-labelledby="r-title">
+    <div class="gt-section-header">
+        <h1 id="r-title">① 总则 · 角色与状态机</h1>
+        <p class="gt-section-subtitle">先看清楚「谁能做什么」「项目会停在哪些状态」，再进流程</p>
+    </div>
+
+    <div class="gt-card">
+        <div class="gt-card-header"><h3>六个角色 · 项目内权限</h3></div>
+        <div class="gt-card-content">
+            <table class="gt-table">
+                <caption>角色职责与权限一览</caption>
+                <thead><tr><th>角色</th><th>主要职责</th><th>项目内权限</th></tr></thead>
+                <tbody>
+                    <tr><td><span class="gt-badge gt-badge-purple">管理员</span></td><td>账号、权限、部门、AI 模型、全局配置</td><td>全部</td></tr>
+                    <tr><td><span class="gt-badge gt-badge-purple">合伙人</span></td><td>重大判断、审计意见、签发</td><td>编辑</td></tr>
+                    <tr><td><span class="gt-badge gt-badge-purple">项目经理</span></td><td>建项、分工、进度、一级复核</td><td>编辑</td></tr>
+                    <tr><td><span class="gt-badge gt-badge-blue">审计员</span></td><td>导入数据、编制底稿、录入调整</td><td>编辑</td></tr>
+                    <tr><td><span class="gt-badge gt-badge-green">质控 QC</span></td><td>质量复核</td><td>复核</td></tr>
+                    <tr><td><span class="gt-badge gt-badge-green">EQCR</span></td><td>项目质量控制复核（独立技术复核）</td><td>复核（只读编辑内容）</td></tr>
+                </tbody>
+            </table>
+            <div class="gt-note" style="margin-top:var(--gt-space-md)">
+                <strong>受限操作</strong>：程序委派、调整审批、审计阶段切换只有 <strong>经理 / 合伙人 / 管理员</strong> 可以操作。
+            </div>
+        </div>
+    </div>
+
+    <div class="gt-card" style="margin-top:var(--gt-space-lg)">
+        <div class="gt-card-header"><h3>项目状态机（execution 自动推进，其余多为手动 / 待定）</h3></div>
+        <div class="gt-card-content">
+            <svg viewBox="0 0 680 250" role="img" width="100%" style="background:#fff;border:1px solid var(--gt-border);border-radius:8px" aria-label="项目状态机示意图">
+                <title>项目状态机：created → planning → execution → (completion/reporting 待定) → archived</title>
+                <defs>
+                    <marker id="ar1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round"/>
+                    </marker>
+                </defs>
+                <!-- nodes -->
+                <rect x="20" y="95" width="96" height="40" rx="10" fill="#F1EDFA" stroke="#4b2d77" stroke-width="1"/>
+                <text x="68" y="112" text-anchor="middle" font-size="12" font-weight="600" fill="#4b2d77">created</text>
+                <text x="68" y="127" text-anchor="middle" font-size="11" fill="#666">新建（复制上年）</text>
+                <rect x="140" y="95" width="96" height="40" rx="10" fill="#F1EDFA" stroke="#4b2d77" stroke-width="1"/>
+                <text x="188" y="112" text-anchor="middle" font-size="12" font-weight="600" fill="#4b2d77">planning</text>
+                <text x="188" y="127" text-anchor="middle" font-size="11" fill="#666">计划中</text>
+                <rect x="260" y="95" width="96" height="40" rx="10" fill="#4b2d77"/>
+                <text x="308" y="112" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">execution</text>
+                <text x="308" y="127" text-anchor="middle" font-size="11" fill="#E5D9FF">执行中（主力工作区）</text>
+                <rect x="392" y="40" width="120" height="36" rx="10" fill="#FFF5F4" stroke="#FF5149" stroke-width="1" stroke-dasharray="4 3"/>
+                <text x="452" y="55" text-anchor="middle" font-size="12" font-weight="600" fill="#B03A34">completion</text>
+                <text x="452" y="69" text-anchor="middle" font-size="10" fill="#B03A34">无自动推进 ⚠</text>
+                <rect x="392" y="112" width="120" height="36" rx="10" fill="#FFF5F4" stroke="#FF5149" stroke-width="1" stroke-dasharray="4 3"/>
+                <text x="452" y="127" text-anchor="middle" font-size="12" font-weight="600" fill="#B03A34">reporting</text>
+                <text x="452" y="141" text-anchor="middle" font-size="10" fill="#B03A34">无自动推进 ⚠</text>
+                <rect x="556" y="95" width="104" height="40" rx="10" fill="#E1F5EE" stroke="#28A745" stroke-width="1"/>
+                <text x="608" y="112" text-anchor="middle" font-size="12" font-weight="600" fill="#186A3B">archived</text>
+                <text x="608" y="127" text-anchor="middle" font-size="11" fill="#186A3B">已归档 · 锁定</text>
+                <!-- arrows -->
+                <line x1="116" y1="115" x2="138" y2="115" stroke="#4b2d77" stroke-width="1.5" marker-end="url(#ar1)"/>
+                <line x1="236" y1="115" x2="258" y2="115" stroke="#4b2d77" stroke-width="1.5" marker-end="url(#ar1)"/>
+                <text x="247" y="104" text-anchor="middle" font-size="10" fill="#4b2d77">建项</text>
+                <line x1="356" y1="105" x2="390" y2="62" stroke="#FF5149" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#ar1)"/>
+                <line x1="356" y1="120" x2="390" y2="128" stroke="#FF5149" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#ar1)"/>
+                <line x1="512" y1="130" x2="554" y2="120" stroke="#28A745" stroke-width="1.5" marker-end="url(#ar1)"/>
+                <text x="533" y="108" text-anchor="middle" font-size="10" fill="#28A745">归档锁定</text>
+                <!-- back arrow -->
+                <path d="M608 137 C608 190 308 200 308 137" fill="none" stroke="#6C757D" stroke-width="1.3" stroke-dasharray="5 3" marker-end="url(#ar1)"/>
+                <text x="440" y="205" text-anchor="middle" font-size="11" fill="#6C757D">解除归档（填原因 + 输项目名确认）→ 回 execution</text>
+                <text x="308" y="230" text-anchor="middle" font-size="11" fill="#4b2d77">触发条件：账套数据集激活时自动推进（只前进，不回退）</text>
+            </svg>
+            <div class="gt-note" style="margin-top:var(--gt-space-md)">
+                另有独立的「审计阶段」字段：<strong>预审 / 年审</strong>（默认年审），由经理以上在项目设置里切换，影响抽凭等功能。
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============ ② 主流程 ============ -->
+<section id="flow" class="gt-section" aria-labelledby="f-title">
+    <div class="gt-section-header">
+        <h1 id="f-title">② 主流程 · 15 环节 5 阶段</h1>
+        <p class="gt-section-subtitle">阶段只是阅读分组，平台不锁定操作顺序（个别页面除外）</p>
+    </div>
+
+    <svg viewBox="0 0 680 330" role="img" width="100%" style="background:#fff;border:1px solid var(--gt-border);border-radius:8px" aria-label="15环节主流程图">
+        <title>主流程：5 阶段泳道图</title>
+        <defs>
+            <marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round"/>
+            </marker>
+        </defs>
+        <!-- phase bands -->
+        <rect x="16" y="40" width="648" height="50" rx="10" fill="#EEEDFE"/>
+        <text x="30" y="30" font-size="12" font-weight="600" fill="#4b2d77">A 建项与准备</text>
+        <rect x="16" y="102" width="648" height="50" rx="10" fill="#E8F4FA"/>
+        <text x="30" y="92" font-size="12" font-weight="600" fill="#0094B3">B 数据准备</text>
+        <rect x="16" y="164" width="648" height="72" rx="10" fill="#F1EDFA"/>
+        <text x="30" y="154" font-size="12" font-weight="600" fill="#4b2d77">C 审计作业</text>
+        <rect x="16" y="248" width="648" height="34" rx="10" fill="#E8F4FA"/>
+        <text x="30" y="238" font-size="12" font-weight="600" fill="#0094B3">D 成果编制</text>
+        <rect x="16" y="294" width="648" height="34" rx="10" fill="#E1F5EE"/>
+        <text x="30" y="284" font-size="12" font-weight="600" fill="#186A3B">E 质控交付归档</text>
+        <!-- Phase A -->
+        <rect x="40" y="50" width="90" height="30" rx="8" fill="#4b2d77"/><text x="85" y="70" text-anchor="middle" font-size="11" fill="#fff">① 建项</text>
+        <rect x="160" y="50" width="110" height="30" rx="8" fill="#fff" stroke="#4b2d77"/><text x="215" y="70" text-anchor="middle" font-size="11" fill="#4b2d77">② 团队与分工</text>
+        <!-- Phase B -->
+        <rect x="40" y="112" width="110" height="30" rx="8" fill="#4b2d77"/><text x="95" y="132" text-anchor="middle" font-size="11" fill="#fff">③ 导入账套</text>
+        <rect x="180" y="112" width="110" height="30" rx="8" fill="#fff" stroke="#4b2d77"/><text x="235" y="132" text-anchor="middle" font-size="11" fill="#4b2d77">④ 科目映射（自动）</text>
+        <rect x="330" y="112" width="90" height="30" rx="8" fill="#fff" stroke="#4b2d77"/><text x="375" y="132" text-anchor="middle" font-size="11" fill="#4b2d77">⑤ 试算表</text>
+        <!-- Phase C -->
+        <rect x="40" y="174" width="130" height="30" rx="8" fill="#fff" stroke="#4b2d77"/><text x="105" y="194" text-anchor="middle" font-size="11" fill="#4b2d77">⑥ 程序裁剪→生成底稿</text>
+        <rect x="200" y="174" width="100" height="30" rx="8" fill="#fff" stroke="#4b2d77"/><text x="250" y="194" text-anchor="middle" font-size="11" fill="#4b2d77">⑦ 编制底稿</text>
+        <rect x="330" y="174" width="100" height="30" rx="8" fill="#fff" stroke="#4b2d77"/><text x="380" y="194" text-anchor="middle" font-size="11" fill="#4b2d77">⑧ 调整分录</text>
+        <rect x="460" y="174" width="110" height="30" rx="8" fill="#fff" stroke="#4b2d77"/><text x="515" y="194" text-anchor="middle" font-size="11" fill="#4b2d77">⑨ 审定数发布</text>
+        <rect x="600" y="174" width="60" height="30" rx="8" fill="#fff" stroke="#4b2d77"/><text x="630" y="194" text-anchor="middle" font-size="11" fill="#4b2d77">⑩ 复核</text>
+        <!-- Phase D -->
+        <rect x="40" y="256" width="100" height="30" rx="8" fill="#fff" stroke="#4b2d77"/><text x="90" y="276" text-anchor="middle" font-size="11" fill="#4b2d77">⑪ 财务报表</text>
+        <rect x="180" y="256" width="80" height="30" rx="8" fill="#fff" stroke="#4b2d77"/><text x="220" y="276" text-anchor="middle" font-size="11" fill="#4b2d77">⑫ 附注</text>
+        <!-- Phase E -->
+        <rect x="40" y="302" width="110" height="30" rx="8" fill="#fff" stroke="#28A745"/><text x="95" y="322" text-anchor="middle" font-size="11" fill="#186A3B">⑬ 质控与签发</text>
+        <rect x="190" y="302" width="130" height="30" rx="8" fill="#fff" stroke="#28A745"/><text x="255" y="322" text-anchor="middle" font-size="11" fill="#186A3B">⑭ 交付三件套 Word/PDF</text>
+        <rect x="360" y="302" width="150" height="30" rx="8" fill="#28A745"/><text x="435" y="322" text-anchor="middle" font-size="11" fill="#fff">⑮ 归档：门禁→打包→锁定</text>
+        <!-- connectors -->
+        <line x1="130" y1="65" x2="158" y2="65" stroke="#4b2d77" stroke-width="1.3" marker-end="url(#ar2)"/>
+        <line x1="95" y1="80" x2="95" y2="110" stroke="#4b2d77" stroke-width="1.3" marker-end="url(#ar2)"/>
+        <line x1="150" y1="127" x2="178" y2="127" stroke="#4b2d77" stroke-width="1.3" marker-end="url(#ar2)"/>
+        <line x1="290" y1="127" x2="328" y2="127" stroke="#4b2d77" stroke-width="1.3" marker-end="url(#ar2)"/>
+        <line x1="375" y1="142" x2="105" y2="172" stroke="#4b2d77" stroke-width="1.2" marker-end="url(#ar2)"/>
+        <line x1="170" y1="189" x2="198" y2="189" stroke="#4b2d77" stroke-width="1.3" marker-end="url(#ar2)"/>
+        <line x1="300" y1="189" x2="328" y2="189" stroke="#4b2d77" stroke-width="1.3" marker-end="url(#ar2)"/>
+        <line x1="430" y1="189" x2="458" y2="189" stroke="#4b2d77" stroke-width="1.3" marker-end="url(#ar2)"/>
+        <line x1="570" y1="189" x2="598" y2="189" stroke="#4b2d77" stroke-width="1.3" marker-end="url(#ar2)"/>
+        <line x1="380" y1="204" x2="375" y2="144" stroke="#0094B3" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#ar2)"/>
+        <text x="392" y="216" font-size="10" fill="#0094B3">通过 → 回写调整列</text>
+        <line x1="515" y1="204" x2="382" y2="146" stroke="#0094B3" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#ar2)"/>
+        <line x1="90" y1="246" x2="90" y2="246" stroke="#4b2d77"/>
+        <line x1="375" y1="142" x2="88" y2="254" stroke="#4b2d77" stroke-width="1.2" marker-end="url(#ar2)"/>
+        <text x="210" y="248" font-size="10" fill="#4b2d77">审定数 → 生成报表</text>
+        <line x1="250" y1="204" x2="218" y2="254" stroke="#4b2d77" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#ar2)"/>
+        <text x="290" y="246" font-size="10" fill="#4b2d77">公式推送披露</text>
+        <line x1="130" y1="271" x2="188" y2="271" stroke="#4b2d77" stroke-width="1.3" marker-end="url(#ar2)"/>
+        <line x1="90" y1="286" x2="92" y2="300" stroke="#4b2d77" stroke-width="1.3" marker-end="url(#ar2)"/>
+        <line x1="150" y1="317" x2="188" y2="317" stroke="#186A3B" stroke-width="1.3" marker-end="url(#ar2)"/>
+        <line x1="320" y1="317" x2="358" y2="317" stroke="#186A3B" stroke-width="1.3" marker-end="url(#ar2)"/>
+    </svg>
+
+    <div class="gt-note" style="margin-top:var(--gt-space-lg)">
+        关键回路：⑧ 调整分录通过后 <strong>回写试算表调整列</strong>、⑨ 审定数 <strong>发布到试算表</strong>（唯一入口，二次确认）→ ⑪ 报表按审定数生成、⑫ 附注由底稿公式推送。
+    </div>
+
+    <!-- 阶段A -->
+    <h2 style="margin:var(--gt-space-2xl) 0 var(--gt-space-md);color:var(--gt-primary);font-size:var(--gt-font-2xl)">阶段 A · 建项与准备</h2>
+    <div class="gt-grid gt-grid-2">
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">①</span><h3>建项</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span>项目 → 新建项目 <span class="gt-code">/projects/new</span>；或批量建项</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>经理（需企业代码建项授权）</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>保存后项目进入「计划中」</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>项目卡片出现</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">要点</span><span>
+                    只填一步「基本信息」；<strong>批量建项</strong>走模板上传校验；<strong>复制上年</strong>继承科目映射、团队、审定数等配置；合伙人 / 管理员建项不受授权限制。
+                </span></div>
+            </div>
+        </div>
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">②</span><h3>团队与分工</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span>项目详情 → 团队；人员档案</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>经理</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>—</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>成员与签字合伙人已指定</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 阶段B -->
+    <h2 style="margin:var(--gt-space-2xl) 0 var(--gt-space-md);color:var(--gt-primary);font-size:var(--gt-font-2xl)">阶段 B · 数据准备</h2>
+    <div class="gt-grid gt-grid-3">
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">③</span><h3>导入账套</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span><span class="gt-code">/ledger-import</span></span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>审计员</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>识别文件、列映射、校验、入库四表；激活数据集</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>数据集「生效」，状态自动变「执行中」</span></div>
+            </div>
+        </div>
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">④</span><h3>科目映射</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span>导入后自动；必要时 <span class="gt-code">/mapping</span> 补全</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>审计员</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>客户科目 → 标准科目自动匹配并重算试算表</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>完成率 ≥ 80%，试算表无漏科目</span></div>
+            </div>
+        </div>
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">⑤</span><h3>试算表</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span><span class="gt-code">/trial-balance</span></span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>审计员</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>按映射汇总未审数；调整变化后自动重算</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>借贷平衡、一致性校验通过</span></div>
+            </div>
+        </div>
+    </div>
+    <div class="gt-grid gt-grid-2" style="margin-top:var(--gt-space-lg)">
+        <div class="gt-warn"><strong>⚠ 账套年度必须和项目审计年度一致</strong>，否则查账、试算表都看不到数据。导入失败可重试 / 接管；导入历史里可回滚到上一个数据集。</div>
+        <div class="gt-note"><strong>试算表公式</strong>：未审数 + 审计调整（AJE）+ 重分类调整（RJE）= 审定数。客户自建的费用归集科目（如 6600「成本费用」）系统认不出，需人工指定映射。</div>
+    </div>
+
+    <!-- 阶段C -->
+    <h2 style="margin:var(--gt-space-2xl) 0 var(--gt-space-md);color:var(--gt-primary);font-size:var(--gt-font-2xl)">阶段 C · 审计作业</h2>
+    <div class="gt-grid gt-grid-3">
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">⑥</span><h3>程序裁剪 / 生成底稿</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span><span class="gt-code">/procedures</span> → 生成</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>经理</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>按循环与裁剪结果生成底稿清单</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>底稿列表生成</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">循环分组</span><span>承接与计划（Q、B）· 控制测试（C）· 实质性程序（D～N、S）· 完成与报告（A）；裁剪掉的底稿进回收站可恢复</span></div>
+            </div>
+        </div>
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">⑦</span><h3>编制底稿</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span><span class="gt-code">/workpapers</span> → 编辑</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>审计员</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>取数、公式计算、跨底稿引用</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>底稿「编制完成」</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">编辑方式</span><span>网页表单（默认）或在线编辑（OnlyOffice，双向同步）；证据附件就地上传预览</span></div>
+            </div>
+        </div>
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">⑩</span><h3>底稿复核</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span>底稿 → 提交复核；复核收件箱</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>现场负责人 / 经理 / 合伙人</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>复核意见、退回修改</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>底稿「复核通过」</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">状态链</span><span>编制中 → 编制完成 → 复核中 →（退回修改）→ 复核通过 → 归档</span></div>
+            </div>
+        </div>
+    </div>
+    <div class="gt-grid gt-grid-2" style="margin-top:var(--gt-space-lg)">
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">⑧</span><h3>调整分录</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span><span class="gt-code">/adjustments</span></span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>审计员录入，经理复核</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>审批通过后进入试算表调整列，通知相关底稿负责人</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>无待复核分录</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">要点</span><span>录入 → 提交复核（选复核人）→ 通过 / 驳回；可从 Excel 导入；草稿不进试算表</span></div>
+            </div>
+        </div>
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">⑨</span><h3>审定数发布</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span>审定表 → 发布到试算表</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>审计员</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>二次确认后写入试算表审定数</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>审定数与审定表一致</span></div>
+            </div>
+        </div>
+    </div>
+    <div class="gt-warn" style="margin-top:var(--gt-space-lg)"><strong>⚠ 审定数只有一个入口写入试算表</strong>：审定表上的「发布到试算表」，需二次确认。任何其他途径都不会改动审定数。</div>
+
+    <!-- 阶段D -->
+    <h2 style="margin:var(--gt-space-2xl) 0 var(--gt-space-md);color:var(--gt-primary);font-size:var(--gt-font-2xl)">阶段 D · 成果编制</h2>
+    <div class="gt-grid gt-grid-2">
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">⑪</span><h3>财务报表</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span><span class="gt-code">/reports</span></span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>审计员 / 经理</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>按试算表审定数生成报表</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>报表与试算表勾稽一致</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">报表清单</span><span>资产负债表 · 利润表 · 现金流量表 · 所有者权益变动表 · 现金流量表补充资料；国企版另有资产减值准备表</span></div>
+            </div>
+        </div>
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">⑫</span><h3>附注</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span><span class="gt-code">/disclosure-notes</span></span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>审计员</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>底稿披露表经公式推送到附注；勾稽校验</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>附注章节无「待更新」</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">辅助能力</span><span><span class="gt-ai-tag">AI</span>续写 / 改写；上传附注 Word、批量编制、内容模板</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 阶段E -->
+    <h2 style="margin:var(--gt-space-2xl) 0 var(--gt-space-md);color:var(--gt-primary);font-size:var(--gt-font-2xl)">阶段 E · 质控交付与归档</h2>
+    <div class="gt-grid gt-grid-3">
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">⑬</span><h3>质控与签发</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span>QC 看板、EQCR、签发检查表</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>QC / EQCR / 合伙人</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>签发检查：未审调整、待确认 AI 内容、报告状态</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>检查表全部通过</span></div>
+            </div>
+        </div>
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">⑭</span><h3>交付件</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span>交付中心 <span class="gt-code">/deliverable-center</span>、审计报告</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>经理 / 合伙人</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>生成审计报告、报表、附注三件套（Word/PDF）</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>交付件审批、签字</span></div>
+            </div>
+        </div>
+        <div class="gt-card gt-step-card">
+            <div class="gt-card-header"><span class="gt-step-num">⑮</span><h3>归档</h3></div>
+            <div class="gt-card-content">
+                <div class="gt-detail-row"><span class="gt-detail-key">在哪操作</span><span><span class="gt-code">/archive</span> 归档向导</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">谁做</span><span>经理 / 合伙人</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">系统自动</span><span>门禁 → 打包 → 锁定（可选上传云端、清理本地）</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">完成标志</span><span>状态「已归档」，底稿锁定</span></div>
+                <div class="gt-detail-row"><span class="gt-detail-key">要点</span><span>门禁与向导同一口径；打包逐文件校验；保留期 10 年；解除归档需填原因 + 输项目名确认</span></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============ ③ 合并项目 ============ -->
+<section id="merge" class="gt-section" aria-labelledby="m-title">
+    <div class="gt-section-header">
+        <h1 id="m-title">③ 合并项目</h1>
+        <p class="gt-section-subtitle">各子企业走单体流程，合并数 = 个别数汇总 + 差额</p>
+    </div>
+    <div class="gt-card">
+        <div class="gt-card-header"><h3>合并六步</h3></div>
+        <div class="gt-card-content">
+            <table class="gt-table">
+                <caption>合并项目流程</caption>
+                <thead><tr><th>步骤</th><th>说明</th></tr></thead>
+                <tbody>
+                    <tr><td><span class="gt-badge gt-badge-purple">1 建项</span></td><td>报表类型选「合并」；子企业项目填上级企业代码</td></tr>
+                    <tr><td><span class="gt-badge gt-badge-purple">2 企业树</span></td><td>按企业代码自动构建，可拖拽调整上级</td></tr>
+                    <tr><td><span class="gt-badge gt-badge-blue">3 子企业</span></td><td>各子企业按单体流程完成试算表、报表、附注</td></tr>
+                    <tr><td><span class="gt-badge gt-badge-blue">4 合并试算表</span></td><td><strong>合并数 = 各子企业个别数汇总 + 差额</strong>（调整、抵销分录，一般以负数填列）</td></tr>
+                    <tr><td><span class="gt-badge gt-badge-blue">5 抵销分录</span></td><td>在差额节点录入；与抵销分录汇总表同源</td></tr>
+                    <tr><td><span class="gt-badge gt-badge-green">6 合并报表 / 附注</span></td><td>合并附注从子企业附注拉数，再按企业树「重新汇总」</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- ============ ④ 辅助功能 ============ -->
+<section id="aux" class="gt-section" aria-labelledby="a-title">
+    <div class="gt-section-header">
+        <h1 id="a-title">④ 辅助功能</h1>
+        <p class="gt-section-subtitle">不在主数据流上，但贯穿项目全程</p>
+    </div>
+    <div class="gt-grid gt-grid-3">
+        <div class="gt-card"><div class="gt-card-header"><h3>函证</h3></div><div class="gt-card-content" style="font-size:var(--gt-font-sm)">函证管理、回函识别比对、替代程序</div></div>
+        <div class="gt-card"><div class="gt-card-header"><h3>附件</h3></div><div class="gt-card-content" style="font-size:var(--gt-font-sm)">全项目附件、OCR 识别、证据关联</div></div>
+        <div class="gt-card"><div class="gt-card-header"><h3>知识库 / 私人库</h3></div><div class="gt-card-content" style="font-size:var(--gt-font-sm)">文档存储与检索，可作为 AI 对话的参考资料</div></div>
+        <div class="gt-card"><div class="gt-card-header"><h3>模板库 / 全局公式</h3></div><div class="gt-card-content" style="font-size:var(--gt-font-sm)">底稿、附注、报告模板；全局公式与项目适配</div></div>
+        <div class="gt-card"><div class="gt-card-header"><h3>工时 / 看板</h3></div><div class="gt-card-content" style="font-size:var(--gt-font-sm)">工时填报审批；经理、合伙人、管理层看板</div></div>
+        <div class="gt-card"><div class="gt-card-header"><h3>AI 模型 / AI 对话</h3></div><div class="gt-card-content" style="font-size:var(--gt-font-sm)"><span class="gt-ai-tag">AI</span>管理员配置模型；在底稿、附注、全局对话中使用</div></div>
+    </div>
+    <div class="gt-note" style="margin-top:var(--gt-space-lg)">另有<strong>智能体商店</strong>（外部链接）：访谈、OCR、审计、标书、人力助手。</div>
+</section>
+
+<!-- ============ ⑤ 常见问题 ============ -->
+<section id="faq" class="gt-section" aria-labelledby="q-title">
+    <div class="gt-section-header">
+        <h1 id="q-title">⑤ 使用前提与常见问题</h1>
+        <p class="gt-section-subtitle">出问题先查这张排查表</p>
+    </div>
+    <div class="gt-card">
+        <div class="gt-card-header"><h3>排查表</h3></div>
+        <div class="gt-card-content">
+            <table class="gt-table">
+                <caption>问题 → 原因与处理</caption>
+                <thead><tr><th style="width:40%">问题</th><th>原因与处理</th></tr></thead>
+                <tbody>
+                    <tr><td>导入后查账没数据</td><td>账套年度 ≠ 项目审计年度；或数据集未生效</td></tr>
+                    <tr><td>试算表漏科目</td><td>科目映射完成率 &lt; 80%，到科目映射页补全</td></tr>
+                    <tr><td>在线编辑报契约不一致</td><td>回写契约改过后，需重新发布该底稿的定义（运维工具补发）</td></tr>
+                    <tr><td>AI 提示「AI 服务未启用」</td><td>服务器未打开 <span class="gt-code">WP_AI_SERVICE_ENABLED</span></td></tr>
+                    <tr><td>AI 对话「引擎不可用」</td><td>模型的信任域 / 客户数据设置不符合数据政策</td></tr>
+                    <tr><td>录入模型 Key 报未配置 ENCRYPTION_KEY</td><td>服务器未配置加密密钥（配好后不可更换）</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- ============ 附录 ============ -->
+<section id="gaps" class="gt-section" aria-labelledby="gp-title">
+    <div class="gt-section-header">
+        <h1 id="gp-title">附录 · 已知缺口与待确认</h1>
+        <p class="gt-section-subtitle">当前实现与预期的差距，需要产品侧决策</p>
+    </div>
+    <div class="gt-grid gt-grid-2">
+        <div class="gt-warn">
+            <strong>1. completion / reporting 状态无自动推进</strong>
+            <p style="margin-top:var(--gt-space-sm)">这两个状态在代码里<strong>没有任何地方自动推进</strong>，项目会一直停在「执行中」直到归档。待决策：按条件自动推进（例如全部底稿复核通过 → 完成阶段），还是提供手动切换。</p>
+        </div>
+        <div class="gt-warn">
+            <strong>2. 「向导六步」已停用</strong>
+            <p style="margin-top:var(--gt-space-sm)">项目向导里的科目导入、科目映射、重要性、团队分工几步已停用，旧文档里「向导六步」的说法<strong>已不适用</strong>，相关操作均移入项目内各页面。</p>
+        </div>
+    </div>
+</section>
+
+</main>
+
+<footer class="gt-footer">
+    <p><strong>致同审计作业平台 · 项目流程（可视化版）</strong></p>
+    <p>配套文档：docs/audit-project-workflow.md（权威定义）</p>
+</footer>
+
+</body>
+</html>

@@ -21,8 +21,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制仿宋_GB2312字体（如果可用）
-COPY fonts/FangSong_GB2312.ttf /usr/share/fonts/truetype/fangsong/ 2>/dev/null || true
-RUN fc-cache -fv 2>/dev/null || true
+# COPY fonts/FangSong_GB2312.ttf /usr/share/fonts/truetype/fangsong/ 2>/dev/null || true
+# RUN fc-cache -fv 2>/dev/null || true
 
 WORKDIR /app
 

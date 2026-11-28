@@ -19,17 +19,44 @@ logger = logging.getLogger(__name__)
 
 
 class DashboardService:
-    """管理看板数据聚合"""
+    """管理看板数据聚合。
 
-    def __init__(self, db: AsyncSession):
+    ``visible_project_ids``：当前用户能看到的项目集合（由路由按 ``deps._project_level_visible_ids``
+    算好传入）。``None`` = 不过滤（只给 admin，或内部 / 旧测试的直接调用）；集合 = 所有统计只算这些项目，
+    空集 = 什么都不算。工时、人员负荷等人员维度统计按工时 / 委派所属项目过滤。
+    """
+
+    def __init__(self, db: AsyncSession, visible_project_ids: set[UUID] | None = None):
         self.db = db
+        self.visible = None if visible_project_ids is None else set(visible_project_ids)
+
+    # ── 可见范围过滤 ─────────────────────────────────────────────────
+    def _scope(self, column):
+        """给查询加「项目在可见集内」的条件；不限范围时返回 None（调用方跳过）。"""
+        if self.visible is None:
+            return None
+        return column.in_(self.visible) if self.visible else sa.false()
+
+    def _where(self, query, column):
+        cond = self._scope(column)
+        return query if cond is None else query.where(cond)
+
+    def _cache_key(self, name: str) -> str:
+        """缓存键按可见集区分：同一可见集共享，不同用户看到的范围不同就不会串数据。"""
+        if self.visible is None:
+            return f"dashboard:all:{name}"
+        import hashlib
+
+        digest = hashlib.sha256(",".join(sorted(str(p) for p in self.visible)).encode()).hexdigest()[:16]
+        return f"dashboard:scoped:{digest}:{name}"
 
     async def get_overview(self) -> dict:
-        """关键指标聚合（带 Redis 缓存）"""
+        """关键指标聚合（带 Redis 缓存，缓存键按可见集区分）"""
+        cache_key = self._cache_key("overview")
         # 尝试 Redis 缓存
         try:
             from app.core.redis import redis_client
-            cached = await redis_client.get("dashboard:global:overview")
+            cached = await redis_client.get(cache_key)
             if cached:
                 import json
                 return json.loads(cached)
@@ -41,9 +68,10 @@ class DashboardService:
             Project.is_deleted == False,  # noqa
             Project.status.in_([ProjectStatus.planning, ProjectStatus.execution, ProjectStatus.completion]),
         )
+        active_q = self._where(active_q, Project.id)
         active_count = (await self.db.execute(active_q)).scalar() or 0
 
-        # 本周工时总量
+        # 本周工时总量（只算可见项目上的工时）
         today = date.today()
         week_start = today - timedelta(days=today.weekday())
         week_hours_q = sa.select(sa.func.coalesce(sa.func.sum(WorkHour.hours), 0)).where(
@@ -51,10 +79,22 @@ class DashboardService:
             WorkHour.work_date >= week_start,
             WorkHour.work_date <= today,
         )
+        week_hours_q = self._where(week_hours_q, WorkHour.project_id)
         week_hours = float((await self.db.execute(week_hours_q)).scalar() or 0)
 
-        # 人员总数
-        staff_q = sa.select(sa.func.count()).select_from(StaffMember).where(StaffMember.is_deleted == False)  # noqa
+        # 人员总数：不限范围时为全部人员；限范围时为委派到可见项目上的人员
+        if self.visible is None:
+            staff_q = sa.select(sa.func.count()).select_from(StaffMember).where(StaffMember.is_deleted == False)  # noqa
+        else:
+            staff_q = (
+                sa.select(sa.func.count(sa.distinct(ProjectAssignment.staff_id)))
+                .join(StaffMember, StaffMember.id == ProjectAssignment.staff_id)
+                .where(
+                    ProjectAssignment.is_deleted == False,  # noqa
+                    StaffMember.is_deleted == False,  # noqa
+                    self._scope(ProjectAssignment.project_id),
+                )
+            )
         staff_count = (await self.db.execute(staff_q)).scalar() or 0
 
         result = {
@@ -69,7 +109,7 @@ class DashboardService:
         try:
             from app.core.redis import redis_client
             import json
-            await redis_client.set("dashboard:global:overview", json.dumps(result), ex=30)
+            await redis_client.set(cache_key, json.dumps(result), ex=30)
         except Exception:
             pass
 
@@ -85,6 +125,7 @@ class DashboardService:
             .order_by(Project.created_at.desc())
             .limit(50)
         )
+        q = self._where(q, Project.id)
         rows = (await self.db.execute(q)).all()
 
         # 批量查询每个项目的底稿完成率（一次 SQL 聚合全部项目）
@@ -144,11 +185,40 @@ class DashboardService:
         return results
 
     async def get_staff_workload(self) -> list[dict]:
-        """人员负荷排行——工时 + 底稿分配数量双维度"""
+        """人员负荷排行——工时 + 底稿分配数量双维度。
+
+        限范围时：只列委派到可见项目上的人员，工时、项目数、底稿数也只算可见项目。
+        """
         from app.models.workpaper_models import WorkingPaper
 
         today = date.today()
         week_start = today - timedelta(days=today.weekday())
+
+        hours_sub = (
+            sa.select(sa.func.sum(WorkHour.hours))
+            .where(
+                WorkHour.staff_id == StaffMember.id,
+                WorkHour.work_date >= week_start,
+                WorkHour.work_date <= today,
+                WorkHour.is_deleted == False,  # noqa
+            )
+        )
+        hours_sub = self._where(hours_sub, WorkHour.project_id)
+        wp_sub = (
+            sa.select(sa.func.count(WorkingPaper.id))
+            .where(
+                WorkingPaper.assigned_to == StaffMember.user_id,
+                WorkingPaper.is_deleted == False,  # noqa
+            )
+        )
+        wp_sub = self._where(wp_sub, WorkingPaper.project_id)
+        assignment_join = [
+            ProjectAssignment.staff_id == StaffMember.id,
+            ProjectAssignment.is_deleted == False,  # noqa
+        ]
+        scope_cond = self._scope(ProjectAssignment.project_id)
+        if scope_cond is not None:
+            assignment_join.append(scope_cond)
 
         q = (
             sa.select(
@@ -156,39 +226,19 @@ class DashboardService:
                 StaffMember.name,
                 StaffMember.title,
                 sa.func.count(sa.distinct(ProjectAssignment.project_id)).label("project_count"),
-                sa.func.coalesce(
-                    sa.select(sa.func.sum(WorkHour.hours))
-                    .where(
-                        WorkHour.staff_id == StaffMember.id,
-                        WorkHour.work_date >= week_start,
-                        WorkHour.work_date <= today,
-                        WorkHour.is_deleted == False,  # noqa
-                    )
-                    .correlate(StaffMember)
-                    .scalar_subquery(),
-                    0,
-                ).label("week_hours"),
+                sa.func.coalesce(hours_sub.correlate(StaffMember).scalar_subquery(), 0).label("week_hours"),
                 # 底稿分配数量（该人作为编制人 assigned_to 的活跃底稿数）
-                sa.func.coalesce(
-                    sa.select(sa.func.count(WorkingPaper.id))
-                    .where(
-                        WorkingPaper.assigned_to == StaffMember.user_id,
-                        WorkingPaper.is_deleted == False,  # noqa
-                    )
-                    .correlate(StaffMember)
-                    .scalar_subquery(),
-                    0,
-                ).label("wp_count"),
+                sa.func.coalesce(wp_sub.correlate(StaffMember).scalar_subquery(), 0).label("wp_count"),
             )
-            .outerjoin(ProjectAssignment, sa.and_(
-                ProjectAssignment.staff_id == StaffMember.id,
-                ProjectAssignment.is_deleted == False,  # noqa
-            ))
+            .outerjoin(ProjectAssignment, sa.and_(*assignment_join))
             .where(StaffMember.is_deleted == False)  # noqa
             .group_by(StaffMember.id, StaffMember.name, StaffMember.title)
             .order_by(sa.desc("wp_count"), sa.desc("week_hours"))
             .limit(20)
         )
+        if scope_cond is not None:
+            # 限范围时只保留至少委派到一个可见项目上的人员
+            q = q.having(sa.func.count(sa.distinct(ProjectAssignment.project_id)) > 0)
         rows = (await self.db.execute(q)).all()
         return [
             {
@@ -222,6 +272,7 @@ class DashboardService:
             .order_by(StaffMember.name, ProjectAssignment.assigned_at)
             .limit(100)
         )
+        q = self._where(q, Project.id)
         rows = (await self.db.execute(q)).all()
         return [
             {
@@ -250,6 +301,7 @@ class DashboardService:
             .group_by(StaffMember.name, WorkHour.work_date)
             .order_by(WorkHour.work_date)
         )
+        q = self._where(q, WorkHour.project_id)
         rows = (await self.db.execute(q)).all()
         return [
             {"staff_name": r.name, "date": str(r.work_date), "hours": float(r.total_hours)}
@@ -269,6 +321,7 @@ class DashboardService:
             Project.status.notin_(["archived", "created"]),
             Project.created_at <= cutoff,
         )
+        overdue_q = self._where(overdue_q, Project.id)
         overdue = (await self.db.execute(overdue_q)).scalar() or 0
         if overdue > 0:
             alerts.append({
@@ -288,6 +341,7 @@ class DashboardService:
             ]),
             WorkingPaper.updated_at < review_cutoff,
         )
+        stale_review_q = self._where(stale_review_q, WorkingPaper.project_id)
         stale_review = (await self.db.execute(stale_review_q)).scalar() or 0
         if stale_review > 0:
             alerts.append({
@@ -302,6 +356,7 @@ class DashboardService:
             WorkingPaper.is_deleted == sa.false(),
             WorkingPaper.assigned_to.is_(None),
         )
+        unassigned_q = self._where(unassigned_q, WorkingPaper.project_id)
         unassigned = (await self.db.execute(unassigned_q)).scalar() or 0
         if unassigned > 0:
             alerts.append({
@@ -317,6 +372,7 @@ class DashboardService:
             misstatement_q = sa.select(sa.func.count()).select_from(UnadjustedMisstatement).where(
                 UnadjustedMisstatement.is_deleted == sa.false(),
             )
+            misstatement_q = self._where(misstatement_q, UnadjustedMisstatement.project_id)
             misstatement_count = (await self.db.execute(misstatement_q)).scalar() or 0
             if misstatement_count > 0:
                 alerts.append({
@@ -335,37 +391,36 @@ class DashboardService:
         from app.models.workpaper_models import WorkingPaper, WpReviewStatus, WpQcResult
         from app.models.audit_platform_models import Adjustment
 
-        # qc_pass_rate — 从 wp_qc_results 计算通过率
-        total_qc = (await self.db.execute(
-            sa.select(sa.func.count()).select_from(WpQcResult)
-        )).scalar() or 0
-        passed_qc = (await self.db.execute(
-            sa.select(sa.func.count()).select_from(WpQcResult).where(WpQcResult.passed == True)  # noqa
-        )).scalar() or 0
+        # qc_pass_rate — 从 wp_qc_results 计算通过率（限范围时经所属底稿过滤项目）
+        qc_total_q = sa.select(sa.func.count()).select_from(WpQcResult)
+        qc_passed_q = sa.select(sa.func.count()).select_from(WpQcResult).where(WpQcResult.passed == True)  # noqa
+        if self.visible is not None:
+            wp_in_scope = sa.select(WorkingPaper.id).where(self._scope(WorkingPaper.project_id))
+            qc_total_q = qc_total_q.where(WpQcResult.working_paper_id.in_(wp_in_scope))
+            qc_passed_q = qc_passed_q.where(WpQcResult.working_paper_id.in_(wp_in_scope))
+        total_qc = (await self.db.execute(qc_total_q)).scalar() or 0
+        passed_qc = (await self.db.execute(qc_passed_q)).scalar() or 0
         qc_pass_rate = round(passed_qc / total_qc * 100, 1) if total_qc > 0 else 0
 
         # review_completion_rate — 从 working_paper 计算复核完成率
-        total_wp = (await self.db.execute(
-            sa.select(sa.func.count()).select_from(WorkingPaper).where(
-                WorkingPaper.is_deleted == sa.false(),
-            )
-        )).scalar() or 0
-        reviewed_wp = (await self.db.execute(
-            sa.select(sa.func.count()).select_from(WorkingPaper).where(
-                WorkingPaper.is_deleted == sa.false(),
-                WorkingPaper.review_status.in_([
-                    WpReviewStatus.level1_passed, WpReviewStatus.level2_passed,
-                ]),
-            )
-        )).scalar() or 0
+        total_wp_q = sa.select(sa.func.count()).select_from(WorkingPaper).where(
+            WorkingPaper.is_deleted == sa.false(),
+        )
+        total_wp = (await self.db.execute(self._where(total_wp_q, WorkingPaper.project_id))).scalar() or 0
+        reviewed_wp_q = sa.select(sa.func.count()).select_from(WorkingPaper).where(
+            WorkingPaper.is_deleted == sa.false(),
+            WorkingPaper.review_status.in_([
+                WpReviewStatus.level1_passed, WpReviewStatus.level2_passed,
+            ]),
+        )
+        reviewed_wp = (await self.db.execute(self._where(reviewed_wp_q, WorkingPaper.project_id))).scalar() or 0
         review_completion_rate = round(reviewed_wp / total_wp * 100, 1) if total_wp > 0 else 0
 
         # adjustment_count 是业务分录笔数；借贷行共享 entry_group_id。
-        adj_count = (await self.db.execute(
-            sa.select(sa.func.count(sa.distinct(Adjustment.entry_group_id))).where(
-                Adjustment.is_deleted == sa.false(),
-            )
-        )).scalar() or 0
+        adj_q = sa.select(sa.func.count(sa.distinct(Adjustment.entry_group_id))).where(
+            Adjustment.is_deleted == sa.false(),
+        )
+        adj_count = (await self.db.execute(self._where(adj_q, Adjustment.project_id))).scalar() or 0
 
         return {
             "qc_pass_rate": qc_pass_rate,
@@ -380,28 +435,26 @@ class DashboardService:
     async def _get_overdue_projects(self) -> int:
         """逾期项目数：创建超 180 天仍处于 planning/execution 状态且未归档"""
         cutoff = datetime.now(timezone.utc) - timedelta(days=180)
-        result = await self.db.execute(
-            sa.select(sa.func.count()).select_from(Project).where(
-                Project.status.in_([ProjectStatus.execution, ProjectStatus.planning]),
-                Project.is_deleted == sa.false(),
-                Project.created_at < cutoff,
-            )
+        q = sa.select(sa.func.count()).select_from(Project).where(
+            Project.status.in_([ProjectStatus.execution, ProjectStatus.planning]),
+            Project.is_deleted == sa.false(),
+            Project.created_at < cutoff,
         )
+        result = await self.db.execute(self._where(q, Project.id))
         return result.scalar() or 0
 
     async def _get_pending_review_workpapers(self) -> int:
         """待复核底稿数：review_status 为 pending_level1 或 pending_level2"""
         from app.models.workpaper_models import WorkingPaper, WpReviewStatus
 
-        result = await self.db.execute(
-            sa.select(sa.func.count()).select_from(WorkingPaper).where(
-                WorkingPaper.is_deleted == sa.false(),
-                WorkingPaper.review_status.in_([
-                    WpReviewStatus.pending_level1,
-                    WpReviewStatus.pending_level2,
-                ]),
-            )
+        q = sa.select(sa.func.count()).select_from(WorkingPaper).where(
+            WorkingPaper.is_deleted == sa.false(),
+            WorkingPaper.review_status.in_([
+                WpReviewStatus.pending_level1,
+                WpReviewStatus.pending_level2,
+            ]),
         )
+        result = await self.db.execute(self._where(q, WorkingPaper.project_id))
         return result.scalar() or 0
 
     async def get_group_progress(self) -> list[dict]:
@@ -417,6 +470,7 @@ class DashboardService:
             .order_by(Project.client_name)
             .limit(50)
         )
+        q = self._where(q, Project.id)
         rows = (await self.db.execute(q)).all()
 
         # 批量查询底稿完成率
@@ -482,6 +536,7 @@ class DashboardService:
                 q = q.where(WorkingPaper.project_id == UUID(project_id))
             except ValueError:
                 pass
+        q = self._where(q, WorkingPaper.project_id)
 
         rows = (await self.db.execute(q)).all()
 
@@ -535,6 +590,7 @@ class DashboardService:
                     q = q.where(Project.id == UUID(project_id))
                 except ValueError:
                     pass
+            q = self._where(q, Project.id)
             rows = (await self.db.execute(q)).all()
             counts: dict[str, int] = {"total": 0, "in_progress": 0, "pending_review": 0, "completed": 0}
             for status, cnt in rows:

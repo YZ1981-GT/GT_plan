@@ -667,7 +667,7 @@ async def _stale_migration_schema():
             connect_args={**connect_args, "server_settings": {"search_path": schema}},
         )
         async with scoped.begin() as conn:
-            # 只建 V270 的 legacy 前置表，确保 ADD COLUMN 真正被执行。
+            # 只建 V272（原 V270）的 legacy 前置表，确保 ADD COLUMN 真正被执行。
             await conn.exec_driver_sql(
                 "CREATE TABLE consol_note_data ("
                 "id UUID PRIMARY KEY, "

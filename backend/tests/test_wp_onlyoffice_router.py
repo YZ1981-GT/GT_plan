@@ -728,12 +728,13 @@ class TestOnlyOfficeConfigEndpoint:
                 data = resp.json()
                 config = data["config"]
 
-                # 验证 actionLink 存在且包含正确的 sheet_name
+                # 验证 actionLink 存在且指向该 sheet。表格编辑器按单元格引用跳转：
+                # 裸表名不跳（2026-11-03 OO 9.4 实测），必须是 `'表名'!A1`。
                 editor_config = config["editorConfig"]
                 assert "actionLink" in editor_config
                 action_link = editor_config["actionLink"]
                 assert action_link == {
-                    "action": {"type": "bookmark", "data": sheet_name}
+                    "action": {"type": "bookmark", "data": f"'{sheet_name}'!A1"}
                 }
 
 

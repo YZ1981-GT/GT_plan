@@ -317,10 +317,20 @@ async def assert_project_permission(
     # 查询 project_users 表（只取级别一列，每次直接查库）
     level_value = await _load_member_level(db, current_user.id, project_id)
 
-    if level_value is None:
-        raise HTTPException(status_code=403, detail="权限不足")
+    # 成员级别判定；成员行缺失或级别不足时，尝试「部门负责人只读」兜底。
+    member_rank = PERMISSION_HIERARCHY.get(level_value, 0) if level_value is not None else 0
+    effective_rank = member_rank
 
-    if PERMISSION_HIERARCHY.get(level_value, 0) < required_level:
+    if member_rank < required_level:
+        # 部门负责人对本部门（含子部门）项目有只读可见权（需求：看见本部门所有项目）。
+        # 仅授予 readonly：更高操作（review/edit）仍需真实成员行，避免越权写。
+        from app.services.dept_head_visibility_service import dept_head_visible_project_ids
+
+        dept_pids = await dept_head_visible_project_ids(current_user, db)
+        if project_id in dept_pids:
+            effective_rank = max(effective_rank, PERMISSION_HIERARCHY["readonly"])
+
+    if effective_rank < required_level:
         raise HTTPException(status_code=403, detail="权限不足")
 
     # 设置 RLS context（SET LOCAL 仅当前事务有效）
@@ -409,7 +419,7 @@ async def authorize_wp_edit(db: AsyncSession, current_user: User, wp_id: UUID) -
 
     判定口径同 require_wp_edit_permission：
     1. 角色须具 WORKPAPER_WRITE（qc/readonly → 403）。
-    2. admin/partner 全局放行。
+    2. admin 全局放行；partner 只放行自己名下的项目（``partner_visible_project_ids``）。
     3. 其余角色须为目标底稿所属项目成员且具 edit 权（project_users）。
 
     Returns:
@@ -439,9 +449,17 @@ async def authorize_wp_edit(db: AsyncSession, current_user: User, wp_id: UUID) -
     if project_id is None:
         raise HTTPException(status_code=404, detail="底稿不存在")
 
-    # ② admin/partner 全局放行（在确认底稿存在后返回其 project_id）
-    if role in ("admin", "partner"):
+    # ② admin 全局放行（在确认底稿存在后返回其 project_id）
+    if role == "admin":
         return project_id
+
+    # ②b partner 只对自己名下的项目放行（与项目列表同一可见集）
+    if role == "partner":
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        if project_id in await partner_visible_project_ids(current_user, db):
+            return project_id
+        raise HTTPException(status_code=403, detail="无底稿编辑权限")
 
     # ④ 项目成员编辑权（project_users edit 级；每次直接查库）
     level = await _load_member_level(db, current_user.id, project_id)
@@ -462,7 +480,7 @@ async def authorize_wp_read(db: AsyncSession, current_user: User, wp_id: UUID) -
     非项目成员放行（否则任意登录用户可拉取他人项目底稿数据）。
 
     判定口径：
-    1. admin/partner 全局放行（在确认底稿存在后返回其 project_id）。
+    1. admin 全局放行；partner 只放行自己名下的项目（在确认底稿存在后返回其 project_id）。
     2. 其余角色须为目标底稿所属项目成员（``project_users`` 任一权限级 ≥ readonly）。
 
     Returns:
@@ -486,8 +504,16 @@ async def authorize_wp_read(db: AsyncSession, current_user: User, wp_id: UUID) -
     if project_id is None:
         raise HTTPException(status_code=404, detail="底稿不存在")
 
-    if role in ("admin", "partner"):
+    if role == "admin":
         return project_id
+
+    # partner 只对自己名下的项目放行（与项目列表同一可见集）
+    if role == "partner":
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        if project_id in await partner_visible_project_ids(current_user, db):
+            return project_id
+        raise HTTPException(status_code=403, detail="无底稿访问权限")
 
     level = await _load_member_level(db, current_user.id, project_id)
     if level is None:
@@ -592,22 +618,79 @@ async def get_visible_project_ids(
 ) -> list[UUID]:
     """返回当前用户可见的项目 ID 列表。
 
-    admin/partner 可见所有项目，其他角色只能看到自己参与的项目。
+    admin 可见所有项目；partner 只见自己名下的项目（``partner_visible_project_ids``）；
+    其他角色只能看到自己参与的项目。
     """
-    if current_user.role.value in ("admin", "partner"):
-        from app.models.core import Project
+    if current_user.role.value == "admin":
         result = await db.execute(
             select(Project.id).where(Project.is_deleted == False)  # noqa: E712
         )
         return [r[0] for r in result.all()]
+    if current_user.role.value == "partner":
+        from app.services.partner_visibility_service import partner_visible_project_ids
 
-    result = await db.execute(
+        pids = set(await partner_visible_project_ids(current_user, db))
+    else:
+        result = await db.execute(
+            select(ProjectUser.project_id).where(
+                ProjectUser.user_id == current_user.id,
+                ProjectUser.is_deleted == False,  # noqa: E712
+            )
+        )
+        pids = {r[0] for r in result.all()}
+
+    # 部门负责人并集：本部门（含子部门）成员参与的项目（与系统角色无关）
+    from app.services.dept_head_visibility_service import dept_head_visible_project_ids
+
+    pids |= await dept_head_visible_project_ids(current_user, db)
+    return list(pids)
+
+
+async def _project_level_visible_ids(
+    current_user: User,
+    db: AsyncSession,
+) -> list[UUID]:
+    """项目级可见 ID（data_scope_service scope=6「我参与的」专用）。
+
+    admin → 全部未删除项目；partner → 自己名下的项目（``partner_visible_project_ids``）；
+    其余角色 → 参与项目（project_users）∪ 担任经理/合伙人的项目 ∪ 创建的项目
+    （DROP ProjectMember：本项目无该模型）。
+    """
+    from sqlalchemy import or_
+
+    role_str = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
+    if role_str == "admin":
+        result = await db.execute(
+            select(Project.id).where(Project.is_deleted == False)  # noqa: E712
+        )
+        return [r[0] for r in result.all()]
+    if role_str == "partner":
+        from app.services.partner_visibility_service import partner_visible_project_ids
+
+        return list(await partner_visible_project_ids(current_user, db))
+
+    member_ids = (await db.execute(
         select(ProjectUser.project_id).where(
             ProjectUser.user_id == current_user.id,
             ProjectUser.is_deleted == False,  # noqa: E712
         )
-    )
-    return [r[0] for r in result.all()]
+    )).scalars().all()
+    lead_ids = (await db.execute(
+        select(Project.id).where(
+            or_(
+                Project.manager_id == current_user.id,
+                Project.partner_id == current_user.id,
+            ),
+            Project.is_deleted == False,  # noqa: E712
+        )
+    )).scalars().all()
+    creator_ids = (await db.execute(
+        select(Project.id).where(
+            Project.created_by == current_user.id,
+            Project.is_deleted == False,  # noqa: E712
+        )
+    )).scalars().all()
+    return list(set(member_ids) | set(lead_ids) | set(creator_ids))
 
 
 async def readable_project_ids(db: AsyncSession, current_user: User) -> set[UUID] | None:

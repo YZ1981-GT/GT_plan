@@ -23,6 +23,38 @@ from app.models.base import (
 
 
 # ---------------------------------------------------------------------------
+# Department 模型
+# ---------------------------------------------------------------------------
+
+
+class Department(Base, SoftDeleteMixin, TimestampMixin):
+    """部门组织架构"""
+
+    __tablename__ = "sys_dept"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, comment="部门名称（未软删范围内唯一）")
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("sys_dept.id"), nullable=True, comment="父部门ID"
+    )
+    head_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, comment="部门负责人，引用 users(id)"
+    )
+    sort_order: Mapped[int] = mapped_column(server_default=text("0"), nullable=False, comment="排序顺序")
+    description: Mapped[str | None] = mapped_column(Text, nullable=True, comment="部门描述")
+
+    __table_args__ = (
+        Index(
+            "uq_sys_dept_name",
+            "name",
+            unique=True,
+            postgresql_where=text("is_deleted = false"),
+        ),
+        Index("idx_sys_dept_parent", "parent_id"),
+    )
+
+
+# ---------------------------------------------------------------------------
 # User 模型
 # ---------------------------------------------------------------------------
 
@@ -41,8 +73,24 @@ class User(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     is_active: Mapped[bool] = mapped_column(default=True)
     language: Mapped[str] = mapped_column(String(10), server_default=text("'zh-CN'"), nullable=False)
 
+    # V149: account-field-completion
+    full_name: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="用户全名")
+    parent_partner_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, comment="所属合伙人ID"
+    )
+    dept_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True, comment="部门ID（预留外键）")
+
+    # V274（operation-log-and-last-login）：最后登录时间与 IP（登录成功时更新）
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="最后登录时间（UTC）"
+    )
+    last_login_ip: Mapped[str | None] = mapped_column(
+        String(45), nullable=True, comment="最后登录 IP"
+    )
+
     __table_args__ = (
         Index("idx_users_active", "is_active", postgresql_where=text("is_deleted = false")),
+        Index("idx_users_parent_partner", "parent_partner_id"),
     )
 
 
@@ -317,6 +365,34 @@ class Log(Base):
     __table_args__ = (
         Index("idx_logs_object", "object_type", "object_id"),
         Index("idx_logs_user_time", "user_id", text("created_at DESC")),
+    )
+
+
+class SysLoginLog(Base):
+    """登录留痕（V274，operation-log-and-last-login）
+
+    登录成功 / 失败 / 锁定 / 登出各写一行；**独立会话写入**（失败登录的请求
+    事务会被异常处理器放弃，写进请求会话必回滚）。result 枚举与 V274 的
+    CHECK 约束一致。
+    """
+
+    __tablename__ = "sys_login_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    username: Mapped[str] = mapped_column(String(150), nullable=False)
+    result: Mapped[str] = mapped_column(String(20), nullable=False)
+    ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        Index("idx_sys_login_log_ts", text("ts DESC")),
+        Index("idx_sys_login_log_user_ts", "user_id", text("ts DESC")),
     )
 
 

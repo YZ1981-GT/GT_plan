@@ -1,4 +1,4 @@
-"""publication registry 的持久化仓储（V272）。
+"""publication registry 的持久化仓储（V275）。
 
 Spec: custom-workpaper-template-ingestion-and-sync-closure
 

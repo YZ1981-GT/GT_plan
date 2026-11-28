@@ -188,7 +188,7 @@ class TestAuthorizeWpEditLevel:
     authorize_wp_edit 和 require_wp_edit_permission 共用同一实现，
     前者是后者的内部调用。authorize_wp_edit 需要底稿存在于库中。
     全局能力检查 (WORKPAPER_WRITE) 使 qc/readonly/eqcr 被提前拒绝。
-    partner 全局放行（不查成员行）。
+    partner 只放行自己名下的项目（本样例有成员行）。
     """
 
     @pytest_asyncio.fixture
@@ -260,7 +260,7 @@ class TestAuthorizeWpEditLevel:
             world, global_role=global_role, project_role=project_role, level=level,
         )
         if expected:
-            # partner 全局放行；manager/auditor 需 edit 成员行
+            # partner 按名下项目放行（本样例有成员行）；manager/auditor 需 edit 成员行
             result = await authorize_wp_edit(world.db, user, wp_id)
             assert result == PROJECT_ID
         else:

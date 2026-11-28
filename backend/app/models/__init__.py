@@ -16,6 +16,7 @@ from app.models.core import (
     Notification,
     Project,
     ProjectUser,
+    SysLoginLog,
     User,
 )
 from app.models.audit_platform_models import (
@@ -249,6 +250,7 @@ __all__ = [
     "Project",
     "ProjectUser",
     "Log",
+    "SysLoginLog",
     "Notification",
     # --- audit platform enums ---
     "AccountDirection",

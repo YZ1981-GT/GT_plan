@@ -220,10 +220,17 @@ async def test_reading_invisible_template_is_403_in_chinese(world):
     assert (response.status_code, response.json()["detail"]) == (403, NOT_VISIBLE)
 
 
-async def test_execute_invisible_template_is_403(world):
+async def test_execute_invisible_template_is_403(world, monkeypatch):
     """变异 B8-b 的靶子：TemplateForbiddenError 原先未映射 ⇒ 500。"""
     admin = (await world.admin_non_member()).user
-    partner = await world.user(UserRole.partner)  # 可访问全部项目，但私有模板只给作者
+    partner = await world.user(UserRole.partner)  # 能访问项目 X，但私有模板只给作者
+    # 合伙人只看自己名下的项目：这里把 X 固定为其名下项目，用例只验证模板可见性
+    from unittest.mock import AsyncMock
+
+    monkeypatch.setattr(
+        "app.services.partner_visibility_service.partner_visible_project_ids",
+        AsyncMock(return_value={X}),
+    )
     private = await _template(world, admin, name="【测试】管理员私有", scope="private")
     async with world.client(custom_query.router, user=partner) as client:
         response = await client.post(f"{CQ}/templates/{private.id}/execute", json={"project_id": str(X), "year": 2025})

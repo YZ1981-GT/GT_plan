@@ -110,20 +110,9 @@ class SecurityMonitor:
             events = [e for e in events if e["event_type"] == event_type]
         return events[-limit:]
 
-    def get_login_attempts(self, username: str | None = None, limit: int = 50) -> list[dict]:
-        """获取登录尝试记录。"""
-        events = [e for e in self._security_events if e["event_type"] in ("login_success", "login_failed")]
-        if username:
-            events = [e for e in events if e["details"].get("username") == username]
-        return events[-limit:]
-
-    def record_login_attempt(self, username: str, ip: str, success: bool):
-        """记录登录尝试。"""
-        self._log_event(
-            "login_success" if success else "login_failed",
-            {"username": username, "ip": ip},
-        )
-        self.record_ip_access(ip, "login")
+    # V274：record_login_attempt / get_login_attempts 已删除 —— 它们读写内存列表，
+    # 登录流程从未调用（读取端恒空、重启即丢）。登录尝试记录统一落 sys_login_log，
+    # 读取走 GET /api/security/login-attempts（routers/security.py）。
 
 
 # Global instance

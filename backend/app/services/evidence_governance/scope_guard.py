@@ -34,8 +34,8 @@ from app.services.evidence_governance.frozen_contracts import (
     EvidenceGovernanceError,
 )
 
-# 系统角色中天然具备全项目可见性的角色（与 deps.get_visible_project_ids 一致）。
-_GLOBAL_VISIBILITY_ROLES: frozenset[str] = frozenset({"admin", "partner"})
+# 系统角色中天然具备全项目可见性的角色（与 deps.get_visible_project_ids 一致：只有 admin）。
+_GLOBAL_VISIBILITY_ROLES: frozenset[str] = frozenset({"admin"})
 
 
 @dataclass(frozen=True)
@@ -85,7 +85,7 @@ class ProjectYearScopeGuard:
         """校验 actor 对请求 scope 有访问权；无权/不存在均抛脱敏
         ``SCOPE_NOT_FOUND_OR_FORBIDDEN``。
 
-        - 人工 actor：全局可见角色（admin/partner）放行；其余须为项目成员（未软删）。
+        - 人工 actor：admin 放行；partner 限自己名下的项目；其余须为项目成员（未软删）。
         - service actor：由其执行的已批准任务 scope 限定——调用方须已把 project_id 绑定到
           任务；本 guard 只确认项目存在（防止对不存在项目伪造 scope）。
         """
@@ -98,6 +98,16 @@ class ProjectYearScopeGuard:
 
         if actor_role in _GLOBAL_VISIBILITY_ROLES:
             return
+
+        if actor_role == "partner":
+            # 合伙人只放行自己名下的项目（与项目列表同一可见集）
+            from app.models.core import User
+            from app.services.partner_visibility_service import partner_visible_project_ids
+
+            partner = await self._db.get(User, actor.actor_user_id)
+            if partner is not None and project_id in await partner_visible_project_ids(partner, self._db):
+                return
+            raise self._denied()
 
         if not await self._is_project_member(project_id, actor.actor_user_id):
             raise self._denied()
