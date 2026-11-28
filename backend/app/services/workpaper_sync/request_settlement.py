@@ -30,11 +30,13 @@ import sqlalchemy as sa
 
 from app.models.workpaper_sync_models import (
     WorkpaperForcesaveRequest,
+    WorkpaperOoParticipant,
     WorkpaperSyncOperation,
 )
 from app.services.workpaper_sync.models import (
     REQUEST_STATE_FOR_TERMINAL_APPLICATION,
     ApplicationState,
+    ParticipantState,
     StateTransitionError,
     assert_transition,
     is_terminal,
@@ -113,6 +115,36 @@ async def settle_requests_of_terminal_application(
         req.state = target.value
         req.finished_at = req.finished_at or now
         settled.append(req.id)
-    if settled:
+
+    # D12 延迟离开：本次落终态的 request 的发起人若已登记 `deferred_leave_at`，
+    # 同事务执行 `active/closing → left`。锁序 room → request → participant ——
+    # room 与 request 行在上面已依次 FOR UPDATE，这里对 participant 取锁是第三把，
+    # 与撤销路径（room → request）不会产生环形等待。此时 initiator 的终态授权早已
+    # 通过（apply 内容已提交或本 application 已被 supersed/失权），转 left 安全。
+    # 未登记的 initiator 原样不动；request 落在非终态 application（conflict/error）
+    # 时根本走不到这里，登记继续挂着等裁决/重试/放弃后的下一次结算。
+    deferred_initiators = {
+        req.initiated_by_participant_id for req in rows if req.initiated_by_participant_id
+    }
+    for participant_id in deferred_initiators:
+        participant = (
+            await session.execute(
+                sa.select(WorkpaperOoParticipant)
+                .where(WorkpaperOoParticipant.id == participant_id)
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        if participant is None or participant.deferred_leave_at is None:
+            continue
+        if ParticipantState(participant.state) not in {
+            ParticipantState.active,
+            ParticipantState.closing,
+        }:
+            continue
+        await repo.mark_participant_left(
+            room_id=application.room_id, participant_id=participant_id
+        )
+
+    if settled or deferred_initiators:
         await session.flush()
     return tuple(settled)

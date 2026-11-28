@@ -340,6 +340,7 @@ OVERRIDES += [
     (r"^79-post-push", ["platform"]),
     (r"^linkage-panorama", ["global-modules", "platform"]),
     (r"^post-enhancement", ["platform"]),
+    (r"^operation-log", ["platform"]),
 ]
 
 
@@ -407,8 +408,10 @@ def render() -> tuple[str, dict]:
     lines.append("> 本项目 `_archive/` 按开发时间批次归档（append-only 审计轨迹），")
     lines.append("> 本目录提供**按功能域的多维视图**：一个 spec 可同属多个域。")
     lines.append(">")
-    lines.append("> 本文件由 `tmp_spec_classify/build_spec_catalog.py` 生成，**请勿手工编辑**。")
-    lines.append("> 改域规则请改生成器 `DOMAINS` / `OVERRIDES`，再重新生成。")
+    lines.append("> 本文件由 `backend/scripts/analyze/build_spec_catalog.py` 生成，**请勿手工编辑**。")
+    lines.append("> 改域规则：分类模式 → `DOMAINS`；特例逐 spec 覆盖 → `OVERRIDES`；版式 → `render()`。")
+    lines.append("> 重新生成：`python backend/scripts/analyze/build_spec_catalog.py`")
+    lines.append("> 漂移校验：`python backend/scripts/analyze/build_spec_catalog.py --check`（不一致 exit 2，可入 CI）")
     lines.append(">")
     active_n = sum(1 for r in rows if r["active"])
     archived_n = len(rows) - active_n
@@ -416,7 +419,8 @@ def render() -> tuple[str, dict]:
     lines.append(f"> 功能域 **{len(DOMAINS)}**；未归类 **{len(unclassified)}**。")
     lines.append("")
 
-    # 域概览
+    # 域概览：域名列是 #domain-{key} 跳转链（各节 HTML 锚点，渲染器无关）
+    lines.append('<a id="top"></a>')
     lines.append("## 一、功能域概览")
     lines.append("")
     lines.append("| 功能域 | spec 数 | 代码锚点 | 前端位置 |")
@@ -427,8 +431,10 @@ def render() -> tuple[str, dict]:
         if not anchor_ok(dom["anchor"]) and anchor_ok(dom.get("anchor_alt", "")):
             anchor = f"`{dom['anchor_alt']}`"
         fe = f"`{dom['frontend']}`" if dom.get("frontend") else "—"
-        lines.append(f"| **{dom['name']}** | {len(items)} | {anchor} | {fe} |")
-    lines.append(f"| （未归类） | {len(unclassified)} | — | — |")
+        lines.append(
+            f"| **[{dom['name']}](#domain-{dom['key']})** | {len(items)} | {anchor} | {fe} |"
+        )
+    lines.append(f"| [（未归类）](#domain-unclassified) | {len(unclassified)} | — | — |")
     lines.append("")
 
     return "\n".join(lines) + "\n", {"rows": rows, "by_key": by_key, "unclassified": unclassified, "dom_names": dom_names}
@@ -440,6 +446,7 @@ def render_domain_sections(ctx: dict) -> str:
         items = ctx["by_key"][dom["key"]]
         if not items:
             continue
+        lines.append(f'<a id="domain-{dom["key"]}"></a>')
         lines.append(f"## {dom['name']}（{len(items)} 个）")
         lines.append("")
         lines.append("| 状态 | Spec | 进度 | 需求标题 |")
@@ -453,7 +460,10 @@ def render_domain_sections(ctx: dict) -> str:
                 multi = " ⧉" + "+".join(r["keys"][1:])
             lines.append(f"| {state} | [`{r['name']}`]({r['link']}){multi} | {prog} | {title} |")
         lines.append("")
+        lines.append("[↑ 返回概览](#top)")
+        lines.append("")
     if ctx["unclassified"]:
+        lines.append('<a id="domain-unclassified"></a>')
         lines.append(f"## 未归类（{len(ctx['unclassified'])} 个）")
         lines.append("")
         lines.append("| 状态 | Spec | 需求标题 |")
@@ -462,6 +472,8 @@ def render_domain_sections(ctx: dict) -> str:
             state = "🟢活跃" if r["active"] else "📦已归档"
             title = r["title"].replace("|", "\\|")
             lines.append(f"| {state} | [`{r['name']}`]({r['link']}) | {title} |")
+        lines.append("")
+        lines.append("[↑ 返回概览](#top)")
         lines.append("")
     return "\n".join(lines)
 
@@ -474,7 +486,7 @@ def main() -> int:
     old = CATALOG.read_text(encoding="utf-8") if CATALOG.exists() else None
     if check:
         if old != full:
-            print("CATALOG.md 与生成结果不一致（漂移）。重新生成：python tmp_spec_classify/build_spec_catalog.py")
+            print("CATALOG.md 与生成结果不一致（漂移）。重新生成：python backend/scripts/analyze/build_spec_catalog.py")
             return 2
         print("CATALOG.md 校验通过（无漂移）。")
         return 0
@@ -485,7 +497,7 @@ def main() -> int:
     print(f"  spec 总数 {len(ctx['rows'])}（活跃 {active_n} / 归档 {len(ctx['rows']) - active_n}）")
     print("  域分布: " + ", ".join(f"{k}={len(v)}" for k, v in ctx['by_key'].items()))
     if ctx["unclassified"]:
-        print(f"  ⚠ 未归类 {len(ctx['unclassified'])}: " + ", ".join(r["name"] for r in ctx["unclassified"][:10]))
+        print(f"  ! 未归类 {len(ctx['unclassified'])}: " + ", ".join(r["name"] for r in ctx["unclassified"][:10]))
     return 0
 
 

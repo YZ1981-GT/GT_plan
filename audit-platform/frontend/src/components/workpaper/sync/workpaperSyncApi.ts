@@ -833,6 +833,13 @@ export interface LeaveRoomInput {
   readonly participantId: string
   /** 客户端自报的 dirty。服务端据它拒绝（AC 4.4），所以**必填**、不给默认值。 */
   readonly dirty: boolean
+  /**
+   * D12 延迟离开：为真且本 participant 的未终结 request 全部是 `correlated`（incoming
+   * 已耐久、apply 在途）时，服务端登记 `deferred_leave_at` 放行 —— participant 保持
+   * `active/closing`（apply 终态授权不受影响），真正的 left 由终态结算同事务执行。
+   * 更早的 frozen/pending/accepted 不在此列，照旧 409。缺省/假 ⇒ 原有语义。
+   */
+  readonly defer?: boolean
 }
 
 /**
@@ -863,7 +870,7 @@ export async function leaveRoom(
     endpoint: 'leave_room',
     scope,
     params: { room_id: input.roomId, participant_id: input.participantId },
-    body: { dirty: input.dirty === true },
+    body: { dirty: input.dirty === true, defer: input.defer === true },
   })
 }
 

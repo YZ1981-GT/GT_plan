@@ -1,13 +1,13 @@
 # 操作日志与最后登录时间 — 任务
 
-- [ ] 1. 迁移 V274/R274 + ORM（User 两列、SysLoginLog、__init__ 登记）+ UserResponse 字段
-- [ ] 2. client_ip 服务抽取 + auth_service 登录/登出留痕（独立会话 fail-open）+ /security/login-attempts 改读新表
-- [ ] 3. GET /api/system/operation-logs 合并查询端点 + router_registry 注册
-- [ ] 4. list_users 返回 last_login 字段
-- [ ] 5. log_retention_worker + 三处注册（bindings / names / candidate policy）
-- [ ] 6. 前端：apiPaths + OperationLogs.vue + 菜单/路由 + UserManagement 部门与最后登录列
-- [ ] 7. 测试：登录成功/失败/锁定留痕、端点 admin 门与筛选、清理函数；后端 pytest + 前端 vitest 相关文件
-- [ ] 8. 真库迁移执行 + 浏览器实测（登录后查列表、失败登录留痕、筛选）
+- [x] 1. 迁移 V274/R274 + ORM（User 两列、SysLoginLog、__init__ 登记）+ UserResponse 字段
+- [x] 2. client_ip 服务抽取 + auth_service 登录/登出留痕（独立会话 fail-open）+ /security/login-attempts 改读新表
+- [x] 3. GET /api/system/operation-logs 合并查询端点 + router_registry 注册
+- [x] 4. list_users 返回 last_login 字段
+- [x] 5. log_retention_worker + 三处注册（bindings / names / candidate policy）
+- [x] 6. 前端：apiPaths + OperationLogs.vue + 菜单/路由 + UserManagement 部门与最后登录列
+- [x] 7. 测试：登录成功/失败/锁定留痕、端点 admin 门与筛选、清理函数；后端 pytest + 前端 vitest 相关文件
+- [x] 8. 真库迁移执行 + 浏览器实测（登录后查列表、失败登录留痕、筛选）
 
 ## 交付记录（2026-11-27）
 

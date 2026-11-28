@@ -2202,18 +2202,35 @@ async def leave_room(
             # （`canLeave` 硬门），必填只会把一个正确的调用变成 422。说谎的客户端由
             # in-flight 门与 close barrier 各自的判据承担。
             client_reports_dirty=bool(payload.get("dirty") or False),
+            # D12：客户端显式选择延迟离开时，未终结 request 全部 `correlated` 即登记
+            # `deferred_leave_at` 放行（state 保持 active/closing，apply 终态授权
+            # 不受影响）；真正的 left 由终态结算同事务执行。缺省 False ⇒ 原 409 语义。
+            defer_until_settlement=bool(payload.get("defer") or False),
         )
         # service 只 flush；事务边界由 router 持有（本域惯例）。
         await svc.session.commit()
     except SyncDomainError as exc:
         await svc.session.rollback()
         raise _sync_http(exc) from exc
+    # D12：`deferred` 时 participant 仍是 active/closing —— state 如实报出
+    # 「不是 left」，left_at 为 None，deferred_leave_at 是登记时刻；真正的 left
+    # 由终态结算同事务执行，前端不需要因此轮询（后台合并追踪照常收口）。
     return {
         "participant_id": str(outcome.participant_id),
-        "state": ParticipantState.left.value,
+        "state": (
+            "deferred" if outcome.deferred else ParticipantState.left.value
+        ),
         # 幂等重放（本次零写入）。前端照样返回表单，不当成失败。
         "replayed": bool(outcome.already_left),
-        "left_at": outcome.left_at.isoformat(),
+        "deferred": bool(outcome.deferred),
+        "deferred_leave_at": (
+            outcome.deferred_leave_at.isoformat()
+            if outcome.deferred_leave_at is not None
+            else None
+        ),
+        "left_at": (
+            outcome.left_at.isoformat() if outcome.left_at is not None else None
+        ),
         # AC 4.3 的可观测面：仍有其他 active editor 时 room 必须**保持** active。
         "remaining_active_editors": int(outcome.remaining_active_editors),
         "room_state": str(outcome.room_state),

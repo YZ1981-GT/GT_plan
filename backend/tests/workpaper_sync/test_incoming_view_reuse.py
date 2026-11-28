@@ -37,10 +37,13 @@ from app.services.workpaper_sync.adapters import excel as AX
 from app.services.workpaper_sync.adapters.base import SubstrateRole
 from app.services.workpaper_sync.excel_extract import (
     IdentityCarrierMissingError,
+    _resolve_field_column,
     _sheet_parts,
     extract_projection,
+    managed_tables_of,
     read_runtime_binding_pairs,
     reinject_runtime_binding_from_base_if_needed,
+    resolve_managed_region,
 )
 from app.services.workpaper_sync.models import ArtifactKind, ArtifactState
 from tests.workpaper_sync.d4_materialize_harness import (
@@ -105,6 +108,74 @@ def _incoming(world: D4World, name: str, data: bytes | None = None) -> Path:
     path = root / name
     path.write_bytes(world.base.read_bytes() if data is None else data)
     return path
+
+
+def _inject_protected_formula(path: Path, adapter: Any, contract: Any) -> tuple[str, str]:
+    """zip 内外科：给第一个受保护行域格塞 `<f>+<v>`，让 incoming 出现一个 present 的公式格。
+
+    契约声明的 5 个受保护字段全是 `{row_uuid}` 行域模板键，模板里这些格无值
+    （`projection.values` 无其实例化键 ⇒ `not present → continue`，分类永远到不了）。
+    openpyxl 写不出公式的缓存值（`data_only` 读到 None ⇒ 仍不 present），所以直接改
+    sheet XML：`<f>1+1</f><v>2</v>` —— `data_only` 读到 2（present）、公式视图读到
+    `=1+1`（observed_formula）⇒ 空清册下记 `formula_added_to_literal_cell`。
+    """
+    target: tuple[str, str] | None = None
+    with zipfile.ZipFile(path) as zf:
+        for binding in adapter._all_bindings():
+            if target is not None:
+                break
+            region = resolve_managed_region(zf, contract=contract, binding=binding)
+            dynamic, statics = managed_tables_of(contract, binding=binding)
+            rows = list(region.row_span)
+            for table in ([dynamic] if dynamic is not None else []) + list(statics or ()):
+                if target is not None:
+                    break
+                for spec in table.fields:
+                    if not spec.is_protected:
+                        continue
+                    column = _resolve_field_column(spec, table=table, region=region, binding=binding)
+                    if spec.row_scoped:
+                        if rows:
+                            target = (region.sheet_name, f"{column}{rows[0]}")
+                    elif spec.cell is not None and spec.cell.static_row is not None:
+                        target = (region.sheet_name, f"{column}{spec.cell.static_row}")
+                    if target is not None:
+                        break
+        assert target is not None, "契约里没有可注射的受保护字段"
+        sheet_name, coord = target
+        wb = zf.read("xl/workbook.xml").decode("utf-8")
+        rid = re.search(
+            r'<sheet[^>]*name="' + re.escape(sheet_name) + r'"[^>]*r:id="(rId\d+)"', wb
+        )
+        assert rid is not None, f"workbook.xml 里找不到 sheet {sheet_name!r}"
+        rels = zf.read("xl/_rels/workbook.xml.rels").decode("utf-8")
+        rel_tag = re.search(r'<Relationship[^>]*Id="' + rid.group(1) + r'"[^>]*/?>', rels)
+        assert rel_tag is not None, f"workbook rels 里找不到 {rid.group(1)}"
+        hit = re.search(r'Target="([^"]+)"', rel_tag.group(0))
+        assert hit is not None, f"{rid.group(1)} 的 Relationship 没有 Target"
+        part = hit.group(1)
+        if part.startswith("/"):
+            part = part.lstrip("/")
+        elif not part.startswith("xl/"):
+            part = "xl/" + part
+        xml = zf.read(part).decode("utf-8")
+        cell_pat = re.compile(r'<c r="' + coord + r'"([^/>]*)(/>|>(.*?)</c>)', re.S)
+        if cell_pat.search(xml):
+            xml = cell_pat.sub(
+                r'<c r="' + coord + r'"\1><f>1+1</f><v>2</v></c>', xml, count=1
+            )
+        else:
+            row_no = int(re.match(r"[A-Z]+(\d+)", coord).group(1))
+            row_pat = re.compile(r'(<row r="' + str(row_no) + r'"[^>]*>)')
+            assert row_pat.search(xml), f"sheet XML 里找不到 <row r=\"{row_no}\">"
+            xml = row_pat.sub(
+                r'\1<c r="' + coord + r'"><f>1+1</f><v>2</v></c>', xml, count=1
+            )
+        entries = [(info, zf.read(info.filename)) for info in zf.infolist()]
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as out:
+        for info, data in entries:
+            out.writestr(info, xml.encode("utf-8") if info.filename == part else data)
+    return target
 
 
 @contextlib.contextmanager
@@ -175,6 +246,7 @@ def runs(world: D4World) -> Runs:
     """同一份 incoming：复用（先 extract 再 materialize）与不复用（新实例直接 materialize）各一次。"""
     adapter = _oo_adapter(world)
     incoming = _incoming(world, "incoming-a.xlsx")
+    _inject_protected_formula(incoming, adapter, world.contract)
     raw: dict[str, Any] = {}
     with findings_forcing_baseline(), counted_extractions(raw) as extract_calls:
         projection = adapter.extract(artifact=incoming, contract=world.contract)

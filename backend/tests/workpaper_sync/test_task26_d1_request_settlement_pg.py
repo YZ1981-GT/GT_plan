@@ -186,3 +186,45 @@ class TestD1RequestSettlementOnTerminalApplication:
             "新 application 尚未应用 ⇒ 它的 request 必须仍 open"
         )
         assert rows[sup["new_request"]]["finished"] is False
+
+    # ── D12：延迟离开 —— 登记是标记不是 left；终态结算同事务执行 ──────────
+
+    def test_defer_with_an_earlier_open_request_is_still_refused(
+        self, snap: dict[str, Any]
+    ) -> None:
+        """混着 accepted（incoming 未 durable）时 defer 也照拒 —— 不是放宽 in-flight 门。"""
+        got = snap["scenarios"]["settlement"]["deferred"]["early"]
+        assert got["left"] is False, got
+        assert got["error_code"] == "participant_leave_refused_in_flight", got
+
+    def test_defer_registers_a_marker_not_a_leave(self, snap: dict[str, Any]) -> None:
+        """未终结 request 全 correlated ⇒ 登记 deferred_leave_at 放行，不落 left。"""
+        got = snap["scenarios"]["settlement"]["deferred"]["registered"]
+        assert got == {
+            "left": False,
+            "already_left": False,
+            "deferred": True,
+            "deferred_at_set": True,
+        }, got
+
+    def test_participant_stays_live_while_the_apply_runs(
+        self, snap: dict[str, Any]
+    ) -> None:
+        """登记后、apply 前：state 仍活（终态授权的 initiator_state 判据不受影响）。"""
+        row = snap["scenarios"]["settlement"]["deferred"]["during"]
+        assert row["state"] != "left", row
+        assert row["deferred_at"] is True and row["left_at"] is False, row
+
+    def test_settlement_executes_the_deferred_leave_in_the_same_commit(
+        self, snap: dict[str, Any]
+    ) -> None:
+        """apply 落终态 ⇒ 同事务 `active/closing → left`：lease 不再残留到 expires_at。"""
+        sc = snap["scenarios"]["settlement"]["deferred"]
+        assert sc["apply"] == "applied", sc["apply"]
+        row = sc["after"]
+        assert row["state"] == "left", row
+        assert row["left_at"] is True, row
+        # 本 world 的 request（含折叠进来的 duplicate）也全部终结。
+        assert all(r["state"] == "terminal" for r in sc["requests"].values()), sc[
+            "requests"
+        ]

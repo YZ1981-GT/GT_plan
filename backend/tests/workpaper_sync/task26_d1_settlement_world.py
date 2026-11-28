@@ -28,6 +28,7 @@ import sqlalchemy as sa
 from app.models.workpaper_sync_models import (
     WorkpaperContentApplication,
     WorkpaperForcesaveRequest,
+    WorkpaperOoParticipant,
 )
 from app.services.workpaper_sync.repository import WorkpaperSyncRepository
 from app.services.workpaper_sync.request_application import RequestApplicationService
@@ -58,16 +59,26 @@ async def _room_request_rows(ctx: Any, room_id: uuid.UUID) -> dict[str, dict[str
     }
 
 
-async def _try_leave(ctx: Any, env: dict[str, Any]) -> dict[str, Any]:
+async def _try_leave(
+    ctx: Any, env: dict[str, Any], defer: bool = False
+) -> dict[str, Any]:
     async with ctx.Session() as s:
         svc = RoomService(WorkpaperSyncRepository(s))
         try:
             out = await svc.leave_participant(
                 room_id=env["room"], participant_id=env["participant"],
                 actor_user_id=ctx.user_a, client_reports_dirty=False,
+                defer_until_settlement=defer,
             )
             await s.commit()
-            return {"left": True, "already_left": out.already_left}
+            got: dict[str, Any] = {
+                "left": not out.deferred,
+                "already_left": out.already_left,
+            }
+            if defer:
+                got["deferred"] = out.deferred
+                got["deferred_at_set"] = out.deferred_leave_at is not None
+            return got
         except Exception as exc:  # noqa: BLE001 - 拒绝形态进快照
             await s.rollback()
             return {
@@ -75,6 +86,23 @@ async def _try_leave(ctx: Any, env: dict[str, Any]) -> dict[str, Any]:
                 "type": type(exc).__name__,
                 "error_code": getattr(exc, "error_code", None),
             }
+
+
+async def _participant_row(ctx: Any, participant_id: uuid.UUID) -> dict[str, Any]:
+    """participant 的 state / left_at / deferred_leave_at —— D12 判据面。"""
+    async with ctx.Session() as s:
+        row = (
+            await s.execute(
+                sa.select(WorkpaperOoParticipant).where(
+                    WorkpaperOoParticipant.id == participant_id
+                )
+            )
+        ).scalar_one()
+    return {
+        "state": str(row.state),
+        "deferred_at": row.deferred_leave_at is not None,
+        "left_at": row.left_at is not None,
+    }
 
 
 async def collect_settlement(ctx: Any) -> dict[str, Any]:
@@ -163,6 +191,44 @@ async def collect_settlement(ctx: Any) -> dict[str, Any]:
             old_application_id=s20s["app"], new_application_id=app_new
         )
         await s.commit()
+    # ⑤ D12 延迟离开：登记 ⇒ participant 保持 active；apply 落终态 ⇒
+    #    `settle_requests_of_terminal_application` 同事务执行 `active → left`。
+    s20d = await ctx.stage_world(
+        "settlement_deferred",
+        base_values={period: "2024", total: Decimal("100")},
+        current_values=None,
+        incoming_values={period: "2024", total: Decimal("888")},
+    )
+    envd = s20d["env"]
+    # 5a. 混着一个更早期的 request（accepted，尚未 correlated）时 defer 也照拒 ——
+    #     defer 是「全 correlated 才放行」，不是放宽 in-flight 门。
+    req_early = await ctx.accept_request(envd, key="fs-deferred-early")
+    defer_early = await _try_leave(ctx, envd, defer=True)
+    # 把它也折叠成 duplicate ⇒ 未终结 request 全 correlated ⇒ defer 登记放行。
+    async with ctx.Session() as s:
+        await RequestApplicationService(WorkpaperSyncRepository(s)).correlate(
+            operation_id=req_early["operation"],
+            incoming_artifact_id=s20d["inc"]["incoming"],
+            current_revision=0,
+            adapter_id=ctx.entry,
+        )
+        await s.commit()
+    defer_registered = await _try_leave(ctx, envd, defer=True)
+    during = await _participant_row(ctx, envd["participant"])
+    # 5b. apply 落终态 ⇒ 同一个事务里 settlement 把已登记的 initiator 落 left。
+    async with ctx.Session() as s:
+        coord = ctx.coordinator(s, probe=ctx.recording_probe())
+        deferred_apply = await coord.apply_durable_incoming(
+            operation_id=s20d["req"]["operation"],
+            declared_project_id=ctx.project,
+            declared_wp_id=s20d["entry"]["wp"],
+            declared_entry_id=ctx.entry,
+            adapter=ctx.json_adapter(),
+            contract=ctx.contract,
+            actor_id=ctx.user_a,
+        )
+    after_left = await _participant_row(ctx, envd["participant"])
+
     return {
         "outcome": outcome.as_dict(),
         "fold": fold,
@@ -179,5 +245,13 @@ async def collect_settlement(ctx: Any) -> dict[str, Any]:
             "old_request": str(s20s["req"]["request"]),
             "new_request": str(req_new["request"]),
             "requests": await _room_request_rows(ctx, s20s["env"]["room"]),
+        },
+        "deferred": {
+            "early": defer_early,
+            "registered": defer_registered,
+            "during": during,
+            "apply": deferred_apply.as_dict()["result"],
+            "after": after_left,
+            "requests": await _room_request_rows(ctx, envd["room"]),
         },
     }

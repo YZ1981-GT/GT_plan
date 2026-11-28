@@ -424,7 +424,7 @@ async function toMerging(h: ReturnType<typeof makeBridge>) {
 }
 
 describe('桥：后台阶段追踪归桥', () => {
-  it('转后台后表单模式；桥自己经 api 读到落地 ⇒ 按结果 revision 重载、恰一次 leave、回表单', async () => {
+  it('转后台后表单模式；桥自己经 api 读到落地 ⇒ 按结果 revision 重载、延迟 leave + 落地 leave、回表单', async () => {
     const h = makeBridge(async () => APPLIED(12))
     await toMerging(h)
     h.bridge.continueInBackground()
@@ -434,7 +434,11 @@ describe('桥：后台阶段追踪归桥', () => {
     await flushPromises()
     expect(h.api.getOperation).toHaveBeenCalled()
     expect(h.reloadHtml).toHaveBeenCalledWith(12)
-    expect(h.api.leaveRoom).toHaveBeenCalledTimes(1)
+    // D12：转后台瞬间一次 defer 登记（服务端结算时落 left）+ 落地后一次普通 leave
+    // （命中幂等重放）。两次各发一次，不能多也不能少。
+    expect(h.api.leaveRoom).toHaveBeenCalledTimes(2)
+    expect(h.api.leaveRoom.mock.calls[0][1].defer).toBe(true)
+    expect(h.api.leaveRoom.mock.calls[1][1].defer, '不延迟时不入参').toBeUndefined()
     expect(h.bridge.state.value).toBe('html_idle')
     expect(isBackgroundMerging(WP)).toBe(false)
     expect(h.bridge.operation.value?.resultRevision, '桥的 operation 投影随后台快照更新').toBe(12)
@@ -514,7 +518,10 @@ describe('宿主：文件耐久后交给后台合并', () => {
     await flushPromises()
     expect(h.reloadHtml).toHaveBeenCalledWith(12)
     expect(h.bridge.state.value).toBe('html_idle')
-    expect(h.api.leaveRoom).toHaveBeenCalledTimes(1)
+    // D12：转后台瞬间一次 defer 登记 + 落地后一次普通 leave（幂等重放）。
+    expect(h.api.leaveRoom).toHaveBeenCalledTimes(2)
+    expect(h.api.leaveRoom.mock.calls[0][1].defer).toBe(true)
+    expect(h.api.leaveRoom.mock.calls[1][1].defer, '不延迟时不入参').toBeUndefined()
     expect(h.bridge.transitions.value).toContain('background_merge_started')
     // 轮询下限 250 ms：等过一个周期，宿主与桥两个追踪器若还有一个在跑必然再读一次。
     const pollsAtLanding = h.api.getOperation.mock.calls.length

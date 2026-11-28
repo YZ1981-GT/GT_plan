@@ -449,6 +449,10 @@ class WorkpaperOoParticipant(Base):
     expires_at: Mapped[datetime] = mapped_column(_TS, nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(_TS, nullable=True)
     left_at: Mapped[datetime | None] = mapped_column(_TS, nullable=True)
+    #: D12：延迟离开登记时刻。非空 = 客户端已登记离开但本 participant 还有 `correlated`
+    #: 的未终结 request —— state 保持 `active/closing`（apply 终态授权不受影响），
+    #: 真正的 `→ left` 由 `settle_requests_of_terminal_application` 同事务执行。
+    deferred_leave_at: Mapped[datetime | None] = mapped_column(_TS, nullable=True)
     oo_drop_confirmed_at: Mapped[datetime | None] = mapped_column(_TS, nullable=True)
     created_at: Mapped[datetime] = mapped_column(_TS, nullable=False, server_default=sa.func.now())
     updated_at: Mapped[datetime] = mapped_column(_TS, nullable=False, server_default=sa.func.now())

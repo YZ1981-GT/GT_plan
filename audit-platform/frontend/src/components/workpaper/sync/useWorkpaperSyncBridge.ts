@@ -321,7 +321,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
    * 让服务端永远收不到会触发它的输入。失败**不阻断**、也不记 `lastError`：它是 lease 释放而非内容
    * 操作，失败只是退回按 `expires_at` 自然过期（判据「网络整体不可用时仍能回表单」锁住）。
    */
-  async function bestEffortLeave(): Promise<void> {
+  async function bestEffortLeave(defer = false): Promise<void> {
     const current = descriptor.value
     if (current === null) return
     try {
@@ -330,6 +330,9 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
         roomId: current.roomId,
         participantId: current.participantId,
         dirty: dirty.value,
+        // 缺省即「不延迟」（服务端缺省 False ⇒ 原 409 语义）：只为真时才入参，
+        // 非 defer 路径的入参形态与加这个键之前逐字段相同。
+        ...(defer ? { defer: true } : {}),
       })
     } catch {
       // 见上。
@@ -465,10 +468,12 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
           return fail('readiness', error)
         }
         if (!readiness.runtime.ready || !readiness.allowed_modes.includes('oo')) {
+          // 先提局部常量：`typeof` 对可选属性的收窄过 `await` 会失效（同 `_probe` 的写法）。
+          const ensureFirstPublication = api.ensureFirstPublication
           const recoverableFirstPublication =
             readiness.capability === 'bidirectional'
             && readiness.reason?.code === 'REPRESENTATION_MISSING'
-            && typeof api.ensureFirstPublication === 'function'
+            && typeof ensureFirstPublication === 'function'
           if (!recoverableFirstPublication) {
             const reason = readiness.reason
             refuse(
@@ -486,7 +491,7 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
             return fail('flush', error)
           }
           try {
-            await api.ensureFirstPublication(scope())
+            await ensureFirstPublication(scope())
           } catch (error) {
             return fail('first_publication', error)
           }
@@ -1663,8 +1668,21 @@ export function useWorkpaperSyncBridge(options: WorkpaperSyncBridgeOptions) {
     setLeaveConfirmer: leaveConfirmer.set,
     canExit,
     exitOnlineEdit,
-    /** 文件已耐久后先回表单、合并在后台跑完（R4）；只在宿主「保存并回到表单」后调用。 */
-    continueInBackground: backgroundMerge.continueInBackground,
+    /**
+     * 文件已耐久后先回表单、合并在后台跑完（R4）；只在宿主「保存并回到表单」后调用。
+     *
+     * D12：转后台的瞬间就用 `defer` 登记延迟离开 —— participant 保持 `active`
+     * 到终态结算（`assert_final_authorization` 的 initiator_state 判据不受影响），
+     * 服务端同事务落 `left`。就算用户在合并期间关掉页面，lease 也会在 apply
+     * 落终态的那一刻被释放，不再残留到 `expires_at`。合并落地后 `finishSession`
+     * 的 `bestEffortLeave` 命中幂等重放。
+     */
+    // 🔴 刻意保持同步签名：宿主在 try/catch 里不 await 地调它（out-of-phase 必须仍是
+    //    同步抛出）。延迟离开是 fire-and-forget —— bestEffortLeave 本就吞掉一切失败。
+    continueInBackground: (): void => {
+      backgroundMerge.continueInBackground()
+      void bestEffortLeave(true)
+    },
     lastForcesaveOutcome: readonly(lastForcesaveOutcome),
     feedback,
     modeStorageKey,

@@ -147,6 +147,19 @@ def called_names_of(fn: ast.AST) -> set[str]:
     return out
 
 
+def _calls(fn: ast.AST, name: str) -> list[ast.Call]:
+    """`name(...)` 或 `x.name(...)` 两种调用形态都算。"""
+    return [
+        n
+        for n in ast.walk(fn)
+        if isinstance(n, ast.Call)
+        and (
+            (isinstance(n.func, ast.Attribute) and n.func.attr == name)
+            or (isinstance(n.func, ast.Name) and n.func.id == name)
+        )
+    ]
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 0. 前提：`left` 在状态机里本来就合法，且是**终态**
 # ═══════════════════════════════════════════════════════════════════════════
@@ -556,6 +569,77 @@ class TestTransactionBoundary:
         assert len(rollbacks) == 1, (
             "拒绝分支必须 rollback —— 不回滚会把 leave 之前那些 SELECT FOR UPDATE 的"
             "事务一直挂着，而 409 的调用方以为什么都没发生"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 5.5 D12 延迟离开：标记列 + 终态结算执行（不提前转 left）
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestDeferredLeaveIsAMarkerNotAStateChange:
+    """D12：`defer` 只登记 `deferred_leave_at`；state 保持 active/closing。
+
+    提前转 `left` 会让 `assert_final_authorization` 的 `initiator_state` 判据红，
+    整次 apply 以「失权」收场 —— 所以延迟离开在数据上只能是一个标记列。
+    """
+
+    def test_the_service_accepts_defer_until_settlement(self) -> None:
+        params = inspect.signature(RM.RoomService.leave_participant).parameters
+        assert "defer_until_settlement" in params, params
+        assert params["defer_until_settlement"].default is False, (
+            "缺省必须维持原 409 语义 —— 不传 defer 的旧调用方行为不变"
+        )
+
+    def test_the_router_passes_the_payload_flag(self) -> None:
+        """`defer` 只能来自 body（客户端显式选择），不得由服务端替他决定。"""
+        fn = _func(_tree(_ROUTER_PY), LEAVE_HANDLER)
+        found: list[str] = []
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Call) and _dotted(node.func) == "svc.rooms.leave_participant":
+                for kw in node.keywords:
+                    if kw.arg == "defer_until_settlement":
+                        found.append(ast.unparse(kw.value))
+        assert found, "leave_participant 调用没有 defer_until_settlement 实参"
+        assert all("payload" in f for f in found), found
+
+    def test_the_deferred_branch_writes_the_marker_not_the_state(self) -> None:
+        """`leave_participant` 里 `participant.*` 被赋值的列：marker 在、state/left_at 不在。
+
+        `state`/`left_at` 在 leave 路径上只由 `mark_participant_left`（repository）写；
+        service 分支若也写它们，「延迟离开」与「真的走了」就分不开了。
+        """
+        wrote = {
+            dotted.split(".")[-1]
+            for dotted in attribute_targets_of(_func_of(RM.RoomService.leave_participant))
+            if dotted.split(".")[0] == "participant"
+        }
+        assert "deferred_leave_at" in wrote, wrote
+        assert "state" not in wrote and "left_at" not in wrote, sorted(wrote)
+
+    def test_the_model_column_exists(self) -> None:
+        from app.models.workpaper_sync_models import WorkpaperOoParticipant
+
+        assert "deferred_leave_at" in WorkpaperOoParticipant.__table__.c, (
+            "ORM 列缺了 —— 迁移 V280 与模型必须同列"
+        )
+
+    def test_settlement_executes_the_deferred_leave_after_the_request_locks(self) -> None:
+        """锁序 room → request → participant：participant 锁必须出现在结算循环之后。
+
+        与撤销路径（room → request）不形成环；第三把锁在 request 之后取。
+        """
+        from app.services.workpaper_sync.request_settlement import (
+            settle_requests_of_terminal_application,
+        )
+
+        fn = _func_of(settle_requests_of_terminal_application)
+        update_lines = [c.lineno for c in _calls(fn, "with_for_update")]
+        leave_lines = [c.lineno for c in _calls(fn, "mark_participant_left")]
+        assert update_lines and leave_lines, (update_lines, leave_lines)
+        assert max(update_lines) < min(leave_lines), (
+            f"participant 锁/离开在 {leave_lines}、request 锁在 {update_lines} —— "
+            "锁序必须是 room → request → participant"
         )
 
 

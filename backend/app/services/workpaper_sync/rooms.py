@@ -754,9 +754,14 @@ class LeaveOutcome:
 
     participant_id: uuid.UUID
     already_left: bool
-    left_at: datetime
+    left_at: datetime | None
     remaining_active_editors: int
     room_state: str
+    #: D12：本响应是「延迟离开已登记」而不是「已 left」。deferred=True 时
+    #: ``left_at`` 为 None（state 仍是 active/closing，apply 终态授权不受影响），
+    #: ``deferred_leave_at`` 是登记时刻；真正的 left 由终态结算同事务执行。
+    deferred: bool = False
+    deferred_leave_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -2072,6 +2077,7 @@ class RoomService:
         participant_id: uuid.UUID,
         actor_user_id: uuid.UUID,
         client_reports_dirty: bool,
+        defer_until_settlement: bool = False,
     ) -> LeaveOutcome:
         """「我走了」：只释放这一条 lease（`active/closing → left`）。
 
@@ -2152,6 +2158,45 @@ class RoomService:
             room_id=room_id, participant_id=participant_id
         )
         if outstanding:
+            # D12 延迟离开：未终结 request **全部**是 `correlated`（incoming 已 durable、
+            # apply 在途）且客户端显式选择延迟离开时，登记 `deferred_leave_at` 放行 ——
+            # state 保持 active/closing（`assert_final_authorization` 的 initiator_state
+            # 判据不受影响），真正的 `→ left` 由 settle_requests_of_terminal_application
+            # 同事务执行。更早的 frozen/pending/accepted（incoming 未 durable）不在此列，
+            # 照旧 409 —— 那时离开会让对 OO 回调的追踪与 UI 脱钩。
+            if defer_until_settlement and all(
+                state == RequestState.correlated.value for _, state in outstanding
+            ):
+                # 🔴 锁序 room → participant（与 `mark_participant_left` / 终态结算同序）：
+                # ① 归属检查那一步是普通 SELECT 不是 FOR UPDATE，若先写 marker 列再锁 room，
+                # 行锁获取顺序就成了 participant → room —— 与在跑的 apply 结算可互等。
+                room = await self._repo.lock_room(room_id)
+                # 幂等重放：已有登记时刻就沿用原值（与 `left_at` 同一纪律 ——
+                # 覆写等于产生第二条审计事件），响应仍给出 deferred=True。
+                now = _now()
+                if participant.deferred_leave_at is None:
+                    participant.deferred_leave_at = now
+                    participant.updated_at = now
+                    await self._session.flush()
+                now = participant.deferred_leave_at
+                remaining = await self.count_active_editors(room_id)
+                logger.info(
+                    "room %s（generation %s）：participant %s 登记延迟离开 "
+                    "（%d 个 correlated request 待终态结算后落 left）",
+                    room_id,
+                    room.generation,
+                    participant_id,
+                    len(outstanding),
+                )
+                return LeaveOutcome(
+                    participant_id=participant_id,
+                    already_left=False,
+                    left_at=None,
+                    remaining_active_editors=remaining,
+                    room_state=str(room.state),
+                    deferred=True,
+                    deferred_leave_at=now,
+                )
             raise ParticipantLeaveInFlightError(
                 f"该 participant 还有 {len(outstanding)} 个未终结的写请求 —— "
                 "同步进行中离开会让 UI 与服务端脱钩，请等它结束"
@@ -2183,18 +2228,21 @@ class RoomService:
 
     async def _outstanding_request_ids_of(
         self, *, room_id: uuid.UUID, participant_id: uuid.UUID
-    ) -> tuple[uuid.UUID, ...]:
-        """该 participant 在 room **当前 generation** 里未终结的 request。
+    ) -> tuple[tuple[uuid.UUID, str], ...]:
+        """该 participant 在 room **当前 generation** 里未终结的 request（id, state 对）。
 
         「未终结」= 还可能收到 callback 的四态，与
         :meth:`_cancel_outstanding_requests_locked` 用的是**同一份**名单（那里是撤销时
         取消它们，这里是据它拒绝离开）。两处若各写一份，新增一个中间态时只会有一处跟上。
+        state 一并返回供 D12 延迟离开判「全部 correlated」（``RequestState`` 值串）。
         """
         room = await self._repo.lock_room(room_id)
         rows = (
             (
                 await self._session.execute(
-                    sa.select(WorkpaperForcesaveRequest.id).where(
+                    sa.select(
+                        WorkpaperForcesaveRequest.id, WorkpaperForcesaveRequest.state
+                    ).where(
                         WorkpaperForcesaveRequest.room_id == room_id,
                         WorkpaperForcesaveRequest.generation == room.generation,
                         WorkpaperForcesaveRequest.initiated_by_participant_id
@@ -2203,10 +2251,9 @@ class RoomService:
                     )
                 )
             )
-            .scalars()
             .all()
         )
-        return tuple(rows)
+        return tuple((row[0], row[1]) for row in rows)
 
     async def count_active_editors(self, room_id: uuid.UUID) -> int:
         """仍在 `active` 的 participant 数。`closing` **不计入**（AC 4.10 的口径）。

@@ -3,30 +3,34 @@
 > 本项目 `_archive/` 按开发时间批次归档（append-only 审计轨迹），
 > 本目录提供**按功能域的多维视图**：一个 spec 可同属多个域。
 >
-> 本文件由 `tmp_spec_classify/build_spec_catalog.py` 生成，**请勿手工编辑**。
-> 改域规则请改生成器 `DOMAINS` / `OVERRIDES`，再重新生成。
+> 本文件由 `backend/scripts/analyze/build_spec_catalog.py` 生成，**请勿手工编辑**。
+> 改域规则：分类模式 → `DOMAINS`；特例逐 spec 覆盖 → `OVERRIDES`；版式 → `render()`。
+> 重新生成：`python backend/scripts/analyze/build_spec_catalog.py`
+> 漂移校验：`python backend/scripts/analyze/build_spec_catalog.py --check`（不一致 exit 2，可入 CI）
 >
-> **统计**：全部 spec **813** = 活跃 **3** + 已归档 **810**；
+> **统计**：全部 spec **814** = 活跃 **4** + 已归档 **810**；
 > 功能域 **12**；未归类 **0**。
 
+<a id="top"></a>
 ## 一、功能域概览
 
 | 功能域 | spec 数 | 代码锚点 | 前端位置 |
 | --- | --- | --- | --- |
-| **公式管理 / 公式推送 / 取数链** | 51 | `backend/app/services/formula_push` | `audit-platform/frontend/src/components/formula/` |
-| **附注 / 披露表 / 底稿→附注同步** | 124 | `backend/app/routers/disclosure_notes.py` | `audit-platform/frontend/src/views/composables/noteDisclosureReverseJump.ts` |
-| **合并 / 集团 / 三码企业树** | 31 | `backend/app/routers/consolidation.py` | `audit-platform/frontend/src/views/ConsolidationIndex.vue` |
-| **底稿双向回写 / OO 在线编辑** | 104 | `backend/app/services/workpaper_sync` | — |
-| **A~S 循环底稿业务（科目/程序/检查表）** | 485 | `backend/app/services/auto_data_resolvers` | — |
-| **凭证 / 序时账 / 抽样审计** | 26 | `backend/app/services/voucher_identity.py` | `audit-platform/frontend/src/components/workpaper/voucher-sampling/` |
-| **附件 / 证据 / 归档与交付件** | 26 | `backend/app/services/attachment_service.py` | `audit-platform/frontend/src/components/deliverable/` |
-| **知识库 / AI / LLM / OCR** | 23 | `backend/app/services/ai_chat` | `audit-platform/frontend/src/composables/useKnowledge.ts` |
-| **ACNR 地址坐标名称库 / 交叉引用** | 11 | `backend/app/services/acnr` | `audit-platform/frontend/src/components/formula/CellSelector.vue` |
-| **程序裁剪 / 生成 / 委派 / 权限** | 29 | `backend/app/services/procedure_trim_engine.py` | — |
-| **平台基建 / 性能 / 治理 / 发布** | 156 | `backend/app/core/startup_registry.py` | — |
-| **高级查询 / 全局 7 横切** | 18 | `backend/app/routers/custom_query.py` | — |
-| （未归类） | 0 | — | — |
+| **[公式管理 / 公式推送 / 取数链](#domain-formula)** | 51 | `backend/app/services/formula_push` | `audit-platform/frontend/src/components/formula/` |
+| **[附注 / 披露表 / 底稿→附注同步](#domain-note)** | 124 | `backend/app/routers/disclosure_notes.py` | `audit-platform/frontend/src/views/composables/noteDisclosureReverseJump.ts` |
+| **[合并 / 集团 / 三码企业树](#domain-consol)** | 31 | `backend/app/routers/consolidation.py` | `audit-platform/frontend/src/views/ConsolidationIndex.vue` |
+| **[底稿双向回写 / OO 在线编辑](#domain-writeback)** | 104 | `backend/app/services/workpaper_sync` | — |
+| **[A~S 循环底稿业务（科目/程序/检查表）](#domain-cycle)** | 485 | `backend/app/services/auto_data_resolvers` | — |
+| **[凭证 / 序时账 / 抽样审计](#domain-voucher)** | 26 | `backend/app/services/voucher_identity.py` | `audit-platform/frontend/src/components/workpaper/voucher-sampling/` |
+| **[附件 / 证据 / 归档与交付件](#domain-attachment)** | 26 | `backend/app/services/attachment_service.py` | `audit-platform/frontend/src/components/deliverable/` |
+| **[知识库 / AI / LLM / OCR](#domain-ai)** | 23 | `backend/app/services/ai_chat` | `audit-platform/frontend/src/composables/useKnowledge.ts` |
+| **[ACNR 地址坐标名称库 / 交叉引用](#domain-acnr)** | 11 | `backend/app/services/acnr` | `audit-platform/frontend/src/components/formula/CellSelector.vue` |
+| **[程序裁剪 / 生成 / 委派 / 权限](#domain-procedure)** | 29 | `backend/app/services/procedure_trim_engine.py` | — |
+| **[平台基建 / 性能 / 治理 / 发布](#domain-platform)** | 157 | `backend/app/core/startup_registry.py` | — |
+| **[高级查询 / 全局 7 横切](#domain-global-modules)** | 18 | `backend/app/routers/custom_query.py` | — |
+| [（未归类）](#domain-unclassified) | 0 | — | — |
 
+<a id="domain-formula"></a>
 ## 公式管理 / 公式推送 / 取数链（51 个）
 
 | 状态 | Spec | 进度 | 需求标题 |
@@ -83,6 +87,9 @@
 | 📦已归档 | [`report-config-account-code-integrity`](_archive/04-infra-architecture/report-config-account-code-integrity/requirements.md) ⧉cycle | 12/12 | Requirements Document |
 | 📦已归档 | [`report-config-baseline`](_archive/04-infra-architecture/report-config-baseline/requirements.md) ⧉cycle | 12/12 | 需求文档：report-config-baseline（报表配置主模板回填 + 联动） |
 
+[↑ 返回概览](#top)
+
+<a id="domain-note"></a>
 ## 附注 / 披露表 / 底稿→附注同步（124 个）
 
 | 状态 | Spec | 进度 | 需求标题 |
@@ -212,6 +219,9 @@
 | 📦已归档 | [`semantic-account-resolver-full-rollout`](_archive/08-disclosure-notes/semantic-account-resolver-full-rollout/requirements.md) | 31/31 | Requirements Document |
 | 📦已归档 | [`soe-listed-note-conversion-correctness`](_archive/08-disclosure-notes/soe-listed-note-conversion-correctness/requirements.md) | 19/19 | Requirements Document |
 
+[↑ 返回概览](#top)
+
+<a id="domain-consol"></a>
 ## 合并 / 集团 / 三码企业树（31 个）
 
 | 状态 | Spec | 进度 | 需求标题 |
@@ -248,6 +258,9 @@
 | 📦已归档 | [`frontend-sse-connection-consolidation`](_archive/04-infra-architecture/frontend-sse-connection-consolidation/requirements.md) ⧉platform | 24/24 | Requirements Document |
 | 📦已归档 | [`phase2-consolidation`](_archive/01-phase-foundation/phase2-consolidation/requirements.md) | 103/103 | 需求文档：第二阶段集团合并 — 集团架构+组成部分审计师+合并抵消+商誉+少数股东+外币折算+合并报表+合并附注 |
 
+[↑ 返回概览](#top)
+
+<a id="domain-writeback"></a>
 ## 底稿双向回写 / OO 在线编辑（104 个）
 
 | 状态 | Spec | 进度 | 需求标题 |
@@ -357,6 +370,9 @@
 | 📦已归档 | [`workpaper-sync-row-deletion-multi-region-propagation`](_archive/17-2026-10-03-verified-batch/workpaper-sync-row-deletion-multi-region-propagation/requirements.md) ⧉cycle | 74/74 | Requirements Document |
 | 📦已归档 | [`workpaper-sync-static-cell-sheet-writeback`](_archive/15-workpaper-sync-engine-hardening/workpaper-sync-static-cell-sheet-writeback/requirements.md) ⧉cycle | 12/12 | Requirements Document |
 
+[↑ 返回概览](#top)
+
+<a id="domain-cycle"></a>
 ## A~S 循环底稿业务（科目/程序/检查表）（485 个）
 
 | 状态 | Spec | 进度 | 需求标题 |
@@ -847,6 +863,9 @@
 | 📦已归档 | [`wp-traceability-panel`](_archive/05-business-features/wp-traceability-panel/requirements.md) | 24/24 | 需求文档：统一溯源面板 + 附件入网 |
 | 📦已归档 | [`x3-adjustment-entry-import-export`](_archive/05-business-features/x3-adjustment-entry-import-export/requirements.md) | 63/63 | Requirements Document |
 
+[↑ 返回概览](#top)
+
+<a id="domain-voucher"></a>
 ## 凭证 / 序时账 / 抽样审计（26 个）
 
 | 状态 | Spec | 进度 | 需求标题 |
@@ -878,6 +897,9 @@
 | 📦已归档 | [`voucher-sampling-engine`](_archive/05-business-features/voucher-sampling-engine/requirements.md) ⧉cycle | 48/48 | Requirements Document: 通用抽凭引擎组件 |
 | 📦已归档 | [`voucher-sampling-hardening`](_archive/05-business-features/voucher-sampling-hardening/requirements.md) ⧉cycle | 40/41 | Requirements Document |
 
+[↑ 返回概览](#top)
+
+<a id="domain-attachment"></a>
 ## 附件 / 证据 / 归档与交付件（26 个）
 
 | 状态 | Spec | 进度 | 需求标题 |
@@ -909,6 +931,9 @@
 | 📦已归档 | [`platform-evidence-knowledge-ai-governance`](_archive/04-infra-architecture/platform-evidence-knowledge-ai-governance/requirements.md) ⧉attachment+platform | 101/101 | 需求文档：附件证据、知识库与 AI 治理闭环 |
 | 📦已归档 | [`wp-evidence-collection`](_archive/05-business-features/wp-evidence-collection/requirements.md) ⧉cycle | 19/19 | 需求文档：审计证据收集体系（wp-evidence-collection） |
 
+[↑ 返回概览](#top)
+
+<a id="domain-ai"></a>
 ## 知识库 / AI / LLM / OCR（23 个）
 
 | 状态 | Spec | 进度 | 需求标题 |
@@ -937,6 +962,9 @@
 | 📦已归档 | [`wp-ai-review-ux-fix`](_archive/05-business-features/wp-ai-review-ux-fix/design.md) ⧉cycle | 8/8 | 设计文档：wp-ai-review-ux-fix（底稿 AI 复核弹窗 UX 缺陷修复） |
 | 📦已归档 | [`wp-tsj-llm-review`](_archive/05-business-features/wp-tsj-llm-review/requirements.md) | 22/22 | 需求文档：TSJ 提示词驱动 LLM 复核（wp-tsj-llm-review） |
 
+[↑ 返回概览](#top)
+
+<a id="domain-acnr"></a>
 ## ACNR 地址坐标名称库 / 交叉引用（11 个）
 
 | 状态 | Spec | 进度 | 需求标题 |
@@ -953,6 +981,9 @@
 | 📦已归档 | [`h3-cross-workpaper-reconciliation`](_archive/05-business-features/h3-cross-workpaper-reconciliation/requirements.md) ⧉cycle | 9/9 | Requirements Document |
 | 📦已归档 | [`wp-locate-foundation`](_archive/05-business-features/wp-locate-foundation/requirements.md) ⧉cycle | 22/27 | 需求文档：底稿定位基础设施 |
 
+[↑ 返回概览](#top)
+
+<a id="domain-procedure"></a>
 ## 程序裁剪 / 生成 / 委派 / 权限（29 个）
 
 | 状态 | Spec | 进度 | 需求标题 |
@@ -987,7 +1018,10 @@
 | 📦已归档 | [`workhour-table-unification`](_archive/05-business-features/workhour-table-unification/requirements.md) ⧉platform | 39/39 | Requirements Document |
 | 📦已归档 | [`workpaper-procedure-table-html`](_archive/07-workpaper-slimdown/workpaper-procedure-table-html/requirements.md) ⧉cycle | 27/27 | Requirements: A循环程序表 HTML 化 |
 
-## 平台基建 / 性能 / 治理 / 发布（156 个）
+[↑ 返回概览](#top)
+
+<a id="domain-platform"></a>
+## 平台基建 / 性能 / 治理 / 发布（157 个）
 
 | 状态 | Spec | 进度 | 需求标题 |
 | --- | --- | --- | --- |
@@ -1077,6 +1111,7 @@
 | 📦已归档 | [`multi-standard-unification`](_archive/05-business-features/multi-standard-unification/requirements.md) ⧉platform | 26/26 | 需求文档：多准则状态统一（multi-standard-unification） |
 | 📦已归档 | [`multi-worker-readiness`](_archive/12-2026-06-23-batch/multi-worker-readiness/requirements.md) | 23/23 | Requirements Document |
 | 📦已归档 | [`n1-deferred-tax-assets`](_archive/05-business-features/n1-deferred-tax-assets/requirements.md) ⧉platform | 34/34 | Requirements Document: N1 递延所得税资产底稿专属HTML精美组件 |
+| 🟢活跃 | [`operation-log-and-last-login`](operation-log-and-last-login/requirements.md) | 8/8 | 操作日志与最后登录时间 — 需求 |
 | 📦已归档 | [`partner-dashboard`](_archive/05-business-features/partner-dashboard/requirements.md) | 26/27 | Requirements Document — 合伙人仪表盘 (Partner Dashboard) |
 | 📦已归档 | [`pg-pooling-and-load-test`](_archive/04-infra-architecture/pg-pooling-and-load-test/requirements.md) | 11/13 | Requirements: PG 连接池化 + 6000 并发压测（PgBouncer + Locust） |
 | 📦已归档 | [`phase0-infrastructure`](_archive/01-phase-foundation/phase0-infrastructure/requirements.md) | 78/78 | 需求文档：第零阶段 — 技术基础设施 |
@@ -1148,6 +1183,9 @@
 | 📦已归档 | [`xlsx-read-acceleration`](_archive/04-infra-architecture/xlsx-read-acceleration/requirements.md) | 15/15 | Requirements: xlsx 读路径 calamine 加速推广 |
 | 📦已归档 | [`zero-downtime-deployment`](_archive/04-infra-architecture/zero-downtime-deployment/requirements.md) | 76/76 | 需求文档：服务器零停机滚动更新与无感版本迭代（zero-downtime-deployment） |
 
+[↑ 返回概览](#top)
+
+<a id="domain-global-modules"></a>
 ## 高级查询 / 全局 7 横切（18 个）
 
 | 状态 | Spec | 进度 | 需求标题 |
@@ -1170,3 +1208,5 @@
 | 📦已归档 | [`linkage-panorama-graph`](_archive/99-superseded/linkage-panorama-graph/requirements.md) ⧉platform | 5/27 | Requirements Document — 联动全景图 (Linkage Panorama Graph) |
 | 📦已归档 | [`template-library-coordination`](_archive/05-business-features/template-library-coordination/requirements.md) | 64/64 | 需求文档：全局模板库管理系统 |
 | 📦已归档 | [`template-library-formula-preset-custom`](_archive/05-business-features/template-library-formula-preset-custom/requirements.md) | 16/16 | Requirements Document |
+
+[↑ 返回概览](#top)
