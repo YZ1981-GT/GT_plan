@@ -34,6 +34,8 @@ export interface TrialBalanceRow {
   wp_adjustment: string | null
   wp_publish_base: string | null
   wp_published_at: string | null
+  /** 父行展示汇总时的本级金额；普通行是 null。跨科目合计只取本级金额，避免双计。 */
+  rollup_base: Partial<Record<'unadjusted_amount' | 'opening_balance' | 'rje_adjustment' | 'aje_adjustment' | 'wp_adjustment' | 'audited_amount', string | null>> | null
   /** `includeMovement`：本期借方发生额（余额表叶子汇总；损益类含结转分录，勿作净额） */
   period_debit?: string
   /** `includeMovement`：本期贷方发生额 */
@@ -52,6 +54,8 @@ export interface TrialBalanceQuery {
   /** 附上年审定数 */
   includePrior?: boolean
   companyCode?: string
+  /** 仅试算表展示页使用：父行展示子级汇总；默认返回本级事实金额供底稿计算。 */
+  displayRollup?: boolean
   /** 默认 true：错误不弹全局提示，由调用方显示「待取数」/ 原因 */
   silent?: boolean
 }
@@ -113,7 +117,10 @@ export async function fetchTrialBalanceRows(
   }
   const result = await pending
   // 每个调用方拿自己的数组与行副本：调用方改行不影响别人
-  return { rows: result.rows.map((r) => ({ ...r })), warning: result.warning }
+  return {
+    rows: result.rows.map((r) => query.displayRollup ? { ...r } : tbFactRow(r)),
+    warning: result.warning,
+  }
 }
 
 /** 取数失败的中文原因（后端 422「未设置审计年度…」等原样给用户；取不到用兜底文案） */
@@ -132,11 +139,18 @@ export function tbNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-/** 标准科目码落在任一前缀下的行（每行只出现一次） */
+/** 将父行展示金额还原为该标准码自己的事实金额。 */
+export function tbFactRow(row: TrialBalanceRow): TrialBalanceRow {
+  return row.rollup_base ? { ...row, ...row.rollup_base, rollup_base: null } : { ...row }
+}
+
+/** 标准科目码落在任一前缀下的事实行（每行只出现一次） */
 export function tbRowsUnder(rows: readonly TrialBalanceRow[], prefixes: string | readonly string[]): TrialBalanceRow[] {
   const list = prefixList(prefixes)
   if (!list.length) return []
-  return rows.filter((r) => list.some((p) => String(r.standard_account_code ?? '').startsWith(p)))
+  return rows
+    .filter((r) => list.some((p) => String(r.standard_account_code ?? '').startsWith(p)))
+    .map(tbFactRow)
 }
 
 type AmountField = 'unadjusted_amount' | 'audited_amount' | 'opening_balance' | 'rje_adjustment'

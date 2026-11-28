@@ -36,6 +36,7 @@ function row(code: string, extra: Partial<TrialBalanceRow> = {}): TrialBalanceRo
     wp_adjustment: null,
     wp_publish_base: null,
     wp_published_at: null,
+    rollup_base: null,
     ...extra,
   }
 }
@@ -75,6 +76,20 @@ describe('fetchTrialBalanceRows', () => {
     expect(await fetchTrialBalanceRows('p1')).toEqual({ rows: [row('6001')], warning: '符号约定待迁移' })
     apiGet.mockResolvedValueOnce({ items: [] })
     await expect(fetchTrialBalanceRows('p1')).rejects.toThrow('试算表响应格式不符')
+  })
+
+  it('默认返回本级金额供底稿计算，显式展示模式返回父级汇总，两个调用不串值', async () => {
+    const parent = row('1002', {
+      unadjusted_amount: '2846934.56',
+      rollup_base: { unadjusted_amount: '0' },
+    })
+    apiGet.mockResolvedValue([parent, row('100201', { unadjusted_amount: '2846934.56' })])
+    const facts = await fetchTrialBalanceRows('p1')
+    const display = await fetchTrialBalanceRows('p1', { displayRollup: true })
+    expect(facts.rows.map((r) => r.unadjusted_amount)).toEqual(['0', '2846934.56'])
+    expect(display.rows.map((r) => r.unadjusted_amount)).toEqual(['2846934.56', '2846934.56'])
+    expect(tbSumUnder(display.rows, '1002', 'unadjusted_amount')).toBe(2846934.56)
+    expect(apiGet).toHaveBeenCalledTimes(2)
   })
 
   it('缺项目直接抛错，不发请求；请求失败原样抛给调用方', async () => {

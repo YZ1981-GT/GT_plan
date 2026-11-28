@@ -58,6 +58,7 @@ export async function getTrialBalance(projectId: string, year: number, companyCo
   const result = await fetchTrialBalanceRows(projectId, {
     year,
     companyCode,
+    displayRollup: true,
   })
   return result.rows
 }

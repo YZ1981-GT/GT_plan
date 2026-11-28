@@ -59,11 +59,12 @@ async def get_trial_balance(
     prefixes = [p.strip() for p in (account_prefix or "").split(",") if p.strip()]
 
     async def _finish(rows: list[dict]) -> list[dict]:
-        """缓存是全量行：读出后按前缀筛，再按需附发生额 / 上年数（不改缓存里的行）。"""
+        """Project the authorized rows before prefix filtering; leave cached facts untouched."""
+        from app.services.trial_balance_rollup_view import project_parent_balances
+
+        rows = project_parent_balances(rows)
         if prefixes:
             rows = [r for r in rows if str(r.get("standard_account_code") or "").startswith(tuple(prefixes))]
-        if include_movement or include_prior:
-            rows = [dict(r) for r in rows]
         if include_movement:
             await _attach_movement(db, project_id, year, rows)
         if include_prior:

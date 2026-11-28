@@ -1353,6 +1353,7 @@ import {
   getTrialBalance, recalcTrialBalance, checkConsistency, listAdjustments,
   type TrialBalanceRow, type ConsistencyResult,
 } from '@/services/auditPlatformApi'
+import { tbFactRow } from '@/services/trialBalanceRows'
 import { getAllWpMappings, listWorkpapers, type WpAccountMapping, type WorkpaperDetail } from '@/services/workpaperApi'
 import { getActiveLedgerDataset, type AutoMapOutcome } from '@/services/ledgerImportApi'
 import { useProjectStore } from '@/stores/project'
@@ -1871,6 +1872,8 @@ function getActualCat(r: any): string {
   return actualCat
 }
 
+const factRows = computed(() => rows.value.map(tbFactRow))
+
 const groupedRows = computed<DisplayRow[]>(() => {
   const result: DisplayRow[] = []
   // 用于"负债和权益合计"
@@ -1880,14 +1883,16 @@ const groupedRows = computed<DisplayRow[]>(() => {
   for (const cat of CATEGORY_ORDER) {
     const catRows = rows.value.filter(r => getActualCat(r) === cat)
     if (!catRows.length) continue
+    const catFacts = factRows.value.filter(r => getActualCat(r) === cat)
 
     const sub = { unadjusted: 0, rje: 0, aje: 0, wp: 0, audited: 0 }
-    for (const r of catRows) {
-      const u = num(r.unadjusted_amount)
-      const rj = num(r.rje_adjustment)
-      const aj = num(r.aje_adjustment)
-      const wp = num(r.wp_adjustment)
-      const au = num(r.audited_amount)
+    for (const [index, r] of catRows.entries()) {
+      const fact = catFacts[index]
+      const u = num(fact.unadjusted_amount)
+      const rj = num(fact.rje_adjustment)
+      const aj = num(fact.aje_adjustment)
+      const wp = num(fact.wp_adjustment)
+      const au = num(fact.audited_amount)
 
       const dir = getDirection(r)
       const catIsDebit = cat === 'asset'
@@ -1948,15 +1953,17 @@ const groupedRows = computed<DisplayRow[]>(() => {
 
   // ── 第二部分：损益类（收入 - 成本 - 费用 = 净利润） ──
   const incomeExpenseRows = rows.value.filter(r => INCOME_EXPENSE_CATS.includes(getActualCat(r)))
+  const incomeExpenseFacts = factRows.value.filter(r => INCOME_EXPENSE_CATS.includes(getActualCat(r)))
   if (incomeExpenseRows.length) {
     const netProfit = { unadjusted: 0, rje: 0, aje: 0, wp: 0, audited: 0 }
 
-    for (const r of incomeExpenseRows) {
-      const u = num(r.unadjusted_amount)
-      const rj = num(r.rje_adjustment)
-      const aj = num(r.aje_adjustment)
-      const wp = num(r.wp_adjustment)
-      const au = num(r.audited_amount)
+    for (const [index, r] of incomeExpenseRows.entries()) {
+      const fact = incomeExpenseFacts[index]
+      const u = num(fact.unadjusted_amount)
+      const rj = num(fact.rje_adjustment)
+      const aj = num(fact.aje_adjustment)
+      const wp = num(fact.wp_adjustment)
+      const au = num(fact.audited_amount)
 
       // 收入类（贷方）：取绝对值加正数；费用/成本类（借方）：取绝对值减
       const dir = getDirection(r)
@@ -1993,7 +2000,7 @@ const groupedRows = computed<DisplayRow[]>(() => {
 
 // 资产类合计（用展示逻辑：按方向加减）
 const assetTotal = computed(() => {
-  const assetRows = rows.value.filter(r => getActualCat(r) === 'asset')
+  const assetRows = factRows.value.filter(r => getActualCat(r) === 'asset')
   let total = 0
   for (const r of assetRows) {
     const val = Math.abs(num(r.audited_amount))
@@ -2004,7 +2011,7 @@ const assetTotal = computed(() => {
 })
 // 负债+权益合计（用展示逻辑：按方向加减）
 const liabEquityTotal = computed(() => {
-  const leRows = rows.value.filter(r => ['liability', 'equity'].includes(getActualCat(r)))
+  const leRows = factRows.value.filter(r => ['liability', 'equity'].includes(getActualCat(r)))
   let total = 0
   for (const r of leRows) {
     const val = Math.abs(num(r.audited_amount))

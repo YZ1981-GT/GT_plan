@@ -32,6 +32,7 @@ from app.models.base import Base, UserRole
 from app.models.core import Project
 from app.routers import trial_balance as tb_router
 from app.services.ledger_import.sign_convention_guard import SignConventionReadinessResult
+from app.services.trial_balance_rollup_view import project_parent_balances
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
@@ -93,6 +94,8 @@ async def env(monkeypatch):
         ])
         published = datetime(2026, 10, 1, tzinfo=timezone.utc)
         tb = [  # (年度, 科目, 类别, 未审, 审定, 期初)
+            (2025, "1002", AccountCategory.asset, "0", "0", "0"),
+            (2025, "100201", AccountCategory.asset, "2846934.56", "2846934.56", "0"),
             (2025, "1122", AccountCategory.asset, "1000", "1100", "800"),
             (2025, "112201", AccountCategory.asset, "10", "10", "0"),
             (2025, "2211", AccountCategory.liability, "300", "300", "250"),
@@ -145,9 +148,39 @@ def _rows(resp):
 async def test_year_omitted_uses_project_audit_year(env):
     client, pid, _empty, _redis = env
     rows = _rows(await client.get(f"/api/projects/{pid}/trial-balance"))
-    assert {r["standard_account_code"] for r in rows} == {"1122", "112201", "2211", "221101", "6001", "6601"}
+    assert {r["standard_account_code"] for r in rows} == {"1002", "100201", "1122", "112201", "2211", "221101", "6001", "6601"}
     explicit = _rows(await client.get(f"/api/projects/{pid}/trial-balance", params={"year": 2024}))
     assert {r["standard_account_code"] for r in explicit} == {"1122", "6001"}
+
+
+async def test_parent_rollup_is_read_only_and_preserves_independent_amounts(env):
+    client, pid, _empty, redis = env
+    url = f"/api/projects/{pid}/trial-balance"
+    for _ in range(2):  # 第二次命中 Redis，投影仍须相同且不能写回缓存
+        by = {r["standard_account_code"]: r for r in _rows(await client.get(url))}
+        assert Decimal(by["1002"]["unadjusted_amount"]) == Decimal("2846934.56")
+        assert by["1002"]["rollup_base"]["unadjusted_amount"] == "0.00"
+        assert Decimal(by["1122"]["unadjusted_amount"]) == Decimal("1000")
+        assert by["1122"]["rollup_base"] is None
+        assert by["100201"]["rollup_base"] is None
+    assert redis.store
+    prefixed = _rows(await client.get(url, params={"account_prefix": "1002"}))
+    assert {r["standard_account_code"] for r in prefixed} == {"1002", "100201"}
+
+
+def test_multiple_children_and_missing_parent_do_not_invent_rows():
+    rows = [
+        {"standard_account_code": "1002", "unadjusted_amount": "1.01"},
+        {"standard_account_code": "100201", "unadjusted_amount": "2.02"},
+        {"standard_account_code": "100202", "unadjusted_amount": "3.03"},
+    ]
+    projected = project_parent_balances(rows)
+    assert projected[0]["unadjusted_amount"] == "6.06"
+    assert projected[0]["rollup_base"]["unadjusted_amount"] == "1.01"
+    assert [r["unadjusted_amount"] for r in rows] == ["1.01", "2.02", "3.03"]
+    assert len(project_parent_balances(rows[1:])) == 2
+    assert project_parent_balances(rows[:2])[0]["unadjusted_amount"] == "3.03"
+    assert project_parent_balances([rows[0]])[0]["unadjusted_amount"] == "1.01"
 
 
 async def test_project_without_audit_year_is_422_with_reason(env):

@@ -113,7 +113,7 @@ watch(() => props.catalogItem, async (item) => {
 
   if (item.type === 'trial_balance') {
     try {
-      const { rows } = await fetchTrialBalanceRows(pid, { year: selectedYear.value })
+      const { rows } = await fetchTrialBalanceRows(pid, { year: selectedYear.value, displayRollup: true })
       tbDetail.value = rows.find((r) => r.standard_account_code === item.code) || null
     } catch { tbDetail.value = null }
   }
