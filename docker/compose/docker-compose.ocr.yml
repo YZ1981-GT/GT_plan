@@ -1,7 +1,8 @@
 # OCR 服务容器 — PaddleOCR + Tesseract
 # 从 web worker 进程中抽离 OCR 模型，降低 worker 内存占用
 #
-# 启动: docker compose -f docker-compose.ocr.yml up -d
+# 启动（仓库根执行；-p 保持原项目名，数据卷 ocr-models 不变）:
+#   docker compose -p gt_plan -f docker/compose/docker-compose.ocr.yml up -d
 # 健康检查: curl http://localhost:9990/health
 #
 # Web worker 通过 OCR_SERVICE_URL 环境变量连接此服务：
@@ -12,7 +13,7 @@ version: "3.8"
 services:
   ocr-service:
     build:
-      context: ./backend/ocr_service
+      context: ../../backend/ocr_service
       dockerfile: Dockerfile
     container_name: audit-ocr-service
     ports:

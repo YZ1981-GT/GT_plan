@@ -5,12 +5,12 @@
 #       数据卷和数据库，互不干扰。
 #
 # 用法（必须在 GT_plan 目录下执行，务必带 --env-file）：
-#   启动：docker compose -p sw-plan --env-file .env.sw-plan \
-#           -f docker-compose.yml -f docker-compose.sw-plan.yml \
+#   启动：docker compose -p sw-plan --env-file docker/sw-plan/.env.sw-plan \
+#           -f docker-compose.yml -f docker/sw-plan/docker-compose.sw-plan.yml \
 #           --profile onlyoffice up -d postgres redis onlyoffice
 #   查看：docker compose -p sw-plan ps
-#   停止：docker compose -p sw-plan --env-file .env.sw-plan \
-#           -f docker-compose.yml -f docker-compose.sw-plan.yml \
+#   停止：docker compose -p sw-plan --env-file docker/sw-plan/.env.sw-plan \
+#           -f docker-compose.yml -f docker/sw-plan/docker-compose.sw-plan.yml \
 #           --profile onlyoffice down
 #
 # 🔴 onlyoffice 在基础 compose 里带 profiles:[onlyoffice]，不加

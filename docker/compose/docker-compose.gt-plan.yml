@@ -4,7 +4,7 @@
 #       「gt-new-plan」平级展示，而不是嵌套在 gt-new-plan 组内。
 #
 # 用法（必须在 GT_plan 目录下执行）：
-#   docker compose -p gt-plan -f docker-compose.yml -f docker-compose.gt-plan.yml --profile docker-backend up -d --no-build --no-deps backend
+#   docker compose -p gt-plan -f docker-compose.yml -f docker/compose/docker-compose.gt-plan.yml --profile docker-backend up -d --no-build --no-deps backend
 #
 # 说明：
 # - postgres/redis/onlyoffice 等基础设施仍属 gt-new-plan 项目，本容器通过

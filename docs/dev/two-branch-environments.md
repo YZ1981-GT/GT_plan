@@ -9,7 +9,7 @@
 | | dev1.0 | sw-dev1.0（税务 demo） |
 |---|---|---|
 | 工作目录 | `D:\zaqcwrok\GT_plan` | `D:\zaqcwrok\GT_plan_sw` |
-| 启动脚本 | `start-dev.bat` | `start-dev-sw.bat` |
+| 启动脚本 | `start-dev.bat` | `start-dev-sw.bat`（只在 sw-dev1.0 分支） |
 | 前端 | `:3030` | `:3031` |
 | 后端 | `:9980` | `:9981` |
 
@@ -65,8 +65,9 @@ cd D:\zaqcwrok\GT_plan_sw
 
 - `.env`、`backend/.env` —— **已按各自环境改好，两边内容不同，不要互相覆盖**
 - `.venv/`、`audit-platform/frontend/node_modules/` —— 各自独立安装
-- `.env.sw-plan`、`docker-compose.sw-plan.yml`、`scripts/sw-plan.ps1`、
-  `start-dev-sw.bat` —— sw-plan 环境定义（尚未提交到 git）
+- sw-plan 环境定义：`docker/sw-plan/.env.sw-plan`、`docker/sw-plan/docker-compose.sw-plan.yml`、
+  `scripts/sw-plan.ps1` 已入库（2026-11-28 从仓库根移到 `docker/sw-plan/`）；
+  `start-dev-sw.bat` 只在 sw-dev1.0 分支，dev1.0 侧已删除
 
 🔴 `GT_plan_sw/backend/.env` 已指向 5532 / `sw_audit_platform`。
 这一点很关键：即使不经 `start-dev-sw.bat`（例如直接跑 pytest 或运维脚本），

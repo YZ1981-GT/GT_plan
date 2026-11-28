@@ -24,7 +24,7 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $RepoRoot
 
 $Project = 'sw-plan'
-$EnvFile = '.env.sw-plan'
+$EnvFile = 'docker/sw-plan/.env.sw-plan'
 
 if (-not (Test-Path $EnvFile)) {
     Write-Error "缺少 $EnvFile，无法确定 sw-plan 的端口与库名。"
@@ -40,7 +40,7 @@ $Base = @(
     '-p', $Project,
     '--env-file', $EnvFile,
     '-f', 'docker-compose.yml',
-    '-f', 'docker-compose.sw-plan.yml',
+    '-f', 'docker/sw-plan/docker-compose.sw-plan.yml',
     '--profile', 'onlyoffice'
 )
 
@@ -91,7 +91,7 @@ switch ($Action) {
         Write-Host "  REDIS_URL    = redis://localhost:${redisPort}/0"
         Write-Host "  ONLYOFFICE   = http://localhost:${officePort}"
         Write-Host ''
-        Write-Host '  用 start-dev-sw.bat 启动后端会自动注入以上变量' -ForegroundColor DarkGray
+        Write-Host '  sw-dev1.0 分支的 start-dev-sw.bat 会自动注入以上变量（本分支已不带该脚本）' -ForegroundColor DarkGray
         Write-Host '  （真实环境变量优先于 backend/.env，故无需改动 dev1.0 的配置）' -ForegroundColor DarkGray
     }
 }

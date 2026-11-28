@@ -51,9 +51,9 @@ paths = [
   # 前端测试目录（业务 fixture key，非真实密钥）
   '''(?i)audit-platform/frontend/.*/__tests__/''',
   # dev1.0 的部署环境文件（Gwei123-tech 2026-10-30 提交 89e92b50e，已在远端 dev1.0 历史中）。
-  # 2026-11-28 合并 dev1.0 时按「保留 dev1.0 功能」原样带入；精确匹配仓库根这一个文件，
+  # 2026-11-28 合并 dev1.0 时按「保留 dev1.0 功能」原样带入，随后移到 docker/sw-plan/；只精确匹配这一个文件，
   # 不放宽其它 .env*。🔴 其中 JWT_SECRET_KEY / ENCRYPTION_KEY 若为真实环境密钥须由维护方轮换。
-  '''^\.env\.sw-plan$''',
+  '''^docker/sw-plan/\.env\.sw-plan$''',
   # gitleaks 自身配置（本文件含规则示例字符串）
   '''(?i)\.gitleaks\.toml$''',
 ]
