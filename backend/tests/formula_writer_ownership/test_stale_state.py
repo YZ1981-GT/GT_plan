@@ -48,6 +48,32 @@ async def test_mark_note_stale_writes_source_and_flushes_without_commit():
 
 
 @pytest.mark.asyncio
+async def test_mark_note_stale_excludes_pure_text_notes():
+    """纯文本章节不参与 stale 标记——它们没有上游数据依赖，
+    refresh_stale_sections 明确无法重算/清除 text_only 章节，标记即永假过期。"""
+    from app.services.stale_state import StaleSource, mark_note_stale
+
+    db = FakeDb(rowcount=5)
+    count = await mark_note_stale(
+        db,
+        uuid4(),
+        source=StaleSource.LEDGER_ACTIVATED,
+        sections=None,
+        year=2025,
+    )
+
+    assert count == 5
+    assert len(db.statements) == 1
+    stmt = db.statements[0]
+    compiled = str(stmt)
+    # 生成的 UPDATE 必须带 content_type 排除条件（!= 'text' OR IS NULL）
+    assert "content_type" in compiled
+    assert "IS NULL" in compiled
+    params = stmt.compile().params
+    assert "text" in params.values()
+
+
+@pytest.mark.asyncio
 async def test_clear_note_stale_only_targets_currently_stale_rows():
     from app.services.stale_state import clear_note_stale
 

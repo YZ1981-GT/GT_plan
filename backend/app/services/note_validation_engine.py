@@ -962,6 +962,14 @@ class NoteValidationEngine:
                     else:
                         bucket["count"] += 1
 
+        # preset.md 规则层缺失时"全过"有误导性（只跑了 inline 规则）——
+        # 如实回传 preset 层规则数，供前端/调用方区分「真全过」与「preset 未加载」。
+        try:
+            _preset_rules = await self.load_preset(template_type)
+            _preset_loaded = len(_preset_rules)
+        except Exception:  # pragma: no cover - defensive
+            _preset_loaded = 0
+
         return {
             "project_id": str(project_id),
             "year": year,
@@ -975,6 +983,8 @@ class NoteValidationEngine:
             "warning_count": warning_count,
             # 宽松模式下 warning 聚合明细；严格模式为空（warning 已逐条进 findings）。
             "warning_summary": list(warning_summary.values()),
+            "preset_available": _preset_loaded > 0,
+            "preset_rules_loaded": _preset_loaded,
         }
 
     async def diagnose_formula_health(
@@ -1024,7 +1034,12 @@ class NoteValidationEngine:
                     blob = json.dumps(td, ensure_ascii=False)
                     if '"_cell_meta"' in blob:
                         summary["notes_with_cell_meta"] += 1
-                    if '"binding"' in blob:
+                    # 单元格绑定两类形态（spec formula/report linkage）：
+                    # 公式绑定 ``_cell_meta[col].binding_id``（非空才算可求值）；
+                    # 报表联动 ``_cell_meta[col].binding = {"source": "report", ...}``。
+                    # 旧口径只查 '"binding"'，匹配不到 "binding_id"（闭合引号不同），
+                    # 导致有公式绑定的附注恒计 0 → in_cell_formula_active 恒 false。
+                    if '"binding_id": "' in blob or '"binding": {' in blob:
                         summary["notes_with_binding"] += 1
                     if '"source": "report"' in blob or '"source":"report"' in blob:
                         summary["notes_with_report_binding"] += 1

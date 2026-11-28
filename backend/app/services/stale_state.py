@@ -13,7 +13,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.report_models import DisclosureNote
+from app.models.report_models import ContentType, DisclosureNote
 
 
 class StaleSource(StrEnum):
@@ -97,12 +97,23 @@ async def mark_note_stale(
     sections: Sequence[str] | None = None,
     year: int | None = None,
 ) -> int:
-    """在调用方当前事务内标记附注过期并记录来源。"""
+    """在调用方当前事务内标记附注过期并记录来源。
+
+    纯文本章节（``content_type == text``）不参与标记：它们没有上游数据依赖，
+    ``refresh_stale_sections`` 明确无法重算/清除 text_only 章节——标了就是
+    永不消除的假过期。``content_type`` 为 NULL 的章节仍照常标记（可能含表）。
+    """
     source_value = _source_value(source)
     if sections is not None and not sections:
         return 0
 
     conditions = _base_conditions(project_id, year)
+    conditions.append(
+        sa.or_(
+            DisclosureNote.content_type != ContentType.text,
+            DisclosureNote.content_type.is_(None),
+        )
+    )
     if sections is not None:
         conditions.append(DisclosureNote.note_section.in_(list(dict.fromkeys(sections))))
     result = await db.execute(
